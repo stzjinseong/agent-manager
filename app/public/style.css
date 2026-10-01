@@ -553,10 +553,23 @@ body.term-full { overflow: hidden; }
 }
 
 /* ---------- 확인 안 한 완료: 카드를 눌러 볼 때까지 초록 빛 깜빡임 ---------- */
-.node.unseen { border-color: color-mix(in srgb, var(--done) 70%, transparent); animation: unseen-pulse 1.6s ease-in-out infinite; }
-@keyframes unseen-pulse {
-  0%, 100% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--done) 35%, transparent), 0 0 10px color-mix(in srgb, var(--done) 20%, transparent); }
-  50% { box-shadow: 0 0 0 2px color-mix(in srgb, var(--done) 75%, transparent), 0 0 28px color-mix(in srgb, var(--done) 55%, transparent); }
+/* 카드 뒤로 초록 후광이 넓게 번졌다 줄어든다. box-shadow 바깥 그림자는 카드 배경 아래(뒤)에 그려져 카드 내용을 가리지 않는다 */
+.node.unseen {
+  border-color: color-mix(in srgb, var(--done) 75%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--done) 9%, var(--surface-2)), var(--surface));
+  animation: unseen-halo 1.8s ease-in-out infinite;
+}
+@keyframes unseen-halo {
+  0%, 100% {
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--done) 45%, transparent),
+      0 0 18px 2px color-mix(in srgb, var(--done) 28%, transparent),
+      0 0 46px 8px color-mix(in srgb, var(--done) 12%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--done) 85%, transparent),
+      0 0 30px 6px color-mix(in srgb, var(--done) 50%, transparent),
+      0 0 80px 22px color-mix(in srgb, var(--done) 24%, transparent);
+  }
 }
 
 /* ---------- 메모 (자동 실행 안 됨) ---------- */
