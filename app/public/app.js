@@ -636,7 +636,10 @@ function renderProfile(w, force) {
   }
   $('#profile-model').textContent = `${p.model || ''} · 컨텍스트 창 ${fmtN(p.window)}`;
   // 접었을 때 제목 옆에 보이는 한 줄 요약
-  { const tt = p.total; $('#profile-mini').textContent = `누적 ${fmtN(tt.input + tt.cacheWrite + tt.cacheRead + tt.output)} · ${fmtUsd(tt.cost)} · 컨텍스트 ${fmtN(p.context)}${p.cacheHit != null ? ` · 캐시 ${Math.round(p.cacheHit * 100)}%` : ''}`; }
+  const tt0 = p.total;
+  $('#profile-mini').textContent = `누적 ${fmtN(tt0.input + tt0.cacheWrite + tt0.cacheRead + tt0.output)} · ${fmtUsd(tt0.cost)} · 컨텍스트 ${fmtN(p.context)}${p.cacheHit != null ? ` · 캐시 ${Math.round(p.cacheHit * 100)}%` : ''}`;
+  // 접혀 있으면 차트 칸 폭이 0 이라 최소 폭(240px)으로 그려진다 → 그리지 않고, 펼칠 때 다시 그리도록 서명을 비운다
+  if ($('#profile').classList.contains('collapsed')) { profileSig = ''; return; }
   const t = p.total;
   const all = t.input + t.cacheWrite + t.cacheRead + t.output;
   const ctx = ctxLevel(p);
@@ -1251,6 +1254,8 @@ const PROFILE_KEY = 'am.profileCollapsed';
 function setProfileCollapsed(on) {
   $('#profile').classList.toggle('collapsed', on);
   $('#profile-toggle').setAttribute('aria-expanded', String(!on));
+  // 펼치는 순간 실제 폭으로 차트를 다시 그린다
+  if (!on) { const w = state.workers.find((x) => x.id === selected); if (w) requestAnimationFrame(() => renderProfile(w, true)); }
   try { on ? localStorage.setItem(PROFILE_KEY, '1') : localStorage.removeItem(PROFILE_KEY); } catch {}
 }
 try { if (localStorage.getItem(PROFILE_KEY)) setProfileCollapsed(true); } catch {}
