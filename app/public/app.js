@@ -1143,6 +1143,7 @@ taskForm.onsubmit = async (e) => {
   if (!text || !selected) return;
   taskForm.text.value = '';
   taskForm.text.focus();
+  flyToWorker(selected, taskForm.text, 'task');
   await api(`/api/workers/${selected}/task`, { text });
 };
 // 입력 칸 공통 키: Enter = 줄바꿈(기본 동작), Alt+Enter / 맥 ⌘+Enter = 제출(폼 submit).
@@ -1175,8 +1176,50 @@ memoForm.onsubmit = (e) => {
   if (!text || !w) return;
   memoForm.text.value = '';
   memoForm.text.focus();
+  flyToWorker(w.id, memoForm.text, 'memo');
   api('/api/memos', { role: w.name, op: 'add', text });
 };
+
+// ---------- 지시·메모 추가 연출: 워커 색 작은 쪽지가 입력 칸에서 그 워커 카드의 캐릭터로 날아간다 ----------
+// 포물선(위로 솟았다 내려앉기) → 도착하면 캐릭터가 통 튀고 '+지시' / '+나중에' 가 떠오른다. 순수 연출이라 실패해도 무시
+const FLY_LABEL = { task: '+지시', memo: '+나중에' };
+function flyToWorker(id, fromEl, kind) {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const w = state.workers.find((x) => x.id === id), node = nodeEls.get(id);
+  const target = node?.querySelector('.avatar');
+  if (!w || !target || !fromEl) return;
+  const color = avatarColor(w.name) || 'var(--accent)';
+  const a = fromEl.getBoundingClientRect(), b = target.getBoundingClientRect();
+  const x0 = a.left + a.width / 2, y0 = a.top + a.height / 2, x1 = b.left + b.width / 2, y1 = b.top + b.height / 2;
+  const dx = x1 - x0, dy = y1 - y0, lift = Math.min(160, 60 + Math.hypot(dx, dy) * 0.18);
+  const el = document.createElement('div');
+  el.className = `fly-note ${kind}`;
+  el.style.setProperty('--fc', color);
+  el.style.left = `${x0}px`; el.style.top = `${y0}px`;
+  document.body.appendChild(el);
+  // 가운데 지점을 직선보다 lift 만큼 위로 올려 포물선처럼 — x 는 선형, y 는 키프레임 사이 ease 로 휘게
+  const mid = (t) => `translate(${dx * t}px, ${dy * t - lift * 4 * t * (1 - t)}px)`;
+  const anim = el.animate([
+    { transform: `${mid(0)} scale(.6) rotate(0deg)`, opacity: 0 },
+    { transform: `${mid(0.15)} scale(1.1) rotate(-12deg)`, opacity: 1, offset: 0.12 },
+    { transform: `${mid(0.5)} scale(1) rotate(8deg)`, offset: 0.5 },
+    { transform: `${mid(0.85)} scale(.85) rotate(-4deg)`, offset: 0.85 },
+    { transform: `${mid(1)} scale(.4) rotate(0deg)`, opacity: 0.2 },
+  ], { duration: Math.min(900, 480 + Math.hypot(dx, dy) * 0.35), easing: 'cubic-bezier(.45,.05,.4,1)' });
+  anim.onfinish = () => {
+    el.remove();
+    const n = nodeEls.get(id);
+    if (!n?.isConnected) return;
+    const stage = n.querySelector('.stage');
+    stage.style.setProperty('--fc', color);
+    stage.classList.remove('got'); void stage.offsetWidth; stage.classList.add('got');
+    const tag = document.createElement('span');
+    tag.className = 'got-tag'; tag.textContent = FLY_LABEL[kind];
+    tag.style.setProperty('--fc', color);
+    stage.appendChild(tag);
+    setTimeout(() => { tag.remove(); stage.classList.remove('got'); }, 1100);
+  };
+}
 $('#memos').addEventListener('click', async (e) => {
   const act = e.target.closest('[data-memo]')?.dataset.memo;
   const li = e.target.closest('li[data-id]');
@@ -1184,6 +1227,7 @@ $('#memos').addEventListener('click', async (e) => {
   if (!act || !li || !w) return;
   if (act === 'remove' && !confirm('이 작업을 지울까요?')) return;
   li.classList.add('busy');
+  if (act === 'send') flyToWorker(w.id, li, 'task');
   const r = await api('/api/memos', { role: w.name, op: act, id: li.dataset.id, workerId: w.id });
   if (r.error) { li.classList.remove('busy'); toast(r.error, 3000); }
   else if (act === 'send') toast(w.status === 'idle' || w.status === 'done' || w.status === 'interrupted' ? '업무 지시로 보냈습니다' : '대기열에 넣었습니다');
