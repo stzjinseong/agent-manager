@@ -125,7 +125,10 @@ main, .new-panel, #inbox, .floor, .compare, .detail { margin-left: 24px; margin-
 .traces .t-working path.flow { stroke: color-mix(in srgb, var(--accent-hi) 70%, #fff); opacity: .55; stroke-width: 1.5; stroke-dasharray: 2 9; animation: flow .5s linear infinite; }
 .traces path.bolt { fill: none; stroke: #ffb08f; stroke-width: 2.6; stroke-linecap: round; stroke-dasharray: 9 91; animation: bolt 1.6s cubic-bezier(.5, 0, .5, 1) infinite, flicker .12s steps(2) infinite; }
 .traces path.bolt.b2 { stroke-dasharray: 4 96; stroke-width: 2; animation-delay: -.8s, -.05s; }
-.traces .spark { fill: #fff3ec; }
+/* 불꽃 점은 SVG 애니메이션(animateMotion)이 첫 프레임을 계산하기 전엔 원점(카드 영역 왼쪽 위)에 놓인다.
+   선을 다시 그릴 때마다 그 한 프레임이 흰 점으로 번쩍여서, 처음 0.06초는 투명하게 시작한다 */
+.traces .spark { fill: #fff3ec; opacity: 0; animation: spark-show 1ms 60ms forwards; }
+@keyframes spark-show { to { opacity: 1; } }
 @keyframes bolt { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
 @keyframes flicker { 50% { opacity: .7; } }
 @keyframes hum { 50% { stroke: color-mix(in srgb, var(--accent) 60%, transparent); } }
