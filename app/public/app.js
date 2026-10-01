@@ -1047,10 +1047,14 @@ taskForm.onsubmit = async (e) => {
   taskForm.text.focus();
   await api(`/api/workers/${selected}/task`, { text });
 };
-// Enter = 줄바꿈(기본 동작), Alt+Enter / 맥 ⌘+Enter = 전송. 한글 조합 중 입력은 무시해야 마지막 글자가 잘리지 않는다
-taskForm.text.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && (e.altKey || e.metaKey) && !e.isComposing) { e.preventDefault(); taskForm.requestSubmit(); }
-});
+// 입력 칸 공통 키: Enter = 줄바꿈(기본 동작), Alt+Enter / 맥 ⌘+Enter = 제출(폼 submit).
+// 업무 지시·메모가 같은 함수를 써서 키 동작이 어긋나지 않게 한다. 한글 조합 중 입력은 무시해야 마지막 글자가 잘리지 않는다
+function submitOnModEnter(form) {
+  form.text.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && (e.altKey || e.metaKey) && !e.isComposing) { e.preventDefault(); form.requestSubmit(); }
+  });
+}
+submitOnModEnter(taskForm);
 // ---------- 메모 (역할별, 자동 실행 안 됨) ----------
 let memoSig = '';
 function renderMemos(w) {
@@ -1065,16 +1069,16 @@ function renderMemos(w) {
     : '<li class="empty-memo">적어 둔 메모가 없습니다</li>';
 }
 const memoForm = $('#memo-form');
-memoForm.text.addEventListener('keydown', (e) => {
-  if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
+submitOnModEnter(memoForm); // 업무 지시 칸과 같은 키: Enter 줄바꿈, Alt/⌘+Enter 추가
+memoForm.onsubmit = (e) => {
   e.preventDefault();
   const text = memoForm.text.value.trim();
   const w = state.workers.find((x) => x.id === selected);
   if (!text || !w) return;
   memoForm.text.value = '';
+  memoForm.text.focus();
   api('/api/memos', { role: w.name, op: 'add', text });
-});
-memoForm.addEventListener('submit', (e) => e.preventDefault());
+};
 $('#memos').addEventListener('click', async (e) => {
   const act = e.target.closest('[data-memo]')?.dataset.memo;
   const li = e.target.closest('li[data-id]');
