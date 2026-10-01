@@ -2,11 +2,9 @@
   "name": "agent-manager",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.js",
-    "stop-workers": "node ptyhost.js --shutdown"
+    "start": "node app/server.js",
+    "stop-workers": "node app/ptyhost.js --shutdown"
   },
   "keywords": [],
   "author": "",

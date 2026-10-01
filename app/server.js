@@ -10,7 +10,8 @@ import { fileURLToPath } from 'node:url';
 import WebSocket, { WebSocketServer } from 'ws';
 import { createProfile, readProfile, profileSummary, runningSubagents } from './profile.js';
 
-const ROOT = path.dirname(fileURLToPath(import.meta.url));
+const APP_DIR = path.dirname(fileURLToPath(import.meta.url)); // app/ — 코드
+const ROOT = path.dirname(APP_DIR); // 프로젝트 최상위 — data/, node_modules/, 실행 파일
 const PORT = Number(process.env.AM_PORT || 7788);
 const HOST = '127.0.0.1'; // 외부 노출 금지 — 이 PC 에서만 접속
 const DATA_DIR = process.env.AM_DATA || path.join(ROOT, 'data');
@@ -102,7 +103,7 @@ function resolveClaude() {
 function hookSettings() {
   // http 타입 훅은 이 환경에서 서버에 도달하지 않아(실측) command 훅 + 전달 스크립트로 보낸다.
   // 워커 식별은 hook.mjs 가 상속받는 AGENT_MANAGER_WORKER 환경변수로 한다.
-  const command = `node "${path.join(ROOT, 'hook.mjs').replace(/\\/g, '/')}"`;
+  const command = `node "${path.join(APP_DIR, 'hook.mjs').replace(/\\/g, '/')}"`;
   const h = (timeout = 10) => [{ type: 'command', command, timeout }];
   const events = ['SessionStart', 'UserPromptSubmit', 'Notification', 'Stop', 'SessionEnd', 'SubagentStop'];
   const hooks = Object.fromEntries(events.map((e) => [e, [{ hooks: h() }]]));
@@ -392,7 +393,7 @@ function hostTerm(id) {
 }
 
 function startHost() {
-  spawnProcess(process.execPath, [path.join(ROOT, 'ptyhost.js')], {
+  spawnProcess(process.execPath, [path.join(APP_DIR, 'ptyhost.js')], {
     detached: true, stdio: 'ignore', windowsHide: true, cwd: ROOT,
     env: { ...process.env, AM_PTY_PORT: String(PTY_PORT) },
   }).unref();
@@ -455,6 +456,21 @@ function onHostMessage(msg) {
   }
 }
 
+// ---------- 호환용 훅 파일 정리 ----------
+// 폴더 정리 전에 띄운 워커는 최상위 hook.mjs 를 훅으로 쓴다. 그런 워커가 하나도 안 남으면 지운다.
+const LEGACY_HOOK = path.join(ROOT, 'hook.mjs');
+function cleanupLegacyHook() {
+  // 다른 data 폴더로 띄운 서버(테스트 등)는 실제 워커 목록을 모르니 건드리지 않는다
+  if (process.env.AM_DATA || !fs.existsSync(LEGACY_HOOK)) return;
+  const needle = LEGACY_HOOK.replace(/\\/g, '/');
+  const inUse = [...workers.values()].some((w) => {
+    if (w.status === 'exited') return false;
+    try { return fs.readFileSync(path.join(DATA_DIR, `${w.id}.settings.json`), 'utf8').includes(needle); } catch { return false; }
+  });
+  if (!inUse) { try { fs.unlinkSync(LEGACY_HOOK); console.log('호환용 hook.mjs 정리'); } catch {} }
+}
+setInterval(cleanupLegacyHook, 60_000);
+
 // ---------- 워커 기록 저장 ----------
 // 서버 재시작 후 이름·상태·타임라인·큐 등을 되살리기 위해 data/workers.json 에 저장 (상태가 바뀔 때마다, 1초 묶음)
 const WORKERS_PATH = path.join(DATA_DIR, 'workers.json');
@@ -504,7 +520,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && STATIC[p]) {
     const [file, type] = STATIC[p];
     res.writeHead(200, { 'content-type': type, 'cache-control': 'no-store' });
-    return fs.createReadStream(path.join(ROOT, file)).pipe(res);
+    return fs.createReadStream(path.join(file.startsWith('node_modules/') ? ROOT : APP_DIR, file)).pipe(res);
   }
 
   if (req.method === 'POST' && p === '/hook') {
@@ -542,6 +558,16 @@ const server = http.createServer(async (req, res) => {
     config.profiles = config.profiles.filter((x) => x.name !== name);
     saveConfig();
     return json(res, 200, { ok: true });
+  }
+
+  // 브라우저의 ⏻ 버튼: 서버만 끄거나(워커는 호스트에서 계속 돎) 워커까지 모두 끈다
+  if (req.method === 'POST' && p === '/api/shutdown') {
+    const { workers: alsoWorkers } = await readBody(req);
+    json(res, 200, { ok: true });
+    console.log(`브라우저에서 종료 요청 (${alsoWorkers ? '워커 포함' : '서버만'})`);
+    if (alsoWorkers) hostSend({ op: 'shutdown' });
+    setTimeout(shutdown, 300);
+    return;
   }
 
   if (req.method === 'POST' && p === '/api/pick-folder') {
@@ -593,6 +619,7 @@ wss.on('connection', (ws) => {
 await connectHost();
 server.listen(PORT, HOST, () => {
   console.log(`클로드 키우기 http://${HOST}:${PORT}  (claude: ${CLAUDE_BIN})`);
+  setTimeout(cleanupLegacyHook, 5000);
 });
 
 // 서버만 내린다. 워커(Claude 프로세스)는 PTY 호스트에서 계속 돈다 — 다음에 서버를 켜면 다시 붙는다

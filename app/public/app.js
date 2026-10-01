@@ -109,6 +109,7 @@ function connect() {
     else if (msg.type === 'pty' && msg.id === selected) term.write(msg.data);
     else if (msg.type === 'scrollback' && msg.id === selected) { term.reset(); term.write(msg.data); }
   };
+  ws.onopen = ((orig) => () => { if (serverDown) { location.reload(); return; } orig?.(); })(ws.onopen);
   ws.onclose = () => setTimeout(connect, 1000);
 }
 async function api(path, body) {
@@ -948,6 +949,20 @@ taskForm.text.addEventListener('keydown', (e) => {
 $('#queue').addEventListener('click', (e) => {
   const i = e.target.closest('[data-unqueue]')?.dataset.unqueue;
   if (i != null && selected) api(`/api/workers/${selected}/unqueue`, { index: Number(i) });
+});
+
+// ---------- 서버 종료 ----------
+let serverDown = false;
+$('#btn-power').onclick = () => { $('#power-modal').hidden = false; };
+$('#power-modal').addEventListener('click', async (e) => {
+  const act = e.target.closest('[data-power]')?.dataset.power;
+  if (!act && e.target !== $('#power-modal')) return;
+  $('#power-modal').hidden = true;
+  if (!act || act === 'cancel') return;
+  try { await api('/api/shutdown', { workers: act === 'all' }); } catch {}
+  serverDown = true;
+  $('#down-detail').textContent = act === 'all' ? '모든 워커도 함께 종료했습니다.' : '워커는 백그라운드에서 계속 실행 중입니다 — 서버를 다시 켜면 그대로 다시 붙습니다.';
+  $('#down-screen').hidden = false;
 });
 
 $('#btn-interrupt').onclick = () => selected && api(`/api/workers/${selected}/interrupt`);

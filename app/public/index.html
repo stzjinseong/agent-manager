@@ -14,6 +14,7 @@
     <div class="brand"><span class="brand-mark" data-clawd></span><h1>클로드 키우기</h1></div>
     <div class="stats" id="stats"></div>
     <button id="btn-new" class="btn primary">+ 워커</button>
+    <button id="btn-power" class="btn ghost power" title="서버 종료">⏻</button>
   </header>
 
   <section id="new-panel" class="panel new-panel" hidden>
@@ -152,6 +153,27 @@
   </section>
 
   <div class="tip" id="tip" hidden></div>
+
+  <div class="modal-back" id="power-modal" hidden>
+    <div class="modal panel">
+      <h3>서버 종료</h3>
+      <p>워커(Claude 세션)는 서버와 별도 프로세스라 <b>서버만 종료</b>하면 계속 돌고, 다음에 켜면 다시 붙습니다.</p>
+      <div class="modal-acts">
+        <button class="btn ghost" data-power="cancel">취소</button>
+        <button class="btn" data-power="server">서버만 종료</button>
+        <button class="btn deny" data-power="all">서버 + 워커 모두 종료</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="down-screen" id="down-screen" hidden>
+    <div class="down-box">
+      <span class="down-mark" data-clawd></span>
+      <h2>서버가 종료되었습니다</h2>
+      <p id="down-detail"></p>
+      <p class="dim">다시 켜려면 프로젝트 폴더의 <b>Launch.vbs</b> (또는 Launch.bat) 를 실행하세요.<br>서버가 다시 켜지면 이 화면은 자동으로 새로고침됩니다.</p>
+    </div>
+  </div>
 
   <script src="/vendor/xterm.js"></script>
   <script src="/vendor/addon-fit.js"></script>
