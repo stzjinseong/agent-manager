@@ -1218,8 +1218,7 @@ memoForm.onsubmit = (e) => {
 };
 
 // ---------- 지시·메모 추가 연출: 워커 색 작은 쪽지가 입력 칸에서 그 워커 카드의 캐릭터로 날아간다 ----------
-// 포물선(위로 솟았다 내려앉기) → 도착하면 캐릭터가 통 튀고 '+지시' / '+나중에' 가 떠오른다. 순수 연출이라 실패해도 무시
-const FLY_LABEL = { task: '+지시', memo: '+나중에' };
+// 직선으로 날아가며 꼬리(트레일)를 남기고, 도착하면 캐릭터가 통 튀고 무대가 워커 색으로 번쩍인다. 순수 연출이라 실패해도 무시
 function flyToWorker(id, fromEl, kind) {
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const w = state.workers.find((x) => x.id === id), node = nodeEls.get(id);
@@ -1228,34 +1227,42 @@ function flyToWorker(id, fromEl, kind) {
   const color = avatarColor(w.name) || 'var(--accent)';
   const a = fromEl.getBoundingClientRect(), b = target.getBoundingClientRect();
   const x0 = a.left + a.width / 2, y0 = a.top + a.height / 2, x1 = b.left + b.width / 2, y1 = b.top + b.height / 2;
-  const dx = x1 - x0, dy = y1 - y0, lift = Math.min(160, 60 + Math.hypot(dx, dy) * 0.18);
+  const dx = x1 - x0, dy = y1 - y0, dist = Math.hypot(dx, dy);
   const el = document.createElement('div');
   el.className = `fly-note ${kind}`;
   el.style.setProperty('--fc', color);
   el.style.left = `${x0}px`; el.style.top = `${y0}px`;
   document.body.appendChild(el);
-  // 가운데 지점을 직선보다 lift 만큼 위로 올려 포물선처럼 — x 는 선형, y 는 키프레임 사이 ease 로 휘게
-  const mid = (t) => `translate(${dx * t}px, ${dy * t - lift * 4 * t * (1 - t)}px)`;
-  const anim = el.animate([
-    { transform: `${mid(0)} scale(.6) rotate(0deg)`, opacity: 0 },
-    { transform: `${mid(0.15)} scale(1.1) rotate(-12deg)`, opacity: 1, offset: 0.12 },
-    { transform: `${mid(0.5)} scale(1) rotate(8deg)`, offset: 0.5 },
-    { transform: `${mid(0.85)} scale(.85) rotate(-4deg)`, offset: 0.85 },
-    { transform: `${mid(1)} scale(.4) rotate(0deg)`, opacity: 0.2 },
-  ], { duration: Math.min(900, 480 + Math.hypot(dx, dy) * 0.35), easing: 'cubic-bezier(.45,.05,.4,1)' });
-  anim.onfinish = () => {
+  const dur = Math.min(700, 360 + dist * 0.28), t0 = performance.now();
+  const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2); // easeInOutCubic
+  let lastX = x0, lastY = y0;
+  const frame = (now) => {
+    const t = Math.min(1, (now - t0) / dur), e = ease(t);
+    const x = x0 + dx * e, y = y0 + dy * e;
+    const sc = t < 0.15 ? 0.6 + (t / 0.15) * 0.5 : 1.1 - (t - 0.15) * 0.8;
+    el.style.transform = `translate(${dx * e}px, ${dy * e}px) scale(${sc})`;
+    el.style.opacity = t < 0.1 ? t / 0.1 : 1;
+    // 꼬리: 지난 프레임 위치에서 지금 위치까지 4px 간격으로 점을 떨군다 — 빠른 구간에서도 끊기지 않게
+    const seg = Math.hypot(x - lastX, y - lastY), n = Math.max(1, Math.floor(seg / 4));
+    for (let i = 1; i <= n && t > 0.03; i++) {
+      const d = document.createElement('i');
+      d.className = 'fly-trail';
+      d.style.setProperty('--fc', color);
+      d.style.left = `${lastX + ((x - lastX) * i) / n}px`; d.style.top = `${lastY + ((y - lastY) * i) / n}px`;
+      d.addEventListener('animationend', () => d.remove());
+      document.body.appendChild(d);
+    }
+    lastX = x; lastY = y;
+    if (t < 1) return requestAnimationFrame(frame);
     el.remove();
-    const n = nodeEls.get(id);
-    if (!n?.isConnected) return;
-    const stage = n.querySelector('.stage');
+    const nd = nodeEls.get(id);
+    if (!nd?.isConnected) return;
+    const stage = nd.querySelector('.stage');
     stage.style.setProperty('--fc', color);
     stage.classList.remove('got'); void stage.offsetWidth; stage.classList.add('got');
-    const tag = document.createElement('span');
-    tag.className = 'got-tag'; tag.textContent = FLY_LABEL[kind];
-    tag.style.setProperty('--fc', color);
-    stage.appendChild(tag);
-    setTimeout(() => { tag.remove(); stage.classList.remove('got'); }, 1100);
+    setTimeout(() => stage.classList.remove('got'), 900);
   };
+  requestAnimationFrame(frame);
 }
 $('#memos').addEventListener('click', async (e) => {
   const act = e.target.closest('[data-memo]')?.dataset.memo;
@@ -1266,8 +1273,7 @@ $('#memos').addEventListener('click', async (e) => {
   li.classList.add('busy');
   if (act === 'send') flyToWorker(w.id, li, 'task');
   const r = await api('/api/memos', { role: w.name, op: act, id: li.dataset.id, workerId: w.id });
-  if (r.error) { li.classList.remove('busy'); toast(r.error, 3000); }
-  else if (act === 'send') toast(w.status === 'idle' || w.status === 'done' || w.status === 'interrupted' ? '업무 지시로 보냈습니다' : '대기열에 넣었습니다');
+  if (r.error) { li.classList.remove('busy'); toast(r.error, 3000); } // 성공은 날아가는 쪽지로 알린다
 });
 
 $('#queue').addEventListener('click', (e) => {

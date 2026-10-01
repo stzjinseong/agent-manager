@@ -685,16 +685,13 @@ body.resizing-term { cursor: row-resize; user-select: none; }
   0% { box-shadow: inset 0 0 0 1px var(--fc), inset 0 0 26px color-mix(in srgb, var(--fc) 40%, transparent); }
   100% { box-shadow: inset 0 0 0 1px transparent, inset 0 0 26px transparent; }
 }
-.got-tag {
-  position: absolute; z-index: 3; left: 50%; top: 18px; pointer-events: none; white-space: nowrap;
-  font: 700 12px/1 var(--mono); color: var(--fc); text-shadow: 0 0 8px color-mix(in srgb, var(--fc) 60%, transparent);
-  animation: got-tag 1.1s ease-out forwards;
+/* 꼬리: 날아간 자리에 떨군 점이 작아지며 사라진다 */
+.fly-trail {
+  position: fixed; z-index: 89; pointer-events: none; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%;
+  background: var(--fc); box-shadow: 0 0 6px var(--fc);
+  animation: fly-trail .38s ease-out forwards;
 }
-@keyframes got-tag {
-  0% { opacity: 0; transform: translate(-50%, 8px) scale(.8); }
-  20% { opacity: 1; transform: translate(-50%, 0) scale(1.05); }
-  100% { opacity: 0; transform: translate(-50%, -14px) scale(1); }
-}
+@keyframes fly-trail { from { opacity: .7; transform: scale(1); } to { opacity: 0; transform: scale(.2); } }
 
 /* ---------- 확인·입력 팝업 (app.js ask) — 회로 기판 컨셉: 칩 카드처럼 위에 구리 핀, 클로드가 묻는다 ---------- */
 .modal-back:not([hidden]) { animation: ask-fade .15s ease-out; backdrop-filter: blur(2px); }
