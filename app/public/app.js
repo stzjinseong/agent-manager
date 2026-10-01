@@ -28,6 +28,32 @@ function clawdSVG() {
 }
 document.querySelectorAll('[data-clawd]').forEach((el) => (el.innerHTML = clawdSVG()));
 
+// 매니저 클로드 — 같은 마스코트에 성장 단계별 액세서리 레이어를 겹친다 (왕 테마). 어떤 레이어를 보일지는 CSS 가 .core-dot 의 geN 클래스로 정한다.
+//  1 볼터치(+눈 깜빡임) · 2 헤드셋 · 3 망토 · 4 왕관(헤드셋 대신) + 금빛 스파크 · 5 후광 + 별가루
+// 바깥 g(.mgr-lean)는 시선 기울기, 안쪽 g(.mgr-act)는 끄덕임·인사 같은 반응 동작용 — 서로 transform 이 겹치지 않게 나눈다
+function managerSVG() {
+  const R = (x, y, w, h, cls = 'body') => `<rect class="${cls}" x="${x}" y="${y}" width="${w}" height="${h}"/>`;
+  return `<svg class="clawd mgr" viewBox="0 0 18 10" shape-rendering="crispEdges"><g class="mgr-lean"><g class="mgr-act">
+    <g class="acc acc-cape">${R(0, 5, 18, 4, 'cape')}${R(-1, 8, 3, 2, 'cape')}${R(16, 8, 3, 2, 'cape')}</g>
+    ${R(3, 0, 12, 4)}${R(1, 4, 16, 2)}${R(3, 6, 12, 2)}
+    <g class="legs-a">${R(4, 8, 1, 2)}${R(6, 8, 1, 2)}${R(11, 8, 1, 2)}${R(13, 8, 1, 2)}</g>
+    <g class="legs-b">${R(5, 8, 1, 2)}${R(7, 8, 1, 2)}${R(10, 8, 1, 2)}${R(12, 8, 1, 2)}</g>
+    ${R(5, 2, 1, 2, 'eye')}${R(12, 2, 1, 2, 'eye')}
+    <g class="acc acc-blush">${R(3, 4, 2, 1, 'blush')}${R(13, 4, 2, 1, 'blush')}</g>
+    <g class="acc acc-headset">${R(2, -2, 14, 1, 'band')}${R(2, -1, 1, 3, 'band')}${R(15, -1, 1, 3, 'band')}${R(1, 1, 2, 2, 'cup')}${R(15, 1, 2, 2, 'cup')}</g>
+    <g class="acc acc-crown">${R(6, -2, 6, 2, 'gold')}${R(6, -3, 1, 1, 'gold')}${R(8, -3, 2, 1, 'gold')}${R(11, -3, 1, 1, 'gold')}${R(8, -4, 2, 1, 'gold')}</g>
+    <g class="acc acc-halo">${R(4, -6, 10, 1, 'halo')}${R(3, -5, 1, 1, 'halo')}${R(14, -5, 1, 1, 'halo')}</g>
+    <g class="acc acc-stars">${R(-3, 0, 1, 1, 'star s1')}${R(20, 2, 1, 1, 'star s2')}${R(19, -4, 1, 1, 'star s3')}${R(-2, -4, 1, 1, 'star s4')}</g>
+  </g></g></svg>`;
+}
+$('.core-mark').innerHTML = managerSVG();
+// 성장 단계 표시 — geN 클래스는 누적(3단계면 ge1~ge3). 4단계부터는 회로 스파크도 금빛
+function applyStage(stage) {
+  const dot = $('.core-dot');
+  for (let i = 1; i <= 5; i++) dot.classList.toggle(`ge${i}`, stage >= i);
+  $('#floor').classList.toggle('royal', stage >= 4);
+}
+
 // 브라우저 탭 아이콘 = 매니저와 같은 흰 클로드 캐릭터. 밝은 탭 바에서도 보이도록 어두운 둥근 사각형 바탕을 깐다.
 // 결정 대기가 있으면 오른쪽 위에 주황 점 (서버 재시작 없이 바뀌도록 파일 대신 data URI 로 넣는다)
 function faviconSVG(alert) {
@@ -301,6 +327,7 @@ function renderStats() {
   dot.classList.toggle('busy', busy > 0);
   dot.classList.toggle('alert', pend > 0);
   dot.title = `매니저 · ${busy}명 작업 중${pend ? ` · 결정 대기 ${pend}건` : ''}`;
+  applyStage(state.progress?.stage ?? 0);
   document.title = pend ? `(${pend}) 클로드 키우기` : '클로드 키우기';
   setFavicon(pend > 0);
 }

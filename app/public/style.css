@@ -724,3 +724,29 @@ body.resizing-term { cursor: row-resize; user-select: none; }
 .ask p { margin: 0 0 14px 54px; font-size: 13px; white-space: pre-wrap; word-break: break-word; }
 .ask textarea { display: block; width: 100%; margin: 0 0 14px; resize: vertical; min-height: 64px; }
 .ask textarea[hidden] { display: none; }
+
+/* ---------- 매니저 성장 단계 (왕 테마) — app.js managerSVG / applyStage ---------- */
+:root { --gold: #e3b341; }
+.mgr .acc { display: none; }
+.mgr .cape { fill: #a63d3d; }
+.mgr .blush { fill: #f29a9a; }
+.mgr .band { fill: #6b7080; }
+.mgr .cup { fill: #3987e5; }
+.mgr .gold { fill: var(--gold); }
+.mgr .halo { fill: #ffe7a3; opacity: .85; }
+.mgr .star { fill: #ffe7a3; opacity: 0; transform-box: fill-box; transform-origin: center; animation: mgr-star 3.2s ease-in-out infinite; }
+.mgr .star.s2 { animation-delay: .8s; } .mgr .star.s3 { animation-delay: 1.6s; } .mgr .star.s4 { animation-delay: 2.4s; }
+@keyframes mgr-star { 0%, 100% { opacity: 0; transform: scale(.4); } 50% { opacity: 1; transform: scale(1); } }
+.core-dot.ge1 .acc-blush { display: inline; }
+.core-dot.ge2:not(.ge4) .acc-headset { display: inline; } /* 4단계부터는 왕관이 대신한다 */
+.core-dot.ge3 .acc-cape { display: inline; }
+.core-dot.ge4 .acc-crown { display: inline; }
+.core-dot.ge5 .acc-halo, .core-dot.ge5 .acc-stars { display: inline; }
+.core-dot:not(.ge1) .mgr .eye { animation: none; } /* 눈 깜빡임은 1단계부터 */
+.core-dot.busy .acc-cape { animation: cape-sway .36s steps(2, jump-none) infinite alternate; } /* 걸을 때 망토 출렁 */
+@keyframes cape-sway { to { transform: translateX(.35px); } }
+.core-dot.ge5 .acc-halo { animation: halo-pulse 2.6s ease-in-out infinite; }
+@keyframes halo-pulse { 50% { opacity: .5; } }
+/* 4단계부터 회로 스파크가 은은한 금빛 */
+.floor.royal .traces .spark { fill: #ffe7a3; }
+.floor.royal .traces .t-working path.flow { stroke: color-mix(in srgb, var(--gold) 65%, #fff); }
