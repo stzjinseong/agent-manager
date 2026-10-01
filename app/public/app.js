@@ -1478,20 +1478,49 @@ const normText = (s) => String(s).replace(/\s+/g, ' ').trim();
 // 첨부 이미지: 보낸 글에는 파일 경로가, 터미널에는 Claude 가 바꾼 '[Image #N]' 이 찍힌다 → 양쪽 다 지우고 비교
 const IMG_RE = /\[Image #\d+\]|"[^"]*\.(?:png|jpe?g|gif|webp|bmp)"|(?:[A-Za-z]:)?[\\/]\S*\.(?:png|jpe?g|gif|webp|bmp)\b/gi;
 const stripImg = (s) => normText(String(s).replace(IMG_RE, ' '));
+// 비교는 공백을 모두 뺀 글자끼리 — Claude 는 요청을 화면 폭에 맞춰 직접 줄을 끊고(들여쓰기 2칸) 원래 줄바꿈도 그대로 찍어서,
+// 줄이 어디서 끊겼는지와 상관없이 같은 요청이면 같게 나오도록
+// 터미널은 `코드` 의 백틱을 빼고 그리고, 붙여넣기 감싸개 태그(<pasted_content …>)는 보이지 않으므로 양쪽에서 지운다
+const compact = (s) => stripImg(String(s).replace(/<\/?pasted_content[^>]*>/g, ' ')).replace(/[\s`]+/g, '');
+const PROMPT_RE = /^\s?[>›❯]\s?/, CONT_RE = /^ {2}\S/; // 요청 첫 줄 / Claude 가 들여써 이어 찍은 줄
 function findPromptLine(text, fromEnd) {
-  const key = stripImg(text).slice(0, 40);
+  const key = compact(text).slice(0, 40);
   if (key.length < 2) return -1;
   const b = term.buffer.active, hits = [];
-  // 줄바꿈으로 나뉜 요청도 잡히게 앞뒤 줄을 이어 붙여 본다
+  const row = (j) => b.getLine(j)?.translateToString(true) ?? '';
   for (let i = 0; i < b.length; i++) {
     const line = b.getLine(i);
     if (!line || line.isWrapped) continue;
-    let s = line.translateToString(true);
-    for (let j = i + 1; j < b.length && b.getLine(j)?.isWrapped; j++) s += b.getLine(j).translateToString(true);
-    const t = normText(s);
-    if (/^[>›❯]\s?/.test(t) && stripImg(t.replace(/^[>›❯]\s?/, '')).startsWith(key)) hits.push(i);
+    const first = row(i);
+    if (!PROMPT_RE.test(first)) continue;
+    // 요청 블록: 프롬프트 줄 + 뒤따르는 줄들 — 자동 줄바꿈(isWrapped), 들여쓴 이어지는 줄, 그 사이 빈 줄.
+    // 들여쓰지 않은 줄(● 응답 등)이 나오면 끝. key 길이만큼 모이면 더 읽지 않는다
+    let acc = compact(first.replace(PROMPT_RE, ''));
+    for (let j = i + 1; j < b.length && acc.length < key.length; j++) {
+      const l = b.getLine(j), t = row(j);
+      if (l.isWrapped || CONT_RE.test(t)) { acc += compact(t); continue; }
+      if (!t.trim() && CONT_RE.test(row(j + 1))) continue; // 요청 안의 빈 줄
+      break;
+    }
+    if (acc.startsWith(key)) hits.push(i);
   }
   return hits.length > fromEnd ? hits[hits.length - 1 - fromEnd] : -1;
+}
+// 턴 요약 줄 "✻ Brewed for 2m 2s · done 오후 4:15"(로케일에 따라 4:15 PM) 중 그 시각(분 단위) 이전의 마지막 것
+const DONE_RE = /^✻ .*\bdone\s+(오전|오후|AM|PM)?\s*(\d{1,2}):(\d{2})\s*(AM|PM)?/i;
+function findTurnEndBefore(t) {
+  const d = new Date(t), want = d.getHours() * 60 + d.getMinutes();
+  const b = term.buffer.active;
+  let best = -1;
+  for (let i = 0; i < b.length; i++) {
+    const m = DONE_RE.exec(b.getLine(i)?.translateToString(true) || '');
+    if (!m) continue;
+    const pm = /오후|PM/i.test(m[1] || m[4] || ''), am = /오전|AM/i.test(m[1] || m[4] || '');
+    let h = Number(m[2]) % 12;
+    if (pm) h += 12; else if (!am) h = Number(m[2]);
+    if (h * 60 + Number(m[3]) <= want) best = i;
+  }
+  return best;
 }
 $('#log').addEventListener('click', (e) => {
   const li = e.target.closest('li.k-req');
@@ -1500,8 +1529,14 @@ $('#log').addEventListener('click', (e) => {
   if (!row) return;
   // 이 요청 뒤에 같은 문구 요청이 몇 번 더 있었나 = 터미널에서 끝에서 몇 번째인가
   const later = timelineCache.slice(i + 1).filter((r) => r.kind === 'req' && normText(r.text) === normText(row.text)).length;
-  const line = findPromptLine(row.text, later);
-  if (line < 0) { toast('터미널 기록에 없는 요청입니다 (clear 등으로 지워졌거나 기록 범위를 벗어남)', 3200); return; }
+  let line = findPromptLine(row.text, later);
+  if (line < 0) {
+    // 앞 턴이 끝나는 바로 그 순간 투입된 요청은 Claude 가 '❯ 요청' 줄을 남기지 않는 경우가 있다 →
+    // 그 시각 직전에 끝난 턴의 요약 줄(✻ … · done 오후 4:15)로 대신 이동
+    line = findTurnEndBefore(row.t + clockSkew);
+    if (line < 0) { toast('터미널 기록에 없는 요청입니다 (clear 등으로 지워졌거나 기록 범위를 벗어남)', 3200); return; }
+    toast('요청 줄이 터미널에 남지 않아 그 무렵(직전 턴 종료) 위치로 이동했습니다', 2800);
+  }
   term.scrollToLine(Math.max(0, line - 2));
   term.selectLines(line, line); // 잠깐 강조
   clearTimeout(findPromptLine.t);
