@@ -650,7 +650,7 @@ const server = http.createServer(async (req, res) => {
   // 기판 칩 순서 — 역할 이름 기준이라 서버를 다시 켜도, 대기실 슬롯↔워커 전환에도 자리가 유지된다
   // 메모: 역할별로 적어 두는 할 일 목록. 자동 실행되지 않고, ▶ 지시를 누른 항목만 업무 지시(즉시 또는 대기열)로 넘어간다
   if (req.method === 'POST' && p === '/api/memos') {
-    const { role, op, text, id, workerId } = await readBody(req);
+    const { role, op, text, id, workerId, to } = await readBody(req);
     if (!role) return json(res, 400, { error: 'role 필요' });
     const list = (config.memos[role] ||= []);
     if (op === 'add' && String(text || '').trim()) list.push({ id: `m${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`, text: String(text).trim(), createdAt: Date.now() });
@@ -661,6 +661,13 @@ const server = http.createServer(async (req, res) => {
       if (w.status === 'exited') return json(res, 409, { error: '종료된 워커에는 지시할 수 없습니다' });
       assignTask(w, m.text);
       config.memos[role] = list.filter((x) => x.id !== id);
+    }
+    // 다른 역할로 옮기기: 워커 카드(대기실 슬롯 포함)에 끌어다 놓으면 그 역할 목록 끝으로 간다
+    if (op === 'move') {
+      const m = list.find((x) => x.id === id);
+      if (!m || !to || to === role) return json(res, 404, { error: '옮길 작업이 없습니다' });
+      config.memos[role] = list.filter((x) => x.id !== id);
+      (config.memos[to] ||= []).push(m);
     }
     if (!config.memos[role]?.length) delete config.memos[role];
     saveConfig();

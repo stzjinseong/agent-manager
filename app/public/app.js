@@ -567,7 +567,7 @@ function updateNode(node, w) {
   node.style.setProperty('--avatar', avatarColor(w.name) || 'var(--accent)');
   // 이름 변경 중(renaming)·드래그 중(dragging) 표시는 사용자 동작이 붙인 것이라 상태 갱신이 지우면 안 된다 —
   // 지우면 바로 아래에서 이름 글자가 입력창을 덮어써, 다른 워커 활동으로 상태가 올 때마다 입력이 닫혔다
-  const keep = ['renaming', 'dragging'].filter((c) => node.classList.contains(c)).map((c) => ` ${c}`).join('');
+  const keep = ['renaming', 'dragging', 'dropping'].filter((c) => node.classList.contains(c)).map((c) => ` ${c}`).join('');
   node.className = `node s-${viewStatus(w)}${w.id === selected ? ' sel' : ''}${isUnseenDone(w) ? ' unseen' : ''}${keep}`;
   node.dataset.id = w.id;
   $('.nid', node).textContent = w.id;
@@ -1196,6 +1196,7 @@ nodesEl.addEventListener('dragstart', (e) => {
   requestAnimationFrame(() => n.classList.add('dragging')); // 드래그 이미지가 찍힌 뒤 흐리게
 });
 nodesEl.addEventListener('dragover', (e) => {
+  if (memoDrag) return memoDragOver(e);
   if (!dragEl) return;
   e.preventDefault();
   const over = e.target.closest('.node');
@@ -1210,7 +1211,11 @@ nodesEl.addEventListener('dragover', (e) => {
     requestAnimationFrame(drawTraces);
   }
 });
-nodesEl.addEventListener('drop', (e) => e.preventDefault());
+nodesEl.addEventListener('drop', (e) => { e.preventDefault(); if (memoDrag) memoDrop(e); });
+nodesEl.addEventListener('dragleave', (e) => {
+  const n = e.target.closest?.('.node');
+  if (n && !n.contains(e.relatedTarget)) n.classList.remove('dropping');
+});
 nodesEl.addEventListener('dragend', () => {
   if (!dragEl) return;
   dragEl.classList.remove('dragging');
@@ -1363,7 +1368,7 @@ function renderMemos(w) {
   memoSig = sig;
   const fmt = (t) => new Date(t + clockSkew).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
   $('#memos').innerHTML = list.length
-    ? list.map((m) => `<li data-id="${m.id}"><span class="mt">${esc(m.text)}</span>
+    ? list.map((m) => `<li data-id="${m.id}" draggable="true" title="워커 카드에 끌어다 놓으면 그 워커의 나중에 할 작업으로 옮겨집니다"><span class="mt">${esc(m.text)}</span>
         <span class="ma"><time>${fmt(m.createdAt)}</time><button class="btn mini primary" data-memo="send" title="이 작업을 업무 지시로 (작업 중이면 대기열)">▶ 지시</button><button class="btn mini ghost" data-memo="remove" title="삭제">✕</button></span></li>`).join('')
     : '<li class="empty-memo">나중에 할 작업이 없습니다</li>';
 }
@@ -1438,6 +1443,47 @@ $('#memos').addEventListener('click', async (e) => {
   const r = await api('/api/memos', { role: w.name, op: act, id: li.dataset.id, workerId: w.id });
   if (r.error) { li.classList.remove('busy'); toast(r.error, 3000); } // 성공은 날아가는 쪽지로 알린다
 });
+
+// ---------- 메모 → 다른 워커 카드로 끌어 옮기기 ----------
+// 카드 순서 변경 드래그(dragEl)와 섞이지 않게 따로 표시한다. dragover 중엔 dataTransfer 를 읽을 수 없어 변수로 들고 다닌다
+let memoDrag = null;
+const memoTarget = (e) => {
+  const n = e.target.closest?.('.node');
+  return n && n.dataset.name && n.dataset.name !== memoDrag.role ? n : null;
+};
+$('#memos').addEventListener('dragstart', (e) => {
+  const li = e.target.closest?.('li[data-id]');
+  const w = state.workers.find((x) => x.id === selected);
+  if (!li || !w || e.target.closest('button')) { e.preventDefault(); return; }
+  memoDrag = { role: w.name, id: li.dataset.id, li };
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('application/x-am-memo', li.dataset.id);
+  requestAnimationFrame(() => li.classList.add('dragging'));
+});
+$('#memos').addEventListener('dragend', () => {
+  memoDrag?.li.classList.remove('dragging');
+  memoDrag = null;
+  nodesEl.querySelectorAll('.node.dropping').forEach((n) => n.classList.remove('dropping'));
+});
+function memoDragOver(e) {
+  const n = memoTarget(e);
+  if (!n) return; // 같은 역할 카드나 빈 곳에는 놓을 수 없다
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  if (!n.classList.contains('dropping')) {
+    nodesEl.querySelectorAll('.node.dropping').forEach((x) => x.classList.remove('dropping'));
+    n.classList.add('dropping');
+  }
+}
+async function memoDrop(e) {
+  const n = memoTarget(e), d = memoDrag;
+  if (!n) return;
+  n.classList.remove('dropping');
+  d.li.classList.add('busy');
+  const r = await api('/api/memos', { role: d.role, op: 'move', id: d.id, to: n.dataset.name });
+  if (r.error) { d.li.classList.remove('busy'); toast(r.error, 3000); }
+  else toast(`'${n.dataset.name}' 의 나중에 할 작업으로 옮겼습니다`);
+}
 
 $('#queue').addEventListener('click', (e) => {
   const i = e.target.closest('[data-unqueue]')?.dataset.unqueue;
