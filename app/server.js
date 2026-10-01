@@ -47,8 +47,8 @@ const config = loadConfig();
 function loadConfig() {
   try {
     const c = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
-    return { profiles: c.profiles || [], recentCwds: c.recentCwds || [], order: c.order || [] };
-  } catch { return { profiles: [], recentCwds: [], order: [] }; }
+    return { profiles: c.profiles || [], recentCwds: c.recentCwds || [], order: c.order || [], memos: c.memos || {} };
+  } catch { return { profiles: [], recentCwds: [], order: [], memos: {} }; }
 }
 
 function saveConfig() {
@@ -80,6 +80,7 @@ function renameRole(from, to, worker) {
   if (worker) { worker.name = to; pushLog(worker, 'status', `이름 변경: ${from} → ${to}`); }
   config.profiles = config.profiles.map((x) => (x.name === from ? { ...x, name: to } : x));
   config.order = (config.order || []).map((x) => (x === from ? to : x));
+  if (config.memos?.[from]) { config.memos[to] = [...(config.memos[to] || []), ...config.memos[from]]; delete config.memos[from]; }
   saveConfig(); // emitState 포함
   return { ok: true };
 }
@@ -388,6 +389,7 @@ function publicState() {
     decisions: [...decisions.values()].map(({ res, timer, ...d }) => d),
     profiles: config.profiles,
     order: config.order,
+    memos: config.memos,
     recentCwds: config.recentCwds,
   };
 }
@@ -592,6 +594,25 @@ const server = http.createServer(async (req, res) => {
   }
 
   // 기판 칩 순서 — 역할 이름 기준이라 서버를 다시 켜도, 대기실 슬롯↔워커 전환에도 자리가 유지된다
+  // 메모: 역할별로 적어 두는 할 일 목록. 자동 실행되지 않고, ▶ 지시를 누른 항목만 업무 지시(즉시 또는 대기열)로 넘어간다
+  if (req.method === 'POST' && p === '/api/memos') {
+    const { role, op, text, id, workerId } = await readBody(req);
+    if (!role) return json(res, 400, { error: 'role 필요' });
+    const list = (config.memos[role] ||= []);
+    if (op === 'add' && String(text || '').trim()) list.push({ id: `m${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`, text: String(text).trim(), createdAt: Date.now() });
+    if (op === 'remove') config.memos[role] = list.filter((m) => m.id !== id);
+    if (op === 'send') {
+      const m = list.find((x) => x.id === id), w = workers.get(workerId);
+      if (!m || !w) return json(res, 404, { error: '메모나 워커가 없습니다' });
+      if (w.status === 'exited') return json(res, 409, { error: '종료된 워커에는 지시할 수 없습니다' });
+      assignTask(w, m.text);
+      config.memos[role] = list.filter((x) => x.id !== id);
+    }
+    if (!config.memos[role]?.length) delete config.memos[role];
+    saveConfig();
+    return json(res, 200, { ok: true });
+  }
+
   if (req.method === 'POST' && p === '/api/order') {
     const { order } = await readBody(req);
     if (Array.isArray(order)) { config.order = [...new Set(order.map(String))].slice(0, 200); saveConfig(); }

@@ -503,6 +503,7 @@ function renderDetail() {
   av.className = `detail-avatar s-${viewStatus(w)}`;
   $("#detail-name").textContent = `${w.name} · ${STATUS_LABEL[viewStatus(w)]}`;
   $('#detail-meta').textContent = [w.id, w.model, w.permissionMode, w.sessionId && `session ${w.sessionId.slice(0, 8)}`, w.pid && `pid ${w.pid}`, w.cwd].filter(Boolean).join(' · ');
+  renderMemos(w);
   $('#queue').innerHTML = w.queue.length
     ? `<div class="qh">대기 중인 지시 ${w.queue.length}건 — 현재 턴이 끝나면 위에서부터 투입</div>` +
       w.queue.map((q, i) => `<div class="qi"><span class="n">${i + 1}</span><span class="tx">${esc(q)}</span><button data-unqueue="${i}" title="큐에서 빼기">✕</button></div>`).join('')
@@ -1050,6 +1051,42 @@ taskForm.onsubmit = async (e) => {
 taskForm.text.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && (e.altKey || e.metaKey) && !e.isComposing) { e.preventDefault(); taskForm.requestSubmit(); }
 });
+// ---------- 메모 (역할별, 자동 실행 안 됨) ----------
+let memoSig = '';
+function renderMemos(w) {
+  const list = state.memos?.[w.name] || [];
+  const sig = `${w.id}|${w.name}|${list.map((m) => m.id).join(',')}`;
+  if (sig === memoSig) return; // 상태 갱신마다 다시 그리면 버튼 클릭이 끊긴다
+  memoSig = sig;
+  const fmt = (t) => new Date(t + clockSkew).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+  $('#memos').innerHTML = list.length
+    ? list.map((m) => `<li data-id="${m.id}"><span class="mt">${esc(m.text)}</span>
+        <span class="ma"><time>${fmt(m.createdAt)}</time><button class="btn mini primary" data-memo="send" title="이 메모를 업무 지시로 (작업 중이면 대기열)">▶ 지시</button><button class="btn mini ghost" data-memo="remove" title="메모 삭제">✕</button></span></li>`).join('')
+    : '<li class="empty-memo">적어 둔 메모가 없습니다</li>';
+}
+const memoForm = $('#memo-form');
+memoForm.text.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
+  e.preventDefault();
+  const text = memoForm.text.value.trim();
+  const w = state.workers.find((x) => x.id === selected);
+  if (!text || !w) return;
+  memoForm.text.value = '';
+  api('/api/memos', { role: w.name, op: 'add', text });
+});
+memoForm.addEventListener('submit', (e) => e.preventDefault());
+$('#memos').addEventListener('click', async (e) => {
+  const act = e.target.closest('[data-memo]')?.dataset.memo;
+  const li = e.target.closest('li[data-id]');
+  const w = state.workers.find((x) => x.id === selected);
+  if (!act || !li || !w) return;
+  if (act === 'remove' && !confirm('이 메모를 지울까요?')) return;
+  li.classList.add('busy');
+  const r = await api('/api/memos', { role: w.name, op: act, id: li.dataset.id, workerId: w.id });
+  if (r.error) { li.classList.remove('busy'); toast(r.error, 3000); }
+  else if (act === 'send') toast(w.status === 'idle' || w.status === 'done' || w.status === 'interrupted' ? '업무 지시로 보냈습니다' : '대기열에 넣었습니다');
+});
+
 $('#queue').addEventListener('click', (e) => {
   const i = e.target.closest('[data-unqueue]')?.dataset.unqueue;
   if (i != null && selected) api(`/api/workers/${selected}/unqueue`, { index: Number(i) });
