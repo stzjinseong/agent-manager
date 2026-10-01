@@ -451,7 +451,9 @@ main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24p
 .compare { position: relative; z-index: 1; margin-top: 30px; padding-top: 12px; border-top: 1px solid var(--line); }
 .cmp-toggle { cursor: pointer; user-select: none; border-radius: 8px; margin: -4px -6px 6px; padding: 4px 6px; }
 .cmp-toggle:hover { background: color-mix(in srgb, var(--surface-2) 70%, transparent); }
-.cmp-toggle .chev { color: var(--dim); font-size: 12px; width: 12px; display: inline-block; transition: transform .2s; }
+/* 제목은 세션 프로파일 제목(.profile-head h2)과 같은 크기·색 */
+.cmp-toggle h3 { font-size: 14px; font-weight: 650; color: var(--text); }
+.cmp-toggle .chev { margin-right: 4px; color: var(--dim); font-size: 12px; width: 12px; display: inline-block; transition: transform .2s; }
 .compare.collapsed .cmp-toggle .chev { transform: rotate(-90deg); }
 .compare.collapsed .cmp-toggle { margin-bottom: -4px; }
 .compare.collapsed .legend, .compare.collapsed .cmp-grid { display: none; }
