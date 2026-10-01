@@ -478,8 +478,11 @@ function drawTraces() {
   const floor = $('#floor');
   const fr = floor.getBoundingClientRect();
   // 매니저 = 흰 클로드 캐릭터. 선은 캐릭터 아래 가장자리에서 출발한다
-  const cr = $('.core-mark').getBoundingClientRect();
-  const cx = Math.round(cr.left + cr.width / 2 - fr.left), cy = Math.round(cr.bottom - fr.top + 4);
+  // 작업 중엔 캐릭터가 걷기 애니메이션(bob, translateY 0 ↔ -4px)으로 들썩인다. getBoundingClientRect 는
+  // 그 순간의 이동까지 반영해서, 다시 그릴 때마다 출발점이 4px 오르내렸다 → 현재 transform 이동분을 빼고 잰다
+  const mark = $('.core-mark'), cr = mark.getBoundingClientRect();
+  const m = getComputedStyle(mark).transform, ty = m && m !== 'none' ? new DOMMatrixReadOnly(m).m42 : 0;
+  const cx = Math.round(cr.left + cr.width / 2 - fr.left), cy = Math.round(cr.bottom - ty - fr.top + 4);
   // 칩 위치는 레이아웃 좌표(offsetTop/Left)로 잰다. getBoundingClientRect 는 호버·선택 시 떠오르는
   // translateY(-2px) 까지 반영해서, 같은 줄인데도 "첫 줄"이 아니라고 판정돼 선이 왼쪽 골목으로 우회했었다.
   const nr = $('#nodes').getBoundingClientRect();
