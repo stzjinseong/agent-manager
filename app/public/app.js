@@ -649,7 +649,7 @@ function renderProfile(w, force) {
     kpi('추정 비용 <small>API 환산</small>', p.unpriced ? `${fmtUsd(t.cost)}+` : fmtUsd(t.cost),
       p.cacheMisses ? `<span class="warn-t">⚠ 캐시 재작성 ${p.cacheMisses}회 · +${fmtUsd(p.cacheMissCost)}</span>` : `턴 평균 ${fmtUsd(t.cost / p.turnCount)}`),
     kpi('현재 컨텍스트', fmtN(p.context),
-      `${ctx.level ? `<span class="warn-t">⚠ ${ctx.text}</span>` : `창의 ${Math.round(ctx.pct * 100)}% · 압축 ${p.compactions}회`}`,
+      `${ctx.level ? `<span class="warn-t">⚠ ${ctx.text}</span>` : `한도의 ${Math.round(ctx.pct * 100)}% · 압축 ${p.compactions}회`}`,
       `<div class="gauge"><i class="${ctx.level ? 'warn' : ''}" style="width:${Math.min(100, ctx.pct * 100)}%"></i></div>` + sparkline(turns.map((x) => x.context || 0))),
     kpi('캐시 적중률', p.cacheHit == null ? '—' : `${Math.round(p.cacheHit * 100)}%`, `캐시 읽기 ${fmtN(t.cacheRead)} · 쓰기 ${fmtN(t.cacheWrite)}`),
     kpi('턴 · API 호출', `${p.turnCount} · ${p.calls}`, `질문당 ${(p.calls / p.turnCount).toFixed(1)}회 왕복 · 도구 ${p.tools}회`),
@@ -689,7 +689,7 @@ function renderProfile(w, force) {
 const CTX_WARN = 150_000; // 이 이상이면 매 턴 캐시 읽기 비용이 커지는 구간 — 새 세션 고려
 function ctxLevel(p) {
   const pct = p.context / (p.window || 200_000);
-  if (pct >= 0.8) return { level: 2, pct, text: `창의 ${Math.round(pct * 100)}% — 곧 자동 압축` };
+  if (pct >= 0.8) return { level: 2, pct, text: `한도의 ${Math.round(pct * 100)}% — 곧 자동 압축` };
   if (p.context >= CTX_WARN) return { level: 1, pct, text: `${fmtN(p.context)} — 새 세션 고려` };
   return { level: 0, pct, text: '' };
 }
@@ -746,7 +746,7 @@ const INFO = {
   '현재 컨텍스트': {
     what: '마지막 요청에 실린 프롬프트 크기 = 다음 턴이 최소한 다시 읽어야 하는 양.',
     how: '마지막 API 호출의 입력 합계(신규 + 캐시 쓰기 + 캐시 읽기). 창 크기·%는 모델표 기준(Haiku 200k, Opus·Sonnet 5세대 1M). 아래 선은 턴별 컨텍스트 추이.',
-    use: '150k를 넘으면 매 턴 읽는 비용이 커지는 구간 → 새 세션이나 /compact 고려. 창의 80%면 곧 자동 압축되며 앞 내용이 요약된다. 추이선이 계단처럼 뛰면 큰 파일·출력이 들어온 턴.',
+    use: '150k를 넘으면 매 턴 읽는 비용이 커지는 구간 → 새 세션이나 /compact 고려. 컨텍스트 한도(창)의 80%면 곧 자동 압축되며 앞 내용이 요약된다. 추이선이 계단처럼 뛰면 큰 파일·출력이 들어온 턴.',
     trust: '크기는 높음(상태줄 Context 표시와 일치 확인). %는 중간 — Claude Code가 실제로 더 작은 창을 쓰면 낮게 보임.',
   },
   '캐시 적중률': {
