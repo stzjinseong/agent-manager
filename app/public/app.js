@@ -1072,13 +1072,28 @@ $('#power-modal').addEventListener('click', async (e) => {
 $('#btn-interrupt').onclick = () => selected && api(`/api/workers/${selected}/interrupt`);
 
 // 터미널 크게 보기: 브라우저 전체화면 API 는 Esc 로 빠져나가는데 Esc 는 Claude 중단 키라 겹친다 → 창 전체를 덮는 오버레이로
+// 크게/원래대로 전환은 FLIP 애니메이션: 바뀌기 전 위치·크기(First)와 바뀐 뒤(Last)를 재서, 원래 자리에서
+// 목표 자리로 늘어나고 줄어드는 것처럼 보이게 한다. 늘어나는 동안 글자가 찌그러져 보이지 않게 터미널 내용은
+// 잠깐 감췄다가, 크기를 맞춘(fit) 뒤 서서히 보여 준다.
+let termAnim = null;
 function setTermFull(on) {
-  $('#term-wrap').classList.toggle('full', on);
+  const wrap = $('#term-wrap'), inner = $('#term');
+  const first = wrap.getBoundingClientRect();
+  wrap.classList.toggle('full', on);
   document.body.classList.toggle('term-full', on);
   $('#btn-full').textContent = on ? '⛶ 원래대로' : '⛶ 크게';
   const w = state.workers.find((x) => x.id === selected);
   $('#term-title').textContent = w ? `${w.name} · ${STATUS_LABEL[viewStatus(w)]}` : '';
-  requestAnimationFrame(() => { fitTerm(); term.focus(); });
+  const done = () => { fitTerm(); term.focus(); inner.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 140, easing: 'ease-out' }); inner.style.opacity = ''; };
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) { requestAnimationFrame(done); return; }
+  const last = wrap.getBoundingClientRect();
+  termAnim?.cancel();
+  inner.style.opacity = '0';
+  termAnim = wrap.animate([
+    { transformOrigin: '0 0', transform: `translate(${first.left - last.left}px, ${first.top - last.top}px) scale(${first.width / last.width}, ${first.height / last.height})` },
+    { transformOrigin: '0 0', transform: 'none' },
+  ], { duration: 280, easing: 'cubic-bezier(.2, .8, .2, 1)' });
+  termAnim.onfinish = () => { termAnim = null; done(); };
 }
 $('#btn-full').onclick = () => setTermFull(!$('#term-wrap').classList.contains('full'));
 $('#btn-full-exit').onclick = () => setTermFull(false);
