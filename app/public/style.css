@@ -133,22 +133,32 @@ main, .new-panel, #inbox, .floor, .compare, .detail { margin-left: 24px; margin-
 @keyframes flow { to { stroke-dashoffset: -34; } }
 
 .core { position: relative; display: flex; justify-content: center; margin-bottom: 44px; }
-.core-chip {
-  position: relative; display: flex; flex-direction: column; align-items: center; gap: 1px;
-  padding: 12px 28px; border-radius: 12px; min-width: 190px;
-  background: linear-gradient(180deg, #20232d, #16181f);
-  border: 1px solid var(--line-2);
-  box-shadow: 0 0 0 4px rgba(0, 0, 0, .25), 0 10px 40px color-mix(in srgb, var(--accent) 16%, transparent);
+/* 매니저 = 흰색으로 빛나는 클로드 캐릭터 (주황 워커들과 구분). 배지 숫자 = 작업 중인 워커 수
+   쉬는 중: 은은한 흰 빛 / 작업 중(.busy): 흰 빛이 맥동하고 걷는다 / 결정 대기(.alert): 주황 빛 */
+.core-dot { position: relative; display: grid; place-items: center; padding: 6px 10px 2px; cursor: default; }
+.core-mark svg { width: 84px; height: 47px; display: block; overflow: visible; }
+.core-mark .clawd .body { fill: #f3f1ec; }
+.core-mark .clawd .eye { fill: #14161c; }
+.core-mark { filter: drop-shadow(0 0 4px rgba(255, 255, 255, .25)) drop-shadow(0 0 14px rgba(255, 255, 255, .12)); transition: filter .4s; }
+#core-count {
+  position: absolute; top: -2px; right: -8px; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px;
+  display: grid; place-items: center; font: 700 12px/1 var(--mono); font-variant-numeric: tabular-nums;
+  color: var(--dim); background: var(--surface-2); border: 1px solid var(--line-2);
 }
-/* 칩 핀 */
-.core-chip::before, .core-chip::after {
-  content: ""; position: absolute; left: 16px; right: 16px; height: 5px;
-  background: repeating-linear-gradient(90deg, var(--copper) 0 5px, transparent 5px 13px); opacity: .7;
+.core-dot.busy #core-count { color: #14161c; background: #f3f1ec; border-color: #fff; box-shadow: 0 0 10px rgba(255, 255, 255, .55); }
+.core-dot.busy .core-mark { animation: core-glow 2.2s ease-in-out infinite, bob .36s steps(2, jump-none) infinite alternate; }
+.core-dot.busy .clawd .legs-a { animation: legA .36s steps(1) infinite; }
+.core-dot.busy .clawd .legs-b { animation: legB .36s steps(1) infinite; }
+@keyframes core-glow {
+  0%, 100% { filter: drop-shadow(0 0 5px rgba(255, 255, 255, .55)) drop-shadow(0 0 18px rgba(255, 255, 255, .25)); }
+  50% { filter: drop-shadow(0 0 9px rgba(255, 255, 255, .9)) drop-shadow(0 0 32px rgba(255, 255, 255, .45)); }
 }
-.core-chip::before { top: -6px; } .core-chip::after { bottom: -6px; }
-.core-label { font: 800 22px/1.1 var(--mono); letter-spacing: .2em; margin-right: -.2em; color: var(--accent); text-shadow: 0 0 18px color-mix(in srgb, var(--accent) 55%, transparent); }
-.core-chip { padding: 16px 34px 13px; gap: 5px; }
-.core-sub { font-size: 12px; color: var(--dim); }
+.core-dot.alert .core-mark { animation: core-alert 1.2s ease-in-out infinite; }
+.core-dot.alert.busy .core-mark { animation: core-alert 1.2s ease-in-out infinite, bob .36s steps(2, jump-none) infinite alternate; }
+@keyframes core-alert {
+  0%, 100% { filter: drop-shadow(0 0 5px color-mix(in srgb, var(--decision) 60%, transparent)) drop-shadow(0 0 16px color-mix(in srgb, var(--decision) 30%, transparent)); }
+  50% { filter: drop-shadow(0 0 9px var(--decision)) drop-shadow(0 0 28px color-mix(in srgb, var(--decision) 55%, transparent)); }
+}
 
 .nodes { position: relative; display: grid; grid-template-columns: repeat(auto-fill, minmax(236px, 1fr)); gap: 34px 22px; }
 .empty { grid-column: 1 / -1; text-align: center; color: var(--dim); padding: 18px 0 6px; }

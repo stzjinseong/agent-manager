@@ -155,7 +155,13 @@ function renderStats() {
     ['결정 대기', pend, 'var(--decision)', pend > 0],
     ['완료', n('done'), 'var(--done)'],
   ].map(([k, v, c, hot]) => `<span class="stat ${hot ? 'hot' : ''}" style="--c:${c}"><i></i>${k} <b>${v}</b></span>`).join('');
-  $('#core-sub').textContent = pend ? `결정 대기 ${pend}건` : `${n('working')}명 작업 중`;
+  // 매니저 캐릭터: 작업 중 인원 숫자 배지. 작업 중이면 흰 빛 맥동 + 걷기, 결정 대기가 있으면 주황 빛
+  const busy = n('working');
+  $('#core-count').textContent = busy;
+  const dot = $('.core-dot');
+  dot.classList.toggle('busy', busy > 0);
+  dot.classList.toggle('alert', pend > 0);
+  dot.title = `매니저 · ${busy}명 작업 중${pend ? ` · 결정 대기 ${pend}건` : ''}`;
   document.title = pend ? `(${pend}) 클로드 키우기` : '클로드 키우기';
   setFavicon(pend > 0);
 }
@@ -341,8 +347,9 @@ let traceSig = '';
 function drawTraces() {
   const floor = $('#floor');
   const fr = floor.getBoundingClientRect();
-  const cr = $('.core-chip').getBoundingClientRect();
-  const cx = Math.round(cr.left + cr.width / 2 - fr.left), cy = Math.round(cr.bottom - fr.top + 6);
+  // 매니저 = 흰 클로드 캐릭터. 선은 캐릭터 아래 가장자리에서 출발한다
+  const cr = $('.core-mark').getBoundingClientRect();
+  const cx = Math.round(cr.left + cr.width / 2 - fr.left), cy = Math.round(cr.bottom - fr.top + 4);
   // 칩 위치는 레이아웃 좌표(offsetTop/Left)로 잰다. getBoundingClientRect 는 호버·선택 시 떠오르는
   // translateY(-2px) 까지 반영해서, 같은 줄인데도 "첫 줄"이 아니라고 판정돼 선이 왼쪽 골목으로 우회했었다.
   const nr = $('#nodes').getBoundingClientRect();
@@ -359,7 +366,7 @@ function drawTraces() {
   if (!list.length) { $('#traces').innerHTML = ''; return; }
   const firstTop = Math.min(...list.map((o) => o.y));
   // 워커마다 전용 차선 — 선끼리 겹치지 않게 한다.
-  //  · 출발점: 코어 칩 아래 변에 목표 x 순서대로 펼쳐 둔다
+  //  · 출발점: 매니저 캐릭터 아래 가장자리에 목표 x 순서대로 펼쳐 둔다
   //  · 가로 차선: 코어에서 먼 워커일수록 코어에 가까운(위쪽) 차선 → 괄호처럼 포개져 서로 교차하지 않는다
   //  · 첫 줄은 칩 위로, 아랫줄은 칩 왼쪽 골목으로(같은 골목을 쓰면 세로 차선을 4px 씩 비켜 둔다)
   const gutterUse = new Map();
@@ -369,22 +376,25 @@ function drawTraces() {
     return { ...o, tx: o.x - 7 - k * 4, first: false };
   }).sort((a, b) => a.tx - b.tx);
   const n = targets.length;
-  const span = Math.min(cr.width - 30, Math.max(0, (n - 1) * 22));
-  targets.forEach((t, i) => { t.ax = Math.round(cx - span / 2 + (n > 1 ? (span * i) / (n - 1) : span / 2)); });
-  const laneTop = cy + 8, laneBottom = firstTop - 16;
+  const span = Math.min(cr.width - 16, Math.max(0, (n - 1) * 14));
+  targets.forEach((t, i) => {
+    t.ax = Math.round(cx - span / 2 + (n > 1 ? (span * i) / (n - 1) : span / 2));
+    t.ay = cy;
+  });
+  const laneTop = cy + 10, laneBottom = firstTop - 16;
   const step = n > 1 ? Math.max(3, Math.min(10, (laneBottom - laneTop) / (n - 1))) : 0;
   [...targets].sort((a, b) => Math.abs(b.tx - cx) - Math.abs(a.tx - cx)).forEach((t, rank) => { t.ly = Math.round(laneTop + rank * step); });
   const routes = targets.map((t) => {
     const pts = t.first
-      ? [[t.ax, cy], [t.ax, t.ly], [t.tx, t.ly], [t.tx, t.y - 7]]
-      : [[t.ax, cy], [t.ax, t.ly], [t.tx, t.ly], [t.tx, t.y + 46], [t.x - 1, t.y + 46]];
+      ? [[t.ax, t.ay], [t.ax, t.ly], [t.tx, t.ly], [t.tx, t.y - 7]]
+      : [[t.ax, t.ay], [t.ax, t.ly], [t.tx, t.ly], [t.tx, t.y + 46], [t.x - 1, t.y + 46]];
     return { ...t, pts, d: roundedPath(pts, 8) };
   });
   const svg = routes.map((o) => {
     const cls = o.st === 'socket' ? 't-socket' : `t-${o.st}`;
     const end = o.pts.at(-1);
     return `<g class="${cls}"><path class="base" d="${o.d}"/><path class="flow" d="${o.d}"/>${o.st === 'working' ? electric(o.d) : ''}` +
-      `<circle class="pad" cx="${o.ax}" cy="${cy}" r="2.5"/><circle class="pad" cx="${end[0]}" cy="${end[1]}" r="3.5"/></g>`;
+      `<circle class="pad" cx="${o.ax}" cy="${o.ay}" r="2"/><circle class="pad" cx="${end[0]}" cy="${end[1]}" r="3.5"/></g>`;
   }).join('');
   $('#traces').innerHTML = ELECTRIC_DEFS + svg;
 }
