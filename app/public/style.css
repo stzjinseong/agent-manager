@@ -302,9 +302,9 @@ main, .new-panel, #inbox, .floor, .compare, .detail { margin-left: 24px; margin-
 .detail-head .spacer { display: none; }
 .spacer { flex: 1; }
 .detail-body { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 14px; }
-.term-wrap { min-width: 0; height: 580px; background: #07080a; border: 1px solid var(--line); border-radius: 12px; padding: 8px; overflow: hidden; }
+.term-wrap { min-width: 0; height: var(--term-h, 580px); background: #07080a; border: 1px solid var(--line); border-radius: 12px; padding: 8px; overflow: hidden; }
 #term { width: 100%; height: 100%; }
-.side { display: flex; flex-direction: column; gap: 12px; min-width: 0; height: 580px; }
+.side { display: flex; flex-direction: column; gap: 12px; min-width: 0; height: var(--term-h, 580px); }
 .task-form { display: flex; flex-direction: column; gap: 8px; }
 .queue:empty { display: none; }
 .queue { display: flex; flex-direction: column; gap: 5px; }
@@ -340,7 +340,7 @@ main, .new-panel, #inbox, .floor, .compare, .detail { margin-left: 24px; margin-
   .detail-body { grid-template-columns: minmax(0, 1fr); }
   .side { height: auto; }
   #log { max-height: 280px; }
-  .term-wrap { height: 460px; }
+  .term-wrap { height: var(--term-h, 460px); }
 }
 @media (max-width: 640px) {
   main, .new-panel, #inbox, .floor, .compare, .detail { margin-left: 12px; margin-right: 12px; }
@@ -610,3 +610,11 @@ body.term-full { overflow: hidden; }
 }
 .stale-bar span { flex: 1; }
 @media (max-width: 640px) { .stale-bar { margin: 10px 12px 0; flex-wrap: wrap; } }
+
+/* ---------- 터미널 높이 조절 손잡이 (CLI 아래 가로선) ---------- */
+.term-resizer { height: 14px; margin: 2px 0 -4px; cursor: row-resize; display: grid; place-items: center; touch-action: none; }
+.term-resizer i { display: block; width: 100%; height: 1px; background: var(--line-2); position: relative; transition: background .15s; }
+.term-resizer i::after { content: ""; position: absolute; left: 50%; top: -2px; width: 44px; height: 5px; margin-left: -22px; border-radius: 3px; background: var(--surface-3); border: 1px solid var(--line-2); transition: background .15s, border-color .15s; }
+.term-resizer:hover i, .term-resizer.dragging i { background: color-mix(in srgb, var(--accent) 60%, transparent); }
+.term-resizer:hover i::after, .term-resizer.dragging i::after { background: var(--accent); border-color: var(--accent); }
+body.resizing-term { cursor: row-resize; user-select: none; }

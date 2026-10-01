@@ -1182,6 +1182,34 @@ $('#power-modal').addEventListener('click', async (e) => {
 $('#btn-interrupt').onclick = () => selected && api(`/api/workers/${selected}/interrupt`);
 
 // 터미널 크게 보기: 브라우저 전체화면 API 는 Esc 로 빠져나가는데 Esc 는 Claude 중단 키라 겹친다 → 창 전체를 덮는 오버레이로
+// ---------- 터미널 높이 조절 (CLI 아래 가로선을 위아래로 끌기) ----------
+// 높이는 #detail 의 --term-h 로 정하고 브라우저에 기억한다. 크기가 바뀌면 기존 ResizeObserver 가 fit + pty resize 를 한다
+const TERM_H_KEY = 'am.termH';
+const clampTermH = (h) => Math.round(Math.max(240, Math.min(innerHeight * 0.9, h)));
+function setTermH(h) {
+  if (h == null) $('#detail').style.removeProperty('--term-h');
+  else $('#detail').style.setProperty('--term-h', `${clampTermH(h)}px`);
+}
+try { const saved = Number(localStorage.getItem(TERM_H_KEY)); if (saved) setTermH(saved); } catch {}
+const resizer = $('#term-resizer');
+resizer.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0) return;
+  e.preventDefault();
+  resizer.setPointerCapture(e.pointerId);
+  const startY = e.clientY, startH = $('#term-wrap').getBoundingClientRect().height;
+  resizer.classList.add('dragging'); document.body.classList.add('resizing-term');
+  const move = (ev) => setTermH(startH + (ev.clientY - startY));
+  const up = () => {
+    resizer.removeEventListener('pointermove', move);
+    resizer.classList.remove('dragging'); document.body.classList.remove('resizing-term');
+    try { localStorage.setItem(TERM_H_KEY, String(Math.round($('#term-wrap').getBoundingClientRect().height))); } catch {}
+  };
+  resizer.addEventListener('pointermove', move);
+  resizer.addEventListener('pointerup', up, { once: true });
+  resizer.addEventListener('pointercancel', up, { once: true });
+});
+resizer.addEventListener('dblclick', () => { setTermH(null); try { localStorage.removeItem(TERM_H_KEY); } catch {} });
+
 // 크게/원래대로 전환은 FLIP 애니메이션: 바뀌기 전 위치·크기(First)와 바뀐 뒤(Last)를 재서, 원래 자리에서
 // 목표 자리로 늘어나고 줄어드는 것처럼 보이게 한다. 늘어나는 동안 글자가 찌그러져 보이지 않게 터미널 내용은
 // 잠깐 감췄다가, 크기를 맞춘(fit) 뒤 서서히 보여 준다.
