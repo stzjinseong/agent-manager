@@ -79,7 +79,7 @@ textarea { resize: vertical; }
 .stat.hot { background: color-mix(in srgb, var(--decision) 16%, var(--surface-2)); color: var(--decision); }
 .stat.hot b { color: var(--decision); }
 
-main, .new-panel, #inbox, .floor, .compare, .detail { margin-left: 24px; margin-right: 24px; }
+main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24px; }
 
 /* ---------- 워커 추가 ---------- */
 .new-panel { margin-top: 16px; padding: 16px; }
@@ -348,9 +348,9 @@ main, .new-panel, #inbox, .floor, .compare, .detail { margin-left: 24px; margin-
   .term-wrap { height: var(--term-h, 460px); }
 }
 @media (max-width: 640px) {
-  main, .new-panel, #inbox, .floor, .compare, .detail { margin-left: 12px; margin-right: 12px; }
+  main, .new-panel, #inbox, .floor, .detail { margin-left: 12px; margin-right: 12px; }
   .topbar { padding: 10px 12px; }
-  .detail, .floor, .compare { width: calc(100% - 24px); }
+  .detail, .floor { width: calc(100% - 24px); }
   #new-form { grid-template-columns: 1fr; }
   .decision { flex-wrap: wrap; }
 }
@@ -446,9 +446,16 @@ main, .new-panel, #inbox, .floor, .compare, .detail { margin-left: 24px; margin-
 .sa-meta { color: var(--dim); margin-top: 2px; font-variant-numeric: tabular-nums; }
 
 /* 폭은 아래 상세(CLI) 영역과 같은 규칙: 화면 폭 - 좌우 24px, 최대 1480px 가운데 정렬 */
-.floor, .compare { width: calc(100% - 48px); max-width: 1480px; margin: 16px auto 0 !important; }
-.compare { padding: 12px 16px 10px; }
-@media (max-width: 640px) { .floor, .compare { width: calc(100% - 24px); } } /* 위 공통 규칙보다 뒤에 둬야 좁은 화면 폭이 적용된다 */
+.floor { width: calc(100% - 48px); max-width: 1480px; margin: 16px auto 0 !important; }
+/* 워커 비교 = 워커 카드 아래에 붙은 접이식 표. 회로선(svg)보다 위에 그려 클릭이 막히지 않게 */
+.compare { position: relative; z-index: 1; margin-top: 30px; padding-top: 12px; border-top: 1px solid var(--line); }
+.cmp-toggle { cursor: pointer; user-select: none; border-radius: 8px; margin: -4px -6px 6px; padding: 4px 6px; }
+.cmp-toggle:hover { background: color-mix(in srgb, var(--surface-2) 70%, transparent); }
+.cmp-toggle .chev { color: var(--dim); font-size: 12px; width: 12px; display: inline-block; transition: transform .2s; }
+.compare.collapsed .cmp-toggle .chev { transform: rotate(-90deg); }
+.compare.collapsed .cmp-toggle { margin-bottom: -4px; }
+.compare.collapsed .legend, .compare.collapsed .cmp-grid { display: none; }
+@media (max-width: 640px) { .floor { width: calc(100% - 24px); } } /* 위 공통 규칙보다 뒤에 둬야 좁은 화면 폭이 적용된다 */
 .cmp-grid { display: flex; flex-direction: column; }
 .cmp-h, .cmp-row { display: grid; grid-template-columns: minmax(120px, 1.2fr) minmax(160px, 2fr) 110px 90px minmax(160px, 1.6fr); gap: 14px; align-items: center; padding: 7px 4px; font-size: 12.5px; }
 .cmp-h { color: var(--dim); font-size: 12px; border-bottom: 1px solid var(--line-2); }

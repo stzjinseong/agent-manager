@@ -60,17 +60,17 @@
       </div>
     </div>
     <div class="nodes" id="nodes"></div>
-  </section>
-
-  <section class="panel compare" id="compare" hidden>
-    <div class="chart-head">
-      <h3>워커 비교 <i class="info" data-info="워커 비교">ⓘ</i></h3>
-      <div class="legend">
-        <span><i style="background:var(--s-read)"></i>누적 토큰</span>
-        <span><i style="background:var(--text-2)"></i>컨텍스트 / 창</span>
+    <!-- 워커 비교: 카드 아래에 붙은 접이식 표 (접힘 상태는 브라우저에 기억) -->
+    <div class="compare" id="compare" hidden>
+      <div class="chart-head cmp-toggle" id="compare-toggle" role="button" tabindex="0" aria-expanded="true" title="클릭해서 접기/펼치기">
+        <h3><span class="chev">▾</span> 워커 비교 <i class="info" data-info="워커 비교">ⓘ</i></h3>
+        <div class="legend">
+          <span><i style="background:var(--s-read)"></i>누적 토큰</span>
+          <span><i style="background:var(--text-2)"></i>컨텍스트 / 창</span>
+        </div>
       </div>
+      <div class="cmp-grid" id="cmp"></div>
     </div>
-    <div class="cmp-grid" id="cmp"></div>
   </section>
 
   <section id="detail" class="panel detail" hidden>

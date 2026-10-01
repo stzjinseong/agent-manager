@@ -1355,6 +1355,17 @@ try { if (localStorage.getItem(PROFILE_KEY)) setProfileCollapsed(true); } catch 
 $('#profile-toggle').addEventListener('click', () => setProfileCollapsed(!$('#profile').classList.contains('collapsed')));
 $('#profile-toggle').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('#profile-toggle').click(); } });
 
+// ---------- 워커 비교 접기/펼치기 (브라우저에 기억) ----------
+const COMPARE_KEY = 'am.compareCollapsed';
+function setCompareCollapsed(on) {
+  $('#compare').classList.toggle('collapsed', on);
+  $('#compare-toggle').setAttribute('aria-expanded', String(!on));
+  try { on ? localStorage.setItem(COMPARE_KEY, '1') : localStorage.removeItem(COMPARE_KEY); } catch {}
+}
+try { if (localStorage.getItem(COMPARE_KEY)) setCompareCollapsed(true); } catch {}
+$('#compare-toggle').addEventListener('click', () => setCompareCollapsed(!$('#compare').classList.contains('collapsed')));
+$('#compare-toggle').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('#compare-toggle').click(); } });
+
 // ---------- 터미널 높이 조절 (CLI 아래 가로선을 위아래로 끌기) ----------
 // 높이는 #detail 의 --term-h 로 정하고 브라우저에 기억한다. 크기가 바뀌면 기존 ResizeObserver 가 fit + pty resize 를 한다
 const TERM_H_KEY = 'am.termH';
