@@ -87,6 +87,55 @@ term.attachCustomKeyEventHandler((e) => {
   if (mod && e.code === 'KeyV') return false; // 기본 paste 이벤트로 넘김
   return true;
 });
+// ---------- 이미지 첨부 ----------
+// 브라우저는 드롭한 파일의 원래 경로를 알 수 없다 → 서버에 올려 data/uploads 에 저장하고 그 경로를 넣는다.
+// Claude Code 는 프롬프트의 이미지 경로를 이미지로 첨부한다(터미널에 파일을 끌어다 놓은 것과 같은 방식)
+async function uploadImage(file) {
+  const r = await fetch('/api/upload', { method: 'POST', headers: { 'content-type': file.type }, body: file });
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || r.status);
+  return j.path;
+}
+const imageFiles = (dt) => [...(dt?.files || [])].filter((f) => f.type.startsWith('image/'));
+function toast(text, ms = 2200) {
+  let t = $('#toast');
+  if (!t) { t = el('<div id="toast" class="toast"></div>'); document.body.append(t); }
+  t.textContent = text; t.hidden = false;
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => (t.hidden = true), ms);
+}
+async function attachImages(files, insert) {
+  for (const f of files) {
+    toast(`이미지 첨부 중… ${f.name || '클립보드 이미지'}`, 60_000);
+    try { insert(await uploadImage(f)); toast('이미지 첨부됨'); }
+    catch (err) { toast(`이미지 첨부 실패: ${err.message}`, 4000); }
+  }
+}
+// 드롭 영역 공통: 이미지가 끌려 오면 테두리 강조
+function dropZone(zone, onFiles) {
+  zone.addEventListener('dragover', (e) => {
+    if (![...e.dataTransfer.types].includes('Files')) return;
+    e.preventDefault(); zone.classList.add('dropping');
+  });
+  zone.addEventListener('dragleave', (e) => { if (!zone.contains(e.relatedTarget)) zone.classList.remove('dropping'); });
+  zone.addEventListener('drop', (e) => {
+    zone.classList.remove('dropping');
+    const files = imageFiles(e.dataTransfer);
+    if (!files.length) return;
+    e.preventDefault();
+    onFiles(files);
+  });
+}
+// 터미널: 경로를 붙여넣기로 보낸다 (Claude 입력칸에 [Image #N] 으로 붙음)
+const termInsert = (p) => selected && term.paste(`${p} `);
+dropZone($('#term-wrap'), (files) => attachImages(files, termInsert));
+// 터미널에서 Ctrl+V 로 클립보드 이미지 붙여넣기 — xterm 보다 먼저 가로챈다(텍스트 붙여넣기는 그대로 둔다)
+$('#term').addEventListener('paste', (e) => {
+  const files = imageFiles(e.clipboardData);
+  if (!files.length) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  attachImages(files, termInsert);
+}, true);
+
 $('#term').addEventListener('contextmenu', async (e) => {
   e.preventDefault();
   if (await copySelection()) return;
@@ -952,6 +1001,21 @@ newForm.onsubmit = async (e) => {
 };
 
 const taskForm = $('#task-form');
+// 업무 지시 칸: 이미지 드롭·붙여넣기 → 커서 위치에 경로 삽입
+function insertAtCursor(ta, text) {
+  const s = ta.selectionStart ?? ta.value.length, e = ta.selectionEnd ?? s;
+  const before = ta.value.slice(0, s), pad = before && !/\s$/.test(before) ? ' ' : '';
+  ta.value = `${before}${pad}${text} ${ta.value.slice(e)}`;
+  ta.selectionStart = ta.selectionEnd = before.length + pad.length + text.length + 1;
+  ta.focus();
+}
+dropZone(taskForm.text, (files) => attachImages(files, (p) => insertAtCursor(taskForm.text, p)));
+taskForm.text.addEventListener('paste', (e) => {
+  const files = imageFiles(e.clipboardData);
+  if (!files.length) return;
+  e.preventDefault();
+  attachImages(files, (p) => insertAtCursor(taskForm.text, p));
+});
 taskForm.onsubmit = async (e) => {
   e.preventDefault();
   const text = taskForm.text.value.trim();

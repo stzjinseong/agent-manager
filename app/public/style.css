@@ -540,3 +540,11 @@ body.term-full { overflow: hidden; }
 .down-box p { color: var(--text-2); line-height: 1.7; margin: 6px 0; }
 .down-box .dim { color: var(--dim); font-size: 13px; margin-top: 14px; }
 .down-mark svg { width: 90px; height: 50px; filter: grayscale(.6); }
+
+/* ---------- 이미지 첨부 ---------- */
+.dropping { outline: 2px dashed var(--accent) !important; outline-offset: -4px; background-color: color-mix(in srgb, var(--accent) 8%, transparent) !important; }
+.toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 400;
+  background: var(--surface-3); color: var(--text); border: 1px solid var(--line-2); border-radius: 10px;
+  padding: 9px 16px; font-size: 13px; box-shadow: 0 10px 30px rgba(0, 0, 0, .5);
+}

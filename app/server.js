@@ -484,6 +484,21 @@ function onHostMessage(msg) {
   }
 }
 
+// ---------- 첨부 이미지 보관 ----------
+const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
+const UPLOAD_LIMIT = 20 * 1024 * 1024;
+// 7일 지난 첨부는 정리 (Claude 가 이미 읽어 트랜스크립트에 담겼으므로 원본은 오래 둘 필요 없음)
+function cleanupUploads() {
+  try {
+    for (const f of fs.readdirSync(UPLOAD_DIR)) {
+      const full = path.join(UPLOAD_DIR, f);
+      if (Date.now() - fs.statSync(full).mtimeMs > 7 * 86400_000) fs.unlinkSync(full);
+    }
+  } catch {}
+}
+cleanupUploads();
+setInterval(cleanupUploads, 6 * 3600_000);
+
 // ---------- 호환용 훅 파일 정리 ----------
 // 폴더 정리 전에 띄운 워커는 최상위 hook.mjs 를 훅으로 쓴다. 그런 워커가 하나도 안 남으면 지운다.
 const LEGACY_HOOK = path.join(ROOT, 'hook.mjs');
@@ -586,6 +601,25 @@ const server = http.createServer(async (req, res) => {
     config.profiles = config.profiles.filter((x) => x.name !== name);
     saveConfig();
     return json(res, 200, { ok: true });
+  }
+
+  // 이미지 첨부: 브라우저는 보안상 드롭한 파일의 원래 경로를 모르므로, 받은 내용을 data/uploads 에 저장하고
+  // 그 절대 경로를 돌려준다. 이 경로를 프롬프트에 넣으면 Claude Code 가 이미지로 첨부한다(터미널에 파일을 끌어다 놓은 것과 같음)
+  if (req.method === 'POST' && p === '/api/upload') {
+    const type = String(req.headers['content-type'] || '');
+    const ext = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' }[type.split(';')[0]];
+    if (!ext) { req.resume(); return json(res, 415, { error: `이미지(png/jpg/gif/webp)만 첨부할 수 있습니다 (${type || '형식 없음'})` }); }
+    const chunks = []; let size = 0, tooBig = false;
+    req.on('data', (c) => { size += c.length; if (size > UPLOAD_LIMIT) tooBig = true; else chunks.push(c); });
+    req.on('end', () => {
+      if (tooBig) return json(res, 413, { error: '20MB 를 넘는 이미지는 첨부할 수 없습니다' });
+      fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+      const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
+      const file = path.join(UPLOAD_DIR, `${stamp}-${Math.random().toString(36).slice(2, 7)}.${ext}`);
+      fs.writeFileSync(file, Buffer.concat(chunks));
+      json(res, 200, { path: file });
+    });
+    return;
   }
 
   // 브라우저의 ⏻ 버튼: 서버만 끄거나(워커는 호스트에서 계속 돎) 워커까지 모두 끈다
