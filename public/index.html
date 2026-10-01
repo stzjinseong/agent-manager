@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>클로드 키우기</title>
+  <link rel="icon" id="favicon" type="image/svg+xml" href="">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="stylesheet" href="/vendor/xterm.css">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark" data-clawd></span><h1>클로드 키우기</h1></div>
+    <div class="stats" id="stats"></div>
+    <button id="btn-new" class="btn primary">+ 워커</button>
+  </header>
+
+  <section id="new-panel" class="panel new-panel" hidden>
+    <form id="new-form">
+      <label class="f-name"><span>역할 이름</span><input name="name" placeholder="예: 클라 구현" required autocomplete="off"></label>
+      <label class="f-cwd"><span>작업 폴더</span>
+        <div class="with-btn">
+          <input name="cwd" list="recent-cwds" placeholder="최근 경로에서 고르거나 📁 로 선택" autocomplete="off">
+          <button type="button" id="btn-pick" class="btn" title="폴더 선택 창 열기">📁</button>
+        </div>
+      </label>
+      <label class="f-mode"><span>권한 모드</span>
+        <select name="permissionMode">
+          <option value="default">승인 필요</option>
+          <option value="acceptEdits">편집 자동 허용</option>
+          <option value="plan">계획 먼저</option>
+          <option value="bypassPermissions">전부 허용</option>
+        </select>
+      </label>
+      <label class="f-args"><span>추가 인자</span><input name="args" placeholder="--model sonnet" autocomplete="off"></label>
+      <label class="f-save"><input type="checkbox" name="save" checked> 역할 저장</label>
+      <div class="f-actions">
+        <button type="button" id="btn-cancel" class="btn ghost">취소</button>
+        <button class="btn primary">띄우기</button>
+      </div>
+    </form>
+    <datalist id="recent-cwds"></datalist>
+  </section>
+
+  <section id="inbox"></section>
+
+  <section class="floor" id="floor">
+    <svg class="traces" id="traces" aria-hidden="true"></svg>
+    <div class="core" id="core">
+      <div class="core-chip">
+        <span class="core-label">MANAGER</span>
+        <span class="core-sub" id="core-sub"></span>
+      </div>
+    </div>
+    <div class="nodes" id="nodes"></div>
+  </section>
+
+  <section class="panel compare" id="compare" hidden>
+    <div class="chart-head">
+      <h3>워커 비교 <i class="info" data-info="워커 비교">ⓘ</i></h3>
+      <div class="legend">
+        <span><i style="background:var(--s-read)"></i>누적 토큰</span>
+        <span><i style="background:var(--text-2)"></i>컨텍스트 / 창</span>
+      </div>
+    </div>
+    <div class="cmp-grid" id="cmp"></div>
+  </section>
+
+  <section id="detail" class="panel detail" hidden>
+    <div class="detail-head">
+      <span class="detail-avatar" id="detail-avatar"></span>
+      <div class="detail-title">
+        <strong id="detail-name"></strong>
+        <span id="detail-meta"></span>
+      </div>
+      <span class="spacer"></span>
+      <button id="btn-full" class="btn" title="터미널 크게 보기 (다시 누르거나 ✕ 로 복귀)">⛶ 크게</button>
+      <button id="btn-interrupt" class="btn" title="진행 중인 작업 중단 (Esc 전송)">⏸ 중단</button>
+      <button id="btn-remove" class="btn">제거</button>
+      <button id="btn-close" class="btn ghost" title="닫기">✕</button>
+    </div>
+    <div class="detail-body">
+      <div class="term-wrap" id="term-wrap">
+        <div class="term-bar"><span id="term-title"></span><button id="btn-full-exit" class="btn ghost" title="원래 크기로">✕ 닫기</button></div>
+        <div id="term"></div>
+      </div>
+      <aside class="side">
+        <form id="task-form" class="task-form">
+          <textarea name="text" rows="3" placeholder="업무 지시 — Alt+Enter(맥: ⌘+Enter) 전송 · Enter 줄바꿈&#10;작업 중이면 큐에 쌓였다가 순서대로 투입됩니다"></textarea>
+          <button class="btn primary">지시</button>
+        </form>
+        <div class="queue" id="queue"></div>
+        <div class="timeline">
+          <h3>타임라인</h3>
+          <ol id="log"></ol>
+        </div>
+      </aside>
+    </div>
+
+    <div class="profile" id="profile">
+      <div class="profile-head">
+        <h2>세션 프로파일</h2>
+        <span id="profile-model"></span>
+      </div>
+      <div class="kpis" id="kpis"></div>
+      <div class="charts">
+        <div class="chart-card">
+          <div class="chart-head">
+            <h3>턴별 입력 토큰 <small>최근 20턴</small> <i class="info" data-info="턴별 입력 토큰">ⓘ</i></h3>
+            <div class="legend">
+              <span><i style="background:var(--s-read)"></i>캐시 읽기</span>
+              <span><i style="background:var(--s-write)"></i>캐시 쓰기</span>
+              <span><i style="background:var(--s-new)"></i>신규 입력</span>
+            </div>
+          </div>
+          <div class="chart" id="chart-input"></div>
+          <div class="chart-head sub"><h3>턴별 출력 토큰 <i class="info" data-info="턴별 출력 토큰">ⓘ</i></h3></div>
+          <div class="chart" id="chart-output"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-head"><h3>도구 사용 <small>세션 누적</small> <i class="info" data-info="도구 사용">ⓘ</i></h3></div>
+          <div id="chart-tools" class="hbars"></div>
+          <div class="chart-head sub"><h3>서브에이전트 <small>별도 트랜스크립트</small> <i class="info" data-info="서브에이전트 목록">ⓘ</i></h3></div>
+          <div id="subagents" class="subagents"></div>
+        </div>
+      </div>
+      <div class="charts">
+        <div class="chart-card">
+          <div class="chart-head">
+            <h3>턴별 소요 시간 <small>최근 20턴</small> <i class="info" data-info="턴별 소요 시간">ⓘ</i></h3>
+            <div class="legend">
+              <span><i style="background:var(--t-model)"></i>모델 응답</span>
+              <span><i style="background:var(--t-tool)"></i>도구 실행</span>
+              <span><i style="background:var(--t-wait)"></i>승인 대기</span>
+              <span><i style="background:var(--t-other)"></i>기타</span>
+            </div>
+          </div>
+          <div class="chart" id="chart-time"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-head"><h3>도구별 소요 시간 <small>세션 누적</small> <i class="info" data-info="도구별 소요 시간">ⓘ</i></h3></div>
+          <div id="chart-tooltime" class="hbars"></div>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-head"><h3>최근 턴 <i class="info" data-info="최근 턴">ⓘ</i></h3></div>
+        <div class="table-wrap"><table class="turns" id="turns-table"></table></div>
+      </div>
+      <p class="profile-note">트랜스크립트(.jsonl) 기준 집계 · 비용은 API 단가 환산 추정치(구독 사용 시 실제 청구액 아님) · 파일 형식은 Claude Code 버전에 따라 바뀔 수 있음</p>
+    </div>
+  </section>
+
+  <div class="tip" id="tip" hidden></div>
+
+  <script src="/vendor/xterm.js"></script>
+  <script src="/vendor/addon-fit.js"></script>
+  <script src="/vendor/addon-unicode11.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
