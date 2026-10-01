@@ -22,6 +22,9 @@ export function createProfile(file) {
     subs: new Map(), // 서브에이전트 파일 → 상태
     toolResults: new Set(), // 결과가 돌아온 tool_use id (포그라운드 서브에이전트 완료 판정)
     doneAgents: new Set(), // 완료 알림(<task-notification>) 또는 SubagentStop 훅으로 끝난 agentId
+    // 백그라운드 작업 (Monitor 감시 · run_in_background 명령). 턴이 끝나도 계속 돈다 → '백그라운드 대기' 판정용
+    bgTasks: new Map(), // task id → { kind: 'monitor'|'shell', desc, startedAt, expiresAt, done }
+    bgCalls: new Map(), // 백그라운드로 시작한 tool_use id → { kind, desc } (결과에서 task id 를 읽기 전까지)
     turns: [], tools: {}, model: null, compactions: 0, context: 0, unpriced: false,
     // 시간 측정: 직전 이벤트 시각, 진행 중인 도구 구간, 도구 호출별 시작
     lastTs: 0, seg: null, toolStart: new Map(), toolTime: {},
@@ -80,7 +83,14 @@ function closeSeg(p) {
 
 function apply(p, e, line) {
   // 완료 알림은 user 메시지·대기열(queue-operation)·첨부(queued_command) 어디로든 기록될 수 있어 원문 줄에서 찾는다
-  if (line.includes('<task-notification>')) for (const m of line.matchAll(/<task-id>([^<]+)<\/task-id>/g)) p.doneAgents.add(m[1].trim());
+  if (line.includes('<task-notification>')) {
+    for (const m of line.matchAll(/<task-id>([^<]+)<\/task-id>/g)) p.doneAgents.add(m[1].trim());
+    // 백그라운드 작업은 <status> 가 붙은 알림이 와야 끝난 것 — Monitor 의 중간 "Monitor event" 알림엔 status 가 없다
+    for (const blk of line.matchAll(/<task-notification>([\s\S]*?)<\/task-notification>/g)) {
+      const id = blk[1].match(/<task-id>([^<]+)<\/task-id>/)?.[1]?.trim();
+      if (id && /<status>[^<]+<\/status>/.test(blk[1]) && p.bgTasks.has(id)) p.bgTasks.get(id).done = true;
+    }
+  }
   const ts = Date.parse(e.timestamp) || Date.now();
   if (e.type === 'system' && /compact/i.test(e.subtype || '')) { p.compactions++; return; }
   if (e.type === 'user') {
@@ -88,6 +98,15 @@ function apply(p, e, line) {
     if (Array.isArray(c)) for (const b of c) {
       if (b.type !== 'tool_result' || !b.tool_use_id) continue;
       p.toolResults.add(b.tool_use_id);
+      // 백그라운드로 시작한 호출의 결과에서 task id 를 읽어 등록
+      const bc = p.bgCalls.get(b.tool_use_id);
+      if (bc) {
+        p.bgCalls.delete(b.tool_use_id);
+        const txt = Array.isArray(b.content) ? b.content.map((x) => x.text || '').join('') : String(b.content || '');
+        const id = txt.match(/background with ID: (\w+)/)?.[1] || txt.match(/Monitor started \(task (\w+)/)?.[1];
+        const min = Number(txt.match(/expires in (\d+)\s*m/)?.[1]);
+        if (id) p.bgTasks.set(id, { kind: bc.kind, desc: bc.desc, startedAt: ts, expiresAt: min ? ts + min * 60_000 : null, done: false });
+      }
       const s = p.toolStart.get(b.tool_use_id);
       if (s) {
         const ms = Math.max(0, ts - s.ts);
@@ -136,6 +155,13 @@ function apply(p, e, line) {
     target.tools++;
     const name = b.name?.startsWith('mcp__') ? `MCP · ${b.name.split('__')[1]}` : b.name;
     p.toolStart.set(b.id, { name, ts, turn: target });
+    const inp = b.input || {};
+    if (b.name === 'Monitor' || inp.run_in_background) {
+      p.bgCalls.set(b.id, { kind: b.name === 'Monitor' ? 'monitor' : 'shell', desc: String(inp.description || inp.command || b.name).slice(0, 120) });
+    }
+    // 백그라운드 작업을 직접 멈춘 경우 (TaskStop / KillShell)
+    const stopId = (b.name === 'TaskStop' || b.name === 'KillShell' || b.name === 'KillBash') && (inp.task_id || inp.shell_id || inp.id);
+    if (stopId && p.bgTasks.has(stopId)) p.bgTasks.get(stopId).done = true;
     if (!p.seg) p.seg = { start: ts, end: ts, turn: target, msgId: m.id, modelEnd: ts };
     p.tools[name] = (p.tools[name] || 0) + 1;
   }
@@ -197,8 +223,15 @@ function isRunning(p, s) {
   return true;
 }
 
+// 돌고 있는 백그라운드 작업(감시·명령). Monitor 는 만료 시각이 지나면 끝난 것으로 본다
+function runningTasks(p) {
+  const now = Date.now();
+  return [...p.bgTasks.entries()].filter(([, t]) => !t.done && !(t.expiresAt && now > t.expiresAt)).map(([id, t]) => ({ id, ...t }));
+}
+
+// 서버가 '계속 읽기'를 판단할 때 쓰는 개수 — 서브에이전트 + 백그라운드 작업
 export function runningSubagents(p) {
-  let n = 0;
+  let n = runningTasks(p).length;
   for (const s of p.subs.values()) if (isRunning(p, s)) n++;
   return n;
 }
@@ -286,7 +319,8 @@ export function profileSummary(p, waits = []) {
     cacheMisses: turns.filter((t) => t.cacheMiss).length,
     cacheMissCost: turns.reduce((a, t) => a + (t.cacheMiss?.extra || 0), 0),
     sub, subagents: subagents.slice(0, 12),
-    bgRunning: subagents.filter((s) => s.running).length,
+    bgTasks: runningTasks(p).map(({ id, kind, desc, startedAt, expiresAt }) => ({ id, kind, desc, startedAt, expiresAt })),
+    bgRunning: subagents.filter((s) => s.running).length + runningTasks(p).length,
     toolTop: Object.entries(p.tools).sort((a, b) => b[1] - a[1]).slice(0, 8),
     toolTime: Object.entries(p.toolTime).map(([name, v]) => ({ name, ...v })).sort((a, b) => b.ms - a.ms).slice(0, 8),
     time: (() => {

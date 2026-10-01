@@ -450,7 +450,7 @@ main, .new-panel, #inbox, .floor, .compare, .detail { margin-left: 24px; margin-
 .cmp-bar b { font-weight: 500; color: var(--text); font-size: 12px; }
 @media (max-width: 900px) { .cmp-h { display: none; } .cmp-h, .cmp-row { grid-template-columns: 1fr 1fr; } }
 
-/* ---------- 서브 대기: 메인 턴은 끝났고 백그라운드 서브에이전트가 도는 중 ---------- */
+/* ---------- 백그라운드 대기: 메인 턴은 끝났고 서브에이전트 · Monitor 감시 · 백그라운드 명령이 도는 중 ---------- */
 :root { --waiting: #9085e9; }
 .node.s-waiting { --c: var(--waiting); box-shadow: 0 8px 30px color-mix(in srgb, var(--waiting) 14%, transparent), 0 1px 0 rgba(255, 255, 255, .04) inset; }
 .cmp-row.s-waiting { --c: var(--waiting); }

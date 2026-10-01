@@ -1,7 +1,7 @@
 // 관제탑 대시보드 — 서버가 WebSocket 으로 상태 스냅샷을 밀어주고, 터미널은 선택한 워커만 그린다.
 // 워커 칩은 id 별로 한 번 만들고 내용만 갱신한다 — 매초 다시 그리면 캐릭터 애니메이션이 리셋된다.
 const $ = (s, el = document) => el.querySelector(s);
-const STATUS_LABEL = { starting: '부팅 중', idle: '입력 대기', working: '작업 중', decision: '결정 필요', waiting: '서브 대기', done: '완료', interrupted: '중단됨', exited: '종료됨' };
+const STATUS_LABEL = { starting: '부팅 중', idle: '입력 대기', working: '작업 중', decision: '결정 필요', waiting: '백그라운드 대기', done: '완료', interrupted: '중단됨', exited: '종료됨' };
 // 표시용 상태: 메인 턴은 끝났지만 백그라운드 서브에이전트가 아직 도는 중이면 'waiting'
 const viewStatus = (w) => ((w.status === 'done' || w.status === 'idle') && w.profile?.bgRunning ? 'waiting' : w.status);
 
@@ -228,7 +228,7 @@ function renderStats() {
   $('#stats').innerHTML = [
     ['워커', state.workers.filter((w) => w.status !== 'exited').length, 'var(--idle)'],
     ['작업 중', n('working'), 'var(--working)'],
-    ['서브 대기', n('waiting'), 'var(--waiting)'],
+    ['백그라운드', n('waiting'), 'var(--waiting)'],
     ['결정 대기', pend, 'var(--decision)', pend > 0],
     ['완료', n('done'), 'var(--done)'],
   ].map(([k, v, c, hot]) => `<span class="stat ${hot ? 'hot' : ''}" style="--c:${c}"><i></i>${k} <b>${v}</b></span>`).join('');
@@ -306,8 +306,12 @@ function bubbleOf(w) {
     case 'working': return w.currentTool ? `⚙ <b>${esc(w.currentTool)}</b>` : `💭 ${esc(w.lastPrompt)}`;
     case 'decision': return pend ? `🔐 <b>${esc(pend.summary)}</b>` : `❓ ${esc(w.notice || '응답이 필요합니다 — 터미널을 확인하세요')}`;
     case 'waiting': {
-      const run = w.profile.subagents.filter((s) => s.running);
-      return `🤖 서브에이전트 ${run.length}개 진행 중 · <b>${esc(w.subTool || `${run[0].type}: ${run[0].description}`)}</b>`;
+      // 턴은 끝났지만 백그라운드에서 도는 것: 서브에이전트 · Monitor 감시 · 백그라운드 명령
+      const p = w.profile, subs = p.subagents.filter((s) => s.running), tasks = p.bgTasks || [];
+      const mons = tasks.filter((t) => t.kind === 'monitor'), shells = tasks.filter((t) => t.kind === 'shell');
+      const parts = [subs.length && `서브에이전트 ${subs.length}`, mons.length && `감시 ${mons.length}`, shells.length && `명령 ${shells.length}`].filter(Boolean).join(' · ');
+      const what = subs.length ? (w.subTool || `${subs[0].type}: ${subs[0].description}`) : (mons[0] || shells[0])?.desc || '';
+      return `⏳ 백그라운드 ${parts} · <b>${esc(what)}</b>`;
     }
     case 'done': return esc(w.lastMessage || '완료');
     case 'idle': return w.lastMessage ? esc(w.lastMessage) : '지시를 기다리는 중';
