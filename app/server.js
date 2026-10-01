@@ -9,6 +9,7 @@ import { execSync, execFile, spawn as spawnProcess } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import WebSocket, { WebSocketServer } from 'ws';
 import { createProfile, readProfile, profileSummary, runningSubagents } from './profile.js';
+import { createProgress, isCommit } from './progress.js';
 
 const APP_DIR = path.dirname(fileURLToPath(import.meta.url)); // app/ — 코드
 const ROOT = path.dirname(APP_DIR); // 프로젝트 최상위 — data/, node_modules/, 실행 파일
@@ -42,6 +43,9 @@ let decisionSeq = 0;
 // ---------- 저장된 역할 · 최근 경로 ----------
 
 const CONFIG_PATH = path.join(DATA_DIR, 'profiles.json');
+// 매니저 클로드 성장 — 작업 완료 시 그 작업에서 쌓인 점수를 지급 (progress.js). 단계가 오르면 화면에 연출 신호
+const progress = createProgress(DATA_DIR, { onStageUp: (stage) => broadcast({ type: 'fx', kind: 'stage', stage }) });
+setInterval(() => progress.sample(workers.values()), progress.SAMPLE_MS);
 const config = loadConfig();
 
 function loadConfig() {
@@ -154,6 +158,7 @@ function checkInterrupted(w) {
     if (tx.lastText) w.lastMessage = tx.lastText.slice(0, 2000);
     w.currentTool = null;
     w.doneAt = Date.now(); // 화면의 '확인 안 한 완료' 표시 기준
+    progress.payout(w);
     setStatus(w, 'done', '턴 완료 (기록으로 확인)');
     if (w.queue.length) { const next = w.queue.shift(); setTimeout(() => sendPrompt(w, next), 400); }
     return;
@@ -162,12 +167,13 @@ function checkInterrupted(w) {
   if (!at || at < (w.turnStartedAt || 0) - 500) return;
   w.currentTool = null;
   for (const [did, d] of decisions) if (d.workerId === w.id) resolveDecision(did, null);
+  progress.drop(w); // 중단된 작업은 점수 없음
   setStatus(w, 'interrupted', '사용자 중단');
 }
 
 // 서버 코드가 켜진 뒤 바뀌었는지 — 화면은 새로고침마다 새 코드를 받지만 서버는 재시작해야 바뀐다.
 // 어긋나면 새 화면이 모르는 API 를 부르다 404 가 나므로, 화면에 "서버 재시작 필요"를 띄우게 알려 준다
-const SERVER_FILES = ['server.js', 'profile.js', 'pricing.js'].map((f) => path.join(APP_DIR, f));
+const SERVER_FILES = ['server.js', 'profile.js', 'pricing.js', 'progress.js'].map((f) => path.join(APP_DIR, f));
 const mtimeOf = (f) => { try { return fs.statSync(f).mtimeMs; } catch { return 0; } };
 const BOOT_MTIMES = SERVER_FILES.map(mtimeOf);
 let staleCache = { at: 0, value: false };
@@ -293,6 +299,7 @@ function onHook(w, ev, res) {
       w.lastPrompt = ev.prompt ?? ev.prompt_text ?? w.lastPrompt;
       w.turnStartedAt = Date.now();
       w.notice = null;
+      progress.open(w);
       setStatus(w, 'working', w.lastPrompt);
       break;
     case 'PreToolUse':
@@ -305,6 +312,7 @@ function onHook(w, ev, res) {
       }
       w.currentTool = summarizeTool(ev.tool_name, ev.tool_input);
       w.toolCount++;
+      progress.tool(w);
       if (w.status !== 'decision') w.status = 'working';
       pushLog(w, 'tool', w.currentTool);
       emitState();
@@ -312,6 +320,7 @@ function onHook(w, ev, res) {
     case 'PostToolUse':
       if (ev.agent_id) { scheduleProfile(w); break; }
       trackTasks(w, ev);
+      if (isCommit(ev)) { progress.commit(w); broadcast({ type: 'fx', kind: 'commit', id: w.id }); }
       // 터미널에서 직접 승인한 경우 등, 도구가 실행됐으면 해당 도구의 대기 결정은 무효
       for (const [did, d] of decisions) if (d.workerId === w.id && (d.toolUseId ? d.toolUseId === ev.tool_use_id : d.tool === ev.tool_name)) resolveDecision(did, null);
       if (w.status === 'decision' && !hasPending(w.id)) w.status = 'working';
@@ -339,11 +348,13 @@ function onHook(w, ev, res) {
       w.lastMessage = ev.last_assistant_message ?? w.lastMessage;
       w.currentTool = null;
       w.doneAt = Date.now(); // 화면의 '확인 안 한 완료' 표시 기준
+      progress.payout(w);
       setStatus(w, 'done', '턴 완료');
       if (w.queue.length) { const next = w.queue.shift(); setTimeout(() => sendPrompt(w, next), 400); }
       break;
     case 'SubagentStop':
       if (ev.agent_id && w.tx) w.tx.doneAgents.add(ev.agent_id);
+      progress.subagent(w); // 작업(턴) 도중 끝난 것만 — 턴이 끝난 뒤의 백그라운드 완료는 주머니가 없어 무시
       pushLog(w, 'status', `서브에이전트 종료 (${ev.agent_type || ev.agent_id || ''})`);
       emitState();
       break;
@@ -418,7 +429,7 @@ function resolveDecision(did, decision) {
 function publicState() {
   return {
     now: Date.now(),
-    workers: [...workers.values()].map(({ term, tx, approvalWaits, ...w }) => ({ ...w, profile: tx && profileSummary(tx, approvalWaits) })),
+    workers: [...workers.values()].map(({ term, tx, approvalWaits, pot, ...w }) => ({ ...w, profile: tx && profileSummary(tx, approvalWaits) })),
     decisions: [...decisions.values()].map(({ res, timer, ...d }) => d),
     profiles: config.profiles,
     order: config.order,
@@ -426,6 +437,7 @@ function publicState() {
     colors: config.colors,
     serverStale: serverStale(),
     recentCwds: config.recentCwds,
+    progress: progress.public(),
   };
 }
 
@@ -521,6 +533,7 @@ function onHostMessage(msg) {
   if (!w) return;
   if (msg.ev === 'spawned') { w.pid = msg.pid; emitState(); }
   if (msg.ev === 'exit') {
+    progress.drop(w);
     setStatus(w, 'exited', `프로세스 종료 (code ${msg.exitCode})${msg.error ? ` · ${msg.error}` : ''}`);
     for (const [did, d] of decisions) if (d.workerId === w.id) resolveDecision(did, null);
   }
