@@ -164,6 +164,20 @@ function checkInterrupted(w) {
   setStatus(w, 'interrupted', '사용자 중단');
 }
 
+// 서버 코드가 켜진 뒤 바뀌었는지 — 화면은 새로고침마다 새 코드를 받지만 서버는 재시작해야 바뀐다.
+// 어긋나면 새 화면이 모르는 API 를 부르다 404 가 나므로, 화면에 "서버 재시작 필요"를 띄우게 알려 준다
+const SERVER_FILES = ['server.js', 'profile.js', 'pricing.js'].map((f) => path.join(APP_DIR, f));
+const mtimeOf = (f) => { try { return fs.statSync(f).mtimeMs; } catch { return 0; } };
+const BOOT_MTIMES = SERVER_FILES.map(mtimeOf);
+let staleCache = { at: 0, value: false };
+function serverStale() {
+  if (Date.now() - staleCache.at > 5000) staleCache = { at: Date.now(), value: SERVER_FILES.some((f, i) => mtimeOf(f) > BOOT_MTIMES[i]) };
+  return staleCache.value;
+}
+
+// 워커 이벤트가 없어도 띠가 뜨도록, 바뀐 순간 상태를 한 번 밀어 준다
+setInterval(() => { const prev = staleCache.value; staleCache.at = 0; if (serverStale() !== prev) emitState(); }, 5000);
+
 const PERMISSION_MODES = ['default', 'acceptEdits', 'plan', 'bypassPermissions'];
 
 function spawnWorker({ name, cwd, args = '', permissionMode = 'default' }) {
@@ -390,6 +404,7 @@ function publicState() {
     profiles: config.profiles,
     order: config.order,
     memos: config.memos,
+    serverStale: serverStale(),
     recentCwds: config.recentCwds,
   };
 }
@@ -642,6 +657,19 @@ const server = http.createServer(async (req, res) => {
       fs.writeFileSync(file, Buffer.concat(chunks));
       json(res, 200, { path: file });
     });
+    return;
+  }
+
+  // ↻ 서버 재시작: 실행기(launch.mjs)를 '포트가 빌 때까지 기다렸다 띄우기' 모드로 남겨 두고 이 서버는 내려간다.
+  // 워커는 PTY 호스트에서 계속 돌고, 새 서버가 뜨면 다시 붙는다. 화면은 서버가 돌아오면 스스로 새로고침
+  if (req.method === 'POST' && p === '/api/restart') {
+    json(res, 200, { ok: true });
+    console.log('브라우저에서 서버 재시작 요청');
+    spawnProcess(process.execPath, [path.join(APP_DIR, 'launch.mjs')], {
+      cwd: ROOT, detached: true, stdio: 'ignore', windowsHide: true,
+      env: { ...process.env, AM_NO_BROWSER: '1', AM_WAIT_FREE: '1' },
+    }).unref();
+    setTimeout(shutdown, 300);
     return;
   }
 

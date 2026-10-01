@@ -36,6 +36,11 @@ function alertBox(text) {
   }
 }
 
+// 서버 재시작 요청으로 불린 경우: 기존 서버가 내려갈 때까지(최대 10초) 기다린 뒤 새로 띄운다
+if (process.env.AM_WAIT_FREE) {
+  for (let i = 0; i < 40 && (await isUp()); i++) await sleep(250);
+}
+
 if (!(await isUp())) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
   // 로그가 5MB 를 넘으면 새로 시작

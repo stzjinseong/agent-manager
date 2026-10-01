@@ -44,6 +44,11 @@
     <datalist id="recent-cwds"></datalist>
   </section>
 
+  <div class="stale-bar" id="stale-bar" hidden>
+    <span>서버 코드가 바뀌었습니다 — 새 기능을 쓰려면 서버를 재시작하세요 (워커는 그대로 유지)</span>
+    <button class="btn" id="btn-restart">↻ 지금 재시작</button>
+  </div>
+
   <section id="inbox"></section>
 
   <section class="floor" id="floor">
@@ -168,6 +173,7 @@
       <p>워커(Claude 세션)는 서버와 별도 프로세스라 <b>서버만 종료</b>하면 계속 돌고, 다음에 켜면 다시 붙습니다.</p>
       <div class="modal-acts">
         <button class="btn ghost" data-power="cancel">취소</button>
+        <button class="btn" data-power="restart">↻ 서버 재시작</button>
         <button class="btn" data-power="server">서버만 종료</button>
         <button class="btn deny" data-power="all">서버 + 워커 모두 종료</button>
       </div>

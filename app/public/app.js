@@ -170,9 +170,23 @@ function connect() {
   ws.onopen = ((orig) => () => { if (serverDown) { location.reload(); return; } orig?.(); })(ws.onopen);
   ws.onclose = () => setTimeout(connect, 1000);
 }
+// 서버 요청. 실패(404·서버 꺼짐·잘못된 응답)를 조용히 삼키지 않고 알림으로 보여 준다 —
+// 예전에 옛 서버가 새 API 에 404 를 돌려줬는데 화면엔 아무 일도 없는 것처럼 보였다
 async function api(path, body) {
-  const r = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body || {}) });
-  return r.json();
+  let r, data;
+  try {
+    r = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body || {}) });
+    data = await r.json().catch(() => ({}));
+  } catch {
+    toast('서버에 연결할 수 없습니다', 4000);
+    return { error: 'network' };
+  }
+  if (!r.ok) {
+    const msg = data.error || (r.status === 404 ? '서버가 이 기능을 모릅니다 — 서버를 재시작하세요' : `요청 실패 (${r.status})`);
+    if (!data.error || r.status >= 500 || r.status === 404) toast(msg, 4000);
+    return { ...data, error: msg };
+  }
+  return data;
 }
 
 // ---------- 유틸 ----------
@@ -190,6 +204,7 @@ const el = (html) => { const t = document.createElement('template'); t.innerHTML
 // ---------- 렌더 ----------
 function render() {
   renderStats();
+  renderStale();
   renderInbox();
   renderFloor();
   renderCompare();
@@ -201,6 +216,11 @@ function pendingCount() {
   const withDecision = new Set(state.decisions.map((d) => d.workerId));
   return state.decisions.length + state.workers.filter((w) => w.status === 'decision' && !withDecision.has(w.id)).length;
 }
+
+function renderStale() {
+  $('#stale-bar').hidden = !(state.serverStale || !('serverStale' in state));
+}
+$('#btn-restart').onclick = () => restartServer();
 
 function renderStats() {
   const n = (st) => state.workers.filter((w) => viewStatus(w) === st).length;
@@ -1096,6 +1116,16 @@ $('#queue').addEventListener('click', (e) => {
   if (i != null && selected) api(`/api/workers/${selected}/unqueue`, { index: Number(i) });
 });
 
+// ---------- 서버 재시작 ----------
+// 서버가 실행기를 '기다렸다 띄우기'로 남기고 내려간다 → 돌아오면 화면이 스스로 새로고침(ws.onopen 의 serverDown 처리)
+async function restartServer() {
+  const r = await api('/api/restart');
+  if (r.error) return; // 옛 서버(이 API 없음)는 api() 가 알림을 띄운다 → ⏻ 서버만 종료 후 Launch 실행
+  serverDown = true;
+  $('#down-detail').textContent = '서버를 다시 켜는 중입니다… 워커는 그대로 실행 중입니다.';
+  $('#down-screen').hidden = false;
+}
+
 // ---------- 서버 종료 ----------
 let serverDown = false;
 $('#btn-power').onclick = () => { $('#power-modal').hidden = false; };
@@ -1104,6 +1134,7 @@ $('#power-modal').addEventListener('click', async (e) => {
   if (!act && e.target !== $('#power-modal')) return;
   $('#power-modal').hidden = true;
   if (!act || act === 'cancel') return;
+  if (act === 'restart') return restartServer();
   try { await api('/api/shutdown', { workers: act === 'all' }); } catch {}
   serverDown = true;
   $('#down-detail').textContent = act === 'all' ? '모든 워커도 함께 종료했습니다.' : '워커는 백그라운드에서 계속 실행 중입니다 — 서버를 다시 켜면 그대로 다시 붙습니다.';
