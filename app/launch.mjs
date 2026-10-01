@@ -18,14 +18,22 @@ async function isUp() {
   try { return (await fetch(`${URL}api/state`)).ok; } catch { return false; }
 }
 
+const IS_WIN = process.platform === 'win32';
+
 function openBrowser() {
-  spawn('cmd.exe', ['/c', 'start', '', URL], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+  if (IS_WIN) spawn('cmd.exe', ['/c', 'start', '', URL], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+  else spawn(process.platform === 'darwin' ? 'open' : 'xdg-open', [URL], { detached: true, stdio: 'ignore' }).unref();
 }
 
 // 창 없이 실행됐을 때도 실패를 알 수 있게 메시지 상자로
 function alertBox(text) {
-  const ps = `Add-Type -AssemblyName PresentationFramework; [System.Windows.MessageBox]::Show('${text.replace(/'/g, "''")}', '클로드 키우기') | Out-Null`;
-  spawn('powershell.exe', ['-NoProfile', '-Command', ps], { stdio: 'ignore', windowsHide: true });
+  if (IS_WIN) {
+    const ps = `Add-Type -AssemblyName PresentationFramework; [System.Windows.MessageBox]::Show('${text.replace(/'/g, "''")}', '클로드 키우기') | Out-Null`;
+    spawn('powershell.exe', ['-NoProfile', '-Command', ps], { stdio: 'ignore', windowsHide: true });
+  } else if (process.platform === 'darwin') {
+    const as = `display dialog "${text.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}" with title "클로드 키우기" buttons {"확인"} default button 1`;
+    spawn('osascript', ['-e', as], { stdio: 'ignore', detached: true }).unref();
+  }
 }
 
 if (!(await isUp())) {

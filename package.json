@@ -4,7 +4,8 @@
   "description": "",
   "scripts": {
     "start": "node app/server.js",
-    "stop-workers": "node app/ptyhost.js --shutdown"
+    "stop-workers": "node app/ptyhost.js --shutdown",
+    "setup-mac": "node app/setup-mac.mjs"
   },
   "keywords": [],
   "author": "",

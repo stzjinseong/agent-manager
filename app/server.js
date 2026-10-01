@@ -18,6 +18,18 @@ const DATA_DIR = process.env.AM_DATA || path.join(ROOT, 'data');
 const DECISION_HOLD_MS = 590_000; // 훅 timeout(600s) 직전에 놓아 터미널 프롬프트로 폴백
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
+const IS_WIN = process.platform === 'win32';
+const IS_MAC = process.platform === 'darwin';
+
+// macOS 에서 Finder(.app)로 띄우면 PATH 가 /usr/bin:/bin 정도뿐이라 claude·node 를 못 찾는다.
+// 흔한 설치 위치와 지금 node 의 위치를 PATH 에 보탠다 — 워커(claude)도 이 PATH 를 물려받는다.
+if (!IS_WIN) {
+  const home = process.env.HOME || '';
+  const extra = [path.dirname(process.execPath), '/opt/homebrew/bin', '/usr/local/bin', `${home}/.local/bin`, `${home}/.npm-global/bin`, `${home}/.volta/bin`, `${home}/.bun/bin`];
+  const cur = (process.env.PATH || '').split(':');
+  process.env.PATH = [...cur, ...extra.filter((p) => p && !cur.includes(p) && fs.existsSync(p))].join(':');
+}
+
 const CLAUDE_BIN = resolveClaude();
 
 /** @type {Map<string, any>} */
@@ -74,6 +86,14 @@ function renameRole(from, to, worker) {
 
 // Windows 폴더 선택 창 — 서버가 이 PC 에서 돌기 때문에 가능한 방식
 function pickFolder(start) {
+  if (IS_MAC) {
+    // macOS: AppleScript 폴더 선택 창 (취소하면 osascript 가 오류로 끝나 null)
+    const def = start && fs.existsSync(start) ? ` default location (POSIX file "${String(start).replace(/"/g, '\\"')}")` : '';
+    const script = `POSIX path of (choose folder with prompt "워커 작업 폴더 선택"${def})`;
+    return new Promise((resolve) => {
+      execFile('osascript', ['-e', script], { encoding: 'utf8' }, (err, out) => resolve(err ? null : out.trim().replace(/\/$/, '') || null));
+    });
+  }
   const script = [
     '[Console]::OutputEncoding=[Text.Encoding]::UTF8',
     'Add-Type -AssemblyName System.Windows.Forms',
@@ -90,7 +110,12 @@ function pickFolder(start) {
 
 function resolveClaude() {
   if (process.env.AM_CLAUDE) return process.env.AM_CLAUDE;
+  if (!IS_WIN) {
+    // macOS/Linux: PATH 의 claude (npm 전역 설치든 네이티브 설치든 실행 파일/심볼릭 링크를 그대로 실행)
+    try { return execSync('command -v claude', { encoding: 'utf8', shell: '/bin/sh' }).trim() || 'claude'; } catch { return 'claude'; }
+  }
   try {
+    // Windows: npm 의 claude.cmd 셔임 대신 그 뒤의 claude.exe 를 직접 띄운다(cmd 한 겹 없이)
     const shim = execSync('where claude.cmd', { encoding: 'utf8' }).split(/\r?\n/)[0].trim();
     const exe = path.join(path.dirname(shim), 'node_modules', '@anthropic-ai', 'claude-code', 'bin', 'claude.exe');
     if (fs.existsSync(exe)) return exe;
@@ -103,7 +128,10 @@ function resolveClaude() {
 function hookSettings() {
   // http 타입 훅은 이 환경에서 서버에 도달하지 않아(실측) command 훅 + 전달 스크립트로 보낸다.
   // 워커 식별은 hook.mjs 가 상속받는 AGENT_MANAGER_WORKER 환경변수로 한다.
-  const command = `node "${path.join(APP_DIR, 'hook.mjs').replace(/\\/g, '/')}"`;
+  // node 는 PATH 대신 지금 서버를 돌리는 node 의 절대 경로로 — macOS 에서 .app 으로 띄우면 PATH 에
+  // Homebrew 경로가 없어 'node' 를 못 찾는다. 슬래시로 통일해 Git Bash/cmd/sh 어디서 실행돼도 같게.
+  const slash = (p) => p.replace(/\\/g, '/');
+  const command = `"${slash(process.execPath)}" "${slash(path.join(APP_DIR, 'hook.mjs'))}"`;
   const h = (timeout = 10) => [{ type: 'command', command, timeout }];
   const events = ['SessionStart', 'UserPromptSubmit', 'Notification', 'Stop', 'SessionEnd', 'SubagentStop'];
   const hooks = Object.fromEntries(events.map((e) => [e, [{ hooks: h() }]]));

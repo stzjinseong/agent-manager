@@ -1,0 +1,5 @@
+# 실행 파일 줄바꿈 고정 — Windows 에서 커밋해도 Mac 의 셸 스크립트가 CRLF 로 깨지지 않게
+*.command text eol=lf
+*.sh      text eol=lf
+*.bat     text eol=crlf
+*.vbs     text eol=crlf

@@ -21,14 +21,16 @@
   --exited: #4b505c;
   --copper: #b98a5a;
   --radius: 14px;
-  --mono: "Cascadia Mono", Consolas, monospace;
+  /* 시스템 고정폭: macOS SF Mono/Menlo, Windows Cascadia Mono/Consolas */
+  --mono: ui-monospace, SFMono-Regular, Menlo, "Cascadia Mono", Consolas, monospace;
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html { background: var(--bg); }
 body {
   margin: 0; color: var(--text); background: var(--bg);
-  font: 14px/1.5 "Pretendard Variable", Pretendard, "Segoe UI", "Malgun Gothic", sans-serif;
+  /* Pretendard(웹폰트) 우선, 오프라인이면 각 OS 시스템 글꼴 — macOS: SF/Apple SD Gothic Neo, Windows: Segoe UI/맑은 고딕 */
+  font: 14px/1.5 "Pretendard Variable", Pretendard, system-ui, -apple-system, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 

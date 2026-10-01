@@ -44,7 +44,8 @@ setFavicon(false);
 
 // ---------- 터미널 ----------
 const term = new Terminal({
-  fontFamily: 'Cascadia Mono, Consolas, monospace', fontSize: 13, cursorBlink: true, scrollback: 5000,
+  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, "Cascadia Mono", Consolas, monospace', // 시스템 고정폭 (style.css --mono 와 같음)
+  fontSize: 13, cursorBlink: true, scrollback: 5000,
   allowProposedApi: true, // unicode 버전 전환에 필요
   theme: { background: '#07080a', foreground: '#e6e4de', cursor: '#d97757', selectionBackground: '#d9775744' },
 });
