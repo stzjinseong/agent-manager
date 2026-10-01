@@ -783,3 +783,19 @@ body.resizing-term { cursor: row-resize; user-select: none; }
 .mgr .pt-a { fill: #e8618c; } .mgr .pt-b { fill: #4fc3d9; } .mgr .pt-c { fill: #ffe7a3; }
 .core-dot.party .acc-crown { display: none; }
 .core-dot.party .acc-party { display: inline; }
+
+/* ---------- 진화하는 순간 — app.js mgrStageSync ---------- */
+.core-dot.evolving .core-mark { animation: mgr-evolve 1.2s ease-in-out !important; }
+@keyframes mgr-evolve {
+  0% { filter: drop-shadow(0 0 4px rgba(255, 255, 255, .25)); }
+  45%, 55% { filter: brightness(2.2) drop-shadow(0 0 14px #fff) drop-shadow(0 0 40px rgba(255, 231, 163, .8)); transform: scale(1.12); }
+  100% { filter: drop-shadow(0 0 4px rgba(255, 255, 255, .25)); transform: none; }
+}
+.mgr-dust {
+  position: absolute; left: 50%; top: 45%; width: 4px; height: 4px; margin: -2px 0 0 -2px; pointer-events: none;
+  background: #ffe7a3; box-shadow: 0 0 6px #ffe7a3; opacity: 0; animation: mgr-dust .9s ease-out forwards;
+}
+@keyframes mgr-dust {
+  0% { opacity: 1; transform: translate(0, 0) scale(1); }
+  100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(.3); }
+}

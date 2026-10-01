@@ -57,6 +57,51 @@ function applyStage(stage) {
   $('#floor').classList.toggle('royal', stage >= 4);
 }
 
+// ---------- 진화하는 순간 ----------
+// 서버 단계가 이 브라우저에서 마지막으로 본 단계보다 높으면, 처리할 승인 요청이 없고 화면을 보고 있을 때만
+// 1.2초 빛나며 모습이 바뀌고 별가루가 흩어진다. 그 전까지는 예전 모습을 유지 — 작업 흐름을 끊지 않으려고.
+// 본 단계는 테마별로 브라우저에 저장한다(테마가 바뀌어 단계가 0 으로 돌아가면 함께 내린다).
+const NEAR_TEXT = { far: '다음 변화까지 아직 멀었음', half: '다음 변화까지 절반쯤', near: '다음 변화까지 조금 남음', max: '최종 단계' };
+let evolving = false;
+function mgrStageSync() {
+  const p = state.progress;
+  if (!p) { applyStage(0); return 0; }
+  const key = `am.seenStage:${p.theme}`;
+  let seen = null;
+  try { const v = localStorage.getItem(key); seen = v == null ? null : Number(v); } catch {}
+  const remember = (v) => { try { localStorage.setItem(key, String(v)); } catch {} };
+  if (seen == null || p.stage < seen) { seen = p.stage; remember(seen); } // 처음 보거나 테마 초기화 — 연출 없이 맞춘다
+  if (evolving) return mgrStage;
+  if (p.stage > seen) {
+    if (state.decisions.length || document.visibilityState !== 'visible') { applyStage(seen); return seen; }
+    evolving = true;
+    applyStage(seen);
+    const dot = $('.core-dot');
+    dot.classList.add('evolving');
+    setTimeout(() => {
+      applyStage(state.progress?.stage ?? p.stage);
+      for (let i = 0; i < 14; i++) { // 별가루
+        const s = document.createElement('i');
+        const a = (Math.PI * 2 * i) / 14 + Math.random() * 0.4, d = 40 + Math.random() * 36;
+        s.className = 'mgr-dust';
+        s.style.setProperty('--dx', `${Math.cos(a) * d}px`); s.style.setProperty('--dy', `${Math.sin(a) * d * 0.7 - 10}px`);
+        s.style.animationDelay = `${Math.random() * 120}ms`;
+        s.addEventListener('animationend', () => s.remove());
+        dot.appendChild(s);
+      }
+    }, 600);
+    setTimeout(() => {
+      dot.classList.remove('evolving');
+      evolving = false;
+      remember(mgrStage);
+      renderStats();
+    }, 1200);
+    return seen;
+  }
+  applyStage(p.stage);
+  return p.stage;
+}
+
 // ---------- 매니저 반응 — 티 나지 않게 살아 있는 느낌. 단계가 오를수록 반응이 늘어난다 ----------
 //  0 끄덕임(워커 완료) · 1 반짝(커밋) + 시선(작업 중인 워커 쪽으로 기울기) · 2 졸음(30분 한가함·늦은 밤) + 그날 첫 지시 인사
 //  3 콤보(승인 연달아 빨리) · 4 이스터에그(가끔 고깔모자) · 5 별가루(외형)
@@ -409,8 +454,8 @@ function renderStats() {
   const dot = $('.core-dot');
   dot.classList.toggle('busy', busy > 0);
   dot.classList.toggle('alert', pend > 0);
-  dot.title = `매니저 · ${busy}명 작업 중${pend ? ` · 결정 대기 ${pend}건` : ''}`;
-  applyStage(state.progress?.stage ?? 0);
+  const shown = mgrStageSync();
+  dot.title = `매니저 · ${busy}명 작업 중${pend ? ` · 결정 대기 ${pend}건` : ''}${state.progress ? ` · ${state.progress.themeName} Lv.${shown} · ${NEAR_TEXT[shown < state.progress.stage ? 'near' : state.progress.near]}` : ''}`;
   document.title = pend ? `(${pend}) 클로드 키우기` : '클로드 키우기';
   setFavicon(pend > 0);
 }
