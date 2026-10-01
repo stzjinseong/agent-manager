@@ -342,7 +342,11 @@ function isUnseenDone(w) {
   return (seenDone[seenKey(w)] || 0) < w.doneAt;
 }
 
+// 역할별 캐릭터 색 — 밝기(L 0.76)·채도(C 0.15)를 고정한 OKLCH 라 어떤 색상각이어도 어둡지 않다
+const avatarColor = (name) => (state.colors?.[name] != null ? `oklch(0.76 0.15 ${state.colors[name]})` : '');
+
 function updateNode(node, w) {
+  node.style.setProperty('--avatar', avatarColor(w.name) || 'var(--accent)');
   node.className = `node s-${viewStatus(w)}${w.id === selected ? ' sel' : ''}${isUnseenDone(w) ? ' unseen' : ''}`;
   node.dataset.id = w.id;
   $('.nid', node).textContent = w.id;
@@ -525,6 +529,7 @@ function renderDetail() {
   const av = $('#detail-avatar');
   if (!av.firstChild) av.innerHTML = clawdSVG();
   av.className = `detail-avatar s-${viewStatus(w)}`;
+  av.style.setProperty('--avatar', avatarColor(w.name) || 'var(--accent)');
   $("#detail-name").textContent = `${w.name} · ${STATUS_LABEL[viewStatus(w)]}`;
   $('#detail-meta').textContent = [w.id, w.model, w.permissionMode, w.sessionId && `session ${w.sessionId.slice(0, 8)}`, w.pid && `pid ${w.pid}`, w.cwd].filter(Boolean).join(' · ');
   renderMemos(w);

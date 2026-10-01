@@ -47,8 +47,8 @@ const config = loadConfig();
 function loadConfig() {
   try {
     const c = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
-    return { profiles: c.profiles || [], recentCwds: c.recentCwds || [], order: c.order || [], memos: c.memos || {} };
-  } catch { return { profiles: [], recentCwds: [], order: [], memos: {} }; }
+    return { profiles: c.profiles || [], recentCwds: c.recentCwds || [], order: c.order || [], memos: c.memos || {}, colors: c.colors || {} };
+  } catch { return { profiles: [], recentCwds: [], order: [], memos: {}, colors: {} }; }
 }
 
 function saveConfig() {
@@ -80,6 +80,7 @@ function renameRole(from, to, worker) {
   if (worker) { worker.name = to; pushLog(worker, 'status', `이름 변경: ${from} → ${to}`); }
   config.profiles = config.profiles.map((x) => (x.name === from ? { ...x, name: to } : x));
   config.order = (config.order || []).map((x) => (x === from ? to : x));
+  if (config.colors?.[from] != null && config.colors[to] == null) { config.colors[to] = config.colors[from]; delete config.colors[from]; }
   if (config.memos?.[from]) { config.memos[to] = [...(config.memos[to] || []), ...config.memos[from]]; delete config.memos[from]; }
   saveConfig(); // emitState 포함
   return { ok: true };
@@ -180,6 +181,23 @@ setInterval(() => { const prev = staleCache.value; staleCache.at = 0; if (server
 
 const PERMISSION_MODES = ['default', 'acceptEdits', 'plan', 'bypassPermissions'];
 
+// 역할별 캐릭터 색(OKLCH 색상각). 이미 쓰는 색들과 색상 차이가 가장 큰 쪽을 골라 약간 무작위로 흔든다 —
+// 워커끼리 잘 구분되면서 무작위처럼 보이게. 밝기·채도는 화면에서 고정(oklch L 0.76, C 0.15)이라 어둡지 않다.
+function ensureRoleColor(name) {
+  config.colors ||= {};
+  if (!name || config.colors[name] != null) return;
+  const used = Object.values(config.colors);
+  const dist = (a, b) => { const d = Math.abs(a - b) % 360; return Math.min(d, 360 - d); };
+  let best = Math.floor(Math.random() * 360), bestGap = -1;
+  for (let i = 0; i < 72; i++) {
+    const h = (i * 5 + Math.random() * 5) % 360;
+    const gap = used.length ? Math.min(...used.map((u) => dist(h, u))) : 180 + Math.random();
+    if (gap > bestGap) { best = h; bestGap = gap; }
+  }
+  config.colors[name] = Math.round(best);
+  saveConfig();
+}
+
 function spawnWorker({ name, cwd, args = '', permissionMode = 'default' }) {
   let id;
   do id = `W${++seq}`; while (workers.has(id)); // 복원된 워커·호스트 터미널과 id 가 겹치면 안 된다
@@ -213,6 +231,7 @@ function spawnWorker({ name, cwd, args = '', permissionMode = 'default' }) {
   };
   workers.set(id, w);
   pushLog(w, 'spawn', `claude 실행 · ${permissionMode}${extra.length ? ` · ${extra.join(' ')}` : ''}`);
+  ensureRoleColor(w.name);
   rememberCwd(cwd);
   return w;
 }
@@ -404,6 +423,7 @@ function publicState() {
     profiles: config.profiles,
     order: config.order,
     memos: config.memos,
+    colors: config.colors,
     serverStale: serverStale(),
     recentCwds: config.recentCwds,
   };
@@ -481,6 +501,7 @@ function onHostHello({ ptys }) {
     else { w.pid = p.pid; pushLog(w, 'status', '관제 서버 재시작 — 워커 다시 연결'); }
     // 완료 시각 기록(doneAt) 이전에 끝난 워커도 '확인 안 한 완료'로 보이게 마지막 갱신 시각으로 채운다
     if (w.status === 'done' && !w.doneAt) w.doneAt = w.updatedAt || Date.now();
+    ensureRoleColor(w.name);
     workers.set(w.id, w);
     if (w.tx) scheduleProfile(w);
   }

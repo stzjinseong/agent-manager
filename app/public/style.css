@@ -216,7 +216,8 @@ main, .new-panel, #inbox, .floor, .compare, .detail { margin-left: 24px; margin-
 }
 .avatar { position: relative; z-index: 1; width: 72px; height: 40px; }
 .avatar svg { width: 100%; height: 100%; display: block; overflow: visible; }
-.clawd .body { fill: var(--accent); }
+/* 워커 캐릭터 색: 역할별 --avatar (서버가 고른 OKLCH 색상각). 없으면 Claude 코랄 */
+.clawd .body { fill: var(--avatar, var(--accent)); }
 .clawd .eye { fill: #1a0f0a; transform-box: fill-box; transform-origin: center; animation: blink 4.5s infinite; }
 @keyframes blink { 0%, 94%, 100% { transform: scaleY(1); } 96% { transform: scaleY(.15); } }
 .clawd .legs-b { opacity: 0; }
