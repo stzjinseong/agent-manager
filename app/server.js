@@ -532,8 +532,11 @@ const UPLOAD_LIMIT = 20 * 1024 * 1024;
 // 7일 지난 첨부는 정리 (Claude 가 이미 읽어 트랜스크립트에 담겼으므로 원본은 오래 둘 필요 없음)
 function cleanupUploads() {
   try {
+    // '나중에 할 작업'은 며칠 묵힐 수 있으니, 거기 적힌 이미지는 기간이 지나도 지우지 않는다
+    const kept = JSON.stringify(config.memos || {});
     for (const f of fs.readdirSync(UPLOAD_DIR)) {
       const full = path.join(UPLOAD_DIR, f);
+      if (kept.includes(f)) continue;
       if (Date.now() - fs.statSync(full).mtimeMs > 7 * 86400_000) fs.unlinkSync(full);
     }
   } catch {}

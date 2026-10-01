@@ -1113,13 +1113,18 @@ function insertAtCursor(ta, text) {
   ta.selectionStart = ta.selectionEnd = before.length + pad.length + text.length + 1;
   ta.focus();
 }
-dropZone(taskForm.text, (files) => attachImages(files, (p) => insertAtCursor(taskForm.text, p)));
-taskForm.text.addEventListener('paste', (e) => {
-  const files = imageFiles(e.clipboardData);
-  if (!files.length) return;
-  e.preventDefault();
-  attachImages(files, (p) => insertAtCursor(taskForm.text, p));
-});
+// 이미지 드롭·Ctrl+V 붙여넣기 → 커서 위치에 경로 삽입 (업무 지시 · 나중에 할 작업 공통)
+function acceptImages(ta) {
+  dropZone(ta, (files) => attachImages(files, (p) => insertAtCursor(ta, p)));
+  ta.addEventListener('paste', (e) => {
+    const files = imageFiles(e.clipboardData);
+    if (!files.length) return;
+    e.preventDefault();
+    attachImages(files, (p) => insertAtCursor(ta, p));
+  });
+}
+acceptImages(taskForm.text);
+acceptImages($('#memo-form').text);
 taskForm.onsubmit = async (e) => {
   e.preventDefault();
   const text = taskForm.text.value.trim();
