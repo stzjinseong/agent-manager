@@ -533,7 +533,36 @@ function renderDetail() {
       w.queue.map((q, i) => `<div class="qi"><span class="n">${i + 1}</span><span class="tx">${esc(q)}</span><button data-unqueue="${i}" title="큐에서 빼기">✕</button></div>`).join('')
     : '';
   const fmt = (t) => new Date(t + clockSkew).toLocaleTimeString('ko-KR', { hour12: false });
-  $('#log').innerHTML = w.log.slice().reverse().map((l) => `<li class="k-${l.kind}"><time>${fmt(l.t)}</time>${esc(l.text)}</li>`).join('');
+  $('#log').innerHTML = timelineRows(w.log).reverse().map((r) =>
+    `<li class="k-${r.kind}"><time>${fmt(r.t)}</time>${r.tag ? `<span class="tag">${r.tag}</span>` : ''}${esc(r.text)}</li>`).join('');
+}
+
+// 타임라인 정리: 사용자 요청을 한 줄로 모아 강조한다.
+//  · 대시보드 지시는 'assign' 과 곧이어 오는 'working: 같은 글' 두 줄로 찍힌다 → 한 줄('요청')
+//  · 터미널에서 직접 친 요청은 'working: …' 만 찍힌다 → '요청'
+//  · 감시·백그라운드 완료 알림으로 생긴 턴('working: <task-notification>…')은 요청이 아니다 → '알림'
+//  · 'queue' 는 대기열에 들어간 지시 → '대기열'
+function timelineRows(log) {
+  const rows = [];
+  for (const l of log) {
+    if (l.kind === 'assign') { rows.push({ t: l.t, kind: 'req', tag: '요청', text: l.text }); continue; }
+    if (l.kind === 'queue') { rows.push({ t: l.t, kind: 'queued', tag: '대기열', text: l.text }); continue; }
+    const m = l.kind === 'status' && l.text.match(/^working: ([\s\S]*)$/);
+    if (m) {
+      const text = m[1];
+      if (text.startsWith('<task-notification>')) {
+        const sum = text.match(/<summary>([^<]*)/)?.[1] || '백그라운드 작업 알림';
+        rows.push({ t: l.t, kind: 'bgnote', tag: '🔔 알림', text: sum });
+        continue;
+      }
+      const prev = rows.findLast((r) => r.kind === 'req');
+      if (prev && prev.text.trim() === text.trim() && l.t - prev.t < 15_000) continue; // 대시보드 지시와 같은 줄
+      rows.push({ t: l.t, kind: 'req', tag: '요청', text });
+      continue;
+    }
+    rows.push({ t: l.t, kind: l.kind, text: l.text });
+  }
+  return rows;
   renderProfile(w);
 }
 
