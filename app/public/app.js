@@ -561,6 +561,7 @@ function renderDetail() {
   timelineCache = timelineRows(w.log);
   $('#log').innerHTML = timelineCache.map((r, i) => [r, i]).reverse().map(([r, i]) =>
     `<li class="k-${r.kind}" data-i="${i}"${r.kind === 'req' ? ' title="클릭: 터미널에서 이 요청 위치로 이동"' : ''}><time>${fmt(r.t)}</time>${r.tag ? `<span class="tag">${r.tag}</span>` : ''}${esc(r.text)}</li>`).join('');
+  renderProfile(w);
 }
 
 // 타임라인 정리: 사용자 요청을 한 줄로 모아 강조한다.
@@ -589,7 +590,6 @@ function timelineRows(log) {
     rows.push({ t: l.t, kind: l.kind, text: l.text });
   }
   return rows;
-  renderProfile(w);
 }
 
 // ---------- 세션 프로파일 ----------
