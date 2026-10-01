@@ -23,16 +23,17 @@ function clawdSVG() {
 }
 document.querySelectorAll('[data-clawd]').forEach((el) => (el.innerHTML = clawdSVG()));
 
-// 브라우저 탭 아이콘 = 같은 픽셀 캐릭터. 결정 대기가 있으면 오른쪽 위에 주황 점
-// (서버 재시작 없이 바뀌도록 파일 대신 data URI 로 넣는다)
+// 브라우저 탭 아이콘 = 매니저와 같은 흰 클로드 캐릭터. 밝은 탭 바에서도 보이도록 어두운 둥근 사각형 바탕을 깐다.
+// 결정 대기가 있으면 오른쪽 위에 주황 점 (서버 재시작 없이 바뀌도록 파일 대신 data URI 로 넣는다)
 function faviconSVG(alert) {
   const R = (x, y, w, h, c) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${c}"/>`;
-  const body = '#d97757', eye = '#1a0f0a';
-  // 18×10 캐릭터(픽셀 = 가로1×세로2)가 정사각형 폭을 꽉 채우도록 위아래만 여백 (16px 탭에서도 크게 보이게)
+  const body = '#f3f1ec', eye = '#14161c';
+  // 18×10 캐릭터(픽셀 = 가로1×세로2)를 22×22 바탕 가운데에
   const g = R(3, 0, 12, 4, body) + R(1, 4, 16, 2, body) + R(3, 6, 12, 2, body) +
     [4, 6, 11, 13].map((x) => R(x, 8, 1, 2, body)).join('') + R(5, 2, 1, 2, eye) + R(12, 2, 1, 2, eye);
-  const dot = alert ? '<circle cx="15" cy="-1" r="3" fill="#f4b34a" stroke="#0c0d11" stroke-width="0.8"/>' : '';
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -4 18 18" shape-rendering="crispEdges">${g}${dot}</svg>`;
+  const bg = '<rect x="0" y="0" width="22" height="22" rx="5" fill="#14161c"/>';
+  const dot = alert ? '<circle cx="18.5" cy="3.5" r="3.5" fill="#f4b34a" stroke="#14161c" stroke-width="1"/>' : '';
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22" shape-rendering="crispEdges">${bg}<g transform="translate(2 6)">${g}</g>${dot}</svg>`;
 }
 let faviconAlert = null;
 function setFavicon(alert) {

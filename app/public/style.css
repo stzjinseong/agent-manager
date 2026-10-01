@@ -65,7 +65,11 @@ textarea { resize: vertical; }
 }
 .brand { display: flex; align-items: center; gap: 10px; }
 .brand h1 { font-size: 17px; font-weight: 700; margin: 0; letter-spacing: -.01em; }
-.brand-mark svg { width: 34px; height: 19px; display: block; }
+.brand-mark svg { width: 34px; height: 19px; display: block; overflow: visible; }
+/* 헤더 로고도 매니저와 같은 흰 캐릭터 (은은한 흰 빛) */
+.brand-mark .clawd .body { fill: #f3f1ec; }
+.brand-mark .clawd .eye { fill: #14161c; }
+.brand-mark { filter: drop-shadow(0 0 4px rgba(255, 255, 255, .3)); }
 .stats { display: flex; gap: 6px; flex: 1; flex-wrap: wrap; }
 .stat { display: inline-flex; align-items: center; gap: 7px; padding: 4px 11px; border-radius: 999px; background: var(--surface-2); color: var(--text-2); font-size: 12.5px; }
 .stat b { color: var(--text); font-variant-numeric: tabular-nums; }
