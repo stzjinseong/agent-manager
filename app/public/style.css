@@ -27,7 +27,8 @@
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-html { background: var(--bg); }
+/* 스크롤바 자리를 항상 비워 둔다 — 내용이 길어져 스크롤바가 생기거나 사라질 때 폭이 바뀌어 레이아웃이 옆으로 밀리지 않게 */
+html { background: var(--bg); scrollbar-gutter: stable; }
 body {
   margin: 0; color: var(--text); background: var(--bg);
   /* Pretendard(웹폰트) 우선, 오프라인이면 각 OS 시스템 글꼴 — macOS: SF/Apple SD Gothic Neo, Windows: Segoe UI/맑은 고딕 */
