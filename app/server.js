@@ -478,9 +478,9 @@ function onHostHello({ ptys }) {
     const w = { ...rec, term: hostTerm(rec.id), tx: rec.txPath ? createProfile(rec.txPath) : null };
     delete w.txPath;
     if (!p || p.exited) w.status = 'exited';
+    else { w.pid = p.pid; pushLog(w, 'status', '관제 서버 재시작 — 워커 다시 연결'); }
     // 완료 시각 기록(doneAt) 이전에 끝난 워커도 '확인 안 한 완료'로 보이게 마지막 갱신 시각으로 채운다
     if (w.status === 'done' && !w.doneAt) w.doneAt = w.updatedAt || Date.now();
-    else { w.pid = p.pid; pushLog(w, 'status', '관제 서버 재시작 — 워커 다시 연결'); }
     workers.set(w.id, w);
     if (w.tx) scheduleProfile(w);
   }
