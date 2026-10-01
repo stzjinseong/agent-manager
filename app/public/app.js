@@ -614,6 +614,8 @@ function renderProfile(w, force) {
     return;
   }
   $('#profile-model').textContent = `${p.model || ''} · 컨텍스트 창 ${fmtN(p.window)}`;
+  // 접었을 때 제목 옆에 보이는 한 줄 요약
+  { const tt = p.total; $('#profile-mini').textContent = `누적 ${fmtN(tt.input + tt.cacheWrite + tt.cacheRead + tt.output)} · ${fmtUsd(tt.cost)} · 컨텍스트 ${fmtN(p.context)}${p.cacheHit != null ? ` · 캐시 ${Math.round(p.cacheHit * 100)}%` : ''}`; }
   const t = p.total;
   const all = t.input + t.cacheWrite + t.cacheRead + t.output;
   const ctx = ctxLevel(p);
@@ -1182,6 +1184,17 @@ $('#power-modal').addEventListener('click', async (e) => {
 $('#btn-interrupt').onclick = () => selected && api(`/api/workers/${selected}/interrupt`);
 
 // 터미널 크게 보기: 브라우저 전체화면 API 는 Esc 로 빠져나가는데 Esc 는 Claude 중단 키라 겹친다 → 창 전체를 덮는 오버레이로
+// ---------- 세션 프로파일 접기/펼치기 (브라우저에 기억) ----------
+const PROFILE_KEY = 'am.profileCollapsed';
+function setProfileCollapsed(on) {
+  $('#profile').classList.toggle('collapsed', on);
+  $('#profile-toggle').setAttribute('aria-expanded', String(!on));
+  try { on ? localStorage.setItem(PROFILE_KEY, '1') : localStorage.removeItem(PROFILE_KEY); } catch {}
+}
+try { if (localStorage.getItem(PROFILE_KEY)) setProfileCollapsed(true); } catch {}
+$('#profile-toggle').addEventListener('click', () => setProfileCollapsed(!$('#profile').classList.contains('collapsed')));
+$('#profile-toggle').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('#profile-toggle').click(); } });
+
 // ---------- 터미널 높이 조절 (CLI 아래 가로선을 위아래로 끌기) ----------
 // 높이는 #detail 의 --term-h 로 정하고 브라우저에 기억한다. 크기가 바뀌면 기존 ResizeObserver 가 fit + pty resize 를 한다
 const TERM_H_KEY = 'am.termH';

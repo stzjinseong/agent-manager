@@ -618,3 +618,12 @@ body.term-full { overflow: hidden; }
 .term-resizer:hover i, .term-resizer.dragging i { background: color-mix(in srgb, var(--accent) 60%, transparent); }
 .term-resizer:hover i::after, .term-resizer.dragging i::after { background: var(--accent); border-color: var(--accent); }
 body.resizing-term { cursor: row-resize; user-select: none; }
+
+/* ---------- 세션 프로파일 접기 ---------- */
+.profile-head { cursor: pointer; user-select: none; border-radius: 8px; margin: -4px -6px; padding: 4px 6px; }
+.profile-head:hover { background: var(--surface-2); }
+.profile-head .chev { color: var(--dim); font-size: 12px; width: 12px; display: inline-block; transition: transform .2s; }
+.profile.collapsed .profile-head .chev { transform: rotate(-90deg); }
+#profile-mini { display: none; margin-left: auto; color: var(--text-2) !important; font: 12px var(--mono); }
+.profile.collapsed #profile-mini { display: inline; }
+.profile.collapsed > :not(.profile-head) { display: none; }

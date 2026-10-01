@@ -113,9 +113,11 @@
     <div class="term-resizer" id="term-resizer" title="위아래로 끌어 터미널 높이 조절 · 더블클릭: 기본 높이"><i></i></div>
 
     <div class="profile" id="profile">
-      <div class="profile-head">
+      <div class="profile-head" id="profile-toggle" role="button" tabindex="0" title="클릭해서 접기/펼치기">
+        <span class="chev">▾</span>
         <h2>세션 프로파일</h2>
         <span id="profile-model"></span>
+        <span id="profile-mini"></span>
       </div>
       <div class="kpis" id="kpis"></div>
       <div class="charts">
