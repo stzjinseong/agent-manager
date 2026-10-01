@@ -577,8 +577,9 @@ body.term-full { overflow: hidden; }
 
 /* ---------- 메모 (자동 실행 안 됨) ---------- */
 .memo { display: flex; flex-direction: column; gap: 6px; }
-.memo h3 { margin: 0; font-size: 12px; font-weight: 600; color: var(--dim); letter-spacing: .04em; }
-.memo h3 small { font-weight: 400; margin-left: 4px; }
+/* 오른쪽 패널 소제목 — 업무 지시 · 나중에 할 작업 · 타임라인이 같은 모양 */
+.memo h3, .side-h { margin: 0; font-size: 12px; font-weight: 600; color: var(--dim); letter-spacing: .04em; }
+.memo h3 small, .side-h small { font-weight: 400; margin-left: 4px; }
 .memo textarea { font-size: 13px; }
 .memos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; max-height: 220px; overflow: auto; }
 .memos li { background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; font-size: 12.5px; display: flex; flex-direction: column; gap: 5px; }

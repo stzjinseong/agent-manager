@@ -1085,8 +1085,8 @@ function renderMemos(w) {
   const fmt = (t) => new Date(t + clockSkew).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
   $('#memos').innerHTML = list.length
     ? list.map((m) => `<li data-id="${m.id}"><span class="mt">${esc(m.text)}</span>
-        <span class="ma"><time>${fmt(m.createdAt)}</time><button class="btn mini primary" data-memo="send" title="이 메모를 업무 지시로 (작업 중이면 대기열)">▶ 지시</button><button class="btn mini ghost" data-memo="remove" title="메모 삭제">✕</button></span></li>`).join('')
-    : '<li class="empty-memo">적어 둔 메모가 없습니다</li>';
+        <span class="ma"><time>${fmt(m.createdAt)}</time><button class="btn mini primary" data-memo="send" title="이 작업을 업무 지시로 (작업 중이면 대기열)">▶ 지시</button><button class="btn mini ghost" data-memo="remove" title="삭제">✕</button></span></li>`).join('')
+    : '<li class="empty-memo">나중에 할 작업이 없습니다</li>';
 }
 const memoForm = $('#memo-form');
 submitOnModEnter(memoForm); // 업무 지시 칸과 같은 키: Enter 줄바꿈, Alt/⌘+Enter 추가
@@ -1104,7 +1104,7 @@ $('#memos').addEventListener('click', async (e) => {
   const li = e.target.closest('li[data-id]');
   const w = state.workers.find((x) => x.id === selected);
   if (!act || !li || !w) return;
-  if (act === 'remove' && !confirm('이 메모를 지울까요?')) return;
+  if (act === 'remove' && !confirm('이 작업을 지울까요?')) return;
   li.classList.add('busy');
   const r = await api('/api/memos', { role: w.name, op: act, id: li.dataset.id, workerId: w.id });
   if (r.error) { li.classList.remove('busy'); toast(r.error, 3000); }
