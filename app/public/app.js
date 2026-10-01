@@ -598,8 +598,11 @@ function updateNode(node, w) {
 function renderFloor() {
   const nodes = $('#nodes');
   const liveNames = new Set(state.workers.filter((w) => w.status !== 'exited').map((w) => w.name));
+  // 종료된 워커는 같은 이름의 대기실 슬롯이 있으면 숨긴다 — 재투입은 슬롯으로 하므로 카드가 겹칠 뿐이다.
+  // 저장된 역할이 없는 종료 워커만 남겨, 기록을 보거나 직접 제거할 수 있게 한다.
+  const profileNames = new Set(state.profiles.map((p) => p.name));
   const items = [
-    ...state.workers.map((w) => ({ key: w.id, name: w.name, w })),
+    ...state.workers.filter((w) => w.status !== 'exited' || !profileNames.has(w.name)).map((w) => ({ key: w.id, name: w.name, w })),
     ...state.profiles.filter((p) => !liveNames.has(p.name)).map((p) => ({ key: `P:${p.name}`, name: p.name, p })),
   ];
   // 저장된 순서(역할 이름) 우선, 없는 항목은 원래 순서대로 뒤에 (stable sort)
