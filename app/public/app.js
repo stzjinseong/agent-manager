@@ -1219,8 +1219,11 @@ $('#btn-interrupt').onclick = () => selected && api(`/api/workers/${selected}/in
 // 못 찾으면(기록이 지워졌거나 범위를 벗어남) 옮기지 않는다.
 let timelineCache = [];
 const normText = (s) => String(s).replace(/\s+/g, ' ').trim();
+// 첨부 이미지: 보낸 글에는 파일 경로가, 터미널에는 Claude 가 바꾼 '[Image #N]' 이 찍힌다 → 양쪽 다 지우고 비교
+const IMG_RE = /\[Image #\d+\]|"[^"]*\.(?:png|jpe?g|gif|webp|bmp)"|(?:[A-Za-z]:)?[\\/]\S*\.(?:png|jpe?g|gif|webp|bmp)\b/gi;
+const stripImg = (s) => normText(String(s).replace(IMG_RE, ' '));
 function findPromptLine(text, fromEnd) {
-  const key = normText(text).slice(0, 40);
+  const key = stripImg(text).slice(0, 40);
   if (key.length < 2) return -1;
   const b = term.buffer.active, hits = [];
   // 줄바꿈으로 나뉜 요청도 잡히게 앞뒤 줄을 이어 붙여 본다
@@ -1230,7 +1233,7 @@ function findPromptLine(text, fromEnd) {
     let s = line.translateToString(true);
     for (let j = i + 1; j < b.length && b.getLine(j)?.isWrapped; j++) s += b.getLine(j).translateToString(true);
     const t = normText(s);
-    if (/^[>›❯]\s?/.test(t) && normText(t.replace(/^[>›❯]\s?/, '')).startsWith(key)) hits.push(i);
+    if (/^[>›❯]\s?/.test(t) && stripImg(t.replace(/^[>›❯]\s?/, '')).startsWith(key)) hits.push(i);
   }
   return hits.length > fromEnd ? hits[hits.length - 1 - fromEnd] : -1;
 }
