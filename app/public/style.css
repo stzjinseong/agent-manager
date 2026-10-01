@@ -688,3 +688,33 @@ body.resizing-term { cursor: row-resize; user-select: none; }
   20% { opacity: 1; transform: translate(-50%, 0) scale(1.05); }
   100% { opacity: 0; transform: translate(-50%, -14px) scale(1); }
 }
+
+/* ---------- 확인·입력 팝업 (app.js ask) — 회로 기판 컨셉: 칩 카드처럼 위에 구리 핀, 클로드가 묻는다 ---------- */
+.modal-back:not([hidden]) { animation: ask-fade .15s ease-out; backdrop-filter: blur(2px); }
+.modal-back:not([hidden]) .modal { animation: ask-pop .22s cubic-bezier(.3, 1.4, .5, 1); }
+@keyframes ask-fade { from { opacity: 0; } }
+@keyframes ask-pop { from { opacity: 0; transform: translateY(8px) scale(.96); } }
+.modal {
+  position: relative; border-radius: 14px; border-color: var(--line-2);
+  background:
+    radial-gradient(circle at 1px 1px, rgba(255, 255, 255, .05) 1px, transparent 1.4px) 0 0 / 18px 18px,
+    linear-gradient(180deg, var(--surface-2), var(--surface));
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .55), 0 1px 0 rgba(255, 255, 255, .05) inset;
+}
+.modal::before { /* 윗면 핀 — 워커 카드와 같은 모양 */
+  content: ""; position: absolute; top: -6px; left: 28px; right: 28px; height: 5px;
+  background: repeating-linear-gradient(90deg, var(--copper) 0 4px, transparent 4px 12px); opacity: .55;
+}
+.ask { --ask-c: var(--accent); width: min(420px, calc(100% - 32px)); padding: 18px 20px 16px; }
+.modal-back.danger .ask { --ask-c: #e0655a; }
+.ask-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.ask-head h3 { margin: 0; font-size: 15px; line-height: 1.4; }
+.ask-mark { flex: none; width: 42px; padding: 7px 6px 5px; border-radius: 10px;
+  background: color-mix(in srgb, var(--ask-c) 12%, rgba(0, 0, 0, .3)); border: 1px solid color-mix(in srgb, var(--ask-c) 35%, transparent); }
+.ask-mark svg { display: block; width: 100%; height: auto; }
+.ask-mark .clawd .body { fill: var(--ask-c); }
+.ask-mark .clawd .legs-b { opacity: 0; }
+.ask-mark .clawd .eye { fill: #14161c; }
+.ask p { margin: 0 0 14px 54px; font-size: 13px; white-space: pre-wrap; word-break: break-word; }
+.ask textarea { display: block; width: 100%; margin: 0 0 14px; resize: vertical; min-height: 64px; }
+.ask textarea[hidden] { display: none; }

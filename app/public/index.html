@@ -182,6 +182,19 @@
     </div>
   </div>
 
+  <!-- 확인·입력 팝업 (브라우저 기본 confirm/prompt 대신) — app.js ask() -->
+  <div class="modal-back" id="ask-modal" hidden>
+    <div class="modal panel ask" role="dialog" aria-modal="true" aria-labelledby="ask-title">
+      <div class="ask-head"><span class="ask-mark" data-clawd></span><h3 id="ask-title"></h3></div>
+      <p id="ask-body"></p>
+      <textarea id="ask-input" rows="3" hidden></textarea>
+      <div class="modal-acts">
+        <button class="btn ghost" data-ask="cancel">취소</button>
+        <button class="btn primary" data-ask="ok">확인</button>
+      </div>
+    </div>
+  </div>
+
   <div class="down-screen" id="down-screen" hidden>
     <div class="down-box">
       <span class="down-mark" data-clawd></span>

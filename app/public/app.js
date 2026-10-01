@@ -109,6 +109,43 @@ function toast(text, ms = 2200) {
   t.textContent = text; t.hidden = false;
   clearTimeout(toast.timer); toast.timer = setTimeout(() => (t.hidden = true), ms);
 }
+// 확인·입력 팝업 — 브라우저 기본 confirm/prompt 대신 화면 가운데 우리 팝업.
+// 확인 → true(입력형이면 입력한 글), 취소·Esc·바깥 클릭 → false(입력형이면 null). Enter = 확인(입력형은 Alt/⌘+Enter)
+function ask({ title, body = '', ok = '확인', danger = false, input = null }) {
+  const back = $('#ask-modal'), inp = $('#ask-input'), okBtn = $('[data-ask="ok"]', back);
+  $('#ask-title').textContent = title;
+  $('#ask-body').textContent = body;
+  $('#ask-body').hidden = !body;
+  inp.hidden = input === null;
+  inp.value = input ?? '';
+  okBtn.textContent = ok;
+  okBtn.className = `btn ${danger ? 'deny' : 'primary'}`;
+  back.classList.toggle('danger', danger);
+  back.hidden = false;
+  const prevFocus = document.activeElement;
+  requestAnimationFrame(() => (input === null ? okBtn : inp).focus());
+  return new Promise((resolve) => {
+    const done = (yes) => {
+      back.hidden = true;
+      back.removeEventListener('click', onClick);
+      back.removeEventListener('keydown', onKey, true);
+      prevFocus?.focus?.();
+      resolve(input === null ? yes : yes ? inp.value.trim() : null);
+    };
+    const onClick = (e) => {
+      const a = e.target.closest('[data-ask]')?.dataset.ask;
+      if (a) done(a === 'ok');
+      else if (e.target === back) done(false);
+    };
+    // 캡처 단계에서 처리하고 막는다 — Esc 가 터미널(=Claude 중단)이나 다른 단축키로 새지 않게
+    const onKey = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done(false); }
+      else if (e.key === 'Enter' && !e.isComposing && (input === null || e.altKey || e.metaKey)) { e.preventDefault(); e.stopPropagation(); done(true); }
+    };
+    back.addEventListener('click', onClick);
+    back.addEventListener('keydown', onKey, true);
+  });
+}
 async function attachImages(files, insert) {
   for (const f of files) {
     toast(`이미지 첨부 중… ${f.name || '클립보드 이미지'}`, 60_000);
@@ -1050,7 +1087,7 @@ function startRename(node, nm) {
     if (!save || !to || to === old) return;
     const url = node.classList.contains('socket') ? '/api/profiles/rename' : `/api/workers/${node.dataset.id}/rename`;
     const r = await api(url, { from: old, name: to });
-    if (r.error) { nm.textContent = old; alert(r.error); }
+    if (r.error) { nm.textContent = old; toast(r.error, 3500); }
   };
   inp.addEventListener('keydown', (ev) => {
     ev.stopPropagation();
@@ -1069,7 +1106,7 @@ $('#nodes').addEventListener('click', async (e) => {
     const p = state.profiles.find((x) => x.name === node.dataset.profile);
     if (!p) return;
     if (act === 'launch') { const { id } = await api('/api/workers', p); select(id); }
-    if (act === 'forget' && confirm(`저장된 역할 "${p.name}" 을 삭제할까요?`)) api('/api/profiles/delete', { name: p.name });
+    if (act === 'forget' && await ask({ title: '저장된 역할 삭제', body: `"${p.name}" 역할을 목록에서 지울까요?`, ok: '삭제', danger: true })) api('/api/profiles/delete', { name: p.name });
     return;
   }
   select(node.dataset.id);
@@ -1081,7 +1118,7 @@ $('#inbox').addEventListener('click', async (e) => {
   const id = btn.closest('.decision').dataset.id;
   let act = btn.dataset.act, message;
   if (act === 'deny-msg') {
-    message = prompt('거부 사유 (Claude 에게 전달됩니다)');
+    message = await ask({ title: '거부 사유', body: 'Claude 에게 그대로 전달됩니다.', ok: '거부', danger: true, input: '' });
     if (message === null) return;
     act = 'deny';
   }
@@ -1225,7 +1262,7 @@ $('#memos').addEventListener('click', async (e) => {
   const li = e.target.closest('li[data-id]');
   const w = state.workers.find((x) => x.id === selected);
   if (!act || !li || !w) return;
-  if (act === 'remove' && !confirm('이 작업을 지울까요?')) return;
+  if (act === 'remove' && !(await ask({ title: '이 작업을 지울까요?', body: li.querySelector('.mt')?.textContent.slice(0, 120) || '', ok: '지우기', danger: true }))) return;
   li.classList.add('busy');
   if (act === 'send') flyToWorker(w.id, li, 'task');
   const r = await api('/api/memos', { role: w.name, op: act, id: li.dataset.id, workerId: w.id });
@@ -1372,7 +1409,7 @@ function setTermFull(on) {
 $('#btn-full').onclick = () => setTermFull(!$('#term-wrap').classList.contains('full'));
 $('#btn-full-exit').onclick = () => setTermFull(false);
 $('#btn-remove').onclick = async () => {
-  if (!selected || !confirm('워커를 목록에서 제거할까요? (실행 중이면 종료됩니다)')) return;
+  if (!selected || !(await ask({ title: '워커를 제거할까요?', body: '목록에서 지웁니다. 실행 중이면 Claude 세션도 종료됩니다.', ok: '제거', danger: true }))) return;
   await api(`/api/workers/${selected}/remove`);
   selected = null; render();
 };
