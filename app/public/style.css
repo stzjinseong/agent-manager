@@ -627,3 +627,5 @@ body.resizing-term { cursor: row-resize; user-select: none; }
 #profile-mini { display: none; margin-left: auto; color: var(--text-2) !important; font: 12px var(--mono); }
 .profile.collapsed #profile-mini { display: inline; }
 .profile.collapsed > :not(.profile-head) { display: none; }
+#log li.k-req { cursor: pointer; }
+#log li.k-req:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); }

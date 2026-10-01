@@ -538,8 +538,9 @@ function renderDetail() {
       w.queue.map((q, i) => `<div class="qi"><span class="n">${i + 1}</span><span class="tx">${esc(q)}</span><button data-unqueue="${i}" title="큐에서 빼기">✕</button></div>`).join('')
     : '';
   const fmt = (t) => new Date(t + clockSkew).toLocaleTimeString('ko-KR', { hour12: false });
-  $('#log').innerHTML = timelineRows(w.log).reverse().map((r) =>
-    `<li class="k-${r.kind}"><time>${fmt(r.t)}</time>${r.tag ? `<span class="tag">${r.tag}</span>` : ''}${esc(r.text)}</li>`).join('');
+  timelineCache = timelineRows(w.log);
+  $('#log').innerHTML = timelineCache.map((r, i) => [r, i]).reverse().map(([r, i]) =>
+    `<li class="k-${r.kind}" data-i="${i}"${r.kind === 'req' ? ' title="클릭: 터미널에서 이 요청 위치로 이동"' : ''}><time>${fmt(r.t)}</time>${r.tag ? `<span class="tag">${r.tag}</span>` : ''}${esc(r.text)}</li>`).join('');
 }
 
 // 타임라인 정리: 사용자 요청을 한 줄로 모아 강조한다.
@@ -1184,6 +1185,42 @@ $('#power-modal').addEventListener('click', async (e) => {
 $('#btn-interrupt').onclick = () => selected && api(`/api/workers/${selected}/interrupt`);
 
 // 터미널 크게 보기: 브라우저 전체화면 API 는 Esc 로 빠져나가는데 Esc 는 Claude 중단 키라 겹친다 → 창 전체를 덮는 오버레이로
+// ---------- 타임라인 요청 → 터미널 해당 위치로 ----------
+// Claude Code 는 요청을 '> 요청 내용' 으로 대화에 다시 찍는다. 터미널 기록(스크롤백)에서 그 줄을 찾아 스크롤한다.
+// 같은 문구가 여러 번이면 뒤에서부터 순서를 맞춘다 — 오래된 기록이 지워져도(clear 등) 최근 요청은 맞게 찾도록.
+// 못 찾으면(기록이 지워졌거나 범위를 벗어남) 옮기지 않는다.
+let timelineCache = [];
+const normText = (s) => String(s).replace(/\s+/g, ' ').trim();
+function findPromptLine(text, fromEnd) {
+  const key = normText(text).slice(0, 40);
+  if (key.length < 2) return -1;
+  const b = term.buffer.active, hits = [];
+  // 줄바꿈으로 나뉜 요청도 잡히게 앞뒤 줄을 이어 붙여 본다
+  for (let i = 0; i < b.length; i++) {
+    const line = b.getLine(i);
+    if (!line || line.isWrapped) continue;
+    let s = line.translateToString(true);
+    for (let j = i + 1; j < b.length && b.getLine(j)?.isWrapped; j++) s += b.getLine(j).translateToString(true);
+    const t = normText(s);
+    if (/^[>›❯]\s?/.test(t) && normText(t.replace(/^[>›❯]\s?/, '')).startsWith(key)) hits.push(i);
+  }
+  return hits.length > fromEnd ? hits[hits.length - 1 - fromEnd] : -1;
+}
+$('#log').addEventListener('click', (e) => {
+  const li = e.target.closest('li.k-req');
+  if (!li) return;
+  const i = Number(li.dataset.i), row = timelineCache[i];
+  if (!row) return;
+  // 이 요청 뒤에 같은 문구 요청이 몇 번 더 있었나 = 터미널에서 끝에서 몇 번째인가
+  const later = timelineCache.slice(i + 1).filter((r) => r.kind === 'req' && normText(r.text) === normText(row.text)).length;
+  const line = findPromptLine(row.text, later);
+  if (line < 0) { toast('터미널 기록에 없는 요청입니다 (clear 등으로 지워졌거나 기록 범위를 벗어남)', 3200); return; }
+  term.scrollToLine(Math.max(0, line - 2));
+  term.selectLines(line, line); // 잠깐 강조
+  clearTimeout(findPromptLine.t);
+  findPromptLine.t = setTimeout(() => term.clearSelection(), 1600);
+});
+
 // ---------- 세션 프로파일 접기/펼치기 (브라우저에 기억) ----------
 const PROFILE_KEY = 'am.profileCollapsed';
 function setProfileCollapsed(on) {
