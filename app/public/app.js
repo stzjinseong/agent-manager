@@ -74,6 +74,13 @@ async function copySelection() {
 }
 term.attachCustomKeyEventHandler((e) => {
   if (e.type !== 'keydown') return true;
+  // 줄바꿈: xterm 은 Ctrl+Enter·Shift+Enter 를 그냥 Enter(\r = 제출)로 보낸다. Claude Code 가 줄바꿈으로
+  // 받는 ESC+CR(= Alt+Enter 와 같은 신호)로 바꿔 보낸다 (실측: ESC CR · Ctrl+J · \+Enter 모두 줄바꿈)
+  if (e.key === 'Enter' && (e.ctrlKey || e.shiftKey) && !e.altKey && !e.metaKey) {
+    e.preventDefault();
+    if (selected) send({ type: 'input', id: selected, data: '\x1b\r' });
+    return false;
+  }
   const mod = e.ctrlKey || e.metaKey;
   // e.key 가 아니라 물리 키(e.code)로 판정 — 한글 입력 상태면 Ctrl+V 의 key 가 'ㅍ', Ctrl+C 는 'ㅊ' 로 온다
   if (mod && e.code === 'KeyC' && (term.hasSelection() || e.shiftKey || e.metaKey)) { e.preventDefault(); copySelection(); return false; }
