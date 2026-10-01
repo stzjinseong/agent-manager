@@ -641,4 +641,12 @@ body.resizing-term { cursor: row-resize; user-select: none; }
   box-shadow: 0 0 14px color-mix(in srgb, var(--avatar, var(--accent)) 22%, transparent);
   transition: border-color .25s, box-shadow .25s;
 }
+/* 선택한 워커 카드도 같은 색 테두리 — 어느 카드의 터미널을 보고 있는지 한눈에. 2px 은 레이아웃이 밀리지 않게
+   border 1px + 바깥 1px 링(box-shadow)으로 만든다. 상태별 그림자(.s-working 등)보다 뒤에 둬야 이긴다 */
+.node.sel {
+  border-color: color-mix(in srgb, var(--avatar, var(--accent)) 75%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--avatar, var(--accent)) 75%, transparent),
+    0 0 14px color-mix(in srgb, var(--avatar, var(--accent)) 22%, transparent), 0 8px 24px rgba(0, 0, 0, .35);
+}
+.node.sel::after { background: var(--avatar, var(--accent)); }
 .term-wrap.full .term-bar { border-bottom: 2px solid color-mix(in srgb, var(--avatar, var(--accent)) 75%, transparent); margin-bottom: 6px; }
