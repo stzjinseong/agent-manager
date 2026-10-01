@@ -344,7 +344,7 @@ main, .new-panel, #inbox, .floor, .compare, .detail { margin-left: 24px; margin-
 @media (max-width: 640px) {
   main, .new-panel, #inbox, .floor, .compare, .detail { margin-left: 12px; margin-right: 12px; }
   .topbar { padding: 10px 12px; }
-  .detail { width: calc(100% - 24px); }
+  .detail, .compare { width: calc(100% - 24px); }
   #new-form { grid-template-columns: 1fr; }
   .decision { flex-wrap: wrap; }
 }
@@ -439,7 +439,9 @@ main, .new-panel, #inbox, .floor, .compare, .detail { margin-left: 24px; margin-
 .sa-desc { color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }
 .sa-meta { color: var(--dim); margin-top: 2px; font-variant-numeric: tabular-nums; }
 
-.compare { margin-top: 16px; padding: 12px 16px 10px; }
+/* 폭은 아래 상세(CLI) 영역과 같은 규칙: 화면 폭 - 좌우 24px, 최대 1480px 가운데 정렬 */
+.compare { width: calc(100% - 48px); max-width: 1480px; margin: 16px auto 0 !important; padding: 12px 16px 10px; }
+@media (max-width: 640px) { .compare { width: calc(100% - 24px); } } /* 위 공통 규칙보다 뒤에 둬야 좁은 화면 폭이 적용된다 */
 .cmp-grid { display: flex; flex-direction: column; }
 .cmp-h, .cmp-row { display: grid; grid-template-columns: minmax(120px, 1.2fr) minmax(160px, 2fr) 110px 90px minmax(160px, 1.6fr); gap: 14px; align-items: center; padding: 7px 4px; font-size: 12.5px; }
 .cmp-h { color: var(--dim); font-size: 12px; border-bottom: 1px solid var(--line-2); }
