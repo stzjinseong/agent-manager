@@ -565,7 +565,10 @@ const avatarColor = (name) => (state.colors?.[name] != null ? `oklch(0.76 0.15 $
 
 function updateNode(node, w) {
   node.style.setProperty('--avatar', avatarColor(w.name) || 'var(--accent)');
-  node.className = `node s-${viewStatus(w)}${w.id === selected ? ' sel' : ''}${isUnseenDone(w) ? ' unseen' : ''}`;
+  // 이름 변경 중(renaming)·드래그 중(dragging) 표시는 사용자 동작이 붙인 것이라 상태 갱신이 지우면 안 된다 —
+  // 지우면 바로 아래에서 이름 글자가 입력창을 덮어써, 다른 워커 활동으로 상태가 올 때마다 입력이 닫혔다
+  const keep = ['renaming', 'dragging'].filter((c) => node.classList.contains(c)).map((c) => ` ${c}`).join('');
+  node.className = `node s-${viewStatus(w)}${w.id === selected ? ' sel' : ''}${isUnseenDone(w) ? ' unseen' : ''}${keep}`;
   node.dataset.id = w.id;
   $('.nid', node).textContent = w.id;
   if (!node.classList.contains('renaming')) $('.nname', node).textContent = w.name;
