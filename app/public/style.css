@@ -320,7 +320,7 @@ main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24p
 .queue .qi button { background: none; border: 0; color: var(--dim); cursor: pointer; padding: 0 2px; font-size: 13px; }
 .queue .qi button:hover { color: var(--text); }
 .timeline { display: flex; flex-direction: column; min-height: 0; flex: 1; }
-.timeline h3 { margin: 0 0 6px; font-size: 12px; font-weight: 600; color: var(--dim); letter-spacing: .04em; }
+.timeline h3 { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--text); letter-spacing: .04em; }
 #log { list-style: none; margin: 0; padding: 0; font-size: 12px; overflow: auto; flex: 1; }
 #log li { padding: 5px 0 5px 12px; border-left: 1px solid var(--line-2); position: relative; color: var(--text-2); word-break: break-all; }
 #log li::before { content: ""; position: absolute; left: -3.5px; top: 11px; width: 6px; height: 6px; border-radius: 50%; background: var(--surface-3); }
@@ -605,8 +605,8 @@ body.term-full { overflow: hidden; }
 /* ---------- 메모 (자동 실행 안 됨) ---------- */
 .memo { display: flex; flex-direction: column; gap: 6px; }
 /* 오른쪽 패널 소제목 — 업무 지시 · 나중에 할 작업 · 타임라인이 같은 모양 */
-.memo h3, .side-h { margin: 0; font-size: 12px; font-weight: 600; color: var(--dim); letter-spacing: .04em; }
-.memo h3 small, .side-h small { font-weight: 400; margin-left: 4px; }
+.memo h3, .side-h { margin: 0; font-size: 13px; font-weight: 600; color: var(--text); letter-spacing: .04em; }
+.memo h3 small, .side-h small { font-size: 12px; font-weight: 400; margin-left: 4px; color: var(--dim); } /* 제목은 흰색, 설명은 흐리게 */
 .memo textarea { font-size: 13px; }
 .memos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; max-height: 220px; overflow: auto; }
 .memos li { background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; font-size: 12.5px; display: flex; flex-direction: column; gap: 5px; }
