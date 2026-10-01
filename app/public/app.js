@@ -145,9 +145,28 @@ $('#term').addEventListener('contextmenu', async (e) => {
 
 let fitTimer;
 new ResizeObserver(() => { clearTimeout(fitTimer); fitTimer = setTimeout(fitTerm, 60); }).observe($('.term-wrap'));
+// 터미널 칸 수(가로 글자 수)를 고정하고, 공간이 넓으면 글자를 키워 채운다.
+// 칸 수가 줄면 화면 위로 밀려난 기록(스크롤백)은 Claude 가 다시 그릴 수 없어서, 넓을 때 줄 끝까지
+// 배경을 칠한 줄(diff 등)이 접히며 배경만 남은 조각 줄이 줄무늬처럼 생겼다(실측: 163→101칸에서 125줄).
+// 칸 수를 고정하면 접힐 일이 없다. 높이는 줄 수만 바뀌어 문제없음.
+const TERM_COLS = 100;
+const FONT_MIN = 11, FONT_MAX = 16;
 function fitTerm() {
   if (!selected || $('#detail').hidden) return;
-  try { fit.fit(); send({ type: 'resize', id: selected, cols: term.cols, rows: term.rows }); } catch {}
+  try {
+    let dims = null;
+    // 큰 글자부터 내려가며, 고정 칸 수가 들어가는 가장 큰 글자 크기를 고른다
+    for (let fs = FONT_MAX; fs >= FONT_MIN; fs--) {
+      if (term.options.fontSize !== fs) term.options.fontSize = fs;
+      dims = fit.proposeDimensions();
+      if (dims && dims.cols >= TERM_COLS) break;
+    }
+    if (!dims) return;
+    // 아주 좁아 최소 글자로도 안 들어가면 그때만 칸 수를 줄인다
+    const cols = Math.min(TERM_COLS, dims.cols), rows = dims.rows;
+    if (term.cols !== cols || term.rows !== rows) term.resize(cols, rows);
+    send({ type: 'resize', id: selected, cols, rows });
+  } catch {}
 }
 
 // ---------- 통신 ----------
