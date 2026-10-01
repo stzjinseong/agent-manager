@@ -291,7 +291,8 @@ function renderStats() {
     ['작업 중', n('working'), 'var(--working)'],
     ['백그라운드', n('waiting'), 'var(--waiting)'],
     ['결정 대기', pend, 'var(--decision)', pend > 0],
-    ['완료', n('done') + n('checked'), 'var(--done)'],
+    ['완료', n('done'), 'var(--done)'],
+    ['확인됨', n('checked'), 'var(--checked)'],
   ].map(([k, v, c, hot]) => `<span class="stat ${hot ? 'hot' : ''}" style="--c:${c}"><i></i>${k} <b>${v}</b></span>`).join('');
   // 매니저 캐릭터: 작업 중 인원 숫자 배지. 작업 중이면 흰 빛 맥동 + 걷기, 결정 대기가 있으면 주황 빛
   const busy = n('working');
