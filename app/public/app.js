@@ -297,8 +297,28 @@ function bubbleOf(w) {
   return '';
 }
 
+// ---------- 확인 안 한 완료 ----------
+// 턴이 끝났는데(서버의 doneAt) 그 뒤로 카드를 눌러 보지 않았으면 초록 빛으로 깜빡인다.
+// 확인 기록은 브라우저에 저장 — 키에 시작 시각을 섞어 서버 재설치 등으로 id 가 재사용돼도 섞이지 않게
+const SEEN_KEY = 'am.seenDone';
+let seenDone = {};
+try { seenDone = JSON.parse(localStorage.getItem(SEEN_KEY) || '{}'); } catch {}
+const seenKey = (w) => `${w.id}:${w.startedAt}`;
+function markSeen(id) {
+  const w = state.workers.find((x) => x.id === id);
+  if (!w?.doneAt || (seenDone[seenKey(w)] || 0) >= w.doneAt) return;
+  seenDone[seenKey(w)] = w.doneAt;
+  try { localStorage.setItem(SEEN_KEY, JSON.stringify(seenDone)); } catch {}
+}
+function isUnseenDone(w) {
+  if (viewStatus(w) !== 'done' || !w.doneAt) return false;
+  // 지금 그 워커를 보고 있으면 바로 확인 처리
+  if (w.id === selected && !$('#detail').hidden && document.visibilityState === 'visible') { markSeen(w.id); return false; }
+  return (seenDone[seenKey(w)] || 0) < w.doneAt;
+}
+
 function updateNode(node, w) {
-  node.className = `node s-${viewStatus(w)}${w.id === selected ? ' sel' : ''}`;
+  node.className = `node s-${viewStatus(w)}${w.id === selected ? ' sel' : ''}${isUnseenDone(w) ? ' unseen' : ''}`;
   node.dataset.id = w.id;
   $('.nid', node).textContent = w.id;
   if (!node.classList.contains('renaming')) $('.nname', node).textContent = w.name;
@@ -845,6 +865,7 @@ new ResizeObserver(() => {
 }).observe($('#profile'));
 
 function select(id) {
+  markSeen(id); // 카드를 눌렀으면 완료 확인
   // 이미 열려 있는 워커를 다시 누르면 아무것도 하지 않는다 — 터미널을 다시 그리지 않고,
   // 포커스도 옮기지 않는다(옮기면 더블클릭으로 연 이름 입력창의 포커스를 빼앗아 바로 닫혀 버림)
   if (id === selected && !$('#detail').hidden) return;
@@ -1068,3 +1089,6 @@ $('#btn-remove').onclick = async () => {
 $('#btn-close').onclick = () => { selected = null; render(); };
 
 connect();
+
+// 다른 탭에 있다가 돌아오면, 열어 둔 워커의 완료를 확인 처리하도록 다시 그린다
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') render(); });

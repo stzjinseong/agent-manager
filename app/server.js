@@ -151,6 +151,7 @@ function checkInterrupted(w) {
   if (w.status === 'working' && tx?.lastKind === 'assistant' && tx.lastStop === 'end_turn' && Date.now() - tx.lastTs > 5000 && !tx.seg) {
     if (tx.lastText) w.lastMessage = tx.lastText.slice(0, 2000);
     w.currentTool = null;
+    w.doneAt = Date.now(); // 화면의 '확인 안 한 완료' 표시 기준
     setStatus(w, 'done', '턴 완료 (기록으로 확인)');
     if (w.queue.length) { const next = w.queue.shift(); setTimeout(() => sendPrompt(w, next), 400); }
     return;
@@ -303,6 +304,7 @@ function onHook(w, ev, res) {
     case 'Stop':
       w.lastMessage = ev.last_assistant_message ?? w.lastMessage;
       w.currentTool = null;
+      w.doneAt = Date.now(); // 화면의 '확인 안 한 완료' 표시 기준
       setStatus(w, 'done', '턴 완료');
       if (w.queue.length) { const next = w.queue.shift(); setTimeout(() => sendPrompt(w, next), 400); }
       break;

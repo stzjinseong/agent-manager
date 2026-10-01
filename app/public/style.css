@@ -548,3 +548,10 @@ body.term-full { overflow: hidden; }
   background: var(--surface-3); color: var(--text); border: 1px solid var(--line-2); border-radius: 10px;
   padding: 9px 16px; font-size: 13px; box-shadow: 0 10px 30px rgba(0, 0, 0, .5);
 }
+
+/* ---------- 확인 안 한 완료: 카드를 눌러 볼 때까지 초록 빛 깜빡임 ---------- */
+.node.unseen { border-color: color-mix(in srgb, var(--done) 70%, transparent); animation: unseen-pulse 1.6s ease-in-out infinite; }
+@keyframes unseen-pulse {
+  0%, 100% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--done) 35%, transparent), 0 0 10px color-mix(in srgb, var(--done) 20%, transparent); }
+  50% { box-shadow: 0 0 0 2px color-mix(in srgb, var(--done) 75%, transparent), 0 0 28px color-mix(in srgb, var(--done) 55%, transparent); }
+}
