@@ -1,9 +1,14 @@
 // 관제탑 대시보드 — 서버가 WebSocket 으로 상태 스냅샷을 밀어주고, 터미널은 선택한 워커만 그린다.
 // 워커 칩은 id 별로 한 번 만들고 내용만 갱신한다 — 매초 다시 그리면 캐릭터 애니메이션이 리셋된다.
 const $ = (s, el = document) => el.querySelector(s);
-const STATUS_LABEL = { starting: '부팅 중', idle: '입력 대기', working: '작업 중', decision: '결정 필요', waiting: '백그라운드 대기', done: '완료', interrupted: '중단됨', exited: '종료됨' };
+const STATUS_LABEL = { starting: '부팅 중', idle: '입력 대기', working: '작업 중', decision: '결정 필요', waiting: '백그라운드 대기', done: '완료', checked: '확인됨', interrupted: '중단됨', exited: '종료됨' };
 // 표시용 상태: 메인 턴은 끝났지만 백그라운드 서브에이전트가 아직 도는 중이면 'waiting'
-const viewStatus = (w) => ((w.status === 'done' || w.status === 'idle') && w.profile?.bgRunning ? 'waiting' : w.status);
+// 완료 후 카드를 눌러 본 워커는 '확인됨'(checked) — 브라우저에만 있는 표시 상태(아래 seenDone)
+const viewStatus = (w) => {
+  if ((w.status === 'done' || w.status === 'idle') && w.profile?.bgRunning) return 'waiting';
+  if (w.status === 'done' && isSeenDone(w)) return 'checked';
+  return w.status;
+};
 
 let state = { workers: [], decisions: [], profiles: [], recentCwds: [], now: Date.now() };
 let clockSkew = 0;
@@ -249,7 +254,7 @@ function renderStats() {
     ['작업 중', n('working'), 'var(--working)'],
     ['백그라운드', n('waiting'), 'var(--waiting)'],
     ['결정 대기', pend, 'var(--decision)', pend > 0],
-    ['완료', n('done'), 'var(--done)'],
+    ['완료', n('done') + n('checked'), 'var(--done)'],
   ].map(([k, v, c, hot]) => `<span class="stat ${hot ? 'hot' : ''}" style="--c:${c}"><i></i>${k} <b>${v}</b></span>`).join('');
   // 매니저 캐릭터: 작업 중 인원 숫자 배지. 작업 중이면 흰 빛 맥동 + 걷기, 결정 대기가 있으면 주황 빛
   const busy = n('working');
@@ -332,7 +337,7 @@ function bubbleOf(w) {
       const what = subs.length ? (w.subTool || `${subs[0].type}: ${subs[0].description}`) : (mons[0] || shells[0])?.desc || '';
       return `⏳ 백그라운드 ${parts} · <b>${esc(what)}</b>`;
     }
-    case 'done': return esc(w.lastMessage || '완료');
+    case 'done': case 'checked': return esc(w.lastMessage || '완료');
     case 'idle': return w.lastMessage ? esc(w.lastMessage) : '지시를 기다리는 중';
     case 'interrupted': return `⏸ 중단됨 — 처리 중인 작업 없음${w.queue.length ? ` · 대기 지시 ${w.queue.length}건은 보류 (지시를 새로 보내면 재개)` : ''}`;
     case 'starting': return '부팅 중… (처음 여는 폴더면 터미널에서 신뢰 여부를 선택하세요)';
@@ -354,12 +359,13 @@ function markSeen(id) {
   seenDone[seenKey(w)] = w.doneAt;
   try { localStorage.setItem(SEEN_KEY, JSON.stringify(seenDone)); } catch {}
 }
-function isUnseenDone(w) {
-  if (viewStatus(w) !== 'done' || !w.doneAt) return false;
+function isSeenDone(w) {
+  if (!w.doneAt) return false;
   // 지금 그 워커를 보고 있으면 바로 확인 처리
-  if (w.id === selected && !$('#detail').hidden && document.visibilityState === 'visible') { markSeen(w.id); return false; }
-  return (seenDone[seenKey(w)] || 0) < w.doneAt;
+  if (w.id === selected && !$('#detail').hidden && document.visibilityState === 'visible') markSeen(w.id);
+  return (seenDone[seenKey(w)] || 0) >= w.doneAt;
 }
+const isUnseenDone = (w) => viewStatus(w) === 'done' && !!w.doneAt;
 
 // 역할별 캐릭터 색 — 밝기(L 0.76)·채도(C 0.15)를 고정한 OKLCH 라 어떤 색상각이어도 어둡지 않다
 const avatarColor = (name) => (state.colors?.[name] != null ? `oklch(0.76 0.15 ${state.colors[name]})` : '');
