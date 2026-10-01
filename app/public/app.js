@@ -530,6 +530,7 @@ function renderDetail() {
   if (!av.firstChild) av.innerHTML = clawdSVG();
   av.className = `detail-avatar s-${viewStatus(w)}`;
   av.style.setProperty('--avatar', avatarColor(w.name) || 'var(--accent)');
+  $('#term-wrap').style.setProperty('--avatar', avatarColor(w.name) || 'var(--accent)'); // 터미널 테두리 = 워커 색
   $("#detail-name").textContent = `${w.name} · ${STATUS_LABEL[viewStatus(w)]}`;
   $('#detail-meta').textContent = [w.id, w.model, w.permissionMode, w.sessionId && `session ${w.sessionId.slice(0, 8)}`, w.pid && `pid ${w.pid}`, w.cwd].filter(Boolean).join(' · ');
   renderMemos(w);

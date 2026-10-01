@@ -629,3 +629,11 @@ body.resizing-term { cursor: row-resize; user-select: none; }
 .profile.collapsed > :not(.profile-head) { display: none; }
 #log li.k-req { cursor: pointer; }
 #log li.k-req:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+
+/* ---------- 터미널 테두리 = 선택한 워커의 캐릭터 색 ---------- */
+.term-wrap:not(.full) {
+  border: 2px solid color-mix(in srgb, var(--avatar, var(--accent)) 75%, transparent);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--avatar, var(--accent)) 22%, transparent);
+  transition: border-color .25s, box-shadow .25s;
+}
+.term-wrap.full .term-bar { border-bottom: 2px solid color-mix(in srgb, var(--avatar, var(--accent)) 75%, transparent); margin-bottom: 6px; }
