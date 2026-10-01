@@ -42,17 +42,96 @@ function managerSVG() {
     <g class="acc acc-blush">${R(3, 4, 2, 1, 'blush')}${R(13, 4, 2, 1, 'blush')}</g>
     <g class="acc acc-headset">${R(2, -2, 14, 1, 'band')}${R(2, -1, 1, 3, 'band')}${R(15, -1, 1, 3, 'band')}${R(1, 1, 2, 2, 'cup')}${R(15, 1, 2, 2, 'cup')}</g>
     <g class="acc acc-crown">${R(6, -2, 6, 2, 'gold')}${R(6, -3, 1, 1, 'gold')}${R(8, -3, 2, 1, 'gold')}${R(11, -3, 1, 1, 'gold')}${R(8, -4, 2, 1, 'gold')}</g>
+    <g class="acc acc-party">${R(8, -5, 2, 1, 'pt-a')}${R(7, -4, 4, 1, 'pt-b')}${R(6, -3, 6, 1, 'pt-a')}${R(5, -2, 8, 1, 'pt-b')}${R(8, -6, 2, 1, 'pt-c')}</g>
     <g class="acc acc-halo">${R(4, -6, 10, 1, 'halo')}${R(3, -5, 1, 1, 'halo')}${R(14, -5, 1, 1, 'halo')}</g>
     <g class="acc acc-stars">${R(-3, 0, 1, 1, 'star s1')}${R(20, 2, 1, 1, 'star s2')}${R(19, -4, 1, 1, 'star s3')}${R(-2, -4, 1, 1, 'star s4')}</g>
   </g></g></svg>`;
 }
 $('.core-mark').innerHTML = managerSVG();
 // 성장 단계 표시 — geN 클래스는 누적(3단계면 ge1~ge3). 4단계부터는 회로 스파크도 금빛
+let mgrStage = 0;
 function applyStage(stage) {
+  mgrStage = stage;
   const dot = $('.core-dot');
   for (let i = 1; i <= 5; i++) dot.classList.toggle(`ge${i}`, stage >= i);
   $('#floor').classList.toggle('royal', stage >= 4);
 }
+
+// ---------- 매니저 반응 — 티 나지 않게 살아 있는 느낌. 단계가 오를수록 반응이 늘어난다 ----------
+//  0 끄덕임(워커 완료) · 1 반짝(커밋) + 시선(작업 중인 워커 쪽으로 기울기) · 2 졸음(30분 한가함·늦은 밤) + 그날 첫 지시 인사
+//  3 콤보(승인 연달아 빨리) · 4 이스터에그(가끔 고깔모자) · 5 별가루(외형)
+const ACTIVE = new Set(['working', 'decision']);
+let mgrActTimer = null;
+function mgrAct(name, ms) {
+  const g = $('.mgr-act');
+  if (!g) return;
+  g.classList.remove('do-nod', 'do-hop', 'do-wave', 'do-yawn');
+  void g.getBoundingClientRect(); // 같은 동작을 연달아 다시 재생하게
+  g.classList.add(`do-${name}`);
+  clearTimeout(mgrActTimer);
+  mgrActTimer = setTimeout(() => g.classList.remove(`do-${name}`), ms);
+}
+const todayKey = () => new Date().toDateString();
+function mgrOnState(prev, next) {
+  if (!prev?.length) return; // 첫 상태 수신 — 비교할 이전 상태가 없다
+  const was = new Map(prev.map((w) => [w.id, w.status]));
+  let finished = false, started = false;
+  for (const w of next) {
+    const p = was.get(w.id);
+    if (ACTIVE.has(p) && w.status === 'done') finished = true;
+    if (p && !ACTIVE.has(p) && w.status === 'working') started = true;
+  }
+  if (started && mgrStage >= 2) {
+    let day = null; try { day = localStorage.getItem('am.waveDay'); } catch {}
+    if (day !== todayKey()) { try { localStorage.setItem('am.waveDay', todayKey()); } catch {} mgrAct('wave', 1300); return; }
+  }
+  if (finished) mgrAct('nod', 700);
+}
+function mgrOnFx(msg) {
+  if (msg.kind === 'commit' && mgrStage >= 1) {
+    const t = document.createElement('span');
+    t.className = 'mgr-twinkle'; t.textContent = '✦';
+    t.addEventListener('animationend', () => t.remove());
+    $('.core-dot').appendChild(t);
+  }
+}
+let approvals = [];
+function mgrOnApprove() {
+  if (mgrStage < 3) return;
+  const now = Date.now();
+  approvals = [...approvals.filter((t) => now - t < 20_000), now];
+  if (approvals.length >= 3) { approvals = []; mgrAct('hop', 900); }
+}
+// 이스터에그: 페이지를 열 때 1% 확률로 그날 하루 고깔모자
+try {
+  const k = 'am.partyDay';
+  if (localStorage.getItem(k) !== todayKey() && Math.random() < 0.01) localStorage.setItem(k, todayKey());
+  if (localStorage.getItem(k) === todayKey()) $('.core-dot').classList.add('party-day');
+} catch {}
+// 매 렌더·30초마다: 시선 기울기, 졸음(모두 30분 넘게 쉬거나 늦은 밤)
+function mgrUpdate() {
+  const dot = $('.core-dot'), lean = $('.mgr-lean');
+  if (!dot || !lean) return;
+  dot.classList.toggle('party', mgrStage >= 4 && dot.classList.contains('party-day'));
+  let deg = 0;
+  if (mgrStage >= 1) {
+    const cr = dot.getBoundingClientRect(), cx = cr.left + cr.width / 2;
+    const xs = state.workers.filter((w) => ACTIVE.has(w.status)).map((w) => nodeEls.get(w.id)).filter((n) => n?.isConnected)
+      .map((n) => { const r = n.getBoundingClientRect(); return r.left + r.width / 2 - cx; });
+    if (xs.length) deg = Math.max(-7, Math.min(7, (xs.reduce((a, b) => a + b, 0) / xs.length) / 80));
+  }
+  lean.style.setProperty('--lean', `${deg.toFixed(1)}deg`);
+  const live = state.workers.filter((w) => w.status !== 'exited');
+  const busy = live.some((w) => ACTIVE.has(w.status));
+  const quietFor = Date.now() - clockSkew - Math.max(0, ...live.map((w) => w.updatedAt || 0));
+  const h = new Date().getHours(), night = h >= 23 || h < 6;
+  dot.classList.toggle('sleepy', mgrStage >= 2 && !busy && (quietFor > 30 * 60_000 || night));
+}
+setInterval(() => {
+  mgrUpdate();
+  // 졸고 있으면 가끔 하품
+  if ($('.core-dot').classList.contains('sleepy') && Math.random() < 0.3) mgrAct('yawn', 1600);
+}, 30_000);
 
 // 브라우저 탭 아이콘 = 매니저와 같은 흰 클로드 캐릭터. 밝은 탭 바에서도 보이도록 어두운 둥근 사각형 바탕을 깐다.
 // 결정 대기가 있으면 오른쪽 위에 주황 점 (서버 재시작 없이 바뀌도록 파일 대신 data URI 로 넣는다)
@@ -245,12 +324,15 @@ function connect() {
   ws.onmessage = (e) => {
     const msg = JSON.parse(e.data);
     if (msg.type === 'state') {
+      const prevWorkers = state.workers;
       state = msg.state; clockSkew = Date.now() - state.now;
+      mgrOnState(prevWorkers, state.workers);
       // 주소 #W1 로 열면 해당 워커를 바로 선택
       const h = location.hash.slice(1);
       if (!selected && h && state.workers.some((w) => w.id === h)) { select(h); return; }
       render();
     }
+    else if (msg.type === 'fx') mgrOnFx(msg);
     else if (msg.type === 'pty' && msg.id === selected) term.write(msg.data);
     else if (msg.type === 'scrollback' && msg.id === selected) { term.reset(); term.write(msg.data); }
   };
@@ -296,6 +378,7 @@ function render() {
   renderFloor();
   renderCompare();
   renderDetail();
+  mgrUpdate();
   $('#recent-cwds').innerHTML = state.recentCwds.map((c) => `<option value="${esc(c)}">`).join('');
 }
 
@@ -1151,6 +1234,7 @@ $('#inbox').addEventListener('click', async (e) => {
     act = 'deny';
   }
   btn.closest('.decision').style.opacity = .5;
+  if (act === 'allow') mgrOnApprove();
   await api(`/api/decisions/${id}`, { behavior: act, message });
 });
 

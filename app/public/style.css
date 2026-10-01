@@ -750,3 +750,36 @@ body.resizing-term { cursor: row-resize; user-select: none; }
 /* 4단계부터 회로 스파크가 은은한 금빛 */
 .floor.royal .traces .spark { fill: #ffe7a3; }
 .floor.royal .traces .t-working path.flow { stroke: color-mix(in srgb, var(--gold) 65%, #fff); }
+
+/* ---------- 매니저 반응 — app.js mgrAct / mgrUpdate ---------- */
+.mgr-lean, .mgr-act { transform-box: fill-box; transform-origin: 50% 100%; }
+.mgr-lean { transform: rotate(var(--lean, 0deg)); transition: transform .8s ease; } /* 시선: 작업 중인 워커 쪽으로 */
+.mgr-act.do-nod { animation: mgr-nod .7s ease-in-out; }
+@keyframes mgr-nod { 30% { transform: translateY(.7px) scaleY(.93); } 60% { transform: none; } }
+.mgr-act.do-hop { animation: mgr-hop .45s cubic-bezier(.3, 1.6, .5, 1) 2; }
+@keyframes mgr-hop { 40% { transform: translateY(-2.2px); } }
+.mgr-act.do-wave { animation: mgr-wave 1.3s ease-in-out; }
+@keyframes mgr-wave { 15% { transform: rotate(-8deg); } 35% { transform: rotate(8deg); } 55% { transform: rotate(-6deg); } 75% { transform: rotate(5deg); } 100% { transform: none; } }
+.mgr-act.do-yawn { animation: mgr-yawn 1.6s ease-in-out; }
+@keyframes mgr-yawn { 40%, 70% { transform: scale(1.04, 1.08); } }
+.mgr-act.do-yawn .eye { transform: scaleY(.1) !important; }
+/* 졸음: 눈 반쯤 감고 깜빡임 멈춤 + z */
+.core-dot.sleepy .mgr .eye { transform: scaleY(.35); animation: none; }
+.core-dot.sleepy::after {
+  content: "z"; position: absolute; top: 4px; left: calc(50% - 50px); font: 800 13px/1 var(--mono); color: var(--dim);
+  animation: zz 2.6s ease-in-out infinite;
+}
+/* 커밋 반짝 */
+.mgr-twinkle {
+  position: absolute; left: 50%; top: -6px; pointer-events: none; font-size: 14px; color: #fff6d8;
+  text-shadow: 0 0 8px #ffe7a3, 0 0 16px rgba(255, 231, 163, .6); animation: mgr-twinkle .9s ease-out forwards;
+}
+@keyframes mgr-twinkle {
+  0% { opacity: 0; transform: translate(-50%, 6px) scale(.4) rotate(0deg); }
+  30% { opacity: 1; transform: translate(-50%, -4px) scale(1.2) rotate(30deg); }
+  100% { opacity: 0; transform: translate(-50%, -14px) scale(.8) rotate(60deg); }
+}
+/* 이스터에그: 고깔모자 (왕관 대신) */
+.mgr .pt-a { fill: #e8618c; } .mgr .pt-b { fill: #4fc3d9; } .mgr .pt-c { fill: #ffe7a3; }
+.core-dot.party .acc-crown { display: none; }
+.core-dot.party .acc-party { display: inline; }
