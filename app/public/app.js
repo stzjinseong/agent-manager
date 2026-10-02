@@ -793,7 +793,7 @@ function renderDetail() {
   // 위로 올려 지난 기록을 보는 중이면 그 자리를 지킨다
   const logEl = $('#log');
   const html = timelineCache.map((r, i) =>
-    `<li class="k-${r.kind}" data-i="${i}"${r.kind === 'req' ? ' title="클릭: 터미널에서 이 요청 위치로 이동"' : ''}><time>${fmt(r.t)}</time>${r.tag ? `<span class="tag">${r.tag}</span>` : ''}${esc(r.text)}${r.shot ? shotImg(r.shot, 'tl-shot') : ''}</li>`).join('');
+    `<li class="k-${r.kind}" data-i="${i}"${r.kind === 'req' ? ' title="클릭: 터미널에서 이 요청 위치로 이동"' : ''}><time>${fmt(r.t)}</time>${r.tag ? `<span class="tag">${r.tag}</span>` : ''}${esc(r.text)}${r.shot ? shotImg(r.shot, 'tl-shot') : ''}${r.kind === 'req' || r.kind === 'queued' ? attachThumbs(r.text) : ''}</li>`).join('');
   if (logEl._html !== html || logEl.dataset.w !== w.id) { // 브라우저가 innerHTML 을 정규화하므로 보낸 글로 비교
     const stick = logEl.dataset.w !== w.id || logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 40;
     logEl.dataset.w = w.id;
@@ -836,13 +836,22 @@ function timelineRows(log, shots = []) {
   }
   return rows;
 }
+// 사람이 지시에 첨부한 이미지: 보낸 글에 들어간 data/uploads 경로를 서버의 /uploads/ 로 바로 보여 준다(따로 저장하지 않음).
+// 이미 정리됐거나(7일) 다른 곳의 경로면 서버가 404 → 썸네일을 숨긴다
+const UPLOAD_PATH_RE = /[\\/]uploads[\\/]([\w.-]+\.(?:png|jpe?g|gif|webp|bmp))\b/gi;
+function attachThumbs(text) {
+  const names = [...new Set([...String(text).matchAll(UPLOAD_PATH_RE)].map((m) => m[1]))];
+  if (!names.length) return '';
+  return `<span class="tl-attach">${names.map((n) => shotImg({ url: `/uploads/${n}` }, 'tl-shot') .replace('<img ', '<img onerror="this.remove()" ')).join('')}</span>`;
+}
 // ---------- 도구 결과 캡처 보기 ----------
 // 썸네일은 data-shot 에 원본 주소를 달아 두고, 어디서 눌러도(타임라인·카드) 같은 크게 보기를 연다
 const shotImg = (s, cls) => `<img class="${cls}" src="${esc(s.url)}" data-shot="${esc(s.url)}" alt="캡처" loading="lazy" draggable="false" title="클릭해 크게 보기">`;
 // 같은 워커의 캡처끼리 ←/→ 로 넘겨 본다. 몇 번째인지·찍힌 시각과 보관 한도 안내를 아래에 둔다
 function openShot(url) {
+  const upload = url.startsWith('/uploads/');
   const id = url.split('/')[2];
-  const list = state.workers.find((w) => w.id === id)?.shots || [];
+  const list = upload ? [] : state.workers.find((w) => w.id === id)?.shots || [];
   let i = Math.max(0, list.findIndex((s) => s.url === url));
   const box = el(`<div class="shot-view" title="바깥을 누르거나 Esc 로 닫기">
     <button class="shot-nav prev" title="이전 캡처 (←)">‹</button>
@@ -851,9 +860,9 @@ function openShot(url) {
   const show = () => {
     const s = list[i] || { url, tool: '', arg: '' };
     $('img', box).src = s.url;
-    $('.cap', box).textContent = [s.tool, s.arg].filter(Boolean).join(' · ');
+    $('.cap', box).textContent = upload ? `사람이 첨부 · data/uploads/${decodeURIComponent(url.slice('/uploads/'.length))}` : [s.tool, s.arg].filter(Boolean).join(' · ');
     $('.meta', box).textContent = list.length ? `${i + 1} / ${list.length}${s.t ? ` · ${new Date(s.t + clockSkew).toLocaleString('ko-KR', { hour12: false })}` : ''}` : '';
-    $('.note', box).textContent = `이미지는 최대 ${state.shotKeep || 50}장까지 관리됩니다.`;
+    $('.note', box).textContent = upload ? '첨부 원본을 그대로 보여 줍니다 (7일 지나면 정리됨).' : `이미지는 최대 ${state.shotKeep || 50}장까지 관리됩니다.`;
     $('.prev', box).disabled = i <= 0;
     $('.next', box).disabled = i >= list.length - 1;
   };

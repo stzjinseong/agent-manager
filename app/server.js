@@ -662,6 +662,18 @@ const server = http.createServer(async (req, res) => {
     return fs.createReadStream(path.join(file.startsWith('node_modules/') ? ROOT : APP_DIR, file)).pipe(res);
   }
 
+  // 사람이 지시에 첨부한 이미지 원본(data/uploads) — 타임라인 요청 줄 썸네일용. 따로 복사하지 않고 원본을 그대로 보여 주며,
+  // 보관은 기존 정리 규칙(cleanupUploads: 7일, 나중에 할 작업에 적힌 것은 유지)을 따른다
+  if (req.method === 'GET' && p.startsWith('/uploads/')) {
+    const name = p.slice('/uploads/'.length);
+    if (!/^[\w.-]+\.(png|jpe?g|gif|webp|bmp)$/i.test(name)) return json(res, 404, {});
+    const full = path.join(UPLOAD_DIR, name);
+    if (!fs.existsSync(full)) return json(res, 404, {});
+    const ext = name.split('.').pop().toLowerCase();
+    res.writeHead(200, { 'content-type': `image/${ext === 'jpg' ? 'jpeg' : ext}`, 'cache-control': 'max-age=86400' });
+    return fs.createReadStream(full).pipe(res);
+  }
+
   // 도구 결과 캡처 (drainShots 가 저장한 파일). 이름 규칙 밖의 경로는 받지 않는다
   if (req.method === 'GET' && p.startsWith('/shots/')) {
     const [, , id, name] = p.split('/');

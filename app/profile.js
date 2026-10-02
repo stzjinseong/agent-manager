@@ -59,7 +59,10 @@ function usageOf(m, p) {
 function promptText(e) {
   if (e.isMeta || e.isSidechain) return null;
   const c = e.message?.content;
-  let text = typeof c === 'string' ? c : Array.isArray(c) && c.length && c.every((b) => b.type === 'text') ? c.map((b) => b.text).join('\n') : null;
+  // 사람이 이미지를 붙인 지시는 [text, image] 블록으로 온다 — 글만 모으고, 글 없이 이미지뿐이면 '(이미지)'
+  let text = typeof c === 'string' ? c
+    : Array.isArray(c) && c.length && c.every((b) => b.type === 'text' || b.type === 'image')
+      ? (c.some((b) => b.type === 'text') ? c.filter((b) => b.type === 'text').map((b) => b.text).join('\n') : '(이미지)') : null;
   if (text == null) return null;
   if (/^<(local-command-stdout|local-command-stderr|command-message|system-reminder)/.test(text)) return null;
   // 백그라운드 작업 완료 알림도 모델 턴을 일으키므로 턴으로 세되, 사람 질문과 구분되게 표시

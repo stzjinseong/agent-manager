@@ -458,6 +458,10 @@ main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24p
 .card-shot:hover { border-color: #fff; transform: scale(1.06); }
 #log li.k-shot .tl-shot { display: block; margin-top: 5px; max-width: 100%; max-height: 120px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, .7); cursor: zoom-in; background: #0c0d11; }
 #log li.k-shot .tl-shot:hover { border-color: #fff; }
+/* 요청 줄의 첨부 썸네일: 여러 장이면 가로로 */
+#log .tl-attach { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; white-space: normal; }
+#log .tl-attach .tl-shot { display: block; max-width: 140px; max-height: 90px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, .7); cursor: zoom-in; background: #0c0d11; }
+#log .tl-attach .tl-shot:hover { border-color: #fff; }
 .shot-view { position: fixed; inset: 0; z-index: 500; display: grid; place-items: center; background: rgba(0, 0, 0, .78); cursor: zoom-out; padding: 24px; }
 .shot-view figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 100%; max-height: 100%; }
 .shot-view img { max-width: min(92vw, 1600px); max-height: calc(100vh - 90px); object-fit: contain; border-radius: 8px; box-shadow: 0 10px 40px rgba(0, 0, 0, .6); background: #0c0d11; }
