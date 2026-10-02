@@ -1956,7 +1956,10 @@ function updatePin() {
   if (!hit) { pinEl.hidden = true; pinFor = null; return; }
   // offsetTop 은 정수로 반올림돼 소수 위치일 때 위로 1px 남짓 틈이 생겨 뒤가 비쳤다 → 실제 위치에서 2px 더 올린다
   // (숨겨진 동안엔 offsetParent 가 null 이라 부모 .timeline 을 직접 기준으로)
-  pinEl.style.top = `${logEl.getBoundingClientRect().top - pinEl.parentElement.getBoundingClientRect().top - 2}px`;
+  const lr = logEl.getBoundingClientRect(), tr = pinEl.parentElement.getBoundingClientRect();
+  pinEl.style.top = `${lr.top - tr.top - 2}px`;
+  // 오른쪽은 목록의 스크롤바 앞에서 멈춘다(스크롤바를 가리지 않게) — clientWidth 는 스크롤바를 뺀 폭
+  pinEl.style.right = `${tr.right - (lr.left + logEl.clientLeft + logEl.clientWidth)}px`;
   if (pinFor !== hit || pinEl.hidden) {
     pinFor = hit;
     const row = timelineCache[Number(hit.dataset.i)];
