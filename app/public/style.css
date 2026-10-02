@@ -453,8 +453,8 @@ main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24p
   border: 1px solid rgba(255, 255, 255, .35); box-shadow: 0 2px 8px rgba(0, 0, 0, .5); cursor: zoom-in; background: #0c0d11;
 }
 .card-shot:hover { border-color: #fff; transform: scale(1.06); }
-#log li.k-shot .tl-shot { display: block; margin-top: 5px; max-width: 100%; max-height: 120px; border-radius: 6px; border: 1px solid var(--line); cursor: zoom-in; background: #0c0d11; }
-#log li.k-shot .tl-shot:hover { border-color: var(--text-2); }
+#log li.k-shot .tl-shot { display: block; margin-top: 5px; max-width: 100%; max-height: 120px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, .7); cursor: zoom-in; background: #0c0d11; }
+#log li.k-shot .tl-shot:hover { border-color: #fff; }
 .shot-view { position: fixed; inset: 0; z-index: 500; display: grid; place-items: center; background: rgba(0, 0, 0, .78); cursor: zoom-out; padding: 24px; }
 .shot-view figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 100%; max-height: 100%; }
 .shot-view img { max-width: min(92vw, 1600px); max-height: calc(100vh - 90px); object-fit: contain; border-radius: 8px; box-shadow: 0 10px 40px rgba(0, 0, 0, .6); background: #0c0d11; }
