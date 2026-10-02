@@ -811,7 +811,7 @@ function renderDetail() {
   av.className = `detail-avatar s-${viewStatus(w)}`;
   av.style.setProperty('--avatar', avatarColor(w.name) || 'var(--accent)');
   $('#term-wrap').style.setProperty('--avatar', avatarColor(w.name) || 'var(--accent)'); // 터미널 테두리 = 워커 색
-  $("#detail-name").textContent = `${w.name} · ${STATUS_LABEL[viewStatus(w)]}`;
+  $("#detail-name").textContent = w.name; // 상태는 카드 배지·LED 로 보인다
   $('#detail-meta').textContent = [w.id, w.model, w.permissionMode, w.sessionId && `session ${w.sessionId.slice(0, 8)}`, w.pid && `pid ${w.pid}`, w.cwd].filter(Boolean).join(' · ');
   renderMemos(w);
   $('#queue').innerHTML = w.queue.length
@@ -2084,7 +2084,7 @@ function setTermFull(on) {
   document.body.classList.toggle('term-full', on);
   $('#btn-full').textContent = on ? '⛶ 원래대로' : '⛶ 크게';
   const w = state.workers.find((x) => x.id === selected);
-  $('#term-title').textContent = w ? `${w.name} · ${STATUS_LABEL[viewStatus(w)]}` : '';
+  $('#term-title').textContent = w ? w.name : '';
   const done = () => { fitTerm(); term.focus(); inner.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 140, easing: 'ease-out' }); inner.style.opacity = ''; };
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) { requestAnimationFrame(done); return; }
   const last = wrap.getBoundingClientRect();
