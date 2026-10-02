@@ -813,12 +813,12 @@ function renderDetail() {
       w.queue.map((q, i) => `<div class="qi"><span class="n">${i + 1}</span><span class="tx">${esc(q)}</span><button data-unqueue="${i}" title="큐에서 빼기">✕</button></div>`).join('')
     : '';
   const fmt = (t) => new Date(t + clockSkew).toLocaleTimeString('ko-KR', { hour12: false });
-  timelineCache = timelineRows(w.log, w.shots);
+  timelineCache = timelineRows(w.log, w.shots, w.docs);
   // CLI 처럼 아래로 갈수록 최신. 맨 아래를 보고 있었거나 워커를 바꿨으면 새 줄을 따라 내려가고,
   // 위로 올려 지난 기록을 보는 중이면 그 자리를 지킨다
   const logEl = $('#log');
   const html = timelineCache.map((r, i) =>
-    `<li class="k-${r.kind}" data-i="${i}"${r.kind === 'req' ? ' title="클릭: 터미널에서 이 요청 위치로 이동"' : ''}><time>${fmt(r.t)}</time>${r.tag ? `<span class="tag">${r.tag}</span>` : ''}${esc(r.text)}${r.shot ? shotImg(r.shot, 'tl-shot') : ''}${r.kind === 'req' || r.kind === 'queued' ? attachThumbs(r.text) : ''}</li>`).join('');
+    `<li class="k-${r.kind}" data-i="${i}"${r.kind === 'req' ? ' title="클릭: 터미널에서 이 요청 위치로 이동"' : ''}><time>${fmt(r.t)}</time>${r.tag ? `<span class="tag">${r.tag}</span>` : ''}${esc(r.text)}${r.shot ? shotImg(r.shot, 'tl-shot') : ''}${r.doc ? docCard(r.doc) : ''}${r.kind === 'req' || r.kind === 'queued' ? attachThumbs(r.text) : ''}</li>`).join('');
   if (logEl._html !== html || logEl.dataset.w !== w.id) { // 브라우저가 innerHTML 을 정규화하므로 보낸 글로 비교
     const stick = logEl.dataset.w !== w.id || logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 40;
     logEl.dataset.w = w.id;
@@ -834,7 +834,7 @@ function renderDetail() {
 //  · 터미널에서 직접 친 요청은 'working: …' 만 찍힌다 → '요청'
 //  · 감시·백그라운드 완료 알림으로 생긴 턴('working: <task-notification>…')은 요청이 아니다 → '알림'
 //  · 'queue' 는 대기열에 들어간 지시 → '대기열'
-function timelineRows(log, shots = []) {
+function timelineRows(log, shots = [], docs = []) {
   const rows = [];
   for (const l of log) {
     if (l.kind === 'assign') { rows.push({ t: l.t, kind: 'req', tag: '요청', text: l.text }); continue; }
@@ -855,11 +855,23 @@ function timelineRows(log, shots = []) {
     rows.push({ t: l.t, kind: l.kind, text: l.text });
   }
   // 도구 결과 캡처: 그 시각 자리에 썸네일 줄로 끼운다 (로그와 캡처는 같은 시계 — 둘 다 이 PC 의 시각)
-  if (shots?.length) {
-    for (const s of shots) rows.push({ t: s.t, kind: 'shot', tag: '📷 캡처', text: [s.tool, s.arg].filter(Boolean).join(' · '), shot: s });
-    rows.sort((a, b) => a.t - b.t); // 안정 정렬이라 같은 시각의 로그 순서는 그대로
-  }
+  for (const s of shots || []) rows.push({ t: s.t, kind: 'shot', tag: '📷 캡처', text: [s.tool, s.arg].filter(Boolean).join(' · '), shot: s });
+  // 워커가 쓴 결과물 문서: 마지막으로 쓴(고친) 시각 자리에 카드 줄로
+  for (const d of docs || []) rows.push({ t: d.t, kind: 'doc', tag: '📄 결과물', text: '', doc: d });
+  if (shots?.length || docs?.length) rows.sort((a, b) => a.t - b.t); // 안정 정렬이라 같은 시각의 로그 순서는 그대로
   return rows;
+}
+// 결과물 문서 카드. 미리보기(iframe)는 넣지 않는다 — 타임라인은 줄이 늘 때마다 통째로 다시 그려서 계속 다시 로드된다
+const DOC_ICON = { html: '🌐', htm: '🌐', md: '📝', markdown: '📝', pdf: '📕', svg: '🖼️' };
+function docCard(d) {
+  const ext = d.name.split('.').pop().toLowerCase();
+  // 폴더는 끝쪽 두 단계만 (전체 경로는 마우스를 올리면)
+  const parts = d.path.slice(0, -d.name.length - 1).split(/[\\/]/), sep = d.path.includes('\\') ? '\\' : '/';
+  const dir = parts.length > 3 ? `…${sep}${parts.slice(-2).join(sep)}` : parts.join(sep);
+  return `<a class="tl-doc" href="${esc(d.url)}" target="_blank" rel="noopener" title="${esc(d.path)}&#10;클릭: 새 탭에서 열기">` +
+    `<span class="ic">${DOC_ICON[ext] || '📄'}</span><span class="meta">` +
+    (d.title ? `<span class="ti">${esc(d.title)}</span>` : '') +
+    `<span class="nm">${esc(d.name)}</span><span class="dir">${esc(dir)}</span></span></a>`;
 }
 // 사람이 지시에 첨부한 이미지: 보낸 글에 들어간 data/uploads 경로를 서버의 /uploads/ 로 바로 보여 준다(따로 저장하지 않음).
 // 이미 정리됐거나(7일) 다른 곳의 경로면 서버가 404 → 썸네일을 숨긴다

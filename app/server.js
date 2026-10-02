@@ -5,6 +5,8 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
+import crypto from 'node:crypto';
 import { execSync, execFile, spawn as spawnProcess } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import WebSocket, { WebSocketServer } from 'ws';
@@ -326,7 +328,9 @@ function onHook(w, ev, res) {
       emitState();
       break;
     case 'PostToolUse':
-      if (ev.agent_id) { scheduleProfile(w); break; }
+      // 서브에이전트가 쓴 문서도 결과물이다
+      if (ev.agent_id) { scheduleProfile(w); if (trackDoc(w, ev)) emitState(); break; }
+      trackDoc(w, ev);
       trackTasks(w, ev);
       if (isCommit(ev)) { progress.commit(w); broadcast({ type: 'fx', kind: 'commit', id: w.id }); }
       // 터미널에서 직접 승인한 경우 등, 도구가 실행됐으면 해당 도구의 대기 결정은 무효
@@ -586,6 +590,37 @@ function drainShots(w) {
 
 // ---------- 첨부 이미지 보관 ----------
 const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
+
+// ---------- 결과물 문서 ----------
+// 워커가 Write/Edit 로 쓴 문서(html·md·pdf·svg)를 타임라인에 카드로 보여 주고, 누르면 새 탭으로 연다.
+// 열어 주는 것은 워커가 직접 쓴 바로 그 파일뿐이다 — w.docs 에 기록된 경로를 문서 id 로만 찾는다.
+// Bash 로 만든 파일은 알 수 없다
+const DOC_TYPES = { html: 'text/html', htm: 'text/html', md: 'text/plain', markdown: 'text/plain', svg: 'image/svg+xml', pdf: 'application/pdf' };
+const DOC_KEEP = 50;
+const CLAUDE_HOME = path.join(os.homedir(), '.claude');
+const docExt = (file) => path.extname(file).slice(1).toLowerCase();
+// 카드에 보일 제목: html 은 <title>/<h1>, md 는 첫 # 제목
+function docTitle(full) {
+  try {
+    const head = fs.readFileSync(full, { encoding: 'utf8' }).slice(0, 65536);
+    const m = head.match(/<title[^>]*>([^<]{1,200})<\/title>/i) || head.match(/<h1[^>]*>([\s\S]{1,300}?)<\/h1>/i) || head.match(/^#\s+(.{1,200})$/m);
+    return m ? m[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().slice(0, 120) : '';
+  } catch { return ''; }
+}
+function trackDoc(w, ev) {
+  if (!['Write', 'Edit', 'MultiEdit'].includes(ev.tool_name)) return false;
+  const file = ev.tool_input?.file_path;
+  if (typeof file !== 'string' || !DOC_TYPES[docExt(file)]) return false;
+  const full = path.resolve(w.cwd || ROOT, file);
+  // Claude 설정·메모리(~/.claude 아래)와 규칙 파일은 결과물이 아니다
+  if (full.toLowerCase().startsWith(CLAUDE_HOME.toLowerCase() + path.sep) || /^(CLAUDE|MEMORY)\.md$/i.test(path.basename(full))) return false;
+  const id = crypto.createHash('sha1').update(full).digest('hex').slice(0, 12);
+  w.docs = (w.docs || []).filter((d) => d.id !== id); // 같은 파일을 다시 고치면 최신 시각으로 옮긴다
+  w.docs.push({ id, url: `/docs/${w.id}/${id}`, path: full, name: path.basename(full), title: docExt(full) === 'pdf' || docExt(full) === 'svg' ? '' : docTitle(full), t: Date.now(), tool: ev.tool_name });
+  if (w.docs.length > DOC_KEEP) w.docs.splice(0, w.docs.length - DOC_KEEP);
+  saveWorkersSoon();
+  return true;
+}
 const UPLOAD_LIMIT = 20 * 1024 * 1024;
 // 7일 지난 첨부는 정리 (Claude 가 이미 읽어 트랜스크립트에 담겼으므로 원본은 오래 둘 필요 없음)
 function cleanupUploads() {
@@ -690,6 +725,23 @@ const server = http.createServer(async (req, res) => {
     const ext = name.split('.').pop();
     res.writeHead(200, { 'content-type': `image/${ext === 'jpg' ? 'jpeg' : ext}`, 'cache-control': 'max-age=86400' });
     return fs.createReadStream(full).pipe(res);
+  }
+
+  // 워커가 쓴 결과물 문서 (trackDoc 이 기록한 파일만). html·svg 는 스크립트가 관제 화면과 같은 출처로 돌지 않게
+  // 샌드박스(고유 출처 없음)로 연다. pdf 는 샌드박스면 브라우저 뷰어가 막혀서 그대로
+  if (req.method === 'GET' && p.startsWith('/docs/')) {
+    const [, , wid, id] = p.split('/');
+    const d = workers.get(wid)?.docs?.find((x) => x.id === id);
+    let ok = false;
+    try { ok = !!d && fs.statSync(d.path).isFile(); } catch {}
+    if (!ok) return json(res, 404, { error: '문서가 없습니다 (지워졌거나 옮겨짐)' });
+    const ext = docExt(d.path), type = DOC_TYPES[ext];
+    res.writeHead(200, {
+      'content-type': type.startsWith('text/') || ext === 'svg' ? `${type}; charset=utf-8` : type,
+      'cache-control': 'no-cache', 'x-content-type-options': 'nosniff',
+      ...(ext === 'pdf' ? {} : { 'content-security-policy': 'sandbox allow-scripts allow-popups allow-modals allow-downloads' }),
+    });
+    return fs.createReadStream(d.path).pipe(res);
   }
 
   if (req.method === 'POST' && p === '/hook') {

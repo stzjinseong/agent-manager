@@ -458,6 +458,15 @@ main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24p
 .card-shot:hover { border-color: #fff; transform: scale(1.06); }
 #log li.k-shot .tl-shot { display: block; margin-top: 5px; max-width: 100%; max-height: 120px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, .7); cursor: zoom-in; background: #0c0d11; }
 #log li.k-shot .tl-shot:hover { border-color: #fff; }
+/* 워커가 쓴 결과물 문서 카드 (누르면 새 탭) */
+#log li.k-doc::before { background: var(--accent); }
+#log li.k-doc .tl-doc { display: flex; gap: 10px; align-items: center; margin-top: 5px; padding: 7px 10px; border: 1px solid rgba(255, 255, 255, .7); border-radius: 8px; background: var(--surface-2); color: var(--text); text-decoration: none; transition: border-color .15s, transform .15s; }
+#log li.k-doc .tl-doc:hover { border-color: #fff; transform: translateY(-1px); }
+#log li.k-doc .tl-doc .ic { flex: none; font-size: 22px; line-height: 1; }
+#log li.k-doc .tl-doc .meta { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+#log li.k-doc .tl-doc .ti { font-weight: 600; font-size: 12.5px; }
+#log li.k-doc .tl-doc .nm { font: 12px var(--mono); color: var(--text-2); }
+#log li.k-doc .tl-doc .dir { font-size: 11px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* 요청 줄의 첨부 썸네일: 여러 장이면 가로로 */
 #log .tl-attach { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; white-space: normal; }
 #log .tl-attach .tl-shot { display: block; max-width: 140px; max-height: 90px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, .7); cursor: zoom-in; background: #0c0d11; }
