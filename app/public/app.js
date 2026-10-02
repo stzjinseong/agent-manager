@@ -1877,7 +1877,18 @@ function setTermFull(on) {
     { transformOrigin: '0 0', transform: 'none' },
   ], { duration: 280, easing: 'cubic-bezier(.2, .8, .2, 1)' });
   termAnim.onfinish = () => { termAnim = null; done(); };
+  // 옆 패널: 넓은 화면의 크게 보기에선 오른쪽에 따로 붙는다(style.css) → 터미널이 커지는 동안 오른쪽에서 밀려 들어오고,
+  // 원래대로 돌아갈 땐 제자리에서 살짝 떠오르며 나타난다. 좁은 화면은 크게 보기에 옆 패널이 없다(터미널만)
+  if (matchMedia('(min-width: 1101px)').matches) {
+    sideAnim?.cancel();
+    sideAnim = $('.side').animate(on
+      ? [{ transform: 'translateX(48px)', opacity: 0 }, { transform: 'none', opacity: 1 }]
+      : [{ transform: 'translateY(8px)', opacity: 0 }, { transform: 'none', opacity: 1 }],
+    { duration: on ? 320 : 240, delay: on ? 60 : 80, easing: 'cubic-bezier(.2, .8, .2, 1)', fill: 'backwards' });
+    sideAnim.onfinish = () => { sideAnim = null; };
+  }
 }
+let sideAnim = null;
 $('#btn-full').onclick = () => setTermFull(!$('#term-wrap').classList.contains('full'));
 $('#btn-full-exit').onclick = () => setTermFull(false);
 $('#btn-remove').onclick = async () => {
