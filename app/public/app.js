@@ -202,7 +202,7 @@ setFavicon(false);
 // ---------- 터미널 ----------
 const term = new Terminal({
   fontFamily: 'ui-monospace, SFMono-Regular, Menlo, "Cascadia Mono", Consolas, monospace', // 시스템 고정폭 (style.css --mono 와 같음)
-  fontSize: 13, cursorBlink: true, scrollback: 5000,
+  fontSize: 13, cursorBlink: true, scrollback: 12000, // PTY 호스트 기록(10000줄)보다 넉넉히
   allowProposedApi: true, // unicode 버전 전환에 필요
   theme: { background: '#07080a', foreground: '#e6e4de', cursor: '#d97757', selectionBackground: '#d9775744' },
 });
@@ -799,6 +799,7 @@ function renderDetail() {
     logEl.dataset.w = w.id;
     logEl.innerHTML = logEl._html = html;
     if (stick) logEl.scrollTop = logEl.scrollHeight;
+    markGoneSoon();
   }
   renderProfile(w);
 }
@@ -1713,58 +1714,89 @@ function sameReq(a, b) {
   return x.length <= y.length ? y.startsWith(x) : x.startsWith(y);
 }
 const PROMPT_RE = /^\s?[>›❯]\s?/, CONT_RE = /^ {2}\S/; // 요청 첫 줄 / Claude 가 들여써 이어 찍은 줄
-function findPromptLine(text, fromEnd) {
-  const key = compact(text).slice(0, 40);
-  if (key.length < 2) return -1;
-  const b = term.buffer.active, hits = [];
+// 터미널 기록을 한 번 훑어 요청 블록(줄 번호 + 앞 40글자)과 턴 요약 줄(줄 번호 + 시각)을 모은다.
+// 기록이 1만 줄이라 타임라인 줄마다 훑으면 무겁다 → 기록이 바뀐 뒤 처음 물을 때만 다시 훑는다
+const KEY_LEN = 40;
+let termScan = null;
+term.onWriteParsed(() => { termScan = null; });
+function scanTerm() {
+  if (termScan) return termScan;
+  const b = term.buffer.active, prompts = [], dones = [];
   const row = (j) => b.getLine(j)?.translateToString(true) ?? '';
   for (let i = 0; i < b.length; i++) {
     const line = b.getLine(i);
     if (!line || line.isWrapped) continue;
     const first = row(i);
+    const dm = DONE_RE.exec(first);
+    if (dm) { dones.push({ line: i, min: doneMinutes(dm) }); continue; }
     if (!PROMPT_RE.test(first)) continue;
     // 요청 블록: 프롬프트 줄 + 뒤따르는 줄들 — 자동 줄바꿈(isWrapped), 들여쓴 이어지는 줄, 그 사이 빈 줄.
-    // 들여쓰지 않은 줄(● 응답 등)이 나오면 끝. key 길이만큼 모이면 더 읽지 않는다
+    // 들여쓰지 않은 줄(● 응답 등)이 나오면 끝. KEY_LEN 만큼 모이면 더 읽지 않는다
     let acc = compact(first.replace(PROMPT_RE, ''));
-    for (let j = i + 1; j < b.length && acc.length < key.length; j++) {
+    for (let j = i + 1; j < b.length && acc.length < KEY_LEN; j++) {
       const l = b.getLine(j), t = row(j);
       if (l.isWrapped || CONT_RE.test(t)) { acc += compact(t); continue; }
       if (!t.trim() && CONT_RE.test(row(j + 1))) continue; // 요청 안의 빈 줄
       break;
     }
-    if (acc.startsWith(key)) hits.push(i);
+    prompts.push({ line: i, acc });
   }
+  return (termScan = { prompts, dones });
+}
+function findPromptLine(text, fromEnd) {
+  const key = compact(text).slice(0, KEY_LEN);
+  if (key.length < 2) return -1;
+  const hits = scanTerm().prompts.filter((p) => p.acc.startsWith(key)).map((p) => p.line);
   return hits.length > fromEnd ? hits[hits.length - 1 - fromEnd] : -1;
 }
 // 턴 요약 줄 "✻ Brewed for 2m 2s · done 오후 4:15"(로케일에 따라 4:15 PM) 중 그 시각(분 단위) 이전의 마지막 것
 const DONE_RE = /^✻ .*\bdone\s+(오전|오후|AM|PM)?\s*(\d{1,2}):(\d{2})\s*(AM|PM)?/i;
+function doneMinutes(m) {
+  const pm = /오후|PM/i.test(m[1] || m[4] || ''), am = /오전|AM/i.test(m[1] || m[4] || '');
+  let h = Number(m[2]) % 12;
+  if (pm) h += 12; else if (!am) h = Number(m[2]);
+  return h * 60 + Number(m[3]);
+}
+// 요약 줄엔 날짜가 없어 시각만으로는 어제·오늘을 못 가른다. 예전엔 '그 시각 이전의 마지막 요약 줄'을 골라,
+// 기록에서 밀려난 어제 요청이 오늘 아침 줄로 엉뚱하게 이동했다 → 요청 직전 NEAR_MIN 분 안에 끝난 턴만 인정한다
+// (원래 목적: 앞 턴이 끝나는 바로 그 순간 투입돼 '❯ 요청' 줄이 안 남은 경우)
+const NEAR_MIN = 3;
 function findTurnEndBefore(t) {
   const d = new Date(t), want = d.getHours() * 60 + d.getMinutes();
-  const b = term.buffer.active;
   let best = -1;
-  for (let i = 0; i < b.length; i++) {
-    const m = DONE_RE.exec(b.getLine(i)?.translateToString(true) || '');
-    if (!m) continue;
-    const pm = /오후|PM/i.test(m[1] || m[4] || ''), am = /오전|AM/i.test(m[1] || m[4] || '');
-    let h = Number(m[2]) % 12;
-    if (pm) h += 12; else if (!am) h = Number(m[2]);
-    if (h * 60 + Number(m[3]) <= want) best = i;
-  }
+  for (const x of scanTerm().dones) if ((want - x.min + 1440) % 1440 <= NEAR_MIN) best = x.line;
   return best;
 }
+// 타임라인의 요청 줄 중 터미널 기록에서 이미 밀려나 이동할 수 없는 것은 흐리게 — 누르기 전에 알 수 있게
+function laterSame(i) {
+  const row = timelineCache[i];
+  return timelineCache.slice(i + 1).filter((r) => r.kind === 'req' && normText(r.text) === normText(row.text)).length;
+}
+function markGoneReqs() {
+  if (!selected || $('#detail').hidden) return;
+  for (const li of $('#log').querySelectorAll('li.k-req')) {
+    const i = Number(li.dataset.i), row = timelineCache[i];
+    if (!row) continue;
+    const gone = findPromptLine(row.text, laterSame(i)) < 0 && findTurnEndBefore(row.t + clockSkew) < 0;
+    li.classList.toggle('gone', gone);
+    li.title = gone ? '터미널 기록에서 밀려난 요청이라 위치로 이동할 수 없습니다' : '클릭: 터미널에서 이 요청 위치로 이동';
+  }
+}
+let goneTimer = null;
+const markGoneSoon = () => { clearTimeout(goneTimer); goneTimer = setTimeout(markGoneReqs, 400); };
+term.onWriteParsed(markGoneSoon);
 $('#log').addEventListener('click', (e) => {
   const li = e.target.closest('li.k-req');
   if (!li) return;
   const i = Number(li.dataset.i), row = timelineCache[i];
   if (!row) return;
   // 이 요청 뒤에 같은 문구 요청이 몇 번 더 있었나 = 터미널에서 끝에서 몇 번째인가
-  const later = timelineCache.slice(i + 1).filter((r) => r.kind === 'req' && normText(r.text) === normText(row.text)).length;
-  let line = findPromptLine(row.text, later);
+  let line = findPromptLine(row.text, laterSame(i));
   if (line < 0) {
     // 앞 턴이 끝나는 바로 그 순간 투입된 요청은 Claude 가 '❯ 요청' 줄을 남기지 않는 경우가 있다 →
     // 그 시각 직전에 끝난 턴의 요약 줄(✻ … · done 오후 4:15)로 대신 이동
     line = findTurnEndBefore(row.t + clockSkew);
-    if (line < 0) { toast('터미널 기록에 없는 요청입니다 (clear 등으로 지워졌거나 기록 범위를 벗어남)', 3200); return; }
+    if (line < 0) { toast('터미널 기록에서 밀려난 요청입니다 (오래됐거나 clear·재부팅으로 지워짐)', 3200); return; }
     toast('요청 줄이 터미널에 남지 않아 그 무렵(직전 턴 종료) 위치로 이동했습니다', 2800);
   }
   term.scrollToLine(Math.max(0, line - 2));

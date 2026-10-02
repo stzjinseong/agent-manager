@@ -342,6 +342,7 @@ main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24p
 /* 요청 줄 강조: 코랄 바탕 + 왼쪽 굵은 막대 · 대기열은 점선 · 알림은 보라 */
 #log li.k-req { color: var(--text); background: color-mix(in srgb, var(--accent) 11%, transparent); border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0; margin: 3px 0; padding: 6px 8px 6px 10px; white-space: pre-wrap; }
 #log li.k-req::before { display: none; }
+#log li.k-req.gone { opacity: .5; cursor: default; border-left-style: dashed; }
 #log li.k-queued { color: var(--text-2); border-left: 2px dashed color-mix(in srgb, var(--accent) 70%, transparent); background: color-mix(in srgb, var(--accent) 5%, transparent); border-radius: 0 6px 6px 0; margin: 3px 0; padding: 5px 8px 5px 10px; white-space: pre-wrap; }
 #log li.k-queued::before { display: none; }
 #log li.k-bgnote::before { background: var(--waiting); }

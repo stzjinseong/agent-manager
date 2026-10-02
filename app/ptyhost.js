@@ -39,8 +39,11 @@ if (process.argv.includes('--shutdown')) {
 
 const ptys = new Map(); // id → { id, term, pid, screen, serializer, exited, exitCode }
 
+// 워커마다 들고 있는 터미널 기록 줄 수. 타임라인의 오래된 요청을 눌러 그 위치로 가려면 기록이 남아 있어야 한다
+// (2000줄일 땐 diff·긴 출력 몇 턴이면 밀려났다). 한 줄 ≈ 110칸이라 워커당 메모리 약 10MB 안팎
+const SCROLLBACK = 10000;
 function makeScreen(cols, rows) {
-  const screen = new Terminal({ cols, rows, scrollback: 2000, allowProposedApi: true });
+  const screen = new Terminal({ cols, rows, scrollback: SCROLLBACK, allowProposedApi: true });
   const serializer = new SerializeAddon();
   screen.loadAddon(serializer);
   screen.loadAddon(new Unicode11Addon()); // 브라우저와 같은 글자 폭 표
@@ -85,7 +88,7 @@ function handle(msg) {
       if (!p) break;
       // 아직 해석 대기 중인 출력까지 반영한 뒤 직렬화
       p.screen.write('', () => {
-        broadcast({ ev: 'snapshot', id: p.id, req: msg.req, cols: p.screen.cols, rows: p.screen.rows, data: p.serializer.serialize({ scrollback: 2000 }) });
+        broadcast({ ev: 'snapshot', id: p.id, req: msg.req, cols: p.screen.cols, rows: p.screen.rows, data: p.serializer.serialize({ scrollback: SCROLLBACK }) });
       });
       break;
     case 'kill': if (p && !p.exited) { try { p.term.kill(); } catch {} } break;
