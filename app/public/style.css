@@ -82,7 +82,8 @@ textarea { resize: vertical; }
 main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24px; }
 
 /* ---------- 워커 추가 ---------- */
-.new-panel { margin-top: 16px; padding: 16px; }
+/* 폭은 워커 카드(.floor)와 같은 규칙: 화면 폭 - 좌우 24px, 최대 1480px 가운데 정렬 */
+.new-panel { width: calc(100% - 48px); max-width: 1480px; margin: 16px auto 0 !important; padding: 16px; }
 #new-form { display: grid; grid-template-columns: 1.1fr 2.4fr 1fr 1fr auto auto; gap: 12px; align-items: end; }
 #new-form label > span { display: block; font-size: 12px; color: var(--dim); margin-bottom: 5px; }
 .with-btn { display: flex; gap: 6px; }
@@ -352,7 +353,7 @@ main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24p
 @media (max-width: 640px) {
   main, .new-panel, #inbox, .floor, .detail { margin-left: 12px; margin-right: 12px; }
   .topbar { padding: 10px 12px; }
-  .detail, .floor { width: calc(100% - 24px); }
+  .detail, .floor, .new-panel { width: calc(100% - 24px); }
   #new-form { grid-template-columns: 1fr; }
   .decision { flex-wrap: wrap; }
 }
