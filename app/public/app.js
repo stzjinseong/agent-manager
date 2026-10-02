@@ -705,7 +705,8 @@ function electric(d) {
 
 // 워커 비교 — 누적 토큰은 워커 간 최대값 기준, 컨텍스트는 각자의 창 기준
 function renderCompare() {
-  const ws_ = state.workers.filter((w) => w.profile?.turnCount);
+  // 지금 관리 중인(세션이 살아 있는) 워커만 — 종료된 워커는 비교에서 뺀다
+  const ws_ = state.workers.filter((w) => w.status !== 'exited' && w.profile?.turnCount);
   $('#compare').hidden = ws_.length < 1;
   if (!ws_.length) return;
   const tok = (w) => { const t = w.profile.total; return t.input + t.cacheWrite + t.cacheRead + t.output; };
