@@ -473,9 +473,16 @@ const snapWaiters = new Map(); // 스냅샷 요청 번호 → 요청한 브라�
 function hostSend(msg) { if (host?.readyState === 1) host.send(JSON.stringify(msg)); }
 
 function hostTerm(id) {
+  // 같은 크기 resize 는 보내지 않는다 — ConPTY 는 같은 크기여도 화면 전체를 다시 그려 보낸다.
+  // 탭이 여럿이어도 여기서 한 번 걸러진다
+  let size = null;
   return {
     write: (data) => hostSend({ op: 'write', id, data }),
-    resize: (cols, rows) => hostSend({ op: 'resize', id, cols, rows }),
+    resize: (cols, rows) => {
+      if (size === `${cols}x${rows}` || host?.readyState !== 1) return;
+      size = `${cols}x${rows}`;
+      hostSend({ op: 'resize', id, cols, rows });
+    },
     kill: () => hostSend({ op: 'kill', id }),
   };
 }

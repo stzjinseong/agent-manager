@@ -344,7 +344,7 @@ new ResizeObserver(() => { clearTimeout(fitTimer); fitTimer = setTimeout(fitTerm
 // 칸 수를 고정하면 접힐 일이 없다. 높이는 줄 수만 바뀌어 문제없음.
 const TERM_COLS = 110;
 const FONT_MIN = 11, FONT_MAX = 16;
-function fitTerm() {
+function fitTerm(now = false) {
   if (!selected || $('#detail').hidden) return;
   try {
     let dims = null;
@@ -358,15 +358,32 @@ function fitTerm() {
     // 아주 좁아 최소 글자로도 안 들어가면 그때만 칸 수를 줄인다
     const cols = Math.min(TERM_COLS, dims.cols), rows = dims.rows;
     if (term.cols !== cols || term.rows !== rows) term.resize(cols, rows);
-    send({ type: 'resize', id: selected, cols, rows });
+    syncPtySize(now);
   } catch {}
 }
+
+// 화면 크기는 바로 맞추되, 워커 터미널(pty) 크기는 아껴서 바꾼다. 줄 수가 늘 때마다 ConPTY 와 Claude 가
+// 화면을 다시 그리면서 이미 스크롤백에 올라간 줄을 한 번 더 써서 입력창이 두 벌 남는다
+// (실측: 40→65줄 중복 +14줄, 30→65줄 +21줄. 같은 크기·줄어들 때는 0).
+// 그래서 보고 있는 탭만 보내고(탭끼리 크기 다툼 방지), 끌기·애니메이션 중에는 멈췄다가 끝난 크기만 보낸다
+let ptyTimer;
+function syncPtySize(now = false) {
+  clearTimeout(ptyTimer);
+  const go = () => {
+    if (!selected || $('#detail').hidden) return;
+    if (document.visibilityState !== 'visible' || !document.hasFocus()) return;
+    send({ type: 'resize', id: selected, cols: term.cols, rows: term.rows });
+  };
+  if (now) go(); else ptyTimer = setTimeout(go, 250);
+}
+// 다른 탭·창에서 돌아오면 이 탭 크기로 되돌린다(같은 크기면 서버가 거른다)
+addEventListener('focus', () => syncPtySize(true));
 
 // ---------- 통신 ----------
 function send(msg) { if (ws?.readyState === 1) ws.send(JSON.stringify(msg)); }
 function connect() {
   ws = new WebSocket(`ws://${location.host}/ws`);
-  ws.onopen = () => selected && send({ type: 'attach', id: selected });
+  ws.onopen = () => { if (selected) { syncPtySize(true); send({ type: 'attach', id: selected }); } };
   ws.onmessage = (e) => {
     const msg = JSON.parse(e.data);
     if (msg.type === 'state') {
@@ -774,7 +791,7 @@ function renderDetail() {
   const wasHidden = $('#detail').hidden;
   $('#detail').hidden = !w;
   if (!w) return;
-  if (wasHidden) requestAnimationFrame(fitTerm);
+  if (wasHidden) requestAnimationFrame(() => fitTerm());
   const av = $('#detail-avatar');
   if (!av.firstChild) av.innerHTML = clawdSVG();
   av.className = `detail-avatar s-${viewStatus(w)}`;
@@ -1334,9 +1351,10 @@ function select(id) {
   restoreFor = id;
   render();
   term.reset();
-  send({ type: 'attach', id });
+  // 크기를 먼저 맞춘 뒤 기록을 받는다 — 기록이 예전 크기로 만들어지지 않게
   requestAnimationFrame(() => {
-    fitTerm();
+    fitTerm(true);
+    send({ type: 'attach', id });
     if (!document.querySelector('input.rename')) $('#task-form').text.focus();
   });
 }
