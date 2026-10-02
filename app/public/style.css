@@ -342,7 +342,19 @@ main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24p
 .queue .qi .tx { flex: 1; min-width: 0; white-space: pre-wrap; word-break: break-all; }
 .queue .qi button { background: none; border: 0; color: var(--dim); cursor: pointer; padding: 0 2px; font-size: 13px; }
 .queue .qi button:hover { color: var(--text); }
-.timeline { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.timeline { display: flex; flex-direction: column; min-height: 0; flex: 1; position: relative; }
+/* 위로 지나간 최근 요청을 타임라인 위에 고정 (덮어 씌움 · 두 줄까지) */
+.tl-pin {
+  position: absolute; left: 0; right: 6px; z-index: 2; cursor: pointer; font-size: 12px; color: var(--text);
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface)); border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0;
+  padding: 6px 8px 6px 10px; box-shadow: 0 6px 12px -4px rgba(0, 0, 0, .6);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-wrap; word-break: break-all;
+}
+.tl-pin[hidden] { display: none; }
+.tl-pin:hover { background: color-mix(in srgb, var(--accent) 24%, var(--surface)); }
+.tl-pin.gone { border-left-style: dashed; color: var(--text-2); cursor: default; }
+.tl-pin time { color: var(--dim); margin-right: 6px; font: 11px var(--mono); }
+.tl-pin .tag { display: inline-block; font-size: 10.5px; font-weight: 600; padding: 0 6px; margin-right: 6px; border-radius: 4px; line-height: 17px; vertical-align: 1px; background: var(--accent); color: #1a0f0a; }
 .timeline h3 { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--text); letter-spacing: .04em; }
 #log { list-style: none; margin: 0; padding: 0; font-size: 12px; overflow: auto; flex: 1; }
 #log li { padding: 5px 0 5px 12px; border-left: 1px solid var(--line-2); position: relative; color: var(--text-2); word-break: break-all; }

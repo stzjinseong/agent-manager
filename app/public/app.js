@@ -823,6 +823,8 @@ function renderDetail() {
     logEl.dataset.w = w.id;
     logEl.innerHTML = logEl._html = html;
     if (stick) logEl.scrollTop = logEl.scrollHeight;
+    pinFor = null; // 줄을 새로 그렸으니 고정 줄도 새 요소 기준으로
+    updatePin();
     markGoneSoon();
   }
   renderProfile(w);
@@ -1917,6 +1919,33 @@ function markGoneReqs() {
 let goneTimer = null;
 const markGoneSoon = () => { clearTimeout(goneTimer); goneTimer = setTimeout(markGoneReqs, 400); };
 term.onWriteParsed(markGoneSoon);
+// ---------- 타임라인 상단 고정 요청 ----------
+// 위로 스크롤돼 안 보이게 된 요청 줄 가운데 가장 아래(최근) 것을 타임라인 위에 붙여 보여 준다.
+// 지금 보고 있는 기록이 어떤 요청의 결과인지 알 수 있고, 누르면 그 줄을 누른 것과 같다(터미널에서 그 위치로).
+// 덮어 씌우는 방식이라 목록 레이아웃·스크롤 위치는 바뀌지 않는다
+const pinEl = $('#tl-pin');
+let pinFor = null;
+function updatePin() {
+  const logEl = $('#log');
+  const top = logEl.getBoundingClientRect().top;
+  let hit = null;
+  for (const li of logEl.querySelectorAll('li.k-req')) {
+    if (li.getBoundingClientRect().bottom <= top + 2) hit = li; else break;
+  }
+  if (!hit) { pinEl.hidden = true; pinFor = null; return; }
+  pinEl.style.top = `${logEl.offsetTop}px`;
+  if (pinFor !== hit || pinEl.hidden) {
+    pinFor = hit;
+    const row = timelineCache[Number(hit.dataset.i)];
+    pinEl.innerHTML = `<time>${esc(hit.querySelector('time')?.textContent || '')}</time><span class="tag">요청</span><span class="tx">${esc(row?.text || '')}</span>`;
+  }
+  pinEl.classList.toggle('gone', hit.classList.contains('gone'));
+  pinEl.hidden = false;
+}
+$('#log').addEventListener('scroll', updatePin, { passive: true });
+new ResizeObserver(() => updatePin()).observe($('#log'));
+pinEl.addEventListener('click', () => { if (pinFor?.isConnected) pinFor.click(); });
+
 $('#log').addEventListener('click', (e) => {
   const li = e.target.closest('li.k-req');
   if (!li) return;
