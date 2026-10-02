@@ -561,6 +561,7 @@ function onHostHello({ ptys }) {
     else { w.pid = p.pid; pushLog(w, 'status', '관제 서버 재시작 — 워커 다시 연결'); }
     // 완료 시각 기록(doneAt) 이전에 끝난 워커도 '확인 안 한 완료'로 보이게 마지막 갱신 시각으로 채운다
     if (w.status === 'done' && !w.doneAt) w.doneAt = w.updatedAt || Date.now();
+    if (w.docs) w.docs = w.docs.filter((d) => isDocCandidate(d.path)); // 규칙이 바뀌기 전에 잡힌 이 앱 자체 파일 등을 정리
     ensureRoleColor(w.name);
     workers.set(w.id, w);
     if (w.tx) scheduleProfile(w);
@@ -635,14 +636,19 @@ function docTitle(full) {
     return m ? m[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().slice(0, 120) : '';
   } catch { return ''; }
 }
+// 결과물로 칠 수 없는 곳: Claude 설정·메모리(~/.claude 아래), 규칙 파일, 이 앱(agent-manager) 자체의 파일(화면 소스 등)
+const underDir = (full, dir) => full.toLowerCase().startsWith(dir.toLowerCase() + path.sep);
+const isDocCandidate = (full) => !underDir(full, CLAUDE_HOME) && !underDir(full, ROOT) && !/^(CLAUDE|MEMORY)\.md$/i.test(path.basename(full));
 function trackDoc(w, ev) {
   if (!['Write', 'Edit', 'MultiEdit'].includes(ev.tool_name)) return false;
   const file = ev.tool_input?.file_path;
   if (typeof file !== 'string' || !DOC_TYPES[docExt(file)]) return false;
   const full = path.resolve(w.cwd || ROOT, file);
-  // Claude 설정·메모리(~/.claude 아래)와 규칙 파일은 결과물이 아니다
-  if (full.toLowerCase().startsWith(CLAUDE_HOME.toLowerCase() + path.sep) || /^(CLAUDE|MEMORY)\.md$/i.test(path.basename(full))) return false;
+  if (!isDocCandidate(full)) return false;
   const id = crypto.createHash('sha1').update(full).digest('hex').slice(0, 12);
+  // 결과물은 Write 로 새로 만든 문서에서 시작한다. 원래 있던 파일을 Edit 로 고친 것(웹 프로젝트의 html 소스 등)은
+  // 결과물이 아니다 — Write 로 만든 문서를 나중에 Edit 로 고친 건 계속 반영
+  if (ev.tool_name !== 'Write' && !(w.docs || []).some((d) => d.id === id)) return false;
   w.docs = (w.docs || []).filter((d) => d.id !== id); // 같은 파일을 다시 고치면 최신 시각으로 옮긴다
   w.docs.push({ id, url: `/docs/${w.id}/${id}`, path: full, name: path.basename(full), title: docExt(full) === 'pdf' || docExt(full) === 'svg' ? '' : docTitle(full), t: Date.now(), tool: ev.tool_name });
   if (w.docs.length > DOC_KEEP) w.docs.splice(0, w.docs.length - DOC_KEEP);
