@@ -345,9 +345,10 @@ main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24p
 .side-grip:hover i, .side-grip.dragging i { background: color-mix(in srgb, var(--accent) 60%, transparent); }
 .side-grip:hover i::after, .side-grip.dragging i::after { background: var(--accent); border-color: var(--accent); opacity: 1; }
 body.resizing-side { cursor: col-resize; user-select: none; }
-/* 좁은 화면(세로 한 줄 배치)과 터미널 크게 보기(옆 패널이 따로 고정 폭)에서는 넓히기를 쓰지 않는다 */
-body.term-full .side-grip { display: none; }
-body.term-full .side.cover { margin-left: 0; padding-left: 12px; box-shadow: none; }
+/* 크게 보기: 옆 패널은 화면 오른쪽에 고정(--full-side-w). 넓히면 고정 폭 + 늘린 만큼으로 터미널 위를 덮는다
+   (터미널 쪽 right 는 --full-side-w 그대로). 좁은 화면(세로 한 줄 배치)에서는 넓히기를 쓰지 않는다 */
+body.term-full .side.cover { margin-left: 0; padding-left: 12px; width: calc(var(--full-side-w) + var(--side-extra, 0px)); }
+body.term-full .side-grip { left: -6px; }
 @media (max-width: 1100px) {
   .side-grip { display: none; }
   .side.cover { margin-left: 0; padding-left: 0; background: none; box-shadow: none; border-left: 0; }

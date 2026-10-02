@@ -2052,10 +2052,14 @@ resizer.addEventListener('pointerdown', (e) => {
 resizer.addEventListener('dblclick', () => { setTermH(null); try { localStorage.removeItem(TERM_H_KEY); } catch {} });
 
 // ---------- 옆 패널 넓히기 (왼쪽 세로선을 끌기 — 터미널 위를 덮는다) ----------
-// 기본 폭(격자 칸 360px)이 최소. 늘린 만큼(--side-extra) 왼쪽으로 겹쳐 덮고, 터미널은 최소 240px 이 보이게 남긴다.
-// 터미널 크기는 그대로라 pty 크기도 안 바뀐다. 폭은 브라우저에 기억 · 더블클릭: 기본 폭
-const SIDE_W_KEY = 'am.sideExtra', TERM_KEEP = 240;
+// 기본 폭(평소 격자 칸 360px · 크게 보기 고정 폭)이 최소. 늘린 만큼(--side-extra) 왼쪽으로 겹쳐 덮고, 터미널은 최소
+// 240px 이 보이게 남긴다. 터미널 크기는 그대로라 pty 크기도 안 바뀐다. 평소·크게 보기 폭을 따로 기억 · 더블클릭: 기본 폭
+const TERM_KEEP = 240;
 const sideEl = $('.side'), sideGrip = $('#side-grip');
+const sideMode = () => (document.body.classList.contains('term-full') ? 'full' : 'normal');
+const SIDE_KEYS = { normal: 'am.sideExtra', full: 'am.sideExtraFull' };
+const sideWant = { normal: 0, full: 0 };
+try { for (const m in SIDE_KEYS) sideWant[m] = Number(localStorage.getItem(SIDE_KEYS[m])) || 0; } catch {}
 function setSideExtra(px) {
   const maxExtra = Math.max(0, $('#term-wrap').getBoundingClientRect().width - TERM_KEEP);
   const extra = Math.round(Math.max(0, Math.min(maxExtra || px, px || 0)));
@@ -2064,29 +2068,31 @@ function setSideExtra(px) {
   requestAnimationFrame(() => updatePin());
   return extra;
 }
-try { const saved = Number(localStorage.getItem(SIDE_W_KEY)); if (saved > 0) setSideExtra(saved); } catch {}
-// 창이 좁아져 터미널이 줄면 기억한 폭을 다시 맞춘다(터미널 240px 은 남게). 상세가 숨겨져 폭이 0 일 땐 건너뜀
-let sideWant = parseFloat(sideEl.style.getPropertyValue('--side-extra')) || 0;
-new ResizeObserver(() => { if (sideWant && $('#term-wrap').getBoundingClientRect().width) setSideExtra(sideWant); }).observe($('#term-wrap'));
+// 지금 모드에 기억한 폭을 적용 — 처음, 크게 보기 전환 때, 창이 좁아져 터미널이 줄 때(상세가 숨겨져 폭이 0 이면 건너뜀)
+const applySideWant = () => { if (sideWant[sideMode()] || sideEl.classList.contains('cover')) setSideExtra(sideWant[sideMode()]); };
+applySideWant();
+new ResizeObserver(() => { if ($('#term-wrap').getBoundingClientRect().width) applySideWant(); }).observe($('#term-wrap'));
+let sideLastMode = sideMode(); // body 클래스는 끌기 중에도 바뀌므로 크게 보기 전환일 때만 반응
+new MutationObserver(() => { if (sideMode() !== sideLastMode) { sideLastMode = sideMode(); applySideWant(); } }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
 sideGrip.addEventListener('pointerdown', (e) => {
   if (e.button !== 0) return;
   e.preventDefault();
   sideGrip.setPointerCapture(e.pointerId);
-  const startX = e.clientX, startExtra = parseFloat(sideEl.style.getPropertyValue('--side-extra')) || 0;
+  const startX = e.clientX, startExtra = parseFloat(sideEl.style.getPropertyValue('--side-extra')) || 0, mode = sideMode();
   sideGrip.classList.add('dragging'); document.body.classList.add('resizing-side');
   let extra = startExtra;
   const move = (ev) => { extra = setSideExtra(startExtra + (startX - ev.clientX)); };
   const up = () => {
     sideGrip.removeEventListener('pointermove', move);
     sideGrip.classList.remove('dragging'); document.body.classList.remove('resizing-side');
-    sideWant = extra;
-    try { extra > 0 ? localStorage.setItem(SIDE_W_KEY, String(extra)) : localStorage.removeItem(SIDE_W_KEY); } catch {}
+    sideWant[mode] = extra;
+    try { extra > 0 ? localStorage.setItem(SIDE_KEYS[mode], String(extra)) : localStorage.removeItem(SIDE_KEYS[mode]); } catch {}
   };
   sideGrip.addEventListener('pointermove', move);
   sideGrip.addEventListener('pointerup', up, { once: true });
   sideGrip.addEventListener('pointercancel', up, { once: true });
 });
-sideGrip.addEventListener('dblclick', () => { sideWant = setSideExtra(0); try { localStorage.removeItem(SIDE_W_KEY); } catch {} });
+sideGrip.addEventListener('dblclick', () => { const m = sideMode(); sideWant[m] = setSideExtra(0); try { localStorage.removeItem(SIDE_KEYS[m]); } catch {} });
 
 // ---------- 옆 패널 영역 높이 조절 (업무 지시 · 나중에 할 작업 · 타임라인 사이 가로선 끌기) ----------
 // 끈 영역(가로선 위쪽)에 높이를 주고, 남는 자리는 타임라인이 갖는다. 영역마다 브라우저에 기억 · 더블클릭: 기본(내용 크기)
