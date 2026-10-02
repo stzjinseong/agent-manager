@@ -380,7 +380,7 @@ function connect() {
     }
     else if (msg.type === 'fx') mgrOnFx(msg);
     else if (msg.type === 'pty' && msg.id === selected) term.write(msg.data);
-    else if (msg.type === 'scrollback' && msg.id === selected) { term.reset(); term.write(msg.data); }
+    else if (msg.type === 'scrollback' && msg.id === selected) { term.reset(); term.write(msg.data, () => restoreTermScroll(msg.id)); }
   };
   ws.onopen = ((orig) => () => { if (serverDown) { location.reload(); return; } orig?.(); })(ws.onopen);
   ws.onclose = () => setTimeout(connect, 1000);
@@ -1220,12 +1220,42 @@ new ResizeObserver(() => {
   if (w) renderProfile(w);
 }).observe($('#profile'));
 
+// ---------- 워커를 오가도 터미널 스크롤 위치 유지 ----------
+// 워커를 바꾸면 터미널을 지우고 서버 스냅샷을 다시 그려 늘 맨 아래가 된다. 떠날 때 보던 맨 윗줄(번호·글자)을 기억했다가
+// 돌아와 스냅샷을 다 그린 뒤 그 줄로 되돌린다. 기록 상한으로 앞줄이 잘려 번호가 밀렸을 수 있어 같은 글자의 줄을
+// 기억한 번호 가까이에서 찾고, 없으면 번호로 간다. 맨 아래를 보고 있었으면 기억하지 않는다(새 출력을 따라감)
+const termScroll = new Map(); // worker id → { line, text }
+let restoreFor = null;
+const lineText = (i) => term.buffer.active.getLine(i)?.translateToString(true) ?? '';
+function saveTermScroll(id) {
+  const b = term.buffer.active;
+  if (b.viewportY >= b.baseY) { termScroll.delete(id); return; }
+  termScroll.set(id, { line: b.viewportY, text: lineText(b.viewportY) });
+}
+function restoreTermScroll(id) {
+  if (restoreFor !== id) return; // 고른 직후 첫 스냅샷에만 — 재연결 등으로 다시 오는 스냅샷은 건드리지 않는다
+  restoreFor = null;
+  const saved = termScroll.get(id);
+  if (!saved) return;
+  const b = term.buffer.active;
+  let at = -1;
+  if (saved.text.trim()) {
+    for (let d = 0; d <= b.length && at < 0; d++) {
+      if (lineText(saved.line - d) === saved.text) at = saved.line - d;
+      else if (d && lineText(saved.line + d) === saved.text) at = saved.line + d;
+      if (saved.line - d < 0 && saved.line + d >= b.length) break;
+    }
+  }
+  term.scrollToLine(Math.max(0, Math.min(b.baseY, at >= 0 ? at : saved.line)));
+}
 function select(id) {
   markSeen(id); // 카드를 눌렀으면 완료 확인
   // 이미 열려 있는 워커를 다시 누르면 아무것도 하지 않는다 — 터미널을 다시 그리지 않고,
   // 포커스도 옮기지 않는다(옮기면 더블클릭으로 연 이름 입력창의 포커스를 빼앗아 바로 닫혀 버림)
   if (id === selected && !$('#detail').hidden) return;
+  if (selected && !$('#detail').hidden) saveTermScroll(selected);
   selected = id;
+  restoreFor = id;
   render();
   term.reset();
   send({ type: 'attach', id });
@@ -1828,7 +1858,7 @@ $('#btn-remove').onclick = async () => {
   await api(`/api/workers/${selected}/remove`);
   selected = null; render();
 };
-$('#btn-close').onclick = () => { selected = null; render(); };
+$('#btn-close').onclick = () => { if (selected) saveTermScroll(selected); selected = null; render(); };
 
 connect();
 
