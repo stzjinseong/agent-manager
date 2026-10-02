@@ -515,7 +515,7 @@ function nodeTemplate() {
   return el(`
     <div class="node">
       <div class="node-head"><span class="led"></span><span class="nid"></span><span class="nname" title="더블클릭해 이름 변경 · 칩을 끌어 순서 변경"></span><span class="pill"></span></div>
-      <div class="stage"><div class="avatar">${clawdSVG()}</div><div class="fx"><span></span><span></span><span></span><span class="mark"></span></div><div class="eta" hidden><span></span><i></i></div></div>
+      <div class="stage"><div class="avatar">${clawdSVG()}</div><div class="fx"><span></span><span></span><span></span><span class="mark"></span></div></div>
       <div class="bubble"></div>
       <div class="quest"><div class="quest-top"><span>할 일</span><b class="qn"></b></div><div class="qbar"><i></i></div></div>
       <div class="meta"></div>
@@ -608,10 +608,6 @@ function updateNode(node, w) {
   let thumb = $('.card-shot', node);
   if (showShot && thumb?.dataset.shot !== showShot.url) { thumb?.remove(); thumb = el(shotImg(showShot, 'card-shot')); $('.stage', node).append(thumb); }
   if (!showShot && thumb) thumb.remove();
-  const eta = $('.eta', node);
-  eta.hidden = !running || !w.turnStartedAt;
-  eta.dataset.start = w.turnStartedAt || '';
-  eta.dataset.expect = running ? expectTurnMs(w) || '' : '';
   const ctx = w.profile ? ctxLevel(w.profile) : { level: 0 };
   node.classList.toggle('ctx-warn', ctx.level > 0);
   let badge = $('.ctx-badge', node);
@@ -1298,32 +1294,6 @@ function tick() {
     const t = Number(n.dataset.since);
     n.textContent = t ? (n.classList.contains('age') ? ` · ${dur(t)} 전` : dur(t)) : '';
   });
-  document.querySelectorAll('.eta:not([hidden])').forEach(etaTick);
-}
-// ---------- 작업중 예상 진행도 ----------
-// 이 워커가 끝낸 최근 턴들의 소요 시간 중앙값을 '보통 걸리는 시간'으로 보고 경과 시간과 비교한다.
-// 평균이 아니라 중앙값인 이유: 몇 시간짜리 턴 하나가 평균을 끌어올려 짧은 지시가 늘 '거의 시작' 으로 보였다.
-// 실제 진행률이 아니라 추정이므로, 예상 시간을 넘기면 100% 로 멈추지 않고 '예상 초과' 로 바꿔 보여 준다.
-function expectTurnMs(w) {
-  const since = (w.turnStartedAt || 0) - 5000; // 진행 중인 지금 턴은 표본에서 뺀다
-  const ms = (w.profile?.turns || []).filter((t) => t.calls && t.start < since && t.time?.total > 0)
-    .map((t) => t.time.total).sort((a, b) => a - b);
-  if (ms.length < 3) return null; // 표본이 너무 적으면 추정하지 않는다
-  return ms[Math.floor(ms.length / 2)];
-}
-const fmtMin = (ms) => { const m = Math.round(ms / 60000); return ms < 60000 ? `${Math.max(1, Math.round(ms / 1000))}초` : m < 60 ? `${m}분` : `${Math.floor(m / 60)}시간 ${m % 60}분`; };
-function etaTick(eta) {
-  const start = Number(eta.dataset.start), expect = Number(eta.dataset.expect);
-  const label = eta.firstElementChild, bar = eta.lastElementChild;
-  if (!expect) { // 첫 턴들: 비교할 기록이 없어 흐르는 줄만
-    eta.className = 'eta unknown'; label.textContent = '예상 시간 모름'; bar.style.width = ''; eta.title = '이 워커가 끝낸 턴이 3개 이상 쌓이면 예상 진행도를 보여 줍니다';
-    return;
-  }
-  const spent = serverNow() - start, over = spent > expect;
-  eta.className = `eta${over ? ' over' : ''}`;
-  bar.style.width = `${over ? 100 : Math.max(3, (spent / expect) * 100)}%`;
-  label.textContent = over ? `예상 초과 +${fmtMin(spent - expect)}` : `~${fmtMin(expect - spent)} 남음`;
-  eta.title = `이 워커의 최근 턴 소요 시간 중앙값 ${fmtMin(expect)} 기준 추정`;
 }
 setInterval(tick, 1000);
 

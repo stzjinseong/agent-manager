@@ -446,18 +446,6 @@ main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24p
 .turns td.note { font-size: 12px; color: var(--text-2); }
 .turns td.note span + span { margin-left: 8px; }
 
-/* 작업중 예상 진행도: 무대 바닥의 얇은 줄 + 오른쪽 위 남은 시간 */
-.eta { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
-.eta[hidden] { display: none; }
-.eta > i { position: absolute; left: 0; bottom: 0; height: 3px; width: 0; background: var(--c); box-shadow: 0 0 8px var(--c); transition: width 1s linear; }
-.eta > span { position: absolute; right: 8px; top: 8px; font: 600 10.5px/1 var(--mono); padding: 4px 7px; border-radius: 6px; color: var(--text-2); background: rgba(12, 13, 17, .7); border: 1px solid var(--line); }
-.eta.over > i { background: repeating-linear-gradient(-45deg, var(--decision) 0 6px, color-mix(in srgb, var(--decision) 45%, transparent) 6px 12px); background-size: 17px 17px; box-shadow: 0 0 8px var(--decision); animation: eta-stripe .8s linear infinite; }
-.eta.over > span { color: var(--decision); border-color: color-mix(in srgb, var(--decision) 35%, transparent); }
-.eta.unknown > i { width: 30%; animation: eta-scan 1.6s ease-in-out infinite; opacity: .7; }
-.eta.unknown > span { color: var(--dim); }
-@keyframes eta-stripe { to { background-position: 17px 0; } }
-@keyframes eta-scan { from { left: -30%; } to { left: 100%; } }
-@media (prefers-reduced-motion: reduce) { .eta > i { animation: none !important; transition: none; } }
 /* 도구 결과 캡처: 카드 무대 왼쪽 아래 썸네일 / 타임라인 썸네일 / 크게 보기 */
 .card-shot {
   position: absolute; left: 8px; bottom: 8px; z-index: 4; width: 54px; height: 38px; object-fit: cover; border-radius: 5px;
