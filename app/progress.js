@@ -17,6 +17,13 @@ const XP = {
   commit: 5,    // 작업 중 git commit 성공
   subagent: 5,  // 작업 중 서브에이전트 완료
 };
+// 효율 사용 보상·감점 (작업 완료 보너스와 별개로 즉시 반영, 배율 없음)
+// /clear: 업무 지시(10)보다 낮게. 쓸 만큼 쓴 세션(컨텍스트 20k 이상)을 정리할 때만, 워커당 5분에 한 번, 하루 10번까지
+const CLEAR = { xp: 5, minContext: 20_000, cooldownMs: 5 * 60_000, perDay: 10 };
+// 캐시 적중률(턴 단위): 실측(2026-10-02, 이 PC 최근 60세션 301턴 · 세션 첫 턴 제외) 중앙 99.6%, 90% 미만 3%.
+// 95% 이상 +2 · 90~95% 0 · 90% 미만은 모자란 만큼 감점(80% → -10, 70% → -15, 최대 -25).
+// 세션 첫 턴·압축 직후처럼 캐시가 비어 있을 수밖에 없는 턴은 서버가 판정에서 뺀다
+const CACHE = { good: 0.95, bad: 0.9, bonus: 2, base: 5, per: 50, max: 25 };
 const CONC_STEP = 0.25, CONC_MAX = 0.75; // 동시 작업 보너스: 다른 워커 1명 평균당 +25%, 최대 +75%
 const STREAK_STEP = 0.1, STREAK_MAX = 0.5; // 연속 사용일 보너스: 하루당 +10%, 최대 +50%
 const SAMPLE_MS = 5_000;
@@ -25,7 +32,7 @@ const fresh = () => ({ theme: THEME.id, xp: 0, stage: 0, streak: 0, lastDay: nul
 const dayOf = (t) => { const d = new Date(t); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
 const stageOf = (xp) => STAGES.reduce((s, min, i) => (xp >= min ? i : s), 0);
 
-export function createProgress(dataDir, { onStageUp } = {}) {
+export function createProgress(dataDir, { onStageUp, onStageDown } = {}) {
   const file = path.join(dataDir, 'progress.json');
   let p;
   try { p = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { p = null; }
@@ -39,6 +46,17 @@ export function createProgress(dataDir, { onStageUp } = {}) {
   save();
 
   const isActive = (w) => w.status === 'working' || w.status === 'decision';
+
+  // XP 를 더하거나 뺀다. 0 아래로는 내려가지 않고, 문턱 아래로 떨어지면 단계도 내려간다. 실제 바뀐 양을 돌려준다
+  function adjust(delta) {
+    const before = p.stage, old = p.xp;
+    p.xp = Math.max(0, p.xp + delta);
+    p.stage = stageOf(p.xp);
+    save();
+    if (p.stage > before) onStageUp?.(p.stage);
+    if (p.stage < before) onStageDown?.(p.stage);
+    return p.xp - old;
+  }
 
   return {
     // 작업 시작 — 이미 주머니가 있으면(같은 턴 안의 추가 입력) 이어서 쌓는다
@@ -67,13 +85,31 @@ export function createProgress(dataDir, { onStageUp } = {}) {
       if (p.lastDay !== today) { p.streak = p.lastDay === yesterday ? p.streak + 1 : 1; p.lastDay = today; }
       const streak = 1 + Math.min(STREAK_MAX, (p.streak - 1) * STREAK_STEP);
       const gained = Math.round(base * conc * streak);
-      p.xp += gained;
       p.counts.tasks++; p.counts.commits += pot.commits; p.counts.subagents += pot.subagents;
-      const before = p.stage;
-      p.stage = stageOf(p.xp);
-      save();
-      if (p.stage > before) onStageUp?.(p.stage);
-      return gained;
+      return adjust(gained);
+    },
+
+    // /clear — prevContext: 정리하기 직전 세션의 컨텍스트 크기
+    clear(w, prevContext) {
+      const now = Date.now(), today = dayOf(now);
+      if (!(prevContext >= CLEAR.minContext)) return 0;
+      if (w.clearXpAt && now - w.clearXpAt < CLEAR.cooldownMs) return 0;
+      if (p.clearDay !== today) { p.clearDay = today; p.clearToday = 0; }
+      if (p.clearToday >= CLEAR.perDay) return 0;
+      w.clearXpAt = now;
+      p.clearToday++;
+      p.counts.clears = (p.counts.clears || 0) + 1;
+      return adjust(CLEAR.xp);
+    },
+
+    // 턴 하나의 캐시 적중률(0~1) → 보너스·감점
+    cache(hit) {
+      let delta = 0;
+      if (hit >= CACHE.good) delta = CACHE.bonus;
+      else if (hit < CACHE.bad) delta = -Math.min(CACHE.max, Math.round(CACHE.base + (CACHE.bad - hit) * CACHE.per));
+      if (!delta) return 0;
+      if (delta < 0) p.counts.cacheMisses = (p.counts.cacheMisses || 0) + 1;
+      return adjust(delta);
     },
 
     // 화면용: 숫자 대신 단계와 대략적인 진척(far / half / near / max)

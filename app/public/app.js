@@ -133,7 +133,7 @@ function mgrOnState(prev, next) {
   if (finished) mgrAct('nod', 700);
 }
 function mgrOnFx(msg) {
-  if (msg.kind === 'xp') flyXpToManager(msg.id, msg.xp);
+  if (msg.kind === 'xp') flyXpToManager(msg.id, msg.xp, msg.reason, msg.detail);
   if (msg.kind === 'commit' && mgrStage >= 1) {
     const t = document.createElement('span');
     t.className = 'mgr-twinkle'; t.textContent = '✦';
@@ -1699,20 +1699,27 @@ function flyToWorker(id, fromEl, kind) {
   });
 }
 // 작업 완료 → 경험치: 반대 방향으로, 워커 카드의 캐릭터에서 금빛 구슬이 매니저 클로드로 날아가 '+N XP' 가 떠오른다
-function flyXpToManager(id, xp) {
+// reason: 'clear'(/clear) · 'cache'(턴 캐시 적중률, detail = %) · 없음(작업 완료). 잃은 경험치는 날아가지 않고 매니저 위에 빨갛게
+const XP_REASON = { clear: () => ' · /clear', cache: (d) => ` · 캐시 ${d}%` };
+function flyXpToManager(id, xp, reason, detail) {
   const from = nodeEls.get(id)?.querySelector('.avatar'), dot = $('.core-dot');
-  if (!from?.isConnected || !dot) return;
-  flyNote(from, dot, 'var(--gold)', 'fly-note xp', () => {
-    dot.classList.remove('xp-got'); void dot.offsetWidth; dot.classList.add('xp-got');
-    setTimeout(() => dot.classList.remove('xp-got'), 700);
-    // 경험치 바는 평소 흐리게 두고, 받는 순간부터 잠깐 또렷하게 (연달아 받으면 그만큼 연장)
+  if (!dot) return;
+  const label = XP_REASON[reason]?.(detail) || '';
+  const show = () => {
+    // 경험치 바는 평소 흐리게 두고, 바뀌는 순간부터 잠깐 또렷하게 (연달아 바뀌면 그만큼 연장)
     dot.classList.add('xp-show');
     clearTimeout(flyXpToManager.t);
     flyXpToManager.t = setTimeout(() => dot.classList.remove('xp-show'), 2200);
     const t = document.createElement('span');
-    t.className = 'mgr-xp'; t.textContent = `+${xp} XP`;
+    t.className = `mgr-xp${xp < 0 ? ' loss' : ''}`; t.textContent = `${xp < 0 ? '−' : '+'}${Math.abs(xp)} XP${label}`;
     t.addEventListener('animationend', () => t.remove());
     dot.appendChild(t);
+  };
+  if (xp < 0 || !from?.isConnected) { show(); return; }
+  flyNote(from, dot, 'var(--gold)', 'fly-note xp', () => {
+    dot.classList.remove('xp-got'); void dot.offsetWidth; dot.classList.add('xp-got');
+    setTimeout(() => dot.classList.remove('xp-got'), 700);
+    show();
   });
 }
 // 공통 비행: 직선으로 날아가며 꼬리(트레일)를 남기고, 도착하면 onArrive. 순수 연출이라 실패해도 무시

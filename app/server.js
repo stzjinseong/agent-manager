@@ -46,11 +46,33 @@ let decisionSeq = 0;
 
 const CONFIG_PATH = path.join(DATA_DIR, 'profiles.json');
 // 매니저 클로드 성장 — 작업 완료 시 그 작업에서 쌓인 점수를 지급 (progress.js). 단계가 오르면 화면에 연출 신호
-const progress = createProgress(DATA_DIR, { onStageUp: (stage) => broadcast({ type: 'fx', kind: 'stage', stage }) });
-// 작업 완료 → 경험치 지급. 화면은 받은 만큼 워커 카드에서 매니저로 경험치가 날아가는 연출을 한다
-function payout(w) {
-  const xp = progress.payout(w);
-  if (xp > 0) broadcast({ type: 'fx', kind: 'xp', id: w.id, xp });
+const progress = createProgress(DATA_DIR, {
+  onStageUp: (stage) => broadcast({ type: 'fx', kind: 'stage', stage }),
+  onStageDown: (stage) => broadcast({ type: 'fx', kind: 'stage', stage, down: true }),
+});
+// 경험치 변화 연출: 얻으면 워커 카드에서 매니저로 날아가고, 잃으면 매니저 위에 빨갛게. reason·detail 은 문구용
+function award(w, xp, reason, detail) {
+  if (xp) broadcast({ type: 'fx', kind: 'xp', id: w.id, xp, reason, detail });
+  return xp;
+}
+// 작업 완료 → 경험치 지급
+function payout(w) { award(w, progress.payout(w)); }
+// 턴이 끝나면(Stop) 트랜스크립트를 마저 읽고 그 턴의 캐시 적중률로 보너스·감점 (progress.cache)
+// 캐시가 빌 수밖에 없는 턴은 뺀다: 세션 첫 턴, 압축 직후, 입력이 작은 턴(2만 토큰 미만)·도구 호출 없는 턴
+function judgeCache(w) {
+  const tx = w.tx;
+  if (!tx) return;
+  try { readProfile(tx); } catch { return; }
+  const t = tx.turns.at(-1);
+  const key = t && `${tx.path}#${t.n}`;
+  if (!t || w.cacheJudged === key) return;
+  w.cacheJudged = key;
+  const all = t.input + t.cacheWrite + t.cacheRead;
+  if (!t.hasPrev || !t.calls || all < 20_000) return;
+  const prevEnd = tx.turns.at(-2)?.end ?? 0;
+  if (tx.compactLog.some((c) => c.ts > prevEnd && c.ts <= t.end + 1000)) return;
+  const hit = t.cacheRead / all;
+  if (award(w, progress.cache(hit), 'cache', Math.round(hit * 100))) emitState();
 }
 setInterval(() => progress.sample(workers.values()), progress.SAMPLE_MS);
 const config = loadConfig();
@@ -294,6 +316,7 @@ function onHook(w, ev, res) {
   const name = ev.hook_event_name;
   const reply = (obj = {}) => { if (!res.writableEnded) { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(obj)); } };
   if (ev.session_id) w.sessionId = ev.session_id;
+  const prevTx = w.tx; // /clear 직전 세션 — 그 세션의 컨텍스트 크기로 /clear 경험치를 정한다
   if (ev.transcript_path) {
     if (!w.tx || w.tx.path !== ev.transcript_path) w.tx = createProfile(ev.transcript_path);
     scheduleProfile(w);
@@ -302,7 +325,11 @@ function onHook(w, ev, res) {
   switch (name) {
     case 'SessionStart':
       w.model = ev.model || w.model;
-      if (ev.source === 'clear') w.todos = [];
+      if (ev.source === 'clear') {
+        w.todos = [];
+        if (prevTx) { try { readProfile(prevTx); } catch {} }
+        award(w, progress.clear(w, prevTx?.context), 'clear');
+      }
       setStatus(w, 'idle', `세션 시작 (${ev.source || 'startup'})`);
       break;
     case 'UserPromptSubmit':
@@ -361,6 +388,7 @@ function onHook(w, ev, res) {
       w.currentTool = null;
       w.doneAt = Date.now(); // 화면의 '확인 안 한 완료' 표시 기준
       payout(w);
+      setTimeout(() => judgeCache(w), 1500); // 마지막 응답이 트랜스크립트에 다 쓰일 시간을 준다
       setStatus(w, 'done', '턴 완료');
       if (w.queue.length) { const next = w.queue.shift(); setTimeout(() => sendPrompt(w, next), 400); }
       break;
