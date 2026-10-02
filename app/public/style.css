@@ -641,6 +641,9 @@ body.term-full { overflow: hidden; }
 .memos li { background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; font-size: 12.5px; display: flex; flex-direction: column; gap: 5px; }
 .memos li.busy { opacity: .5; pointer-events: none; }
 .memos li[draggable="true"] { cursor: grab; }
+.memos li.editing { border-color: var(--accent); }
+.memos .memo-edit { width: 100%; resize: vertical; min-height: 60px; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
+.memos .ma .hint { flex: 1; color: var(--dim); font-size: 11px; }
 .memos li.dragging { opacity: .35; border-style: dashed; }
 .memos .mt { white-space: pre-wrap; word-break: break-all; color: var(--text); display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
 .memos .ma { display: flex; align-items: center; gap: 6px; }

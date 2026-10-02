@@ -1436,14 +1436,53 @@ submitOnModEnter(taskForm);
 let memoSig = '';
 function renderMemos(w) {
   const list = state.memos?.[w.name] || [];
-  const sig = `${w.id}|${w.name}|${list.map((m) => m.id).join(',')}`;
+  const sig = `${w.id}|${w.name}|${list.map((m) => `${m.id}:${m.text}`).join('|')}`; // 글도 넣어야 수정이 반영된다
   if (sig === memoSig) return; // 상태 갱신마다 다시 그리면 버튼 클릭이 끊긴다
+  if ($('#memos li.editing') && sig.startsWith(`${w.id}|`)) return; // 수정 중엔 다시 그리지 않는다 — 끝나면 다음 갱신에 반영
   memoSig = sig;
   const fmt = (t) => new Date(t + clockSkew).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
   $('#memos').innerHTML = list.length
     ? `<li class="mh">${list.length}건</li>` + list.map((m) => `<li data-id="${m.id}" draggable="true" title="워커 카드에 끌어다 놓으면 그 워커의 나중에 할 작업으로 옮겨집니다"><span class="mt">${esc(m.text)}</span>
-        <span class="ma"><time>${fmt(m.createdAt)}</time><button class="btn mini primary" data-memo="send" title="이 작업을 업무 지시로 (작업 중이면 대기열)">▶ 지시</button><button class="btn mini ghost" data-memo="remove" title="삭제">✕</button></span></li>`).join('')
+        <span class="ma"><time>${fmt(m.createdAt)}</time><button class="btn mini ghost" data-memo="edit" title="내용 수정">수정</button><button class="btn mini primary" data-memo="send" title="이 작업을 업무 지시로 (작업 중이면 대기열)">▶ 지시</button><button class="btn mini ghost" data-memo="remove" title="삭제">✕</button></span></li>`).join('')
     : '<li class="empty-memo">나중에 할 작업이 없습니다</li>';
+}
+// 수정: 본문 자리에 입력칸을 띄운다. Alt(⌘)+Enter 저장 · Esc 취소 — 추가 칸과 같은 키
+function editMemo(li, w) {
+  if (li.classList.contains('editing')) return;
+  const id = li.dataset.id, old = (state.memos?.[w.name] || []).find((m) => m.id === id)?.text ?? $('.mt', li).textContent;
+  li.classList.add('editing');
+  li.draggable = false; // 입력칸에서 글자를 끌어 선택할 수 있게
+  const ta = el('<textarea class="memo-edit" rows="3"></textarea>');
+  ta.value = old;
+  const bar = el('<span class="ma"><span class="hint">Alt(⌘)+Enter 저장 · Esc 취소</span><button class="btn mini primary" data-edit="save">저장</button><button class="btn mini ghost" data-edit="cancel">취소</button></span>');
+  const keep = [...li.children];
+  keep.forEach((c) => (c.hidden = true));
+  li.append(ta, bar);
+  acceptImages(ta);
+  ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
+  const done = () => { ta.remove(); bar.remove(); keep.forEach((c) => (c.hidden = false)); li.classList.remove('editing'); li.draggable = true; memoSig = ''; renderMemos(w); };
+  const save = async () => {
+    const text = ta.value.trim();
+    if (text === old.trim()) return done();
+    if (!text) { toast('내용이 비었습니다 — 지우려면 ✕', 2400); return; }
+    li.classList.add('busy');
+    const r = await api('/api/memos', { role: w.name, op: 'edit', id, text });
+    li.classList.remove('busy');
+    if (r.error) { toast(r.error, 3000); return; }
+    const m = (state.memos?.[w.name] || []).find((x) => x.id === id);
+    if (m) m.text = text; // 서버 상태가 오기 전에 바로 보이게
+    done();
+  };
+  ta.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && (e.altKey || e.metaKey) && !e.isComposing) { e.preventDefault(); save(); }
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done(); }
+  });
+  bar.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-edit]')?.dataset.edit;
+    e.stopPropagation();
+    if (b === 'save') save();
+    if (b === 'cancel') done();
+  });
 }
 const memoForm = $('#memo-form');
 submitOnModEnter(memoForm); // 업무 지시 칸과 같은 키: Enter 줄바꿈, Alt/⌘+Enter 추가
@@ -1528,6 +1567,7 @@ $('#memos').addEventListener('click', async (e) => {
   const li = e.target.closest('li[data-id]');
   const w = state.workers.find((x) => x.id === selected);
   if (!act || !li || !w) return;
+  if (act === 'edit') return editMemo(li, w);
   if (act === 'remove' && !(await ask({ title: '이 작업을 지울까요?', body: li.querySelector('.mt')?.textContent.slice(0, 120) || '', ok: '지우기', danger: true }))) return;
   li.classList.add('busy');
   if (act === 'send') flyToWorker(w.id, li, 'task');

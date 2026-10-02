@@ -703,6 +703,12 @@ const server = http.createServer(async (req, res) => {
     const list = (config.memos[role] ||= []);
     if (op === 'add' && String(text || '').trim()) list.push({ id: `m${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`, text: String(text).trim(), createdAt: Date.now() });
     if (op === 'remove') config.memos[role] = list.filter((m) => m.id !== id);
+    if (op === 'edit') {
+      const m = list.find((x) => x.id === id);
+      if (!m) return json(res, 404, { error: '수정할 작업이 없습니다' });
+      if (!String(text || '').trim()) return json(res, 400, { error: '내용이 비었습니다 (지우려면 ✕)' });
+      m.text = String(text).trim();
+    }
     if (op === 'send') {
       const m = list.find((x) => x.id === id), w = workers.get(workerId);
       if (!m || !w) return json(res, 404, { error: '메모나 워커가 없습니다' });
