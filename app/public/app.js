@@ -784,7 +784,7 @@ function renderDetail() {
   $('#detail-meta').textContent = [w.id, w.model, w.permissionMode, w.sessionId && `session ${w.sessionId.slice(0, 8)}`, w.pid && `pid ${w.pid}`, w.cwd].filter(Boolean).join(' · ');
   renderMemos(w);
   $('#queue').innerHTML = w.queue.length
-    ? `<div class="qh">대기 중인 지시 ${w.queue.length}건 — 현재 턴이 끝나면 위에서부터 투입</div>` +
+    ? `<div class="qh" title="현재 턴이 끝나면 위에서부터 투입">대기 중인 지시 ${w.queue.length}건</div>` +
       w.queue.map((q, i) => `<div class="qi"><span class="n">${i + 1}</span><span class="tx">${esc(q)}</span><button data-unqueue="${i}" title="큐에서 빼기">✕</button></div>`).join('')
     : '';
   const fmt = (t) => new Date(t + clockSkew).toLocaleTimeString('ko-KR', { hour12: false });
