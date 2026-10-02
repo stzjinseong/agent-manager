@@ -28,6 +28,8 @@ export function createProfile(file) {
     turns: [], tools: {}, model: null, compactions: 0, context: 0, unpriced: false,
     // 시간 측정: 직전 이벤트 시각, 진행 중인 도구 구간, 도구 호출별 시작
     lastTs: 0, seg: null, toolStart: new Map(), toolTime: {},
+    // 도구 결과에 담긴 이미지(Read 로 연 그림, MCP 스크린샷 등). 서버가 읽을 때마다 꺼내 파일로 저장하고 비운다
+    shots: [],
   };
 }
 
@@ -98,6 +100,13 @@ function apply(p, e, line) {
     if (Array.isArray(c)) for (const b of c) {
       if (b.type !== 'tool_result' || !b.tool_use_id) continue;
       p.toolResults.add(b.tool_use_id);
+      // 이미지 블록: { type:'image', source:{ type:'base64', media_type, data } } — 실측 Read 134건 모두 이 모양
+      if (Array.isArray(b.content)) b.content.forEach((x, i) => {
+        if (x?.type !== 'image' || x.source?.type !== 'base64' || !x.source.data) return;
+        const st = p.toolStart.get(b.tool_use_id);
+        p.shots.push({ key: `${b.tool_use_id}-${i}`, ts, tool: st?.name || null, arg: st?.arg || null, media: x.source.media_type, data: x.source.data });
+        if (p.shots.length > 40) p.shots.shift(); // 처음부터 다시 읽을 때 base64 가 메모리에 쌓이지 않게 (어차피 최근 것만 남긴다)
+      });
       // 백그라운드로 시작한 호출의 결과에서 task id 를 읽어 등록
       const bc = p.bgCalls.get(b.tool_use_id);
       if (bc) {
@@ -154,8 +163,8 @@ function apply(p, e, line) {
     p.toolTurn.set(b.id, target);
     target.tools++;
     const name = b.name?.startsWith('mcp__') ? `MCP · ${b.name.split('__')[1]}` : b.name;
-    p.toolStart.set(b.id, { name, ts, turn: target });
     const inp = b.input || {};
+    p.toolStart.set(b.id, { name, ts, turn: target, arg: String(inp.file_path || inp.url || inp.description || '').slice(0, 200) || null });
     if (b.name === 'Monitor' || inp.run_in_background) {
       p.bgCalls.set(b.id, { kind: b.name === 'Monitor' ? 'monitor' : 'shell', desc: String(inp.description || inp.command || b.name).slice(0, 120) });
     }

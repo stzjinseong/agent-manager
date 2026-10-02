@@ -447,6 +447,18 @@ main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24p
 @keyframes eta-stripe { to { background-position: 17px 0; } }
 @keyframes eta-scan { from { left: -30%; } to { left: 100%; } }
 @media (prefers-reduced-motion: reduce) { .eta > i { animation: none !important; transition: none; } }
+/* 도구 결과 캡처: 카드 무대 왼쪽 아래 썸네일 / 타임라인 썸네일 / 크게 보기 */
+.card-shot {
+  position: absolute; left: 8px; bottom: 8px; z-index: 4; width: 54px; height: 38px; object-fit: cover; border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, .35); box-shadow: 0 2px 8px rgba(0, 0, 0, .5); cursor: zoom-in; background: #0c0d11;
+}
+.card-shot:hover { border-color: #fff; transform: scale(1.06); }
+#log li.k-shot .tl-shot { display: block; margin-top: 5px; max-width: 100%; max-height: 120px; border-radius: 6px; border: 1px solid var(--line); cursor: zoom-in; background: #0c0d11; }
+#log li.k-shot .tl-shot:hover { border-color: var(--text-2); }
+.shot-view { position: fixed; inset: 0; z-index: 500; display: grid; place-items: center; background: rgba(0, 0, 0, .78); cursor: zoom-out; padding: 24px; }
+.shot-view figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 100%; max-height: 100%; }
+.shot-view img { max-width: min(92vw, 1600px); max-height: calc(100vh - 90px); object-fit: contain; border-radius: 8px; box-shadow: 0 10px 40px rgba(0, 0, 0, .6); background: #0c0d11; }
+.shot-view figcaption { color: var(--text-2); font: 12px var(--mono); word-break: break-all; text-align: center; }
 .ctx-badge {
   position: absolute; left: 8px; top: 8px; z-index: 3; font: 600 10.5px/1 var(--mono); padding: 4px 7px; border-radius: 6px;
   color: var(--decision); background: color-mix(in srgb, var(--decision) 14%, #0c0d11); border: 1px solid color-mix(in srgb, var(--decision) 30%, transparent);

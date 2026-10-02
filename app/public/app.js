@@ -587,6 +587,12 @@ function updateNode(node, w) {
     `<span title="도구 사용 횟수">⚙ ${w.toolCount}</span>` +
     (w.queue.length ? `<span class="q" title="대기 중인 지시">📥 ${w.queue.length}</span>` : '') +
     (w.profile?.turnCount ? `<span title="추정 비용 (API 환산)">$ ${fmtUsd(w.profile.total.cost).slice(1)}</span>` : '');
+  // 이번(또는 마지막) 턴에 나온 최근 캡처를 무대 왼쪽 아래에 작게. 주소가 같으면 다시 그리지 않는다(깜빡임 방지)
+  const shot = (w.shots || []).at(-1);
+  const showShot = shot && (!w.turnStartedAt || shot.t >= w.turnStartedAt - 5000) ? shot : null;
+  let thumb = $('.card-shot', node);
+  if (showShot && thumb?.dataset.shot !== showShot.url) { thumb?.remove(); thumb = el(shotImg(showShot, 'card-shot')); $('.stage', node).append(thumb); }
+  if (!showShot && thumb) thumb.remove();
   const eta = $('.eta', node);
   eta.hidden = !running || !w.turnStartedAt;
   eta.dataset.start = w.turnStartedAt || '';
@@ -771,9 +777,9 @@ function renderDetail() {
       w.queue.map((q, i) => `<div class="qi"><span class="n">${i + 1}</span><span class="tx">${esc(q)}</span><button data-unqueue="${i}" title="큐에서 빼기">✕</button></div>`).join('')
     : '';
   const fmt = (t) => new Date(t + clockSkew).toLocaleTimeString('ko-KR', { hour12: false });
-  timelineCache = timelineRows(w.log);
+  timelineCache = timelineRows(w.log, w.shots);
   $('#log').innerHTML = timelineCache.map((r, i) => [r, i]).reverse().map(([r, i]) =>
-    `<li class="k-${r.kind}" data-i="${i}"${r.kind === 'req' ? ' title="클릭: 터미널에서 이 요청 위치로 이동"' : ''}><time>${fmt(r.t)}</time>${r.tag ? `<span class="tag">${r.tag}</span>` : ''}${esc(r.text)}</li>`).join('');
+    `<li class="k-${r.kind}" data-i="${i}"${r.kind === 'req' ? ' title="클릭: 터미널에서 이 요청 위치로 이동"' : ''}><time>${fmt(r.t)}</time>${r.tag ? `<span class="tag">${r.tag}</span>` : ''}${esc(r.text)}${r.shot ? shotImg(r.shot, 'tl-shot') : ''}</li>`).join('');
   renderProfile(w);
 }
 
@@ -782,7 +788,7 @@ function renderDetail() {
 //  · 터미널에서 직접 친 요청은 'working: …' 만 찍힌다 → '요청'
 //  · 감시·백그라운드 완료 알림으로 생긴 턴('working: <task-notification>…')은 요청이 아니다 → '알림'
 //  · 'queue' 는 대기열에 들어간 지시 → '대기열'
-function timelineRows(log) {
+function timelineRows(log, shots = []) {
   const rows = [];
   for (const l of log) {
     if (l.kind === 'assign') { rows.push({ t: l.t, kind: 'req', tag: '요청', text: l.text }); continue; }
@@ -802,8 +808,30 @@ function timelineRows(log) {
     }
     rows.push({ t: l.t, kind: l.kind, text: l.text });
   }
+  // 도구 결과 캡처: 그 시각 자리에 썸네일 줄로 끼운다 (로그와 캡처는 같은 시계 — 둘 다 이 PC 의 시각)
+  if (shots?.length) {
+    for (const s of shots) rows.push({ t: s.t, kind: 'shot', tag: '📷 캡처', text: [s.tool, s.arg].filter(Boolean).join(' · '), shot: s });
+    rows.sort((a, b) => a.t - b.t); // 안정 정렬이라 같은 시각의 로그 순서는 그대로
+  }
   return rows;
 }
+// ---------- 도구 결과 캡처 보기 ----------
+// 썸네일은 data-shot 에 원본 주소를 달아 두고, 어디서 눌러도(타임라인·카드) 같은 크게 보기를 연다
+const shotImg = (s, cls) => `<img class="${cls}" src="${esc(s.url)}" data-shot="${esc(s.url)}" data-cap="${esc([s.tool, s.arg].filter(Boolean).join(' · '))}" alt="캡처" loading="lazy" draggable="false" title="클릭해 크게 보기">`;
+function openShot(url, cap) {
+  const box = el(`<div class="shot-view" title="클릭하거나 Esc 로 닫기"><figure><img src="${esc(url)}" alt="캡처"><figcaption>${esc(cap || '')}</figcaption></figure></div>`);
+  const close = () => { box.remove(); document.removeEventListener('keydown', onKey, true); };
+  const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+  box.addEventListener('click', close);
+  document.addEventListener('keydown', onKey, true);
+  document.body.append(box);
+}
+document.addEventListener('click', (e) => {
+  const t = e.target.closest?.('[data-shot]');
+  if (!t) return;
+  e.stopPropagation(); // 카드 선택·타임라인 요청 이동으로 번지지 않게
+  openShot(t.dataset.shot, t.dataset.cap);
+}, true);
 
 // ---------- 세션 프로파일 ----------
 const SERIES = [ // 쌓는 순서 = 아래 → 위

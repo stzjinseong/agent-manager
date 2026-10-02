@@ -236,7 +236,7 @@ function spawnWorker({ name, cwd, args = '', permissionMode = 'default' }) {
     status: 'starting', // starting | idle | working | decision | done | exited
     sessionId: null, model: null,
     currentTool: null, subTool: null, lastPrompt: null, lastMessage: null, notice: null,
-    todos: [], queue: [], toolCount: 0,
+    todos: [], queue: [], toolCount: 0, shots: [],
     startedAt: Date.now(), turnStartedAt: null, updatedAt: Date.now(),
     log: [], // 최근 이벤트 타임라인
     tx: null, // 트랜스크립트 프로파일러 상태 (profile.js)
@@ -394,7 +394,7 @@ function scheduleProfile(w) {
   if (!w.tx || w.tx.timer) return;
   w.tx.timer = setTimeout(() => {
     w.tx.timer = null;
-    if (readProfile(w.tx)) { checkInterrupted(w); emitState(); }
+    if (readProfile(w.tx)) { drainShots(w); checkInterrupted(w); emitState(); }
   }, 300);
 }
 // 작업 중이거나, 턴은 끝났어도 백그라운드 서브에이전트가 돌고 있으면 계속 읽는다
@@ -547,6 +547,35 @@ function onHostMessage(msg) {
   }
 }
 
+// ---------- 도구 결과 이미지(캡처) 보관 ----------
+// 터미널은 그림을 못 그리지만 트랜스크립트에는 도구 결과 이미지가 base64 로 남는다 → 파일로 꺼내 화면(타임라인·카드)에 보여 준다.
+// 워커별 data/shots/<id>/ 에 최근 SHOT_KEEP 장만 둔다. 파일 이름이 tool_use id 라 처음부터 다시 읽어도 중복 저장되지 않는다
+const SHOT_DIR = path.join(DATA_DIR, 'shots');
+const SHOT_KEEP = 20;
+const SHOT_EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' };
+function drainShots(w) {
+  const list = w.tx?.shots;
+  if (!list?.length) return;
+  w.tx.shots = [];
+  const dir = path.join(SHOT_DIR, w.id);
+  w.shots ||= [];
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    for (const s of list.slice(-SHOT_KEEP)) {
+      const ext = SHOT_EXT[s.media];
+      if (!ext) continue;
+      const name = `${s.key.replace(/[^\w-]/g, '')}.${ext}`;
+      if (w.shots.some((x) => x.name === name)) continue;
+      const full = path.join(dir, name);
+      if (!fs.existsSync(full)) fs.writeFileSync(full, Buffer.from(s.data, 'base64'));
+      w.shots.push({ name, url: `/shots/${w.id}/${name}`, t: s.ts, tool: s.tool, arg: s.arg });
+    }
+    w.shots.sort((a, b) => a.t - b.t);
+    for (const d of w.shots.splice(0, Math.max(0, w.shots.length - SHOT_KEEP))) fs.rmSync(path.join(dir, d.name), { force: true });
+    saveWorkersSoon();
+  } catch (e) { console.error('[shots]', e.message); }
+}
+
 // ---------- 첨부 이미지 보관 ----------
 const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
 const UPLOAD_LIMIT = 20 * 1024 * 1024;
@@ -630,6 +659,17 @@ const server = http.createServer(async (req, res) => {
     const [file, type] = STATIC[p];
     res.writeHead(200, { 'content-type': type, 'cache-control': 'no-store' });
     return fs.createReadStream(path.join(file.startsWith('node_modules/') ? ROOT : APP_DIR, file)).pipe(res);
+  }
+
+  // 도구 결과 캡처 (drainShots 가 저장한 파일). 이름 규칙 밖의 경로는 받지 않는다
+  if (req.method === 'GET' && p.startsWith('/shots/')) {
+    const [, , id, name] = p.split('/');
+    if (!/^[\w-]+$/.test(id || '') || !/^[\w-]+\.(png|jpg|gif|webp)$/.test(name || '')) return json(res, 404, {});
+    const full = path.join(SHOT_DIR, id, name);
+    if (!fs.existsSync(full)) return json(res, 404, {});
+    const ext = name.split('.').pop();
+    res.writeHead(200, { 'content-type': `image/${ext === 'jpg' ? 'jpeg' : ext}`, 'cache-control': 'max-age=86400' });
+    return fs.createReadStream(full).pipe(res);
   }
 
   if (req.method === 'POST' && p === '/hook') {
@@ -755,7 +795,7 @@ const server = http.createServer(async (req, res) => {
       if (r.error) return json(res, 409, r);
     }
     if (m[2] === 'kill') { try { w.term.kill(); } catch {} }
-    if (m[2] === 'remove') { hostSend({ op: 'forget', id: w.id }); workers.delete(w.id); emitState(); }
+    if (m[2] === 'remove') { hostSend({ op: 'forget', id: w.id }); workers.delete(w.id); fs.rmSync(path.join(SHOT_DIR, w.id), { recursive: true, force: true }); emitState(); }
     return json(res, 200, { ok: true });
   }
 
