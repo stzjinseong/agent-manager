@@ -156,6 +156,9 @@ main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24p
   background: rgba(0, 0, 0, .45); border: 1px solid rgba(255, 255, 255, .35); cursor: help;
 }
 .mgr-xpbar[hidden] { display: none; }
+/* 평소엔 흐리게, 경험치를 받을 때(xp-show)·진화할 때·마우스를 올렸을 때만 또렷하게 */
+.mgr-xpbar { opacity: .3; transition: opacity .5s ease; }
+.core-dot.xp-show .mgr-xpbar, .core-dot.evolving .mgr-xpbar, .mgr-xpbar:hover { opacity: 1; transition-duration: .2s; }
 /* 머리 위 액세서리가 단계마다 높아져서(헤드셋 -2칸 · 왕관/고깔 -4~-6칸 · 후광 -6칸, 1칸 ≈ 4.7px) 그 위로 올린다 */
 .core-dot.ge2 .mgr-xpbar { top: -14px; }
 .core-dot.ge4 .mgr-xpbar, .core-dot.party .mgr-xpbar { top: -30px; }

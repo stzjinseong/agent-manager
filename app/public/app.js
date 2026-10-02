@@ -1562,6 +1562,10 @@ function flyXpToManager(id, xp) {
   flyNote(from, dot, 'var(--gold)', 'fly-note xp', () => {
     dot.classList.remove('xp-got'); void dot.offsetWidth; dot.classList.add('xp-got');
     setTimeout(() => dot.classList.remove('xp-got'), 700);
+    // 경험치 바는 평소 흐리게 두고, 받는 순간부터 잠깐 또렷하게 (연달아 받으면 그만큼 연장)
+    dot.classList.add('xp-show');
+    clearTimeout(flyXpToManager.t);
+    flyXpToManager.t = setTimeout(() => dot.classList.remove('xp-show'), 2200);
     const t = document.createElement('span');
     t.className = 'mgr-xp'; t.textContent = `+${xp} XP`;
     t.addEventListener('animationend', () => t.remove());
