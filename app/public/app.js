@@ -2051,6 +2051,43 @@ resizer.addEventListener('pointerdown', (e) => {
 });
 resizer.addEventListener('dblclick', () => { setTermH(null); try { localStorage.removeItem(TERM_H_KEY); } catch {} });
 
+// ---------- 옆 패널 넓히기 (왼쪽 세로선을 끌기 — 터미널 위를 덮는다) ----------
+// 기본 폭(격자 칸 360px)이 최소. 늘린 만큼(--side-extra) 왼쪽으로 겹쳐 덮고, 터미널은 최소 240px 이 보이게 남긴다.
+// 터미널 크기는 그대로라 pty 크기도 안 바뀐다. 폭은 브라우저에 기억 · 더블클릭: 기본 폭
+const SIDE_W_KEY = 'am.sideExtra', TERM_KEEP = 240;
+const sideEl = $('.side'), sideGrip = $('#side-grip');
+function setSideExtra(px) {
+  const maxExtra = Math.max(0, $('#term-wrap').getBoundingClientRect().width - TERM_KEEP);
+  const extra = Math.round(Math.max(0, Math.min(maxExtra || px, px || 0)));
+  sideEl.classList.toggle('cover', extra > 0);
+  if (extra > 0) sideEl.style.setProperty('--side-extra', `${extra}px`); else sideEl.style.removeProperty('--side-extra');
+  requestAnimationFrame(() => updatePin());
+  return extra;
+}
+try { const saved = Number(localStorage.getItem(SIDE_W_KEY)); if (saved > 0) setSideExtra(saved); } catch {}
+// 창이 좁아져 터미널이 줄면 기억한 폭을 다시 맞춘다(터미널 240px 은 남게). 상세가 숨겨져 폭이 0 일 땐 건너뜀
+let sideWant = parseFloat(sideEl.style.getPropertyValue('--side-extra')) || 0;
+new ResizeObserver(() => { if (sideWant && $('#term-wrap').getBoundingClientRect().width) setSideExtra(sideWant); }).observe($('#term-wrap'));
+sideGrip.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0) return;
+  e.preventDefault();
+  sideGrip.setPointerCapture(e.pointerId);
+  const startX = e.clientX, startExtra = parseFloat(sideEl.style.getPropertyValue('--side-extra')) || 0;
+  sideGrip.classList.add('dragging'); document.body.classList.add('resizing-side');
+  let extra = startExtra;
+  const move = (ev) => { extra = setSideExtra(startExtra + (startX - ev.clientX)); };
+  const up = () => {
+    sideGrip.removeEventListener('pointermove', move);
+    sideGrip.classList.remove('dragging'); document.body.classList.remove('resizing-side');
+    sideWant = extra;
+    try { extra > 0 ? localStorage.setItem(SIDE_W_KEY, String(extra)) : localStorage.removeItem(SIDE_W_KEY); } catch {}
+  };
+  sideGrip.addEventListener('pointermove', move);
+  sideGrip.addEventListener('pointerup', up, { once: true });
+  sideGrip.addEventListener('pointercancel', up, { once: true });
+});
+sideGrip.addEventListener('dblclick', () => { sideWant = setSideExtra(0); try { localStorage.removeItem(SIDE_W_KEY); } catch {} });
+
 // ---------- 옆 패널 영역 높이 조절 (업무 지시 · 나중에 할 작업 · 타임라인 사이 가로선 끌기) ----------
 // 끈 영역(가로선 위쪽)에 높이를 주고, 남는 자리는 타임라인이 갖는다. 영역마다 브라우저에 기억 · 더블클릭: 기본(내용 크기)
 const SIDE_LOG_MIN = 80; // 타임라인이 최소한 남길 높이

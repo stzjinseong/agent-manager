@@ -330,7 +330,28 @@ main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24p
 .detail-body { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 14px; }
 .term-wrap { min-width: 0; height: var(--term-h, 580px); background: #07080a; border: 1px solid var(--line); border-radius: 12px; padding: 8px; overflow: hidden; }
 #term { width: 100%; height: 100%; }
-.side { display: flex; flex-direction: column; gap: 12px; min-width: 0; height: var(--term-h, 580px); }
+.side { display: flex; flex-direction: column; gap: 12px; min-width: 0; height: var(--term-h, 580px); position: relative; }
+/* 옆 패널 넓히기: 격자 칸(360px)은 그대로 두고 패널만 왼쪽으로 늘려 터미널 위를 덮는다 — 터미널 크기가 안 바뀌니
+   워커 터미널(pty) 크기도 그대로다(줄 수가 바뀌면 입력창이 두 벌 남는 문제를 피함). --side-extra = 늘린 폭.
+   덮는 동안은 불투명 배경 + 왼쪽 그림자, 왼쪽 안쪽 여백만큼 더 당겨 내용 위치가 튀지 않게 */
+.side.cover {
+  margin-left: calc(-1 * var(--side-extra, 0px) - 14px); padding-left: 14px; z-index: 6;
+  background: var(--surface); box-shadow: -14px 0 24px -12px rgba(0, 0, 0, .7); border-left: 1px solid var(--line-2);
+}
+.side-grip { position: absolute; left: -12px; top: 0; bottom: 0; width: 10px; cursor: col-resize; touch-action: none; z-index: 7; display: grid; place-items: center; }
+.side.cover .side-grip { left: -6px; }
+.side-grip i { width: 1px; height: 100%; background: transparent; position: relative; transition: background .15s; }
+.side-grip i::after { content: ""; position: absolute; top: 50%; left: -2px; width: 5px; height: 36px; margin-top: -18px; border-radius: 3px; background: var(--surface-3); border: 1px solid var(--line-2); opacity: .55; transition: background .15s, border-color .15s, opacity .15s; }
+.side-grip:hover i, .side-grip.dragging i { background: color-mix(in srgb, var(--accent) 60%, transparent); }
+.side-grip:hover i::after, .side-grip.dragging i::after { background: var(--accent); border-color: var(--accent); opacity: 1; }
+body.resizing-side { cursor: col-resize; user-select: none; }
+/* 좁은 화면(세로 한 줄 배치)과 터미널 크게 보기(옆 패널이 따로 고정 폭)에서는 넓히기를 쓰지 않는다 */
+body.term-full .side-grip { display: none; }
+body.term-full .side.cover { margin-left: 0; padding-left: 12px; box-shadow: none; }
+@media (max-width: 1100px) {
+  .side-grip { display: none; }
+  .side.cover { margin-left: 0; padding-left: 0; background: none; box-shadow: none; border-left: 0; }
+}
 .task-form { display: flex; flex-direction: column; gap: 8px; }
 .queue:empty { display: none; }
 /* 지시가 쌓여도 아래(나중에 할 작업·타임라인)를 밀어내지 않게 일정 높이에서 스크롤. 머리줄(건수)은 위에 붙여 둔다.
