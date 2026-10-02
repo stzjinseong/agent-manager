@@ -342,7 +342,7 @@ new ResizeObserver(() => { clearTimeout(fitTimer); fitTimer = setTimeout(fitTerm
 // 칸 수가 줄면 화면 위로 밀려난 기록(스크롤백)은 Claude 가 다시 그릴 수 없어서, 넓을 때 줄 끝까지
 // 배경을 칠한 줄(diff 등)이 접히며 배경만 남은 조각 줄이 줄무늬처럼 생겼다(실측: 163→101칸에서 125줄).
 // 칸 수를 고정하면 접힐 일이 없다. 높이는 줄 수만 바뀌어 문제없음.
-const TERM_COLS = 100;
+const TERM_COLS = 110;
 const FONT_MIN = 11, FONT_MAX = 16;
 function fitTerm() {
   if (!selected || $('#detail').hidden) return;
