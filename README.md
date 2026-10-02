@@ -14,15 +14,13 @@
 
 ## 설치
 
+**Claude 에서 셋업하는 것을 권장합니다.**
+
 ```bash
 git clone https://github.com/stzjinseong/agent-manager.git
-cd agent-manager
-npm install
-npm run setup-win   # Windows — PowerShell 에 agent-manager 명령 등록
-npm run setup-mac   # macOS — Launch.app 생성 + 터미널에 agent-manager 명령 등록
 ```
 
-또는 클론한 폴더에서 `claude` 를 열고 `/setup --mac` (Windows 는 `/setup --windows`) — 확인부터 설치까지 대신 해 줍니다.
+클론한 폴더에서 `claude` 를 열고 `/setup --mac` (Windows 는 `/setup --windows`) — 확인부터 설치까지 대신 해 줍니다.
 macOS 에서 `Launch.app` 을 처음 열 때 보안 경고가 뜨면 Finder 에서 **우클릭 → 열기**.
 
 ## 실행
