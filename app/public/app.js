@@ -1939,6 +1939,39 @@ resizer.addEventListener('pointerdown', (e) => {
 });
 resizer.addEventListener('dblclick', () => { setTermH(null); try { localStorage.removeItem(TERM_H_KEY); } catch {} });
 
+// ---------- 옆 패널 영역 높이 조절 (업무 지시 · 나중에 할 작업 · 타임라인 사이 가로선 끌기) ----------
+// 끈 영역(가로선 위쪽)에 높이를 주고, 남는 자리는 타임라인이 갖는다. 영역마다 브라우저에 기억 · 더블클릭: 기본(내용 크기)
+const SIDE_LOG_MIN = 80; // 타임라인이 최소한 남길 높이
+function setSecH(sec, h) {
+  if (h == null) { sec.classList.remove('sized'); sec.style.removeProperty('--sec-h'); return; }
+  sec.classList.add('sized');
+  sec.style.setProperty('--sec-h', `${Math.round(h)}px`);
+}
+// 제목과 입력칸까지는 항상 보이게 — 그 아래 목록(대기열·메모)만 줄어든다
+const secMinH = (sec) => sec.querySelector('form').getBoundingClientRect().bottom - sec.getBoundingClientRect().top;
+for (const handle of document.querySelectorAll('.side-resizer')) {
+  const sec = $('#' + handle.dataset.sec), key = `am.secH.${handle.dataset.sec}`;
+  try { const saved = Number(localStorage.getItem(key)); if (saved) setSecH(sec, saved); } catch {}
+  handle.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    handle.setPointerCapture(e.pointerId);
+    const startY = e.clientY, startH = sec.getBoundingClientRect().height;
+    const minH = secMinH(sec), maxH = Math.max(startH, startH + $('.timeline').getBoundingClientRect().height - SIDE_LOG_MIN);
+    handle.classList.add('dragging'); document.body.classList.add('resizing-term');
+    const move = (ev) => setSecH(sec, Math.max(minH, Math.min(maxH, startH + (ev.clientY - startY))));
+    const up = () => {
+      handle.removeEventListener('pointermove', move);
+      handle.classList.remove('dragging'); document.body.classList.remove('resizing-term');
+      try { if (sec.classList.contains('sized')) localStorage.setItem(key, String(Math.round(sec.getBoundingClientRect().height))); } catch {}
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', up, { once: true });
+    handle.addEventListener('pointercancel', up, { once: true });
+  });
+  handle.addEventListener('dblclick', () => { setSecH(sec, null); try { localStorage.removeItem(key); } catch {} });
+}
+
 // 크게/원래대로 전환은 FLIP 애니메이션: 바뀌기 전 위치·크기(First)와 바뀐 뒤(Last)를 재서, 원래 자리에서
 // 목표 자리로 늘어나고 줄어드는 것처럼 보이게 한다. 늘어나는 동안 글자가 찌그러져 보이지 않게 터미널 내용은
 // 잠깐 감췄다가, 크기를 맞춘(fit) 뒤 서서히 보여 준다.
