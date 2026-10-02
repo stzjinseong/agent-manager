@@ -778,8 +778,17 @@ function renderDetail() {
     : '';
   const fmt = (t) => new Date(t + clockSkew).toLocaleTimeString('ko-KR', { hour12: false });
   timelineCache = timelineRows(w.log, w.shots);
-  $('#log').innerHTML = timelineCache.map((r, i) => [r, i]).reverse().map(([r, i]) =>
+  // CLI 처럼 아래로 갈수록 최신. 맨 아래를 보고 있었거나 워커를 바꿨으면 새 줄을 따라 내려가고,
+  // 위로 올려 지난 기록을 보는 중이면 그 자리를 지킨다
+  const logEl = $('#log');
+  const html = timelineCache.map((r, i) =>
     `<li class="k-${r.kind}" data-i="${i}"${r.kind === 'req' ? ' title="클릭: 터미널에서 이 요청 위치로 이동"' : ''}><time>${fmt(r.t)}</time>${r.tag ? `<span class="tag">${r.tag}</span>` : ''}${esc(r.text)}${r.shot ? shotImg(r.shot, 'tl-shot') : ''}</li>`).join('');
+  if (logEl._html !== html || logEl.dataset.w !== w.id) { // 브라우저가 innerHTML 을 정규화하므로 보낸 글로 비교
+    const stick = logEl.dataset.w !== w.id || logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 40;
+    logEl.dataset.w = w.id;
+    logEl.innerHTML = logEl._html = html;
+    if (stick) logEl.scrollTop = logEl.scrollHeight;
+  }
   renderProfile(w);
 }
 
@@ -826,6 +835,11 @@ function openShot(url, cap) {
   document.addEventListener('keydown', onKey, true);
   document.body.append(box);
 }
+// 타임라인 썸네일은 늦게 로드되며 높이가 늘어난다 → 맨 아래를 보던 중이면 바닥을 유지
+$('#log').addEventListener('load', (e) => {
+  const logEl = e.currentTarget;
+  if (e.target.tagName === 'IMG' && logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 160) logEl.scrollTop = logEl.scrollHeight;
+}, true);
 document.addEventListener('click', (e) => {
   const t = e.target.closest?.('[data-shot]');
   if (!t) return;
