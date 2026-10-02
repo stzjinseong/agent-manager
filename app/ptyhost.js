@@ -24,7 +24,7 @@ const { Terminal } = require('@xterm/headless');
 const { SerializeAddon } = require('@xterm/addon-serialize');
 const { Unicode11Addon } = require('@xterm/addon-unicode11');
 
-const VERSION = 1;
+const VERSION = 2; // 2: clearScrollback
 const PORT = Number(process.env.AM_PTY_PORT || 7787);
 const IDLE_EXIT_MS = 60_000; // 워커도 접속한 서버도 없으면 스스로 종료 (고아 방지)
 
@@ -91,6 +91,9 @@ function handle(msg) {
         broadcast({ ev: 'snapshot', id: p.id, req: msg.req, cols: p.screen.cols, rows: p.screen.rows, data: p.serializer.serialize({ scrollback: SCROLLBACK }) });
       });
       break;
+    // /clear 뒤 이전 대화 기록(스크롤백)만 지운다. Windows 에선 Claude 의 화면 지우기(ED3)가 ConPTY 를 거치며 사라져
+    // 기록이 그대로 남는다(실측: /clear 후 지우기 제어 문자 0개, 스크롤백 1150줄 잔존). 화면(뷰포트)은 그대로 둔다
+    case 'clearScrollback': if (p) p.screen.write('\x1b[3J'); break;
     case 'kill': if (p && !p.exited) { try { p.term.kill(); } catch {} } break;
     case 'forget': if (p) { if (!p.exited) { try { p.term.kill(); } catch {} } p.screen.dispose(); ptys.delete(msg.id); } break;
     case 'shutdown':

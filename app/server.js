@@ -327,6 +327,13 @@ function onHook(w, ev, res) {
       w.model = ev.model || w.model;
       if (ev.source === 'clear') {
         w.todos = [];
+        // 새 세션이니 타임라인(로그·캡처·결과물)도 비운다
+        w.log = [];
+        for (const s of w.shots || []) fs.rmSync(path.join(SHOT_DIR, w.id, s.name), { force: true });
+        w.shots = []; w.docs = [];
+        // 터미널의 이전 대화 기록(스크롤백)도 지운다 — 호스트 원본 화면과 브라우저 터미널 둘 다.
+        // Claude 가 새 화면을 그릴 틈을 조금 준 뒤에(화면 자체는 건드리지 않고 기록만 지운다)
+        setTimeout(() => { hostSend({ op: 'clearScrollback', id: w.id }); broadcast({ type: 'clearScrollback', id: w.id }); }, 300);
         if (prevTx) { try { readProfile(prevTx); } catch {} }
         award(w, progress.clear(w, prevTx?.context), 'clear');
       }

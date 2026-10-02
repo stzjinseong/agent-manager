@@ -406,6 +406,7 @@ function connect() {
     else if (msg.type === 'fx') mgrOnFx(msg);
     else if (msg.type === 'pty' && msg.id === selected) term.write(msg.data);
     else if (msg.type === 'scrollback' && msg.id === selected) { term.reset(); term.write(msg.data, () => restoreTermScroll(msg.id)); }
+    else if (msg.type === 'clearScrollback' && msg.id === selected) term.write('\x1b[3J'); // /clear — 이전 대화 기록만 지움
   };
   ws.onopen = ((orig) => () => { if (serverDown) { location.reload(); return; } orig?.(); })(ws.onopen);
   ws.onclose = () => setTimeout(connect, 1000);
