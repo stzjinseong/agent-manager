@@ -796,7 +796,7 @@ function timelineRows(log) {
         continue;
       }
       const prev = rows.findLast((r) => r.kind === 'req');
-      if (prev && prev.text.trim() === text.trim() && l.t - prev.t < 15_000) continue; // 대시보드 지시와 같은 줄
+      if (prev && l.t - prev.t < 15_000 && sameReq(prev.text, text)) continue; // 대시보드 지시와 같은 줄
       rows.push({ t: l.t, kind: 'req', tag: '요청', text });
       continue;
     }
@@ -1580,6 +1580,14 @@ const stripImg = (s) => normText(String(s).replace(IMG_RE, ' '));
 // 줄이 어디서 끊겼는지와 상관없이 같은 요청이면 같게 나오도록
 // 터미널은 `코드` 의 백틱을 빼고 그리고, 붙여넣기 감싸개 태그(<pasted_content …>)는 보이지 않으므로 양쪽에서 지운다
 const compact = (s) => stripImg(String(s).replace(/<\/?pasted_content[^>]*>/g, ' ')).replace(/[\s`]+/g, '');
+// 대시보드 지시 로그와 훅이 받은 프롬프트 로그가 같은 요청인지. 첨부 이미지는 한쪽이 파일 경로, 한쪽이 '[Image #N]' 이라
+// 글자 그대로는 달라서 같은 지시가 두 줄로 찍혔다 → compact 로 비교. 둘 다 서버에서 300자로 잘리는데 훅 쪽은 앞에
+// 'working: ' 이 붙어 9자 먼저 끊기므로, 긴 지시도 맞도록 짧은 쪽이 긴 쪽의 앞부분이면 같은 요청으로 본다
+function sameReq(a, b) {
+  const x = compact(a), y = compact(b);
+  if (!x || !y) return x === y; // 이미지만 보낸 지시끼리만 — 빈 글이 아무 요청에나 붙지 않게
+  return x.length <= y.length ? y.startsWith(x) : x.startsWith(y);
+}
 const PROMPT_RE = /^\s?[>›❯]\s?/, CONT_RE = /^ {2}\S/; // 요청 첫 줄 / Claude 가 들여써 이어 찍은 줄
 function findPromptLine(text, fromEnd) {
   const key = compact(text).slice(0, 40);
