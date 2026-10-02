@@ -551,7 +551,7 @@ function onHostMessage(msg) {
 // 터미널은 그림을 못 그리지만 트랜스크립트에는 도구 결과 이미지가 base64 로 남는다 → 파일로 꺼내 화면(타임라인·카드)에 보여 준다.
 // 워커별 data/shots/<id>/ 에 최근 SHOT_KEEP 장만 둔다. 파일 이름이 tool_use id 라 처음부터 다시 읽어도 중복 저장되지 않는다
 const SHOT_DIR = path.join(DATA_DIR, 'shots');
-const SHOT_KEEP = 20;
+const SHOT_KEEP = 50;
 const SHOT_EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' };
 function drainShots(w) {
   const list = w.tx?.shots;

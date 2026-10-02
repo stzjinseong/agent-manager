@@ -105,7 +105,7 @@ function apply(p, e, line) {
         if (x?.type !== 'image' || x.source?.type !== 'base64' || !x.source.data) return;
         const st = p.toolStart.get(b.tool_use_id);
         p.shots.push({ key: `${b.tool_use_id}-${i}`, ts, tool: st?.name || null, arg: st?.arg || null, media: x.source.media_type, data: x.source.data });
-        if (p.shots.length > 40) p.shots.shift(); // 처음부터 다시 읽을 때 base64 가 메모리에 쌓이지 않게 (어차피 최근 것만 남긴다)
+        if (p.shots.length > 60) p.shots.shift(); // 처음부터 다시 읽을 때 base64 가 메모리에 쌓이지 않게 (서버가 최근 50장만 남기므로 그보다 조금 넉넉히)
       });
       // 백그라운드로 시작한 호출의 결과에서 task id 를 읽어 등록
       const bc = p.bgCalls.get(b.tool_use_id);
