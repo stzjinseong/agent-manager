@@ -594,23 +594,25 @@ body.term-full { overflow: hidden; }
   padding: 9px 16px; font-size: 13px; box-shadow: 0 10px 30px rgba(0, 0, 0, .5);
 }
 
-/* ---------- 확인 안 한 완료: 카드를 눌러 볼 때까지 초록 빛 깜빡임 ---------- */
-/* 카드 뒤로 초록 후광이 넓게 번졌다 줄어든다. box-shadow 바깥 그림자는 카드 배경 아래(뒤)에 그려져 카드 내용을 가리지 않는다 */
+/* ---------- 확인 안 한 완료: 카드를 눌러 볼 때까지 흰 빛 깜빡임 ---------- */
+/* 워커마다 아바타 색이 따로 있어 초록 후광은 그 색과 섞여 보였다 — 상태색 대신 흰색(--halo)으로 둘러 어떤 워커든 똑같이 눈에 띄게 한다.
+   카드 뒤로 후광이 넓게 번졌다 줄어든다. box-shadow 바깥 그림자는 카드 배경 아래(뒤)에 그려져 카드 내용을 가리지 않는다 */
 .node.unseen {
-  border-color: color-mix(in srgb, var(--done) 75%, transparent);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--done) 9%, var(--surface-2)), var(--surface));
+  --halo: #fff;
+  border-color: color-mix(in srgb, var(--halo) 75%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--halo) 9%, var(--surface-2)), var(--surface));
   animation: unseen-halo 1.8s ease-in-out infinite;
 }
 @keyframes unseen-halo {
   0%, 100% {
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--done) 45%, transparent),
-      0 0 18px 2px color-mix(in srgb, var(--done) 28%, transparent),
-      0 0 46px 8px color-mix(in srgb, var(--done) 12%, transparent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--halo) 45%, transparent),
+      0 0 18px 2px color-mix(in srgb, var(--halo) 28%, transparent),
+      0 0 46px 8px color-mix(in srgb, var(--halo) 12%, transparent);
   }
   50% {
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--done) 85%, transparent),
-      0 0 30px 6px color-mix(in srgb, var(--done) 50%, transparent),
-      0 0 80px 22px color-mix(in srgb, var(--done) 24%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--halo) 85%, transparent),
+      0 0 30px 6px color-mix(in srgb, var(--halo) 50%, transparent),
+      0 0 80px 22px color-mix(in srgb, var(--halo) 24%, transparent);
   }
 }
 
