@@ -1880,12 +1880,14 @@ function setTermFull(on) {
   // 옆 패널: 넓은 화면의 크게 보기에선 오른쪽에 따로 붙는다(style.css) → 터미널이 커지는 동안 오른쪽에서 밀려 들어오고,
   // 원래대로 돌아갈 땐 제자리에서 살짝 떠오르며 나타난다. 좁은 화면은 크게 보기에 옆 패널이 없다(터미널만)
   if (matchMedia('(min-width: 1101px)').matches) {
-    sideAnim?.cancel();
-    sideAnim = $('.side').animate(on
-      ? [{ transform: 'translateX(48px)', opacity: 0 }, { transform: 'none', opacity: 1 }]
-      : [{ transform: 'translateY(8px)', opacity: 0 }, { transform: 'none', opacity: 1 }],
-    { duration: on ? 320 : 240, delay: on ? 60 : 80, easing: 'cubic-bezier(.2, .8, .2, 1)', fill: 'backwards' });
-    sideAnim.onfinish = () => { sideAnim = null; };
+    // 움직임과 페이드를 따로 돌린다 — 같은 감속 곡선에 묶으면 투명도가 처음 0.1초에 거의 다 차서 페이드가 안 보였다
+    sideAnim?.forEach((a) => a.cancel());
+    const side = $('.side');
+    sideAnim = [
+      side.animate(on ? [{ transform: 'translateX(48px)' }, { transform: 'none' }] : [{ transform: 'translateY(8px)' }, { transform: 'none' }],
+        { duration: on ? 320 : 240, delay: on ? 60 : 80, easing: 'cubic-bezier(.2, .8, .2, 1)', fill: 'backwards' }),
+      side.animate([{ opacity: 0 }, { opacity: 1 }], { duration: on ? 480 : 360, delay: on ? 60 : 80, easing: 'ease-in-out', fill: 'backwards' }),
+    ];
   }
 }
 let sideAnim = null;
