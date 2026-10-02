@@ -672,6 +672,8 @@ i.info:hover, .kpi[data-info]:hover i.info { color: var(--text-2); }
 }
 .term-wrap.full .term-bar { display: flex; align-items: center; gap: 10px; padding: 8px 2px; color: var(--text-2); font-size: 13px; }
 .term-wrap.full .term-bar span { flex: 1; }
+/* 옆 패널을 넓혀 터미널 위를 덮으면, 닫기 버튼이 덮개 가장자리를 따라 왼쪽으로 옮겨 가려지지 않게 */
+body.term-full .term-wrap.full .term-bar { padding-right: calc(2px + var(--side-extra, 0px)); }
 .term-wrap.full #term { flex: 1; min-height: 0; }
 body.term-full { overflow: hidden; }
 /* 크게 보기에서도 오른쪽에 업무 지시·나중에 할 작업·타임라인을 둔다. 터미널은 110칸 고정이라 넓은 화면에선

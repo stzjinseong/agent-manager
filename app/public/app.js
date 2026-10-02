@@ -2065,7 +2065,9 @@ function setSideExtra(px) {
   const maxExtra = Math.max(0, $('#term-wrap').getBoundingClientRect().width - TERM_KEEP);
   const extra = Math.round(Math.max(0, Math.min(maxExtra || px, px || 0)));
   sideEl.classList.toggle('cover', extra > 0);
-  if (extra > 0) sideEl.style.setProperty('--side-extra', `${extra}px`); else sideEl.style.removeProperty('--side-extra');
+  // 변수는 #detail 에 둔다 — 옆 패널(덮개 폭)과 크게 보기 터미널 제목줄(닫기 버튼이 덮개 가장자리를 따라감)이 함께 쓴다
+  const host = $('#detail');
+  if (extra > 0) host.style.setProperty('--side-extra', `${extra}px`); else host.style.removeProperty('--side-extra');
   requestAnimationFrame(() => updatePin());
   return extra;
 }
@@ -2079,7 +2081,7 @@ sideGrip.addEventListener('pointerdown', (e) => {
   if (e.button !== 0) return;
   e.preventDefault();
   sideGrip.setPointerCapture(e.pointerId);
-  const startX = e.clientX, startExtra = parseFloat(sideEl.style.getPropertyValue('--side-extra')) || 0, mode = sideMode();
+  const startX = e.clientX, startExtra = parseFloat($('#detail').style.getPropertyValue('--side-extra')) || 0, mode = sideMode();
   sideGrip.classList.add('dragging'); document.body.classList.add('resizing-side');
   let extra = startExtra;
   const move = (ev) => { extra = setSideExtra(startExtra + (startX - ev.clientX)); };
