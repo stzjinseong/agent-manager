@@ -216,7 +216,12 @@ if (window.Unicode11Addon) {
   term.unicode.activeVersion = '11';
 } else console.warn('addon-unicode11 없음 — 서버를 재시작하세요 (이모지 폭 보정 꺼짐)');
 term.open($('#term'));
-term.onData((data) => selected && send({ type: 'input', id: selected, data }));
+// Enter 는 키 처리기가 정해 둔 대로 바꿔 보낸다(아래 attachCustomKeyEventHandler 참고)
+let enterAs = null;
+term.onData((data) => {
+  if (enterAs && (data === '\r' || data === '\x1b\r')) { data = enterAs; enterAs = null; }
+  if (selected) send({ type: 'input', id: selected, data });
+});
 
 // ---------- 클립보드 (Windows Terminal 방식) ----------
 // Ctrl+C: 선택 영역이 있으면 복사, 없으면 그대로 인터럽트(^C) 전달
@@ -234,11 +239,12 @@ term.attachCustomKeyEventHandler((e) => {
   // Enter 는 줄바꿈, Alt(⌥)·Cmd+Enter 는 제출 — 업무 지시 입력창과 같은 규칙.
   // 줄바꿈은 \n(Ctrl+J)으로 보낸다. 입력창에선 줄바꿈이고 메뉴(권한 확인·선택지)에선 아무 일도 안 해서,
   // 메뉴 확정도 Alt+Enter(\r)로 통일된다. ESC CR 도 줄바꿈이지만 ESC 가 섞여 메뉴에선 위험하다
-  // (실측: \n·ESC CR → 입력창 줄바꿈, /model 메뉴 그대로 / \r → 제출·메뉴 확정). 한글 조합 중 Enter 는 조합 확정이라 건드리지 않는다
+  // (실측: \n·ESC CR → 입력창 줄바꿈, /model 메뉴 그대로 / \r → 제출·메뉴 확정). 한글 조합 중 Enter 는 조합 확정이라 건드리지 않는다.
+  // 직접 보내지 않고 xterm 이 처리하게 둔 뒤 onData 에서 바꾼다 — 이 처리기는 xterm 의 조합 마무리보다 먼저 돌아서,
+  // 여기서 바로 보내면 조합 중이던 글자보다 줄바꿈이 먼저 가 글자가 다음 줄로 내려갔다
   if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229) {
-    e.preventDefault();
-    if (selected) send({ type: 'input', id: selected, data: e.altKey || e.metaKey ? '\r' : '\n' });
-    return false;
+    enterAs = e.altKey || e.metaKey ? '\r' : '\n';
+    return true;
   }
   const mod = e.ctrlKey || e.metaKey;
   // e.key 가 아니라 물리 키(e.code)로 판정 — 한글 입력 상태면 Ctrl+V 의 key 가 'ㅍ', Ctrl+C 는 'ㅊ' 로 온다
