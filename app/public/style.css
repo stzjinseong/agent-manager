@@ -474,6 +474,16 @@ main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24p
   border: 1px solid rgba(255, 255, 255, .35); box-shadow: 0 2px 8px rgba(0, 0, 0, .5); cursor: zoom-in; background: #0c0d11;
 }
 .card-shot:hover { border-color: #fff; transform: scale(1.06); }
+/* 최근 결과물 문서 타일 (무대 오른쪽 아래, 캡처 썸네일과 같은 크기) */
+.card-doc {
+  position: absolute; right: 8px; bottom: 8px; z-index: 4; width: 54px; height: 38px; border-radius: 5px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; text-decoration: none;
+  border: 1px solid rgba(255, 255, 255, .35); box-shadow: 0 2px 8px rgba(0, 0, 0, .5); background: #0c0d11; color: var(--text-2);
+  transition: border-color .15s, transform .15s;
+}
+.card-doc:hover { border-color: #fff; transform: scale(1.06); color: var(--text); }
+.card-doc .ic { font-size: 16px; line-height: 1; }
+.card-doc .ext { font: 600 9px/1 var(--mono); letter-spacing: .04em; }
 #log li.k-shot .tl-shot { display: block; margin-top: 5px; max-width: 100%; max-height: 120px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, .7); cursor: zoom-in; background: #0c0d11; }
 #log li.k-shot .tl-shot:hover { border-color: #fff; }
 /* 워커가 쓴 결과물 문서 카드 (누르면 새 탭) */

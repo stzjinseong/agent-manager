@@ -632,6 +632,13 @@ function updateNode(node, w) {
   let thumb = $('.card-shot', node);
   if (showShot && thumb?.dataset.shot !== showShot.url) { thumb?.remove(); thumb = el(shotImg(showShot, 'card-shot')); $('.stage', node).append(thumb); }
   if (!showShot && thumb) thumb.remove();
+  // 같은 규칙으로 최근 결과물 문서(html·md·pdf·svg)를 무대 오른쪽 아래에 작은 타일로. 누르면 새 탭
+  const doc = (w.docs || []).at(-1);
+  const showDoc = doc && (!w.turnStartedAt || doc.t >= w.turnStartedAt - 5000) ? doc : null;
+  let tile = $('.card-doc', node);
+  const docKey = showDoc && `${showDoc.url}@${showDoc.t}`;
+  if (showDoc && tile?.dataset.key !== docKey) { tile?.remove(); tile = el(docTile(showDoc)); tile.dataset.key = docKey; $('.stage', node).append(tile); }
+  if (!showDoc && tile) tile.remove();
   const ctx = w.profile ? ctxLevel(w.profile) : { level: 0 };
   node.classList.toggle('ctx-warn', ctx.level > 0);
   let badge = $('.ctx-badge', node);
@@ -864,6 +871,12 @@ function timelineRows(log, shots = [], docs = []) {
 }
 // 결과물 문서 카드. 미리보기(iframe)는 넣지 않는다 — 타임라인은 줄이 늘 때마다 통째로 다시 그려서 계속 다시 로드된다
 const DOC_ICON = { html: '🌐', htm: '🌐', md: '📝', markdown: '📝', pdf: '📕', svg: '🖼️' };
+// 워커 카드용 작은 타일 (아이콘 + 확장자). 끌면 링크가 아니라 카드가 끌리게 draggable=false
+function docTile(d) {
+  const ext = d.name.split('.').pop().toLowerCase();
+  return `<a class="card-doc" href="${esc(d.url)}" target="_blank" rel="noopener" draggable="false" title="${esc(d.title ? `${d.title}\n` : '')}${esc(d.name)}&#10;클릭: 새 탭에서 열기">` +
+    `<span class="ic">${DOC_ICON[ext] || '📄'}</span><span class="ext">${esc(ext.toUpperCase())}</span></a>`;
+}
 function docCard(d) {
   const ext = d.name.split('.').pop().toLowerCase();
   // 폴더는 끝쪽 두 단계만 (전체 경로는 마우스를 올리면)
@@ -1497,7 +1510,7 @@ function startRename(node, nm) {
 
 $('#nodes').addEventListener('click', async (e) => {
   const node = e.target.closest('.node');
-  if (!node) return;
+  if (!node || e.target.closest('.card-doc')) return; // 문서 타일은 새 탭만 열고 카드는 선택하지 않음
   const act = e.target.closest('[data-act]')?.dataset.act;
   if (node.classList.contains('socket')) {
     const p = state.profiles.find((x) => x.name === node.dataset.profile);
