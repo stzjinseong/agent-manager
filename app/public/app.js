@@ -133,6 +133,7 @@ function mgrOnState(prev, next) {
   if (finished) mgrAct('nod', 700);
 }
 function mgrOnFx(msg) {
+  if (msg.kind === 'xp') flyXpToManager(msg.id, msg.xp);
   if (msg.kind === 'commit' && mgrStage >= 1) {
     const t = document.createElement('span');
     t.className = 'mgr-twinkle'; t.textContent = '✦';
@@ -1418,16 +1419,39 @@ memoForm.onsubmit = (e) => {
 // ---------- 지시·메모 추가 연출: 워커 색 작은 쪽지가 입력 칸에서 그 워커 카드의 캐릭터로 날아간다 ----------
 // 직선으로 날아가며 꼬리(트레일)를 남기고, 도착하면 캐릭터가 통 튀고 무대가 워커 색으로 번쩍인다. 순수 연출이라 실패해도 무시
 function flyToWorker(id, fromEl, kind) {
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const w = state.workers.find((x) => x.id === id), node = nodeEls.get(id);
-  const target = node?.querySelector('.avatar');
+  const w = state.workers.find((x) => x.id === id), target = nodeEls.get(id)?.querySelector('.avatar');
   if (!w || !target || !fromEl) return;
   const color = avatarColor(w.name) || 'var(--accent)';
-  const a = fromEl.getBoundingClientRect(), b = target.getBoundingClientRect();
+  flyNote(fromEl, target, color, `fly-note ${kind}`, () => {
+    const nd = nodeEls.get(id);
+    if (!nd?.isConnected) return;
+    const stage = nd.querySelector('.stage');
+    stage.style.setProperty('--fc', color);
+    stage.classList.remove('got'); void stage.offsetWidth; stage.classList.add('got');
+    setTimeout(() => stage.classList.remove('got'), 900);
+  });
+}
+// 작업 완료 → 경험치: 반대 방향으로, 워커 카드의 캐릭터에서 금빛 구슬이 매니저 클로드로 날아가 '+N XP' 가 떠오른다
+function flyXpToManager(id, xp) {
+  const from = nodeEls.get(id)?.querySelector('.avatar'), dot = $('.core-dot');
+  if (!from?.isConnected || !dot) return;
+  flyNote(from, dot, 'var(--gold)', 'fly-note xp', () => {
+    dot.classList.remove('xp-got'); void dot.offsetWidth; dot.classList.add('xp-got');
+    setTimeout(() => dot.classList.remove('xp-got'), 700);
+    const t = document.createElement('span');
+    t.className = 'mgr-xp'; t.textContent = `+${xp} XP`;
+    t.addEventListener('animationend', () => t.remove());
+    dot.appendChild(t);
+  });
+}
+// 공통 비행: 직선으로 날아가며 꼬리(트레일)를 남기고, 도착하면 onArrive. 순수 연출이라 실패해도 무시
+function flyNote(fromEl, toEl, color, cls, onArrive) {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const a = fromEl.getBoundingClientRect(), b = toEl.getBoundingClientRect();
   const x0 = a.left + a.width / 2, y0 = a.top + a.height / 2, x1 = b.left + b.width / 2, y1 = b.top + b.height / 2;
   const dx = x1 - x0, dy = y1 - y0, dist = Math.hypot(dx, dy);
   const el = document.createElement('div');
-  el.className = `fly-note ${kind}`;
+  el.className = cls;
   el.style.setProperty('--fc', color);
   el.style.left = `${x0}px`; el.style.top = `${y0}px`;
   document.body.appendChild(el);
@@ -1453,12 +1477,7 @@ function flyToWorker(id, fromEl, kind) {
     lastX = x; lastY = y;
     if (t < 1) return requestAnimationFrame(frame);
     el.remove();
-    const nd = nodeEls.get(id);
-    if (!nd?.isConnected) return;
-    const stage = nd.querySelector('.stage');
-    stage.style.setProperty('--fc', color);
-    stage.classList.remove('got'); void stage.offsetWidth; stage.classList.add('got');
-    setTimeout(() => stage.classList.remove('got'), 900);
+    onArrive?.();
   };
   requestAnimationFrame(frame);
 }

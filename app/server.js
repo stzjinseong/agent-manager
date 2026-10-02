@@ -45,6 +45,11 @@ let decisionSeq = 0;
 const CONFIG_PATH = path.join(DATA_DIR, 'profiles.json');
 // 매니저 클로드 성장 — 작업 완료 시 그 작업에서 쌓인 점수를 지급 (progress.js). 단계가 오르면 화면에 연출 신호
 const progress = createProgress(DATA_DIR, { onStageUp: (stage) => broadcast({ type: 'fx', kind: 'stage', stage }) });
+// 작업 완료 → 경험치 지급. 화면은 받은 만큼 워커 카드에서 매니저로 경험치가 날아가는 연출을 한다
+function payout(w) {
+  const xp = progress.payout(w);
+  if (xp > 0) broadcast({ type: 'fx', kind: 'xp', id: w.id, xp });
+}
 setInterval(() => progress.sample(workers.values()), progress.SAMPLE_MS);
 const config = loadConfig();
 
@@ -158,7 +163,7 @@ function checkInterrupted(w) {
     if (tx.lastText) w.lastMessage = tx.lastText.slice(0, 2000);
     w.currentTool = null;
     w.doneAt = Date.now(); // 화면의 '확인 안 한 완료' 표시 기준
-    progress.payout(w);
+    payout(w);
     setStatus(w, 'done', '턴 완료 (기록으로 확인)');
     if (w.queue.length) { const next = w.queue.shift(); setTimeout(() => sendPrompt(w, next), 400); }
     return;
@@ -351,7 +356,7 @@ function onHook(w, ev, res) {
       w.lastMessage = ev.last_assistant_message ?? w.lastMessage;
       w.currentTool = null;
       w.doneAt = Date.now(); // 화면의 '확인 안 한 완료' 표시 기준
-      progress.payout(w);
+      payout(w);
       setStatus(w, 'done', '턴 완료');
       if (w.queue.length) { const next = w.queue.shift(); setTimeout(() => sendPrompt(w, next), 400); }
       break;
