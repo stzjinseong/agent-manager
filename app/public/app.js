@@ -231,11 +231,13 @@ async function copySelection() {
 }
 term.attachCustomKeyEventHandler((e) => {
   if (e.type !== 'keydown') return true;
-  // 줄바꿈: xterm 은 Ctrl+Enter·Shift+Enter 를 그냥 Enter(\r = 제출)로 보낸다. Claude Code 가 줄바꿈으로
-  // 받는 ESC+CR(= Alt+Enter 와 같은 신호)로 바꿔 보낸다 (실측: ESC CR · Ctrl+J · \+Enter 모두 줄바꿈)
-  if (e.key === 'Enter' && (e.ctrlKey || e.shiftKey) && !e.altKey && !e.metaKey) {
+  // Enter 는 줄바꿈, Alt(⌥)·Cmd+Enter 는 제출 — 업무 지시 입력창과 같은 규칙.
+  // 줄바꿈은 \n(Ctrl+J)으로 보낸다. 입력창에선 줄바꿈이고 메뉴(권한 확인·선택지)에선 아무 일도 안 해서,
+  // 메뉴 확정도 Alt+Enter(\r)로 통일된다. ESC CR 도 줄바꿈이지만 ESC 가 섞여 메뉴에선 위험하다
+  // (실측: \n·ESC CR → 입력창 줄바꿈, /model 메뉴 그대로 / \r → 제출·메뉴 확정). 한글 조합 중 Enter 는 조합 확정이라 건드리지 않는다
+  if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229) {
     e.preventDefault();
-    if (selected) send({ type: 'input', id: selected, data: '\x1b\r' });
+    if (selected) send({ type: 'input', id: selected, data: e.altKey || e.metaKey ? '\r' : '\n' });
     return false;
   }
   const mod = e.ctrlKey || e.metaKey;
