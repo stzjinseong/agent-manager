@@ -205,6 +205,9 @@ const term = new Terminal({
   fontSize: 13, cursorBlink: true, scrollback: 12000, // PTY 호스트 기록(10000줄)보다 넉넉히
   allowProposedApi: true, // unicode 버전 전환에 필요
   theme: { background: '#07080a', foreground: '#e6e4de', cursor: '#d97757', selectionBackground: '#d9775744' },
+  // 배경과 대비가 모자란 글자색은 자동으로 밝혀 그린다. 라이트 테마로 뜬 워커는 질문 창 문구 등을 순수 검정(rgb 0,0,0)으로
+  // 그려 이 검정 배경에서 드래그해야만 보였다(실측). 새 워커는 서버가 다크 테마로 띄우지만, 이미 떠 있는 워커도 바로 보이게
+  minimumContrastRatio: 4.5,
 });
 const fit = new FitAddon.FitAddon();
 term.loadAddon(fit);
