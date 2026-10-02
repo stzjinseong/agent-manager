@@ -1946,7 +1946,9 @@ function updatePin() {
     if (li.getBoundingClientRect().bottom <= top + 2) hit = li; else break;
   }
   if (!hit) { pinEl.hidden = true; pinFor = null; return; }
-  pinEl.style.top = `${logEl.offsetTop}px`;
+  // offsetTop 은 정수로 반올림돼 소수 위치일 때 위로 1px 남짓 틈이 생겨 뒤가 비쳤다 → 실제 위치에서 2px 더 올린다
+  // (숨겨진 동안엔 offsetParent 가 null 이라 부모 .timeline 을 직접 기준으로)
+  pinEl.style.top = `${logEl.getBoundingClientRect().top - pinEl.parentElement.getBoundingClientRect().top - 2}px`;
   if (pinFor !== hit || pinEl.hidden) {
     pinFor = hit;
     const row = timelineCache[Number(hit.dataset.i)];
@@ -1957,7 +1959,14 @@ function updatePin() {
 }
 $('#log').addEventListener('scroll', updatePin, { passive: true });
 new ResizeObserver(() => updatePin()).observe($('#log'));
-pinEl.addEventListener('click', () => { if (pinFor?.isConnected) pinFor.click(); });
+// 누르면 타임라인도 그 요청 줄이 맨 위에 오게 스크롤하고, 터미널은 그 요청 위치로
+pinEl.addEventListener('click', () => {
+  const li = pinFor;
+  if (!li?.isConnected) return;
+  const logEl = $('#log');
+  logEl.scrollTo({ top: logEl.scrollTop + li.getBoundingClientRect().top - logEl.getBoundingClientRect().top, behavior: 'smooth' });
+  li.click();
+});
 
 $('#log').addEventListener('click', (e) => {
   const li = e.target.closest('li.k-req');
