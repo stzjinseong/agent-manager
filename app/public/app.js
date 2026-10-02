@@ -919,13 +919,15 @@ let profileSig = '';
 let profileTurns = [];
 function renderProfile(w, force) {
   const p = w.profile;
-  const sig = p ? `${w.id}|${p.calls}|${p.turnCount}|${p.total.output}|${p.total.cacheRead}|${p.bgRunning}|${p.sub.tokens}|${Math.round((p.time?.total || 0) / 2000)}|${$('#profile').clientWidth}` : `${w.id}|none`;
+  const sig = p ? `${w.id}|${p.calls}|${p.turnCount}|${p.total.output}|${p.total.cacheRead}|${p.bgRunning}|${p.sub.tokens}|${p.apiErrors?.length}|${p.toolErrors}|${p.cacheMisses}|${Math.round((p.time?.total || 0) / 2000)}|${$('#profile').clientWidth}` : `${w.id}|none`;
   if (sig === profileSig && !force) return;
   profileSig = sig;
   if (!p || !p.turnCount) {
     $('#kpis').innerHTML = '<div class="profile-empty">첫 지시가 끝나면 토큰 사용량이 여기에 쌓입니다.</div>';
-    ['#chart-input', '#chart-output', '#chart-tools', '#turns-table'].forEach((s) => ($(s).innerHTML = ''));
+    // 이전 워커의 차트·목록·요약이 남지 않게 프로파일 칸을 전부 비운다
+    ['#chart-input', '#chart-output', '#chart-tools', '#chart-time', '#chart-tooltime', '#subagents', '#turns-table'].forEach((s) => ($(s).innerHTML = ''));
     $('#profile-model').textContent = '';
+    $('#profile-mini').textContent = '';
     return;
   }
   $('#profile-model').textContent = `${p.model || ''} · 컨텍스트 창 ${fmtN(p.window)}`;
@@ -939,11 +941,11 @@ function renderProfile(w, force) {
   const ctx = ctxLevel(p);
   const turns = p.turns;
   $('#kpis').innerHTML = [
-    kpi('누적 토큰', fmtN(all), `입력 ${fmtN(all - t.output)} · 출력 ${fmtN(t.output)}`),
+    kpi('누적 토큰', fmtN(all), `입력 ${fmtN(all - t.output)} · 출력 ${fmtN(t.output)}${p.thinking ? ` <small title="출력 중 사고(thinking) 토큰 — 출력에 포함">(사고 ${fmtN(p.thinking)})</small>` : ''}`),
     kpi('추정 비용 <small>API 환산</small>', p.unpriced ? `${fmtUsd(t.cost)}+` : fmtUsd(t.cost),
-      p.cacheMisses ? `<span class="warn-t">⚠ 캐시 재작성 ${p.cacheMisses}회 · +${fmtUsd(p.cacheMissCost)}</span>` : `턴 평균 ${fmtUsd(t.cost / p.turnCount)}`),
+      p.cacheMisses ? `<span class="warn-t" title="원인: ${esc(missReasonsText(p.cacheMissReasons))}">⚠ 캐시 재작성 ${p.cacheMisses}회 · +${fmtUsd(p.cacheMissCost)}</span>` : `턴 평균 ${fmtUsd(t.cost / p.turnCount)}`),
     kpi('현재 컨텍스트', fmtN(p.context),
-      `${ctx.level ? `<span class="warn-t">⚠ ${ctx.text}</span>` : `한도의 ${Math.round(ctx.pct * 100)}% · 압축 ${p.compactions}회`}`,
+      `${ctx.level ? `<span class="warn-t">⚠ ${ctx.text}</span>` : `한도의 ${Math.round(ctx.pct * 100)}% · <span title="${esc(compactText(p.compactLog))}">압축 ${p.compactions}회</span>`}`,
       `<div class="gauge"><i class="${ctx.level ? 'warn' : ''}" style="width:${Math.min(100, ctx.pct * 100)}%"></i></div>` + sparkline(turns.map((x) => x.context || 0))),
     kpi('캐시 적중률', p.cacheHit == null ? '—' : `${Math.round(p.cacheHit * 100)}%`, `캐시 읽기 ${fmtN(t.cacheRead)} · 쓰기 ${fmtN(t.cacheWrite)}`),
     kpi('턴 · API 호출', `${p.turnCount} · ${p.calls}`, `질문당 ${(p.calls / p.turnCount).toFixed(1)}회 왕복 · 도구 ${p.tools}회`),
@@ -951,6 +953,7 @@ function renderProfile(w, force) {
       timeBar(p.time)),
     kpi('서브에이전트', p.subagents.length ? `${p.subagents.length}개${p.bgRunning ? ` <small class="sa-run">· ${p.bgRunning}개 진행 중</small>` : ''}` : '—',
       p.subagents.length ? `${fmtN(p.sub.tokens)} · ${fmtUsd(p.sub.cost)} <small>(메인 별도)</small>` : '이 세션에서 사용 안 함'),
+    errKpi(p),
   ].join('');
   renderSubagents(p);
 
@@ -990,8 +993,35 @@ function ctxLevel(p) {
 
 const fmtUsd = (v) => (v == null ? '—' : v < 0.01 ? `$${v.toFixed(3)}` : v < 100 ? `$${v.toFixed(2)}` : `$${Math.round(v)}`);
 
+// 캐시 재작성 원인: API 가 붙여 준 진단(diagnostics.cache_miss_reason)이 있으면 그 값, 없으면 공백 시간으로 추정
+const MISS_REASON = {
+  previous_message_not_found: '앞 대화의 캐시를 못 찾음 (만료·다른 서버)',
+  tools_changed: '도구 목록이 바뀜 (MCP 연결·해제 등)',
+  system_changed: '시스템 프롬프트가 바뀜',
+  expired: '캐시 만료 추정 (공백이 TTL 초과)',
+  unknown: '원인 미상 (프롬프트·도구 변경 추정)',
+};
+const missReason = (k) => MISS_REASON[k] || k;
+const missReasonsText = (r) => Object.entries(r || {}).map(([k, n]) => `${missReason(k)} ${n}회`).join(' · ') || '—';
+function compactText(log) {
+  if (!log?.length) return '자동 압축 기록 없음';
+  return log.map((c) => `${new Date(c.ts + clockSkew).toLocaleString('ko-KR', { hour12: false })} ${c.trigger === 'manual' ? '수동' : '자동'} 압축 ${fmtN(c.pre)} → ${fmtN(c.post)}${c.ms ? ` (${fmtMs(c.ms)})` : ''}`).join('\n');
+}
+// 오류 KPI: API 오류(429 레이트리밋 등)·사용량 한도·도구 실패. 없으면 '—'
+function errKpi(p) {
+  const api = p.apiErrors || [], q = p.quota, limited = q && q.status === 'rejected' && q.resetsAt && q.resetsAt * 1000 > serverNow();
+  const n = api.length + (p.toolErrors || 0);
+  const last = api.at(-1);
+  const apiT = api.length ? `API 오류 ${api.length}건${last?.status ? ` (최근 ${last.status})` : ''}` : '';
+  const toolT = p.toolErrors ? `도구 실패 ${p.toolErrors}건${p.toolErrTop?.length ? ` · ${p.toolErrTop.map(([k, v]) => `${k} ${v}`).join(', ')}` : ''}` : '';
+  const sub = [apiT, toolT].filter(Boolean).join(' · ') || '이 세션에서 오류 없음';
+  const tip = api.map((x) => `${new Date(x.ts + clockSkew).toLocaleTimeString('ko-KR', { hour12: false })} ${x.status ?? ''} ${x.text}`).join('\n');
+  return kpi('오류', n ? `${n}건` : '—',
+    `${limited ? `<span class="warn-t">⚠ 사용량 한도(${esc(q.rateLimitType || '')}) · ${new Date(q.resetsAt * 1000 + clockSkew).toLocaleTimeString('ko-KR', { hour12: false, hour: '2-digit', minute: '2-digit' })} 해제</span> · ` : ''}<span title="${esc(tip)}">${esc(sub)}</span>`);
+}
 function missText(m) {
   const gap = m.gap != null ? ` · 공백 ${fmtMs(m.gap)}` : '';
+  if (m.reason) return `캐시 재작성 — ${missReason(m.reason)}${gap} (API 진단)`;
   return m.expired ? `캐시 만료 추정${gap} (TTL ${m.ttl >= 3600_000 ? '1시간' : '5분'})` : `캐시 재작성${gap} (프롬프트·도구 변경 추정)`;
 }
 
@@ -999,6 +1029,7 @@ function turnNotes(x) {
   const notes = [];
   if (x.cacheMiss) notes.push(`<span class="warn-t" title="${esc(missText(x.cacheMiss))}">⚠ ${x.cacheMiss.expired ? '캐시 만료' : '캐시 재작성'} ${fmtN(x.cacheMiss.tokens)}${x.cacheMiss.extra != null ? ` +${fmtUsd(x.cacheMiss.extra)}` : ''}</span>`);
   if (x.sub) notes.push(`<span title="이 턴에서 띄운 서브에이전트">🤖 ${x.sub.n}개 ${fmtN(x.sub.tokens)} · ${fmtUsd(x.sub.cost)}</span>`);
+  if (x.toolErrors) notes.push(`<span class="warn-t" title="도구 결과가 오류(is_error)로 돌아온 횟수">✕ 도구 실패 ${x.toolErrors}</span>`);
   return notes.join(' ');
 }
 
@@ -1007,9 +1038,15 @@ function renderSubagents(p) {
     ? p.subagents.map((s) => `<div class="sa">
         <div class="sa-top"><b>${s.running ? '<i class="sa-live"></i>' : ''}${esc(s.type)}</b><span>${s.running ? '<em class="sa-run">진행 중</em> · ' : ''}${s.background ? '백그라운드 · ' : ''}${s.turn ? `턴 #${s.turn}` : ''}</span></div>
         <div class="sa-desc" title="${esc(s.description)}">${esc(s.description || '—')}</div>
-        <div class="sa-meta">${fmtN(s.tokens)} 토큰 · ${fmtUsd(s.cost)} · API ${s.calls}회${s.start && s.end ? ` · ${fmtMs(s.end - s.start)}` : ''}</div>
+        <div class="sa-meta">${s.model ? `${esc(String(s.model).replace(/^claude-/, ''))} · ` : ''}${fmtN(s.tokens)} 토큰 · ${fmtUsd(s.cost)} · API ${s.calls}회${s.start && s.end ? ` · ${fmtMs(s.end - s.start)}` : ''}</div>
       </div>`).join('')
     : '<div class="profile-empty">서브에이전트(Explore 등)를 쓰면 메인 세션과 따로 집계됩니다.</div>';
+  // 돌고 있는 백그라운드 작업(감시·명령): 경과 시간은 1초마다 갱신(tick), 만료 시각이 있으면 함께
+  if (p.bgTasks?.length) $('#subagents').insertAdjacentHTML('beforeend', p.bgTasks.map((b) => `<div class="sa">
+      <div class="sa-top"><b><i class="sa-live"></i>${b.kind === 'monitor' ? '감시' : '백그라운드 명령'}</b><span><em class="sa-run">진행 중</em> · <em data-since="${b.startedAt}"></em></span></div>
+      <div class="sa-desc" title="${esc(b.desc)}">${esc(b.desc || '—')}</div>
+      <div class="sa-meta">${b.expiresAt ? `만료 ${new Date(b.expiresAt + clockSkew).toLocaleTimeString('ko-KR', { hour12: false, hour: '2-digit', minute: '2-digit' })}` : '만료 없음'}${b.id ? ` · ${esc(b.id)}` : ''}</div>
+    </div>`).join(''));
 }
 
 function timeBar(tm) {
@@ -1027,7 +1064,7 @@ function kpi(k, v, s, extra = '') {
 const INFO = {
   '누적 토큰': {
     what: '이 세션이 모델과 주고받은 토큰 총합. 입력(신규 + 캐시 쓰기 + 캐시 읽기) + 출력.',
-    how: 'API 응답마다 서버가 보고한 usage 값(트랜스크립트에 저장됨)을 메시지 ID 기준으로 중복 제거해 합산. 서브에이전트는 제외(별도 칸).',
+    how: 'API 응답마다 서버가 보고한 usage 값(트랜스크립트에 저장됨)을 메시지 ID 기준으로 중복 제거해 세션 처음부터 합산. 서브에이전트는 제외(별도 칸). 괄호 안 사고 토큰은 출력 중 thinking 몫(출력에 포함).',
     use: '대부분이 캐시 읽기인 게 정상 — 매 턴 대화 전체를 다시 읽기 때문. 그래서 대화가 길어질수록 턴당 토큰이 계속 커진다. 증가 속도가 가팔라지면 세션을 나눌 때.',
     trust: '높음 — 추정이 아닌 API 실측값. 단 Claude Code 내부 호출(제목 생성 등)이 기록되지 않으면 약간 적게 나올 수 있음.',
   },
@@ -1072,6 +1109,12 @@ const INFO = {
     how: '도구 호출 기록 시각 → 그 결과 기록 시각. 병렬로 돈 도구는 각자 시간을 따로 더하므로 합계가 실제 경과보다 클 수 있다. 메인 세션만(서브에이전트 제외).',
     use: '느린 도구를 찾는다 — Bash 가 길면 빌드·테스트·대기 명령, Agent 가 길면 서브에이전트 작업, MCP 가 길면 외부 서버 응답. 최대값이 튀면 한 번의 긴 명령이 원인.',
     trust: '높음 — 호출과 결과의 기록 시각 차이. 터미널 승인 대기는 포함될 수 있음.',
+  },
+  '오류': {
+    what: 'API 오류(429 레이트리밋·과부하 등)와 도구 실패(도구 결과가 오류로 돌아온 경우) 횟수. 사용량 한도에 걸려 있으면 풀리는 시각.',
+    how: 'API 오류는 Claude Code 가 남기는 오류 응답 줄(isApiErrorMessage·apiErrorStatus), 한도는 그 줄의 quotaLimits, 도구 실패는 tool_result 의 is_error. 오류 응답은 실제 API 호출이 아니라 호출 수·토큰에서 뺀다.',
+    use: '도구 실패가 한 도구에 몰리면 명령·경로 문제. 429 가 잦으면 동시에 돌리는 워커 수를 줄일 때. 마우스를 올리면 최근 API 오류 내용.',
+    trust: '높음 — 기록된 실측값. 다만 기록 형식은 공식 계약이 아니라 버전에 따라 빠질 수 있음.',
   },
   '서브에이전트': {
     what: '이 세션이 띄운 서브에이전트(Explore 등) 수와 토큰·비용. 메인 세션 수치와 따로 집계.',

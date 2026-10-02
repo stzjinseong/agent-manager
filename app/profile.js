@@ -30,6 +30,12 @@ export function createProfile(file) {
     lastTs: 0, seg: null, toolStart: new Map(), toolTime: {},
     // 도구 결과에 담긴 이미지(Read 로 연 그림, MCP 스크린샷 등). 서버가 읽을 때마다 꺼내 파일로 저장하고 비운다
     shots: [],
+    // 세션 전체 누적 — turns 는 최근 MAX_TURNS 개만 들고 있어, 합계를 거기서 더하면 긴 세션에서 작게 나왔다
+    sess: { ...empty(), thinking: 0, calls: 0, tools: 0 },
+    miss: { n: 0, cost: 0, reasons: {} }, // 캐시 재작성(턴이 끝날 때 확정해 센다)
+    apiErrors: [], quota: null, // API 오류(429 등)·사용량 한도 — Claude Code 가 '<synthetic>' 응답 줄로 남긴다
+    toolErrors: 0, toolErrBy: {}, // 도구 결과 is_error
+    compactLog: [], // compact_boundary.compactMetadata
   };
 }
 
@@ -42,6 +48,7 @@ function usageOf(m, p) {
   const usage = {
     input: u.input_tokens || 0, cacheWrite: write, cacheRead: u.cache_read_input_tokens || 0, output: u.output_tokens || 0,
     w1h, w5: Math.max(0, write - w1h),
+    thinking: u.output_tokens_details?.thinking_tokens || 0, // 출력 중 사고(thinking) 토큰 — 출력에 포함된 값
   };
   const price = priceFor(m.model);
   if (!price && m.model && m.model !== '<synthetic>') p.unpriced = true;
@@ -65,10 +72,34 @@ function promptText(e) {
   return text.trim() || null;
 }
 
+// 캐시 재작성: 이전 턴이 있는데 첫 호출이 캐시를 거의 못 읽고 크게 새로 썼다. 원인은 API 가 진단을 붙여 주면
+// 그 값(diagnostics.cache_miss_reason.type)을, 없으면 공백 시간으로 만료를 추정한다. 단가는 그 턴의 모델 기준
+function missOf(t) {
+  const f = t.first;
+  if (!t.hasPrev || !f || f.cacheWrite < 10_000 || f.cacheWrite <= f.cacheRead) return null;
+  const ttl = f.w1h > 0 ? 3600_000 : 300_000;
+  const price = priceFor(t.model);
+  // 같은 토큰을 읽었으면 냈을 값과의 차이
+  const extra = price ? (f.cacheWrite * price.input * (f.w1h > 0 ? 2 : 1.25) - f.cacheWrite * price.read) / 1e6 : null;
+  return { tokens: f.cacheWrite, gap: t.gap, ttl, expired: t.gap != null && t.gap > ttl, extra, reason: t.missReason || null };
+}
+const missKey = (m) => m.reason || (m.expired ? 'expired' : 'unknown');
+function countMiss(p, t) {
+  if (t.missCounted) return;
+  t.missCounted = true;
+  const m = missOf(t);
+  if (!m) return;
+  p.miss.n++; p.miss.cost += m.extra || 0;
+  p.miss.reasons[missKey(m)] = (p.miss.reasons[missKey(m)] || 0) + 1;
+}
+
 function newTurn(p, text, ts) {
   closeSeg(p);
-  const t = { n: (p.turns.at(-1)?.n || 0) + 1, prompt: text.slice(0, 200), start: ts, end: ts, calls: 0, tools: 0, firstId: null, first: null,
-    firstAt: null, modelMs: 0, toolWallMs: 0, toolPer: {}, ...empty() };
+  const last = p.turns.at(-1);
+  if (last) countMiss(p, last); // 앞 턴은 이제 바뀌지 않는다 → 캐시 재작성 확정
+  const t = { n: (last?.n || 0) + 1, prompt: text.slice(0, 200), start: ts, end: ts, calls: 0, tools: 0, firstId: null, first: null,
+    firstAt: null, modelMs: 0, toolWallMs: 0, toolPer: {}, ...empty(), thinking: 0, toolErrors: 0, model: null,
+    hasPrev: Boolean(last), gap: last ? ts - last.end : null, missReason: null, missCounted: false };
   p.turns.push(t);
   if (p.turns.length > MAX_TURNS) p.turns.shift();
   return t;
@@ -94,7 +125,12 @@ function apply(p, e, line) {
     }
   }
   const ts = Date.parse(e.timestamp) || Date.now();
-  if (e.type === 'system' && /compact/i.test(e.subtype || '')) { p.compactions++; return; }
+  if (e.type === 'system' && /compact/i.test(e.subtype || '')) {
+    p.compactions++;
+    const cm = e.compactMetadata;
+    if (cm) { p.compactLog.push({ ts, trigger: cm.trigger || null, pre: cm.preTokens ?? null, post: cm.postTokens ?? null, ms: cm.durationMs ?? null }); if (p.compactLog.length > 20) p.compactLog.shift(); }
+    return;
+  }
   if (e.type === 'user') {
     const c = e.message?.content;
     if (Array.isArray(c)) for (const b of c) {
@@ -117,6 +153,12 @@ function apply(p, e, line) {
         if (id) p.bgTasks.set(id, { kind: bc.kind, desc: bc.desc, startedAt: ts, expiresAt: min ? ts + min * 60_000 : null, done: false });
       }
       const s = p.toolStart.get(b.tool_use_id);
+      if (b.is_error) {
+        p.toolErrors++;
+        const nm = s?.name || '?';
+        p.toolErrBy[nm] = (p.toolErrBy[nm] || 0) + 1;
+        if (s) s.turn.toolErrors++;
+      }
       if (s) {
         const ms = Math.max(0, ts - s.ts);
         s.turn.toolPer[s.name] = (s.turn.toolPer[s.name] || 0) + ms;
@@ -131,8 +173,17 @@ function apply(p, e, line) {
     // 사용자 중단(Esc)은 Stop 훅이 오지 않고 이 문구의 user 메시지로만 남는다 — 턴이 아니라 중단 시각으로 기록
     const first = typeof c === 'string' ? c : Array.isArray(c) && c[0]?.type === 'text' ? c[0].text : '';
     if (first.startsWith('[Request interrupted by user')) { p.interruptedAt = ts; return; }
+    if (e.isCompactSummary) return; // 압축 뒤 이어 붙는 요약 글 — 사람이 보낸 질문이 아니라 턴으로 세지 않는다
     const text = promptText(e);
     if (text) newTurn(p, text, ts);
+    return;
+  }
+  if (e.type === 'assistant' && e.quotaLimits) p.quota = { ...e.quotaLimits, ts };
+  // API 오류(429 레이트리밋 등)는 '<synthetic>' 응답으로 남는다 — 실제 API 호출이 아니므로 호출·토큰에 넣지 않고 따로 모은다
+  if (e.type === 'assistant' && e.isApiErrorMessage) {
+    const txt = (e.message?.content || []).filter((b) => b.type === 'text').map((b) => b.text).join(' ').slice(0, 200);
+    p.apiErrors.push({ ts, status: e.apiErrorStatus ?? null, text: txt });
+    if (p.apiErrors.length > 10) p.apiErrors.shift();
     return;
   }
   if (e.type !== 'assistant' || !e.message?.usage || e.isSidechain) return;
@@ -141,13 +192,15 @@ function apply(p, e, line) {
   const turn = p.turns.at(-1) || newTurn(p, '(기록 시작 전)', ts);
   const prev = p.msgs.get(m.id);
   const target = prev?.turn || turn;
-  if (!prev) { if (!target.calls) target.firstId = m.id; target.calls++; }
+  if (!prev) { if (!target.calls) target.firstId = m.id; target.calls++; p.sess.calls++; }
+  const why = m.diagnostics?.cache_miss_reason?.type;
+  if (why && target.firstId === m.id) target.missReason = why;
   // 모델 시간: 새 응답이면 요청을 보낸 시점(직전 이벤트)부터, 같은 응답의 다음 줄이면 이전 줄부터 (스트리밍)
   if (!prev) { closeSeg(p); target.modelMs += Math.max(0, ts - Math.max(p.lastTs, target.start)); }
   else target.modelMs += Math.max(0, ts - prev.end);
   if (p.seg && p.seg.msgId === m.id) p.seg.modelEnd = ts;
   target.firstAt ??= ts;
-  for (const k of KEYS) target[k] += usage[k] - (prev?.usage[k] || 0);
+  for (const k of [...KEYS, 'thinking']) { const d = usage[k] - (prev?.usage[k] || 0); target[k] += d; p.sess[k] += d; }
   if (target.firstId === m.id) target.first = { cacheWrite: usage.cacheWrite, cacheRead: usage.cacheRead, w1h: usage.w1h };
   p.msgs.set(m.id, { turn: target, usage, end: ts });
   p.lastTs = ts;
@@ -155,13 +208,13 @@ function apply(p, e, line) {
   p.lastStop = m.stop_reason || null; // 'end_turn' 이면 응답이 정상으로 끝난 것 (스트리밍 중간 줄은 null)
   p.lastText = (m.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('\n') || p.lastText;
   target.end = ts;
-  if (m.model && m.model !== '<synthetic>') p.model = m.model;
+  if (m.model && m.model !== '<synthetic>') { p.model = m.model; target.model = m.model; }
   p.context = usage.input + usage.cacheWrite + usage.cacheRead;
   target.context = p.context;
   for (const b of m.content || []) {
     if (b.type !== 'tool_use' || p.toolTurn.has(b.id)) continue;
     p.toolTurn.set(b.id, target);
-    target.tools++;
+    target.tools++; p.sess.tools++;
     const name = b.name?.startsWith('mcp__') ? `MCP · ${b.name.split('__')[1]}` : b.name;
     const inp = b.input || {};
     p.toolStart.set(b.id, { name, ts, turn: target, arg: String(inp.file_path || inp.url || inp.description || '').slice(0, 200) || null });
@@ -273,13 +326,15 @@ export function profileSummary(p, waits = []) {
     const model = Math.min(t.modelMs, total);
     return { total, first: t.firstAt ? t.firstAt - t.start : null, model, tool, approval, other: Math.max(0, total - model - toolWall) };
   };
-  const total = empty();
-  let calls = 0, tools = 0, durSum = 0, durN = 0;
-  for (const t of p.turns) {
-    for (const k of KEYS) total[k] += t[k];
-    calls += t.calls; tools += t.tools;
-    if (t.calls && t.end > t.start) { durSum += t.end - t.start; durN++; }
-  }
+  // 합계는 세션 전체(p.sess). 평균 턴 시간은 들고 있는 최근 턴 기준
+  const total = Object.fromEntries(KEYS.map((k) => [k, p.sess[k]]));
+  const { calls, tools } = p.sess;
+  let durSum = 0, durN = 0;
+  for (const t of p.turns) if (t.calls && t.end > t.start) { durSum += t.end - t.start; durN++; }
+  // 캐시 재작성: 끝난 턴은 세어 둔 값, 진행 중인 마지막 턴은 지금 상태로 더한다
+  const lastT = p.turns.at(-1), lastMiss = lastT && !lastT.missCounted ? missOf(lastT) : null;
+  const missReasons = { ...p.miss.reasons };
+  if (lastMiss) missReasons[missKey(lastMiss)] = (missReasons[missKey(lastMiss)] || 0) + 1;
   // 서브에이전트 → 턴 귀속
   const subByTurn = new Map();
   const subagents = [...p.subs.values()].map((s) => {
@@ -292,24 +347,13 @@ export function profileSummary(p, waits = []) {
   const sub = subagents.reduce((a, s) => ({ tokens: a.tokens + s.tokens, cost: a.cost + s.cost }), { tokens: 0, cost: 0 });
 
   const inputAll = total.input + total.cacheWrite + total.cacheRead;
-  const turns = p.turns.slice(-30).map((t, i, arr) => {
-    const idx = p.turns.length - arr.length + i;
-    const prev = p.turns[idx - 1];
-    const gap = prev ? t.start - prev.end : null;
-    // 캐시 재작성: 이전 턴이 있는데 첫 호출이 캐시를 거의 못 읽고 크게 새로 썼다
-    const f = t.first;
-    let cacheMiss = null;
-    if (prev && f && f.cacheWrite >= 10_000 && f.cacheWrite > f.cacheRead) {
-      const ttl = f.w1h > 0 ? 3600_000 : 300_000;
-      const price = priceFor(p.model);
-      // 같은 토큰을 읽었으면 냈을 값과의 차이
-      const extra = price ? (f.cacheWrite * price.input * (f.w1h > 0 ? 2 : 1.25) - f.cacheWrite * price.read) / 1e6 : null;
-      cacheMiss = { tokens: f.cacheWrite, gap, ttl, expired: gap != null && gap > ttl, extra };
-    }
+  const turns = p.turns.slice(-30).map((t) => {
+    const gap = t.gap ?? null, cacheMiss = missOf(t);
     const sa = subByTurn.get(t);
     return {
       n: t.n, prompt: t.prompt, start: t.start, end: t.end, calls: t.calls, tools: t.tools,
       input: t.input, cacheWrite: t.cacheWrite, cacheRead: t.cacheRead, output: t.output, cost: t.cost, context: t.context,
+      thinking: t.thinking, toolErrors: t.toolErrors,
       gap, cacheMiss, sub: sa || null,
       time: timing(t),
       toolPer: Object.entries(t.toolPer).sort((a, b) => b[1] - a[1]).slice(0, 4),
@@ -325,8 +369,15 @@ export function profileSummary(p, waits = []) {
     avgTurnMs: durN ? durSum / durN : null,
     compactions: p.compactions,
     unpriced: p.unpriced,
-    cacheMisses: turns.filter((t) => t.cacheMiss).length,
-    cacheMissCost: turns.reduce((a, t) => a + (t.cacheMiss?.extra || 0), 0),
+    cacheMisses: p.miss.n + (lastMiss ? 1 : 0),
+    cacheMissCost: p.miss.cost + (lastMiss?.extra || 0),
+    cacheMissReasons: missReasons,
+    thinking: p.sess.thinking,
+    apiErrors: p.apiErrors.slice(-5),
+    quota: p.quota,
+    toolErrors: p.toolErrors,
+    toolErrTop: Object.entries(p.toolErrBy).sort((a, b) => b[1] - a[1]).slice(0, 5),
+    compactLog: p.compactLog.slice(-5),
     sub, subagents: subagents.slice(0, 12),
     bgTasks: runningTasks(p).map(({ id, kind, desc, startedAt, expiresAt }) => ({ id, kind, desc, startedAt, expiresAt })),
     bgRunning: subagents.filter((s) => s.running).length + runningTasks(p).length,
