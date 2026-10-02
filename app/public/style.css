@@ -660,10 +660,19 @@ body.term-full { overflow: hidden; }
 .memo h3, .side-h { margin: 0; font-size: 13px; font-weight: 600; color: var(--text); letter-spacing: .04em; }
 .memo h3 small, .side-h small { font-size: 12px; font-weight: 400; margin-left: 4px; color: var(--dim); } /* 제목은 흰색, 설명은 흐리게 */
 .memo textarea { font-size: 13px; }
-.memos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; max-height: 220px; overflow: auto; }
+.memos { list-style: none; margin: 0; padding: 2px 4px 6px 8px; /* 마우스 오버 손잡이·그림자가 스크롤 영역에 잘리지 않게 */ display: flex; flex-direction: column; gap: 5px; max-height: 220px; overflow: auto; }
 .memos li { background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; font-size: 12.5px; display: flex; flex-direction: column; gap: 5px; }
 .memos li.busy { opacity: .5; pointer-events: none; }
 .memos li[draggable="true"] { cursor: grab; }
+/* 마우스를 올리면 테두리가 밝아지고 살짝 떠오르며 왼쪽에 잡는 손잡이(⠿)가 보인다 — 끌어서 워커 카드로 옮길 수 있다는 힌트 */
+.memos li[data-id] { position: relative; transition: border-color .15s, box-shadow .15s, transform .15s; }
+.memos li[draggable="true"]:hover { border-color: rgba(255, 255, 255, .45); box-shadow: 0 0 0 1px rgba(255, 255, 255, .12), 0 4px 14px rgba(0, 0, 0, .35); transform: translateY(-1px); }
+.memos li[draggable="true"]::before {
+  content: "⠿"; position: absolute; left: -1px; top: 50%; transform: translate(-50%, -50%); font-size: 12px; line-height: 1;
+  color: var(--text-2); background: var(--surface); border-radius: 4px; padding: 3px 1px; opacity: 0; transition: opacity .15s; pointer-events: none;
+}
+.memos li[draggable="true"]:hover::before { opacity: 1; }
+.memos li[draggable="true"]:active { cursor: grabbing; }
 .memos li.editing { border-color: var(--accent); }
 /* 수정 버튼: 흰 배경 (지시=코랄, 삭제=투명 사이에서 구분되게) */
 .memos .btn[data-memo="edit"] { background: #f3f1ec; border-color: #f3f1ec; color: #14161c; font-weight: 600; }
