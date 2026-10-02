@@ -1550,12 +1550,26 @@ newForm.onsubmit = async (e) => {
 };
 
 const taskForm = $('#task-form');
+// 업무 지시·나중에 할 작업 입력칸: 쓴 줄 수만큼 높이가 늘고 줄어든다(최소 3줄 = rows,
+// 옆 패널 높이의 40% 까지 늘고 그 뒤로는 칸 안에서 스크롤 — 타임라인 자리를 남긴다). 코드로 값을 바꾼 뒤에도 불러 준다
+const GROW_MAX = 0.4;
+function autoGrow(ta) {
+  if (!ta.matches('.task-form textarea, .memo-form textarea')) return;
+  ta.style.height = 'auto';
+  const sideH = $('.side').clientHeight || innerHeight;
+  const max = Math.max(ta.offsetHeight, Math.round(Math.min(sideH, innerHeight) * GROW_MAX));
+  const h = ta.scrollHeight + ta.offsetHeight - ta.clientHeight; // + 테두리
+  ta.style.height = `${Math.min(h, max)}px`;
+  ta.style.overflowY = h > max ? 'auto' : 'hidden';
+}
+for (const ta of document.querySelectorAll('.task-form textarea, .memo-form textarea')) ta.addEventListener('input', () => autoGrow(ta));
 // 업무 지시 칸: 이미지 드롭·붙여넣기 → 커서 위치에 경로 삽입
 function insertAtCursor(ta, text) {
   const s = ta.selectionStart ?? ta.value.length, e = ta.selectionEnd ?? s;
   const before = ta.value.slice(0, s), pad = before && !/\s$/.test(before) ? ' ' : '';
   ta.value = `${before}${pad}${text} ${ta.value.slice(e)}`;
   ta.selectionStart = ta.selectionEnd = before.length + pad.length + text.length + 1;
+  autoGrow(ta);
   ta.focus();
 }
 // 이미지 드롭·Ctrl+V 붙여넣기 → 커서 위치에 경로 삽입 (업무 지시 · 나중에 할 작업 공통)
@@ -1575,6 +1589,7 @@ taskForm.onsubmit = async (e) => {
   const text = taskForm.text.value.trim();
   if (!text || !selected) return;
   taskForm.text.value = '';
+  autoGrow(taskForm.text);
   taskForm.text.focus();
   flyToWorker(selected, taskForm.text, 'task');
   await api(`/api/workers/${selected}/task`, { text });
@@ -1647,6 +1662,7 @@ memoForm.onsubmit = (e) => {
   const w = state.workers.find((x) => x.id === selected);
   if (!text || !w) return;
   memoForm.text.value = '';
+  autoGrow(memoForm.text);
   memoForm.text.focus();
   flyToWorker(w.id, memoForm.text, 'memo');
   api('/api/memos', { role: w.name, op: 'add', text });

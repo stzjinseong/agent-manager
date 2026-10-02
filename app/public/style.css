@@ -679,6 +679,8 @@ body.term-full { overflow: hidden; }
 .memo h3, .side-h { margin: 0; font-size: 13px; font-weight: 600; color: var(--text); letter-spacing: .04em; }
 .memo h3 small, .side-h small { font-size: 12px; font-weight: 400; margin-left: 4px; color: var(--dim); } /* 제목은 흰색, 설명은 흐리게 */
 .memo textarea { font-size: 13px; }
+/* 업무 지시·나중에 할 작업 입력칸은 쓴 줄 수만큼 자동으로 늘어난다(autoGrow) — 손잡이로 크기 조절은 없앰 */
+.task-form textarea, .memo-form textarea { resize: none; overflow-y: hidden; flex-shrink: 0; }
 .memos { list-style: none; margin: 0; padding: 2px 4px 6px 8px; /* 마우스 오버 손잡이·그림자가 스크롤 영역에 잘리지 않게 */ display: flex; flex-direction: column; gap: 5px; max-height: 220px; overflow: auto; }
 .memos li { background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; font-size: 12.5px; display: flex; flex-direction: column; gap: 5px; }
 .memos li.busy { opacity: .5; pointer-events: none; }
@@ -727,7 +729,8 @@ body.resizing-term { cursor: row-resize; user-select: none; }
 /* ---------- 옆 패널 영역 높이 조절 (업무 지시 · 나중에 할 작업 · 타임라인 사이) ----------
    끈 영역에 높이를 주고(.sized) 남는 자리는 타임라인이 갖는다. 안 끈 영역은 원래대로 내용 크기 */
 #sec-task { display: flex; flex-direction: column; gap: 12px; }
-.side-sec.sized { height: var(--sec-h); flex-shrink: 0; min-height: 0; overflow: hidden; }
+/* min-height: min-content — 입력칸이 줄 수만큼 늘면(autoGrow) 정해 둔 높이보다 커져도 잘리지 않게 */
+.side-sec.sized { height: var(--sec-h); flex-shrink: 0; min-height: min-content; overflow: hidden; }
 #sec-task.sized .queue, .memo.sized .memos { max-height: none; flex: 1; min-height: 0; }
 .side-resizer { height: 10px; margin: -8px 0; flex-shrink: 0; cursor: row-resize; display: grid; place-items: center; touch-action: none; }
 .side-resizer i { display: block; width: 100%; height: 1px; background: transparent; position: relative; transition: background .15s; }
