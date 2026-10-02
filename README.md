@@ -18,7 +18,8 @@
 git clone https://github.com/stzjinseong/agent-manager.git
 cd agent-manager
 npm install
-npm run setup-mac   # macOS 만
+npm run setup-win   # Windows — PowerShell 에 agent-manager 명령 등록
+npm run setup-mac   # macOS — Launch.app 생성 + 터미널에 agent-manager 명령 등록
 ```
 
 또는 클론한 폴더에서 `claude` 를 열고 `/setup --mac` (Windows 는 `/setup --windows`) — 확인부터 설치까지 대신 해 줍니다.
@@ -28,7 +29,7 @@ macOS 에서 `Launch.app` 을 처음 열 때 보안 경고가 뜨면 Finder 에�
 
 | | 보통 | 문제 볼 때 (콘솔 창) |
 |---|---|---|
-| Windows | `Launch.vbs` | `Launch.bat` |
+| Windows | `Launch.vbs` (또는 PowerShell 에서 `agent-manager`) | `Launch.bat` |
 | macOS | `Launch.app` (또는 터미널에서 `agent-manager`) | `Launch.command` |
 
 더블클릭하면 브라우저가 **http://127.0.0.1:7788** 로 열립니다. 이미 떠 있으면 브라우저만 엽니다.

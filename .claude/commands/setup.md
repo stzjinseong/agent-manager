@@ -24,12 +24,19 @@ agent-manager 를 이 컴퓨터에 설치한다. 인자: `$ARGUMENTS`
 3. **OS별**
    - macOS: `npm run setup-mac` — Launch.command 실행 권한, 창 없는 `Launch.app` 생성,
      `~/.zshrc` 에 `agent-manager` 명령 등록. 각 단계의 `✓` 줄이 다 나왔는지 확인한다.
-   - Windows: 추가 단계 없음. `Launch.vbs`(창 없이) / `Launch.bat`(콘솔과 함께)이 있는지만 확인한다.
-4. **결과 확인** — macOS 는 `Launch.app` 폴더가 생겼는지 `ls` 로 확인한다.
+   - Windows: `npm run setup-win` — PowerShell 프로필에 `agent-manager` 명령(창 없는 `Launch.vbs` 실행) 등록.
+     Windows PowerShell 5.1 과 설치돼 있으면 PowerShell 7 프로필 모두. 이미 있으면 경로만 갱신하고, 직접 적어 둔
+     `function agent-manager` 줄은 표식 블록으로 바꾼다. `✓` 줄과 `!` 경고(실행 정책·인코딩)를 그대로 보여 준다.
+4. **결과 확인**
+   - macOS: `Launch.app` 폴더가 생겼는지 `ls` 로 확인한다.
+   - Windows: `powershell -Command "Get-Command agent-manager"` 로 새 셸에서 명령이 잡히는지 확인한다.
 
 ## 마치며 알릴 것
 
-- 실행 방법: macOS `Launch.app` 더블클릭 또는 새 터미널에서 `agent-manager`
-  (지금 창은 `source ~/.zshrc` 후), Windows `Launch.vbs` 더블클릭. 주소 http://127.0.0.1:7788
+- 실행 방법: 주소 http://127.0.0.1:7788
+  - macOS: `Launch.app` 더블클릭 또는 새 터미널에서 `agent-manager` (지금 창은 `source ~/.zshrc` 후)
+  - Windows: `Launch.vbs` 더블클릭 또는 새 PowerShell 창에서 `agent-manager` (지금 창은 `. $PROFILE` 후)
+- Windows 에서 실행 정책 경고가 나왔으면 `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` 를 안내한다
+  (정책은 대신 바꾸지 않는다).
 - macOS 는 `Launch.app` 을 처음 열 때 보안 경고가 뜨면 Finder 에서 **우클릭 → 열기** 를 한 번 해야 한다.
 - 서버를 직접 띄우지는 않는다 — 실행은 사용자가 한다.

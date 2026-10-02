@@ -5,7 +5,8 @@
   "scripts": {
     "start": "node app/server.js",
     "stop-workers": "node app/ptyhost.js --shutdown",
-    "setup-mac": "node app/setup-mac.mjs"
+    "setup-mac": "node app/setup-mac.mjs",
+    "setup-win": "node app/setup-win.mjs"
   },
   "keywords": [],
   "author": "",
