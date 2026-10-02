@@ -1609,7 +1609,9 @@ taskForm.onsubmit = async (e) => {
   autoGrow(taskForm.text);
   taskForm.text.focus();
   flyToWorker(selected, taskForm.text, 'task');
-  await api(`/api/workers/${selected}/task`, { text });
+  const r = await api(`/api/workers/${selected}/task`, { text });
+  // CLI 입력창에 쓰던 글이 있으면 서버가 합치지 않고 대기열에 둔다(server.js assignTask)
+  if (r?.held) toast('CLI 입력창에 쓰던 글이 있어 업무 지시를 대기열에 두었습니다 — 그 글을 보내거나 지우면 이어서 투입됩니다', 4500);
 };
 // 입력 칸 공통 키: Enter = 줄바꿈(기본 동작), Alt+Enter / 맥 ⌘+Enter = 제출(폼 submit).
 // 업무 지시·메모가 같은 함수를 써서 키 동작이 어긋나지 않게 한다. 한글 조합 중 입력은 무시해야 마지막 글자가 잘리지 않는다

@@ -10,8 +10,10 @@ import crypto from 'node:crypto';
 import { execSync, execFile, spawn as spawnProcess } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import WebSocket, { WebSocketServer } from 'ws';
+import { createRequire } from 'node:module';
 import { createProfile, readProfile, profileSummary, runningSubagents } from './profile.js';
 import { createProgress, isCommit } from './progress.js';
+const { Terminal: HeadlessTerminal } = createRequire(import.meta.url)('@xterm/headless');
 
 const APP_DIR = path.dirname(fileURLToPath(import.meta.url)); // app/ — 코드
 const ROOT = path.dirname(APP_DIR); // 프로젝트 최상위 — data/, node_modules/, 실행 파일
@@ -204,7 +206,7 @@ function checkInterrupted(w) {
     w.doneAt = Date.now(); // 화면의 '확인 안 한 완료' 표시 기준
     payout(w);
     setStatus(w, 'done', '턴 완료 (기록으로 확인)');
-    if (w.queue.length) { const next = w.queue.shift(); setTimeout(() => sendPrompt(w, next), 400); }
+    if (w.queue.length) setTimeout(() => dispatchQueued(w), 400);
     return;
   }
   const at = w.tx?.interruptedAt;
@@ -301,12 +303,79 @@ function setStatus(w, status, note) {
   emitState();
 }
 
-// 업무 지시: 입력 대기 상태면 즉시, 아니면 큐에 쌓았다가 Stop 시점에 투입
-function assignTask(w, text) {
+// 업무 지시: 입력 대기 상태면 즉시, 아니면 큐에 쌓았다가 Stop 시점에 투입.
+// CLI 입력창에 사람이 쓰던 글이 있으면 그 뒤에 붙어 한 요청으로 나가 버리므로, 그때도 큐에 넣고 입력창이 빌 때까지 기다린다
+const isIdle = (w) => w.status === 'idle' || w.status === 'done' || w.status === 'interrupted';
+async function assignTask(w, text) {
   text = String(text || '').trim();
-  if (!text) return;
-  if (w.status === 'idle' || w.status === 'done' || w.status === 'interrupted') sendPrompt(w, text);
-  else { w.queue.push(text); pushLog(w, 'queue', text); emitState(); }
+  if (!text) return {};
+  if (isIdle(w) && !w.queue.length) {
+    const draft = await cliDraft(w);
+    if (isIdle(w) && !draft) { sendPrompt(w, text); return {}; }
+    if (draft) { w.queue.push(text); pushLog(w, 'queue', text); holdForDraft(w); emitState(); return { held: true }; }
+  }
+  w.queue.push(text); pushLog(w, 'queue', text); emitState();
+  return {};
+}
+// 큐 맨 앞 지시를 투입 — 턴이 끝났을 때. 입력창에 쓰던 글이 있으면 빌 때까지 기다린다
+async function dispatchQueued(w) {
+  if (!w.queue.length || !isIdle(w)) return;
+  if (await cliDraft(w)) { holdForDraft(w); emitState(); return; }
+  if (!w.queue.length || !isIdle(w)) return;
+  sendPrompt(w, w.queue.shift());
+}
+// 입력창이 빌 때까지 1.5초마다 다시 본다. 사람이 그 글을 보내 턴이 시작되면 그만 — 그 턴이 끝날 때(Stop) 큐가 이어진다.
+// 타이머는 워커 객체 밖에 둔다 — 워커는 화면 상태·workers.json 으로 JSON 직렬화된다(Timeout 은 순환 참조라 서버가 죽었다)
+const draftTimers = new Map(); // 워커 id → setInterval
+function holdForDraft(w) {
+  if (draftTimers.has(w.id)) return;
+  pushLog(w, 'notice', 'CLI 입력창에 쓰던 글이 있어 업무 지시를 대기열에 두었습니다 — 그 글을 보내거나 지우면 이어서 투입');
+  const stop = () => { clearInterval(draftTimers.get(w.id)); draftTimers.delete(w.id); };
+  draftTimers.set(w.id, setInterval(async () => {
+    if (!workers.has(w.id) || !w.queue.length || !isIdle(w)) { stop(); return; }
+    if (await cliDraft(w)) return;
+    stop();
+    if (w.queue.length && isIdle(w)) sendPrompt(w, w.queue.shift());
+  }, 1500));
+}
+// 호스트 원본 화면에서 Claude 입력창(❯ 줄, 위아래 가로선 사이)에 사람이 쓴 글이 있는지.
+// 비어 있을 때 보이는 안내 문구(Try "…")는 흐린 색이라 빼고, 기본 글자색 칸만 센다. 못 읽으면 빈 것으로 본다
+function hostSnapshot(id, ms = 1500) {
+  return new Promise((resolve) => {
+    if (host?.readyState !== 1) return resolve(null);
+    const req = ++snapSeq;
+    const timer = setTimeout(() => { snapWaiters.delete(req); resolve(null); }, ms);
+    snapWaiters.set(req, (msg) => { clearTimeout(timer); resolve(msg); });
+    hostSend({ op: 'snapshot', id, req });
+  });
+}
+async function cliDraft(w) {
+  const snap = await hostSnapshot(w.id);
+  if (!snap?.data || !snap.cols) return '';
+  const t = new HeadlessTerminal({ cols: snap.cols, rows: snap.rows, scrollback: 0, allowProposedApi: true });
+  try {
+    await new Promise((r) => t.write(snap.data, r));
+    const b = t.buffer.active, rows = [];
+    for (let i = b.baseY; i < b.length; i++) rows.push(b.getLine(i));
+    const rule = rows.map((l, i) => (/^s*─{20,}s*$/.test(l.translateToString(true)) ? i : -1)).filter((i) => i >= 0);
+    for (let k = rule.length - 1; k > 0; k--) {
+      const top = rule[k - 1], bottom = rule[k];
+      if (bottom - top < 2) continue;
+      const first = rows[top + 1].translateToString(true);
+      const at = first.indexOf('❯');
+      if (at < 0) continue;
+      let text = '';
+      for (let i = top + 1; i < bottom; i++) {
+        const line = rows[i];
+        for (let x = i === top + 1 ? at + 1 : 0; x < line.length; x++) {
+          const c = line.getCell(x);
+          if (c && c.getChars().trim() && c.isFgDefault() && !c.isDim()) text += c.getChars();
+        }
+      }
+      return text.trim();
+    }
+    return '';
+  } catch { return ''; } finally { t.dispose(); }
 }
 
 function sendPrompt(w, text) {
@@ -412,7 +481,7 @@ function onHook(w, ev, res) {
       payout(w);
       setTimeout(() => judgeCache(w), 1500); // 마지막 응답이 트랜스크립트에 다 쓰일 시간을 준다
       setStatus(w, 'done', '턴 완료');
-      if (w.queue.length) { const next = w.queue.shift(); setTimeout(() => sendPrompt(w, next), 400); }
+      if (w.queue.length) setTimeout(() => dispatchQueued(w), 400);
       break;
     case 'SubagentStop':
       if (ev.agent_id && w.tx) w.tx.doneAgents.add(ev.agent_id);
@@ -598,6 +667,7 @@ function onHostMessage(msg) {
   if (msg.ev === 'snapshot') {
     const ws = snapWaiters.get(msg.req);
     snapWaiters.delete(msg.req);
+    if (typeof ws === 'function') return ws(msg); // 서버가 직접 요청한 것(cliDraft)
     if (ws?.readyState === 1) ws.send(JSON.stringify({ type: 'scrollback', id: msg.id, data: msg.data }));
     return;
   }
@@ -921,7 +991,7 @@ const server = http.createServer(async (req, res) => {
     const w = workers.get(m[1]);
     if (!w) return json(res, 404, { error: 'no worker' });
     const body = await readBody(req);
-    if (m[2] === 'task') assignTask(w, body.text);
+    if (m[2] === 'task') return json(res, 200, { ok: true, ...(await assignTask(w, body.text)) });
     if (m[2] === 'interrupt' && w.status !== 'exited') { w.term.write('\x1b'); pushLog(w, 'status', '관리자가 중단(Esc)'); emitState(); setTimeout(() => scheduleProfile(w), 700); }
     if (m[2] === 'unqueue') { w.queue.splice(Number(body.index), 1); emitState(); }
     if (m[2] === 'rename') {
