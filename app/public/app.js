@@ -438,7 +438,22 @@ function renderStale() {
 }
 $('#btn-restart').onclick = () => restartServer();
 
+// 매니저 머리 위 경험치 바: 지금 단계 구간에서 얼마나 찼는지. 진화 연출을 아직 안 본 상태(보이는 단계 < 실제 단계)면
+// 새 구간으로 먼저 넘어가 버리지 않게 꽉 찬 채로 둔다 — 연출이 끝나면 새 구간으로 내려간다
+function renderXpBar() {
+  const p = state.progress, bar = $('#mgr-xpbar');
+  if (!bar) return;
+  bar.hidden = !p || p.xp == null;
+  if (bar.hidden) return;
+  const max = p.nextMin == null, pending = mgrStage < p.stage;
+  const r = max || pending ? 1 : (p.xp - p.stageMin) / (p.nextMin - p.stageMin);
+  bar.classList.toggle('max', max);
+  bar.firstElementChild.style.width = `${Math.max(0, Math.min(1, r)) * 100}%`;
+  bar.title = max ? `${p.themeName} 최종 단계 · 누적 ${p.xp.toLocaleString()} XP`
+    : `${p.themeName} Lv.${p.stage} · ${(p.xp - p.stageMin).toLocaleString()} / ${(p.nextMin - p.stageMin).toLocaleString()} XP (누적 ${p.xp.toLocaleString()})`;
+}
 function renderStats() {
+  renderXpBar();
   const n = (st) => state.workers.filter((w) => viewStatus(w) === st).length;
   const pend = pendingCount();
   $('#stats').innerHTML = [

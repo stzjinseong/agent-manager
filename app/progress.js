@@ -84,7 +84,8 @@ export function createProgress(dataDir, { onStageUp } = {}) {
         const r = (p.xp - STAGES[p.stage]) / (next - STAGES[p.stage]);
         near = r < 0.34 ? 'far' : r < 0.8 ? 'half' : 'near';
       }
-      return { theme: THEME.id, themeName: THEME.name, stage: p.stage, maxStage: STAGES.length - 1, near };
+      // xp·stageMin·nextMin: 매니저 머리 위 경험치 바용 (지금 단계 구간 안에서 얼마나 찼는지)
+      return { theme: THEME.id, themeName: THEME.name, stage: p.stage, maxStage: STAGES.length - 1, near, xp: p.xp, stageMin: STAGES[p.stage], nextMin: next ?? null };
     },
     SAMPLE_MS,
   };
