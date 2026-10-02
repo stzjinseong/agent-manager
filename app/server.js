@@ -446,6 +446,7 @@ function publicState() {
     serverStale: serverStale(),
     recentCwds: config.recentCwds,
     progress: progress.public(),
+    shotKeep: SHOT_KEEP, // 화면 안내 문구용 (워커당 캡처 보관 장수)
   };
 }
 

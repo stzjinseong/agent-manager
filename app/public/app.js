@@ -841,14 +841,41 @@ function timelineRows(log, shots = []) {
 }
 // ---------- 도구 결과 캡처 보기 ----------
 // 썸네일은 data-shot 에 원본 주소를 달아 두고, 어디서 눌러도(타임라인·카드) 같은 크게 보기를 연다
-const shotImg = (s, cls) => `<img class="${cls}" src="${esc(s.url)}" data-shot="${esc(s.url)}" data-cap="${esc([s.tool, s.arg].filter(Boolean).join(' · '))}" alt="캡처" loading="lazy" draggable="false" title="클릭해 크게 보기">`;
-function openShot(url, cap) {
-  const box = el(`<div class="shot-view" title="클릭하거나 Esc 로 닫기"><figure><img src="${esc(url)}" alt="캡처"><figcaption>${esc(cap || '')}</figcaption></figure></div>`);
+const shotImg = (s, cls) => `<img class="${cls}" src="${esc(s.url)}" data-shot="${esc(s.url)}" alt="캡처" loading="lazy" draggable="false" title="클릭해 크게 보기">`;
+// 같은 워커의 캡처끼리 ←/→ 로 넘겨 본다. 몇 번째인지·찍힌 시각과 보관 한도 안내를 아래에 둔다
+function openShot(url) {
+  const id = url.split('/')[2];
+  const list = state.workers.find((w) => w.id === id)?.shots || [];
+  let i = Math.max(0, list.findIndex((s) => s.url === url));
+  const box = el(`<div class="shot-view" title="바깥을 누르거나 Esc 로 닫기">
+    <button class="shot-nav prev" title="이전 캡처 (←)">‹</button>
+    <figure><img alt="캡처"><figcaption><div class="cap"></div><div class="meta"></div><div class="note"></div></figcaption></figure>
+    <button class="shot-nav next" title="다음 캡처 (→)">›</button></div>`);
+  const show = () => {
+    const s = list[i] || { url, tool: '', arg: '' };
+    $('img', box).src = s.url;
+    $('.cap', box).textContent = [s.tool, s.arg].filter(Boolean).join(' · ');
+    $('.meta', box).textContent = list.length ? `${i + 1} / ${list.length}${s.t ? ` · ${new Date(s.t + clockSkew).toLocaleString('ko-KR', { hour12: false })}` : ''}` : '';
+    $('.note', box).textContent = `이미지는 최대 ${state.shotKeep || 50}장까지 관리됩니다.`;
+    $('.prev', box).disabled = i <= 0;
+    $('.next', box).disabled = i >= list.length - 1;
+  };
+  const go = (d) => { const n = i + d; if (n >= 0 && n < list.length) { i = n; show(); } };
   const close = () => { box.remove(); document.removeEventListener('keydown', onKey, true); };
-  const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
-  box.addEventListener('click', close);
+  const onKey = (e) => {
+    if (e.key === 'Escape') { e.stopPropagation(); close(); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); e.stopPropagation(); go(-1); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); go(1); }
+  };
+  box.addEventListener('click', (e) => {
+    const nav = e.target.closest('.shot-nav');
+    if (nav) { go(nav.classList.contains('prev') ? -1 : 1); return; }
+    if (e.target.closest('figure')) return; // 그림·설명을 눌러도 닫지 않는다(글자 복사 등)
+    close();
+  });
   document.addEventListener('keydown', onKey, true);
   document.body.append(box);
+  show();
 }
 // 타임라인 썸네일은 늦게 로드되며 높이가 늘어난다 → 맨 아래를 보던 중이면 바닥을 유지
 $('#log').addEventListener('load', (e) => {
@@ -859,7 +886,7 @@ document.addEventListener('click', (e) => {
   const t = e.target.closest?.('[data-shot]');
   if (!t) return;
   e.stopPropagation(); // 카드 선택·타임라인 요청 이동으로 번지지 않게
-  openShot(t.dataset.shot, t.dataset.cap);
+  openShot(t.dataset.shot);
 }, true);
 
 // ---------- 세션 프로파일 ----------
