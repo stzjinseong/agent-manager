@@ -164,12 +164,6 @@ main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24p
 .core-dot.ge4 .mgr-xpbar, .core-dot.party .mgr-xpbar { top: -30px; }
 .mgr-xpbar > i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, rgba(255, 255, 255, .75), #fff); box-shadow: 0 0 6px rgba(255, 255, 255, .7); transition: width .6s ease-out; }
 .mgr-xpbar.max > i { background: #fff; box-shadow: 0 0 8px #fff; }
-#core-count {
-  position: absolute; top: -2px; right: -8px; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px;
-  display: grid; place-items: center; font: 700 12px/1 var(--mono); font-variant-numeric: tabular-nums;
-  color: var(--dim); background: var(--surface-2); border: 1px solid var(--line-2);
-}
-.core-dot.busy #core-count { color: #14161c; background: #f3f1ec; border-color: #fff; box-shadow: 0 0 10px rgba(255, 255, 255, .55); }
 .core-dot.busy .core-mark { animation: core-glow 2.2s ease-in-out infinite, bob .36s steps(2, jump-none) infinite alternate; }
 .core-dot.busy .clawd .legs-a { animation: legA .36s steps(1) infinite; }
 .core-dot.busy .clawd .legs-b { animation: legB .36s steps(1) infinite; }

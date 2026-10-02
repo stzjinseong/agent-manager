@@ -489,9 +489,8 @@ function renderStats() {
     ['완료', n('done'), 'var(--done)'],
     ['확인됨', n('checked'), 'var(--checked)'],
   ].map(([k, v, c, hot]) => `<span class="stat ${hot ? 'hot' : ''}" style="--c:${c}"><i></i>${k} <b>${v}</b></span>`).join('');
-  // 매니저 캐릭터: 작업 중 인원 숫자 배지. 작업 중이면 흰 빛 맥동 + 걷기, 결정 대기가 있으면 주황 빛
+  // 매니저 캐릭터: 작업 중이면 흰 빛 맥동 + 걷기, 결정 대기가 있으면 주황 빛
   const busy = n('working');
-  $('#core-count').textContent = busy;
   const dot = $('.core-dot');
   dot.classList.toggle('busy', busy > 0);
   dot.classList.toggle('alert', pend > 0);
