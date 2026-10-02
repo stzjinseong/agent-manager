@@ -606,6 +606,16 @@ i.info:hover, .kpi[data-info]:hover i.info { color: var(--text-2); }
 .term-wrap.full .term-bar span { flex: 1; }
 .term-wrap.full #term { flex: 1; min-height: 0; }
 body.term-full { overflow: hidden; }
+/* 크게 보기에서도 오른쪽에 업무 지시·나중에 할 작업·타임라인을 둔다. 터미널은 110칸 고정이라 넓은 화면에선
+   어차피 오른쪽이 비었다 — 그 자리를 옆 패널로 쓴다. 좁은 화면(1100px 이하)은 지금처럼 터미널만 꽉 채운다 */
+@media (min-width: 1101px) {
+  body.term-full { --full-side-w: clamp(340px, 26vw, 460px); }
+  body.term-full .term-wrap.full { right: var(--full-side-w); }
+  body.term-full .side {
+    position: fixed; top: 0; right: 0; bottom: 0; z-index: 101; width: var(--full-side-w); height: auto;
+    padding: 12px 14px 12px 12px; background: #0c0d11; border-left: 1px solid var(--line);
+  }
+}
 
 /* ---------- 서버 종료 ---------- */
 .btn.power { font-size: 16px; padding: 4px 10px; color: var(--text-2); }
