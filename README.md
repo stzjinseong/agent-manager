@@ -48,6 +48,9 @@ npm run setup-mac
 실행 파일 권한 설정, 창 없이 여는 `Launch.app` 생성, 터미널 명령 `agent-manager` 등록(`~/.zshrc`)을 해 줍니다.
 `Launch.app` 을 처음 열 때 보안 경고가 뜨면 Finder 에서 **우클릭 → 열기**.
 
+Claude Code 로 설치해도 됩니다. 클론한 폴더에서 `claude` 를 열고 `/setup --mac`(Windows 는 `/setup --windows`, 생략하면 OS 자동 판별).
+준비물 확인 → `npm install` → OS별 설치까지 대신 돌리고 결과를 확인해 줍니다.
+
 ## 실행
 
 프로젝트 폴더의 실행 파일을 더블클릭하세요. 서버가 뜨고 브라우저가 열립니다.
