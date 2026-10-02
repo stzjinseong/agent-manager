@@ -1486,7 +1486,7 @@ function renderMemos(w) {
   const fmt = (t) => new Date(t + clockSkew).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
   $('#memos').innerHTML = list.length
     ? `<li class="mh">${list.length}건</li>` + list.map((m) => `<li data-id="${m.id}" draggable="true" title="워커 카드에 끌어다 놓으면 그 워커의 나중에 할 작업으로 옮겨집니다"><span class="mt">${esc(m.text)}</span>
-        <span class="ma"><time>${fmt(m.createdAt)}</time><button class="btn mini ghost" data-memo="edit" title="내용 수정">수정</button><button class="btn mini primary" data-memo="send" title="이 작업을 업무 지시로 (작업 중이면 대기열)">▶ 지시</button><button class="btn mini ghost" data-memo="remove" title="삭제">✕</button></span></li>`).join('')
+        <span class="ma"><time>${fmt(m.createdAt)}</time><button class="btn mini ghost" data-memo="edit" title="내용 수정">수정</button><button class="btn mini primary" data-memo="send" title="업무 지시로 보내기 (작업 중이면 대기열)" aria-label="업무 지시로 보내기">▶</button><button class="btn mini ghost" data-memo="remove" title="삭제">✕</button></span></li>`).join('')
     : '<li class="empty-memo">나중에 할 작업이 없습니다</li>';
 }
 // 수정: 본문 자리에 입력칸을 띄운다. Alt(⌘)+Enter 저장 · Esc 취소 — 추가 칸과 같은 키
