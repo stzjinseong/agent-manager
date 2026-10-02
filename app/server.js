@@ -173,7 +173,22 @@ function hookSettings() {
   hooks.PreToolUse = [{ matcher: '*', hooks: h() }];
   hooks.PostToolUse = [{ matcher: '*', hooks: h() }];
   hooks.PermissionRequest = [{ matcher: '*', hooks: h(600) }];
-  return { hooks };
+  const theme = workerTheme();
+  return theme ? { hooks, theme } : { hooks };
+}
+
+// 워커 터미널은 검정 배경이라, 전역 Claude 테마가 라이트 계열이면 짝이 맞는 다크 테마로 띄운다.
+// 라이트 테마는 본문을 검정에 가깝게 그려 질문 창 문구 등이 배경에 묻혔다(실측: ~/.claude/settings.json theme=light-daltonized).
+// --settings 의 theme 은 그 세션에만 적용된다(실측: 환영 화면 색이 다크 팔레트로 바뀜) — 평소 터미널 설정은 그대로.
+// 테마는 사용자 설정(~/.claude/settings.json)에 있고, 예전 버전은 전역 설정(~/.claude.json)에 두었다
+function workerTheme() {
+  for (const f of [path.join(CLAUDE_HOME, 'settings.json'), path.join(os.homedir(), '.claude.json')]) {
+    try {
+      const t = JSON.parse(fs.readFileSync(f, 'utf8')).theme;
+      if (typeof t === 'string') return t.startsWith('light') ? t.replace(/^light/, 'dark') : null;
+    } catch {}
+  }
+  return null;
 }
 
 // 사용자가 중단(Esc)하면 Stop 훅이 오지 않아 '작업 중'으로 남는다. 트랜스크립트의 중단 기록이
