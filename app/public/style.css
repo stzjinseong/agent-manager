@@ -184,6 +184,18 @@ main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24p
   50% { filter: drop-shadow(0 0 9px var(--decision)) drop-shadow(0 0 28px color-mix(in srgb, var(--decision) 55%, transparent)); }
 }
 
+/* 칩을 끄는 동안만 뜨는 휴지통. 높이 0 짜리 sticky 라 자리를 차지하지 않고, 칩 영역 끝이 화면 아래로 넘어가면 화면 아래에 붙는다 */
+.trash { position: sticky; bottom: 16px; height: 0; z-index: 5; display: flex; justify-content: center; pointer-events: none; }
+.trash .bin {
+  position: absolute; bottom: -8px; display: flex; align-items: center; gap: 8px; padding: 12px 26px;
+  border: 1.5px dashed rgba(255, 255, 255, .35); border-radius: 999px; background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: blur(6px); box-shadow: 0 8px 24px rgba(0, 0, 0, .45); color: var(--text-2); font-size: 13px; white-space: nowrap;
+  opacity: 0; transform: translateY(10px) scale(.96); pointer-events: none;
+  transition: opacity .15s, transform .15s, border-color .15s, background .15s, color .15s;
+}
+.trash .ic { font-size: 20px; line-height: 1; }
+.trash.show .bin { opacity: 1; transform: none; pointer-events: auto; }
+.trash.over .bin { border-style: solid; border-color: #e0655a; background: color-mix(in srgb, #e0655a 22%, var(--surface)); color: #fff; transform: scale(1.06); }
 .nodes { position: relative; display: grid; grid-template-columns: repeat(auto-fill, minmax(236px, 1fr)); gap: 34px 22px; }
 .empty { grid-column: 1 / -1; text-align: center; color: var(--dim); padding: 18px 0 6px; }
 

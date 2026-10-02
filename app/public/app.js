@@ -1399,7 +1399,7 @@ nodesEl.addEventListener('dragstart', (e) => {
   dragEl = n;
   e.dataTransfer.effectAllowed = 'move';
   e.dataTransfer.setData('text/plain', n.dataset.name || '');
-  requestAnimationFrame(() => n.classList.add('dragging')); // 드래그 이미지가 찍힌 뒤 흐리게
+  requestAnimationFrame(() => { n.classList.add('dragging'); trashEl.classList.add('show'); }); // 드래그 이미지가 찍힌 뒤 흐리게
 });
 nodesEl.addEventListener('dragover', (e) => {
   if (memoDrag) return memoDragOver(e);
@@ -1423,6 +1423,7 @@ nodesEl.addEventListener('dragleave', (e) => {
   if (n && !n.contains(e.relatedTarget)) n.classList.remove('dropping');
 });
 nodesEl.addEventListener('dragend', () => {
+  trashEl.classList.remove('show', 'over');
   if (!dragEl) return;
   dragEl.classList.remove('dragging');
   dragEl = null;
@@ -1430,6 +1431,28 @@ nodesEl.addEventListener('dragend', () => {
   state.order = order; // 서버 응답 전 깜빡임 방지
   api('/api/order', { order });
   requestAnimationFrame(drawTraces);
+});
+
+// ---------- 휴지통: 칩을 끌기 시작하면 아래에 뜨고, 놓으면 제거 ----------
+// 워커 칩은 상세의 '제거'와 같고(실행 중이면 세션 종료), 대기실 칩은 저장된 역할 삭제와 같다. 둘 다 확인을 받는다
+const trashEl = $('#trash');
+trashEl.addEventListener('dragover', (e) => { if (!dragEl) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; trashEl.classList.add('over'); });
+trashEl.addEventListener('dragleave', (e) => { if (!trashEl.contains(e.relatedTarget)) trashEl.classList.remove('over'); });
+trashEl.addEventListener('drop', async (e) => {
+  e.preventDefault();
+  const n = dragEl;
+  if (!n) return;
+  if (n.classList.contains('socket')) {
+    const name = n.dataset.profile;
+    if (name && await ask({ title: '저장된 역할 삭제', body: `"${name}" 역할을 목록에서 지울까요?`, ok: '삭제', danger: true })) api('/api/profiles/delete', { name });
+    return;
+  }
+  const w = state.workers.find((x) => x.id === n.dataset.id);
+  if (!w) return;
+  const running = w.status !== 'exited';
+  if (!(await ask({ title: `"${w.name}" 워커를 제거할까요?`, body: running ? '목록에서 지웁니다. 실행 중인 Claude 세션도 종료됩니다.' : '목록에서 지웁니다.', ok: '제거', danger: true }))) return;
+  await api(`/api/workers/${w.id}/remove`);
+  if (selected === w.id) { selected = null; render(); }
 });
 
 // ---------- 역할 이름 변경: 칩의 이름을 더블클릭 → Enter 저장 / Esc 취소 ----------
