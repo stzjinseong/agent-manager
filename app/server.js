@@ -404,11 +404,48 @@ async function cliDraft(w) {
         }
       }
       text = text.trim();
-      return { state: text ? 'draft' : 'empty', text };
+      // 턴이 돌고 있다는 표시: 입력창 아래 상태줄의 'esc to interrupt', 또는 입력창 바로 위 진행 줄("· Nebulizing…").
+      // 끝나면 둘 다 사라지고 "✻ Baked for 6s · done …" 이 남는다(실측 v2.1.288)
+      const line = (i) => (i >= 0 && i < rows.length ? rows[i].translateToString(true) : '');
+      let busy = false;
+      for (let i = bottom + 1; i <= last; i++) if (/esc to interrupt/i.test(line(i))) busy = true;
+      for (let i = top - 1; i >= Math.max(0, top - 2); i--) if (/^\s*\S\s+\S.*…/.test(line(i))) busy = true;
+      return { state: text ? 'draft' : 'empty', text, busy };
     }
     return { state: 'blocked', text: '' };
   } catch { return { state: 'empty', text: '' }; } finally { t.dispose(); }
 }
+
+// ---------- '작업 중'에 갇힌 워커 바로잡기 ----------
+// 응답이 오기 전에 Esc 로 취소하면 Claude Code 는 그 요청을 대화에서 지우고 글을 입력창에 되돌린다 — Stop 훅도,
+// 트랜스크립트의 중단 기록도 남지 않아 '작업 중'에서 영영 안 풀리고 대기열도 멈췄다(실측 v2.1.288).
+// 작업 중인데 화면에 턴 표시가 연달아 없고 기록도 조용하면 입력 대기로 바로잡고 대기열을 잇는다.
+// 되돌아온 글이 입력창에 남아 있으면 dispatchQueued 가 그 글이 빌 때까지 기다리므로 섞이지 않는다
+const STUCK_CHECK_MS = 4000, STUCK_QUIET_MS = 10_000, STUCK_MISSES = 2;
+const stuckMisses = new Map(); // 워커 id → 연속으로 턴 표시가 없던 횟수
+let stuckBusy = false;
+setInterval(async () => {
+  if (stuckBusy) return;
+  stuckBusy = true;
+  try {
+    for (const w of workers.values()) {
+      if (w.status !== 'working' || w.sentPrompt) { stuckMisses.delete(w.id); continue; }
+      const quietSince = Math.max(w.turnStartedAt || 0, w.updatedAt || 0, w.tx?.lastTs || 0);
+      if (Date.now() - quietSince < STUCK_QUIET_MS) { stuckMisses.delete(w.id); continue; }
+      const cli = await cliDraft(w);
+      if (w.status !== 'working') continue;
+      // 화면을 못 읽었거나(busy 없음) 입력창이 아닌 화면(선택창 등)이면 판단하지 않는다
+      if (cli.busy !== false) { stuckMisses.delete(w.id); continue; }
+      const n = (stuckMisses.get(w.id) || 0) + 1;
+      stuckMisses.set(w.id, n);
+      if (n < STUCK_MISSES) continue;
+      stuckMisses.delete(w.id);
+      w.currentTool = null;
+      setStatus(w, 'idle', '작업 표시가 없어 입력 대기로 바로잡음 (응답 전에 취소된 것으로 보임)');
+      if (w.queue.length) setTimeout(() => dispatchQueued(w), 400);
+    }
+  } finally { stuckBusy = false; }
+}, STUCK_CHECK_MS);
 
 // 투입 확인: 보낸 뒤 이 시간 안에 UserPromptSubmit 훅도, 트랜스크립트 새 기록도 없으면 들어가지 않은 것으로 본다
 const PROMPT_CONFIRM_MS = 8000;
