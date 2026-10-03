@@ -1,7 +1,7 @@
 // 관제탑 P0 — 로컬 전용 Claude Code 세션 매니저
 // 관제탑이 PTY 로 claude CLI 를 직접 띄우고, 세션별 --settings 로 주입한 command 훅이
-// 상태 이벤트를 이 서버로 보낸다. 권한 요청(PermissionRequest)은 대시보드의 결정이
-// 나올 때까지 훅 응답을 붙잡아 두는 방식으로 원격 승인한다.
+// 상태 이벤트를 이 서버로 보낸다. 권한 요청(PermissionRequest)은 기본으로 터미널 선택창에 맡기고,
+// AM_REMOTE_DECISIONS=1 이면 대시보드의 결정이 나올 때까지 훅 응답을 붙잡아 두는 방식으로 원격 승인한다.
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -21,6 +21,8 @@ const PORT = Number(process.env.AM_PORT || 7788);
 const HOST = '127.0.0.1'; // 외부 노출 금지 — 이 PC 에서만 접속
 const DATA_DIR = process.env.AM_DATA || path.join(ROOT, 'data');
 const DECISION_HOLD_MS = 590_000; // 훅 timeout(600s) 직전에 놓아 터미널 프롬프트로 폴백
+// 권한 요청을 대시보드(페이지 상단 결정함)에서 허용/거부할지. 끄면 터미널 선택창에서 고르고 카드엔 '결정 대기'만 보인다
+const REMOTE_DECISIONS = process.env.AM_REMOTE_DECISIONS === '1';
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
 const IS_WIN = process.platform === 'win32';
@@ -269,7 +271,7 @@ function spawnWorker({ name, cwd, args = '', permissionMode = 'default' }) {
   if (process.platform === 'darwin' && !env.LANG && !env.LC_ALL && !env.LC_CTYPE) env.LANG = 'en_US.UTF-8';
 
   const extra = args.trim() ? args.trim().split(/\s+/) : [];
-  // 전역 설정이 bypassPermissions 여도 워커는 지정한 모드로 띄운다 — 그래야 권한 결정이 관제탑으로 온다
+  // 전역 설정이 bypassPermissions 여도 워커는 지정한 모드로 띄운다 — 그래야 권한 요청이 관제탑에 '결정 대기'로 보인다
   if (!PERMISSION_MODES.includes(permissionMode)) permissionMode = 'default';
   // 터미널은 PTY 호스트가 띄우고 붙잡는다 — 이 서버를 재시작해도 워커는 살아 있다
   hostSend({ op: 'spawn', id, file: CLAUDE_BIN, args: ['--settings', settingsPath, '--permission-mode', permissionMode, ...extra], cwd, env, cols: 120, rows: 34 });
@@ -555,6 +557,15 @@ function onHook(w, ev, res) {
       emitState();
       break;
     case 'PermissionRequest': {
+      // 권한 선택은 터미널(CLI 의 원래 선택창)에서 한다 — 페이지 상단에 허용/거부 알림을 띄우지 않는다.
+      // 훅을 붙잡지 않고 빈 응답으로 바로 넘겨야 CLI 가 선택창을 띄운다(붙잡으면 결정이 올 때까지 최대 590초 멈춘다).
+      // 카드에는 '결정 대기'로 보이고, 선택하면 다음 훅(PreToolUse·Stop 등)으로 상태가 이어진다
+      if (!REMOTE_DECISIONS) {
+        const summary = summarizeTool(ev.tool_name, ev.tool_input);
+        w.notice = `권한 요청 ${summary} — 터미널에서 선택하세요`;
+        setStatus(w, 'decision', `권한 요청 ${summary}`);
+        break;
+      }
       const did = `D${++decisionSeq}`;
       const d = {
         id: did, workerId: w.id, kind: 'permission', tool: ev.tool_name, input: ev.tool_input,
