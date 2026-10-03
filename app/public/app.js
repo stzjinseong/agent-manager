@@ -2024,7 +2024,7 @@ function markGoneReqs() {
     if (!row) continue;
     const gone = findPromptLine(row.text, laterSame(i)) < 0 && findTurnEndBefore(row.t + clockSkew) < 0;
     li.classList.toggle('gone', gone);
-    li.title = gone ? '터미널 기록에서 밀려난 요청이라 위치로 이동할 수 없습니다' : '클릭: 터미널에서 이 요청 위치로 이동';
+    li.title = gone ? '만료된 요청이라 처리할 수 없습니다.' : '클릭: 터미널에서 이 요청 위치로 이동';
   }
 }
 let goneTimer = null;
@@ -2080,7 +2080,7 @@ $('#log').addEventListener('click', (e) => {
     // 앞 턴이 끝나는 바로 그 순간 투입된 요청은 Claude 가 '❯ 요청' 줄을 남기지 않는 경우가 있다 →
     // 그 시각 직전에 끝난 턴의 요약 줄(✻ … · done 오후 4:15)로 대신 이동
     line = findTurnEndBefore(row.t + clockSkew);
-    if (line < 0) { toast('터미널 기록에서 밀려난 요청입니다 (오래됐거나 clear·재부팅으로 지워짐)', 3200); return; }
+    if (line < 0) { toast('만료된 요청이라 처리할 수 없습니다.', 3200); return; }
     toast('요청 줄이 터미널에 남지 않아 그 무렵(직전 턴 종료) 위치로 이동했습니다', 2800);
   }
   term.scrollToLine(Math.max(0, line - 2));
