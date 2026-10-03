@@ -830,19 +830,22 @@ function renderDetail() {
   $("#detail-name").textContent = w.name; // 상태는 카드 배지·LED 로 보인다
   $('#detail-meta').textContent = [w.id, w.model, w.permissionMode, w.sessionId && `session ${w.sessionId.slice(0, 8)}`, w.pid && `pid ${w.pid}`, w.cwd].filter(Boolean).join(' · ');
   renderMemos(w);
-  $('#queue').innerHTML = w.queue.length
+  const queueEl = $('#queue');
+  const queueHtml = w.queue.length
     ? (w.queueHeld
       ? `<div class="qh held" title="지시가 CLI 에 들어가지 않아 보류 중 — 중복 투입을 막으려고 자동으로 다시 보내지 않습니다">⚠ 보류된 지시 ${w.queue.length}건 · 터미널 확인 후 <button data-resume title="맨 위부터 다시 투입">▶ 재개</button></div>`
       : `<div class="qh" title="현재 턴이 끝나면 위에서부터 투입">대기 중인 지시 ${w.queue.length}건</div>`) +
-      w.queue.map((q, i) => `<div class="qi"><span class="n">${i + 1}</span><span class="tx">${esc(q)}</span><button data-unqueue="${i}" title="큐에서 빼기">✕</button></div>`).join('')
+      w.queue.map((q, i) => `<div class="qi"><span class="n">${i + 1}</span><span class="tx"><span class="qt">${esc(q)}</span>${attachChips(q, 'sm')}</span><button data-unqueue="${i}" title="큐에서 빼기">✕</button></div>`).join('')
     : '';
+  // 상태가 올 때마다 통째로 바꾸면 썸네일이 다시 로드되고 누르는 중인 타일이 사라진다 → 바뀐 때만
+  if (queueEl._html !== queueHtml) queueEl.innerHTML = queueEl._html = queueHtml;
   const fmt = (t) => new Date(t + clockSkew).toLocaleTimeString('ko-KR', { hour12: false });
   timelineCache = timelineRows(w.log, w.shots, w.docs);
   // CLI 처럼 아래로 갈수록 최신. 맨 아래를 보고 있었거나 워커를 바꿨으면 새 줄을 따라 내려가고,
   // 위로 올려 지난 기록을 보는 중이면 그 자리를 지킨다
   const logEl = $('#log');
   const html = timelineCache.map((r, i) =>
-    `<li class="k-${r.kind}" data-i="${i}"${r.kind === 'req' ? ' title="클릭: 터미널에서 이 요청 위치로 이동"' : ''}><time>${fmt(r.t)}</time>${r.tag ? `<span class="tag">${r.tag}</span>` : ''}${esc(r.text)}${r.shot ? shotImg(r.shot, 'tl-shot') : ''}${r.doc ? docCard(r.doc) : ''}${r.kind === 'req' || r.kind === 'queued' ? attachThumbs(r.text) : ''}</li>`).join('');
+    `<li class="k-${r.kind}" data-i="${i}"${r.kind === 'req' ? ' title="클릭: 터미널에서 이 요청 위치로 이동"' : ''}><time>${fmt(r.t)}</time>${r.tag ? `<span class="tag">${r.tag}</span>` : ''}${esc(r.text)}${r.shot ? shotImg(r.shot, 'tl-shot') : ''}${r.doc ? docCard(r.doc) : ''}${r.kind === 'req' || r.kind === 'queued' ? attachChips(r.text, 'md') : ''}</li>`).join('');
   if (logEl._html !== html || logEl.dataset.w !== w.id) { // 브라우저가 innerHTML 을 정규화하므로 보낸 글로 비교
     const stick = logEl.dataset.w !== w.id || logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 40;
     logEl.dataset.w = w.id;
@@ -905,13 +908,39 @@ function docCard(d) {
     (d.title ? `<span class="ti">${esc(d.title)}</span>` : '') +
     `<span class="nm">${esc(d.name)}</span><span class="dir">${esc(dir)}</span></span></a>`;
 }
-// 사람이 지시에 첨부한 이미지: 보낸 글에 들어간 data/uploads 경로를 서버의 /uploads/ 로 바로 보여 준다(따로 저장하지 않음).
-// 이미 정리됐거나(7일) 다른 곳의 경로면 서버가 404 → 썸네일을 숨긴다
-const UPLOAD_PATH_RE = /[\\/]uploads[\\/]([\w.-]+\.(?:png|jpe?g|gif|webp|bmp))\b/gi;
-function attachThumbs(text) {
-  const names = [...new Set([...String(text).matchAll(UPLOAD_PATH_RE)].map((m) => m[1]))];
-  if (!names.length) return '';
-  return `<span class="tl-attach">${names.map((n) => shotImg({ url: `/uploads/${n}` }, 'tl-shot') .replace('<img ', '<img onerror="this.remove()" ')).join('')}</span>`;
+// 사람이 지시에 첨부한 파일: 글에 들어간 data/uploads 경로를 서버의 /uploads/ 로 바로 보여 준다(따로 저장하지 않음).
+// 이미지는 썸네일(누르면 크게 보기), 그 밖의 파일은 아이콘 + 원래 이름(누르면 새 탭). 이름은 /api/upload 가 지은 규칙
+// (시각-난수.확장자 / 시각-난수-원래이름). 이미 정리됐으면(7일) 서버가 404 → 썸네일은 숨긴다
+// size: 'md' = 타임라인, 'sm' = 입력칸 아래·대기열·나중에 할 작업(칸이 좁아 더 작게)
+const UPLOAD_PATH_RE = /[\\/]uploads[\\/](\d{14}-[a-z0-9]{1,8}(?:\.[a-z0-9]+|-[\p{L}\p{N}._-]*[\p{L}\p{N}_-]))/giu;
+const IMG_EXT = /^(png|jpe?g|gif|webp|bmp)$/i;
+// 타임라인 글은 서버가 300자로 자른다(pushLog) — 잘린 끝에 걸친 경로는 이름이 잘려 있어 빼야 깨진 타일이 안 생긴다
+const LOG_CLIP = 290;
+function uploadsIn(text, clipped = false) {
+  text = String(text);
+  const cut = clipped && text.length >= LOG_CLIP;
+  const names = [...new Set([...text.matchAll(UPLOAD_PATH_RE)].filter((m) => !(cut && m.index + m[0].length >= text.length)).map((m) => m[1]))];
+  return names.map((name) => {
+    const label = name.replace(/^\d{14}-[a-z0-9]{1,8}-/i, '');
+    const ext = name.includes('.') ? name.split('.').pop().toLowerCase() : '';
+    return { name, label, ext, url: `/uploads/${encodeURIComponent(name)}`, image: IMG_EXT.test(ext) };
+  });
+}
+function attachChips(text, size = 'sm') {
+  const list = uploadsIn(text, size === 'md');
+  if (!list.length) return '';
+  return `<span class="att att-${size}">${list.map((f) => f.image
+    ? shotImg({ url: f.url }, 'att-img').replace('<img ', '<img onerror="this.remove()" ')
+    : `<a class="att-file" href="${esc(f.url)}" target="_blank" rel="noopener" draggable="false" title="${esc(f.label)}&#10;클릭: 새 탭에서 열기"><span class="ic">${DOC_ICON[f.ext] || '📄'}</span><span class="nm">${esc(f.label)}</span></a>`).join('')}</span>`;
+}
+// 첨부 파일 타일을 눌러도 요청 줄 이동(타임라인)·카드 선택으로 번지지 않게 — 새 탭 열기(기본 동작)는 그대로
+document.addEventListener('click', (e) => { if (e.target.closest?.('.att-file')) e.stopPropagation(); }, true);
+// 입력칸 바로 아래에 지금 글에 들어간 첨부를 보여 준다. 글이 바뀔 때만 다시 그린다(썸네일 깜박임 방지)
+function syncAttach(ta) {
+  let box = ta.nextElementSibling;
+  if (!box?.classList.contains('att-live')) { box = el('<div class="att-live"></div>'); ta.after(box); }
+  const html = attachChips(ta.value, 'sm');
+  if (box._html !== html) box.innerHTML = box._html = html;
 }
 // ---------- 도구 결과 캡처 보기 ----------
 // 썸네일은 data-shot 에 원본 주소를 달아 두고, 어디서 눌러도(타임라인·카드) 같은 크게 보기를 연다
@@ -1594,6 +1623,7 @@ function autoGrow(ta) {
   const h = ta.scrollHeight + ta.offsetHeight - ta.clientHeight; // + 테두리
   ta.style.height = `${Math.min(h, max)}px`;
   ta.style.overflowY = h > max ? 'auto' : 'hidden';
+  syncAttach(ta);
 }
 for (const ta of document.querySelectorAll('.task-form textarea, .memo-form textarea')) ta.addEventListener('input', () => autoGrow(ta));
 // 업무 지시 칸: 파일 드롭·붙여넣기 → 커서 위치에 경로 삽입
@@ -1603,6 +1633,7 @@ function insertAtCursor(ta, text) {
   ta.value = `${before}${pad}${text} ${ta.value.slice(e)}`;
   ta.selectionStart = ta.selectionEnd = before.length + pad.length + text.length + 1;
   autoGrow(ta);
+  syncAttach(ta); // 수정 칸(.memo-edit)은 autoGrow 대상이 아니라 따로
   ta.focus();
 }
 // 파일 드롭·Ctrl+V 붙여넣기 → 커서 위치에 경로 삽입 (업무 지시 · 나중에 할 작업 공통)
@@ -1647,7 +1678,7 @@ function renderMemos(w) {
   memoSig = sig;
   const fmt = (t) => new Date(t + clockSkew).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
   $('#memos').innerHTML = list.length
-    ? `<li class="mh">${list.length}건</li>` + list.map((m) => `<li data-id="${m.id}" draggable="true" title="워커 카드에 끌어다 놓으면 그 워커의 나중에 할 작업으로 옮겨집니다"><span class="mt">${esc(m.text)}</span>
+    ? `<li class="mh">${list.length}건</li>` + list.map((m) => `<li data-id="${m.id}" draggable="true" title="워커 카드에 끌어다 놓으면 그 워커의 나중에 할 작업으로 옮겨집니다"><span class="mt">${esc(m.text)}</span>${attachChips(m.text, 'sm')}
         <span class="ma"><time>${fmt(m.createdAt)}</time><button class="btn mini ghost" data-memo="edit" title="내용 수정">수정</button><button class="btn mini primary" data-memo="send" title="업무 지시로 보내기 (작업 중이면 대기열)" aria-label="업무 지시로 보내기">▶</button><button class="btn mini ghost" data-memo="remove" title="삭제">✕</button></span></li>`).join('')
     : '<li class="empty-memo">나중에 할 작업이 없습니다</li>';
 }
@@ -1663,9 +1694,11 @@ function editMemo(li, w) {
   const keep = [...li.children];
   keep.forEach((c) => (c.hidden = true));
   li.append(ta, bar);
+  syncAttach(ta); // 입력칸과 버튼 줄 사이에 첨부 타일
+  ta.addEventListener('input', () => syncAttach(ta));
   acceptFiles(ta);
   ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
-  const done = () => { ta.remove(); bar.remove(); keep.forEach((c) => (c.hidden = false)); li.classList.remove('editing'); li.draggable = true; memoSig = ''; renderMemos(w); };
+  const done = () => { ta.nextElementSibling?.classList.contains('att-live') && ta.nextElementSibling.remove(); ta.remove(); bar.remove(); keep.forEach((c) => (c.hidden = false)); li.classList.remove('editing'); li.draggable = true; memoSig = ''; renderMemos(w); };
   const save = async () => {
     const text = ta.value.trim();
     if (text === old.trim()) return done();

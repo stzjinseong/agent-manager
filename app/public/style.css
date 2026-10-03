@@ -364,6 +364,8 @@ body.term-full .side-grip { left: -6px; }
 .queue .qi { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
 .queue .qi .n { color: var(--accent); font: 600 11px/1.6 var(--mono); }
 .queue .qi .tx { flex: 1; min-width: 0; white-space: pre-wrap; word-break: break-all; }
+/* 첨부 경로로 글이 길어도 타일이 보이게 글은 4줄까지 (나중에 할 작업 .mt 와 같게) */
+.queue .qi .qt { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
 .queue .qi button { background: none; border: 0; color: var(--dim); cursor: pointer; padding: 0 2px; font-size: 13px; }
 .queue .qi button:hover { color: var(--text); }
 .timeline { display: flex; flex-direction: column; min-height: 0; flex: 1; position: relative; }
@@ -533,9 +535,25 @@ body.term-full .side-grip { left: -6px; }
 #log li.k-doc .tl-doc .nm { display: block; font: 12px var(--mono); color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #log li.k-doc .tl-doc .dir { font-size: 11px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* 요청 줄의 첨부 썸네일: 여러 장이면 가로로 */
-#log .tl-attach { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; white-space: normal; }
-#log .tl-attach .tl-shot { display: block; max-width: 140px; max-height: 90px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, .7); cursor: zoom-in; background: #0c0d11; }
-#log .tl-attach .tl-shot:hover { border-color: #fff; }
+/* 사람이 첨부한 파일 타일: 이미지는 썸네일(누르면 크게 보기), 그 밖은 아이콘 + 원래 이름(누르면 새 탭).
+   md = 타임라인, sm = 입력칸 아래·대기열·나중에 할 작업(칸이 좁아 더 작게) */
+.att { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; white-space: normal; }
+.att .att-img { display: block; border-radius: 6px; border: 1px solid rgba(255, 255, 255, .7); cursor: zoom-in; background: #0c0d11; object-fit: cover; }
+.att .att-img:hover, .att .att-file:hover { border-color: #fff; }
+.att .att-file { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; border: 1px solid rgba(255, 255, 255, .45); border-radius: 6px; background: var(--surface-3); color: var(--text); text-decoration: none; cursor: pointer; }
+.att .att-file .ic { flex: none; line-height: 1; }
+.att .att-file .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); color: var(--text-2); }
+.att-md .att-img { max-width: 140px; max-height: 90px; }
+.att-md .att-file { padding: 5px 9px; max-width: 240px; }
+.att-md .att-file .ic { font-size: 16px; }
+.att-md .att-file .nm { font-size: 12px; }
+.att-sm { gap: 4px; margin-top: 4px; }
+.att-sm .att-img { width: 40px; height: 40px; border-radius: 5px; }
+.att-sm .att-file { height: 40px; padding: 0 7px; max-width: 160px; border-radius: 5px; }
+.att-sm .att-file .ic { font-size: 14px; }
+.att-sm .att-file .nm { font-size: 11px; }
+.att-live:empty { display: none; }
+.att-live .att { margin-top: 0; }
 .shot-view { position: fixed; inset: 0; z-index: 500; display: grid; place-items: center; background: rgba(0, 0, 0, .78); cursor: zoom-out; padding: 24px; }
 .shot-view figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 100%; max-height: 100%; }
 .shot-view img { max-width: min(92vw, 1600px); max-height: calc(100vh - 90px); object-fit: contain; border-radius: 8px; box-shadow: 0 10px 40px rgba(0, 0, 0, .6); background: #0c0d11; }
@@ -980,3 +998,4 @@ body.resizing-term { cursor: row-resize; user-select: none; }
   0% { opacity: 1; transform: translate(0, 0) scale(1); }
   100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(.3); }
 }
+.memos .att { margin-top: 0; }

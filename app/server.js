@@ -891,15 +891,28 @@ const server = http.createServer(async (req, res) => {
     return fs.createReadStream(path.join(file.startsWith('node_modules/') ? ROOT : APP_DIR, file)).pipe(res);
   }
 
-  // 사람이 지시에 첨부한 이미지 원본(data/uploads) — 타임라인 요청 줄 썸네일용. 따로 복사하지 않고 원본을 그대로 보여 주며,
-  // 보관은 기존 정리 규칙(cleanupUploads: 7일, 나중에 할 작업에 적힌 것은 유지)을 따른다
+  // 사람이 지시에 첨부한 파일 원본(data/uploads) — 입력칸·대기열·나중에 할 작업·타임라인의 첨부 타일용. 따로 복사하지 않고
+  // 원본을 그대로 보여 주며, 보관은 기존 정리 규칙(cleanupUploads: 7일, 나중에 할 작업에 적힌 것은 유지)을 따른다.
+  // 이름은 /api/upload 가 지은 규칙(시각-난수.확장자 / 시각-난수-원래이름)만 받는다 — 폴더 밖으로 나갈 수 없게
   if (req.method === 'GET' && p.startsWith('/uploads/')) {
-    const name = p.slice('/uploads/'.length);
-    if (!/^[\w.-]+\.(png|jpe?g|gif|webp|bmp)$/i.test(name)) return json(res, 404, {});
+    let name = '';
+    try { name = decodeURIComponent(p.slice('/uploads/'.length)); } catch {}
+    if (!/^\d{14}-[a-z0-9]{1,8}(?:\.[a-z0-9]+|-[\p{L}\p{N}._-]+)$/iu.test(name) && !/^[\w.-]+\.(png|jpe?g|gif|webp|bmp)$/i.test(name)) return json(res, 404, {});
     const full = path.join(UPLOAD_DIR, name);
-    if (!fs.existsSync(full)) return json(res, 404, {});
-    const ext = name.split('.').pop().toLowerCase();
-    res.writeHead(200, { 'content-type': `image/${ext === 'jpg' ? 'jpeg' : ext}`, 'cache-control': 'max-age=86400' });
+    if (path.dirname(full) !== UPLOAD_DIR || !fs.existsSync(full)) return json(res, 404, {});
+    const ext = docExt(name);
+    const img = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp' }[ext];
+    const textLike = /^(txt|log|csv|tsv|json|jsonl|ya?ml|toml|ini|xml|js|mjs|cjs|ts|tsx|jsx|py|rb|go|rs|java|kt|c|h|cpp|cs|sh|ps1|bat|sql|css|scss|diff|patch)$/.test(ext);
+    const type = img || DOC_TYPES[ext] || (textLike ? 'text/plain' : null);
+    // 이미지가 아닌 것: html·svg 의 스크립트가 관제 화면과 같은 출처로 돌지 않게 샌드박스(결과물 문서와 같은 방식, pdf 는 뷰어 때문에 제외).
+    // 브라우저가 못 보여 주는 형식은 내려받기로
+    const orig = name.replace(/^\d{14}-[a-z0-9]{1,8}-/i, '');
+    res.writeHead(200, {
+      'content-type': type ? (type.startsWith('text/') || ext === 'svg' ? `${type}; charset=utf-8` : type) : 'application/octet-stream',
+      'cache-control': 'max-age=86400', 'x-content-type-options': 'nosniff',
+      ...(img || ext === 'pdf' ? {} : { 'content-security-policy': 'sandbox allow-scripts allow-popups allow-modals allow-downloads' }),
+      ...(type ? {} : { 'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(orig)}` }),
+    });
     return fs.createReadStream(full).pipe(res);
   }
 
