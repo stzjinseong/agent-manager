@@ -655,7 +655,8 @@ function isSeenDone(w) {
 const isUnseenDone = (w) => viewStatus(w) === 'done' && !!w.doneAt;
 
 // 역할별 캐릭터 색 — 밝기(L 0.76)·채도(C 0.15)를 고정한 OKLCH 라 어떤 색상각이어도 어둡지 않다
-const avatarColor = (name) => (state.colors?.[name] != null ? `oklch(0.76 0.15 ${state.colors[name]})` : '');
+// 밝기는 테마 변수(--av-l: 다크 0.76, 라이트 0.62) — 밝은 바탕에선 조금 어둡게
+const avatarColor = (name) => (state.colors?.[name] != null ? `oklch(var(--av-l, 0.76) 0.15 ${state.colors[name]})` : '');
 
 function updateNode(node, w) {
   node.style.setProperty('--avatar', avatarColor(w.name) || 'var(--accent)');
@@ -1909,6 +1910,47 @@ $('#queue').addEventListener('click', (e) => {
   if (e.target.closest('[data-resume]') && selected) { api(`/api/workers/${selected}/resume`, {}); return; }
   const i = e.target.closest('[data-unqueue]')?.dataset.unqueue;
   if (i != null && selected) api(`/api/workers/${selected}/unqueue`, { index: Number(i) });
+});
+
+// ---------- 다크/라이트 테마 ----------
+// 고른 테마는 브라우저에 기억한다(첫 그리기 전 적용은 index.html 머리의 짧은 스크립트). 터미널은 두 테마 모두 어둡다
+// 좌우 스위치: 왼쪽 다크(🌙) · 오른쪽 라이트(☀), 기본 다크. 손잡이가 물방울처럼 — 움찔했다가 길게 늘어나 미끄러지고,
+// 뒤에 남은 작은 방울이 끈적하게 이어져 따라오다 합쳐지며, 도착하면 납작해졌다 출렁이며 멈춘다(style.css, index.html 의 gooey 필터).
+// 움직이는 동안 다시 누르면(클릭·Enter·Space) 무시한다 — 중간에 방향이 뒤집히며 상태와 위치가 어긋나지 않게
+const themeSw = $('#btn-theme'), themeKnob = $('.ts-knob', themeSw), themeFace = $('.ts-face', themeSw);
+const THEME_ANIM_MS = 720;
+let themeBusy = false;
+function setThemeSwitch(light) {
+  themeSw.setAttribute('aria-checked', String(light));
+  themeSw.title = light ? '다크 모드로' : '라이트 모드로';
+  themeFace.textContent = light ? '☀' : '🌙';
+}
+function applyTheme(light) {
+  if (light) document.documentElement.dataset.theme = 'light'; else delete document.documentElement.dataset.theme;
+  try { light ? localStorage.setItem('am.theme', 'light') : localStorage.removeItem('am.theme'); } catch {}
+}
+setThemeSwitch(document.documentElement.dataset.theme === 'light');
+themeSw.addEventListener('click', (e) => {
+  e.preventDefault();
+  if (themeBusy) return; // 연출 중 입력은 취소
+  const light = themeSw.getAttribute('aria-checked') !== 'true';
+  applyTheme(light);
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) { setThemeSwitch(light); return; }
+  themeBusy = true;
+  themeSw.classList.add('busy', light ? 'go-right' : 'go-left');
+  const swap = setTimeout(() => { themeFace.textContent = light ? '☀' : '🌙'; }, THEME_ANIM_MS * 0.4); // 가장 늘어난 순간쯤 아이콘 교체
+  let done = false;
+  const finish = () => {
+    if (done) return;
+    done = true;
+    clearTimeout(swap); clearTimeout(fallback);
+    themeKnob.removeEventListener('animationend', finish);
+    setThemeSwitch(light); // 마지막 프레임 = 고정 위치라 튀지 않는다
+    themeSw.classList.remove('busy', 'go-right', 'go-left');
+    themeBusy = false;
+  };
+  themeKnob.addEventListener('animationend', finish);
+  const fallback = setTimeout(finish, THEME_ANIM_MS + 200); // 애니메이션 이벤트를 못 받아도 잠기지 않게
 });
 
 // ---------- 서버 재시작 ----------
