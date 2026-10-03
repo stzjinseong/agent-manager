@@ -831,7 +831,9 @@ function renderDetail() {
   $('#detail-meta').textContent = [w.id, w.model, w.permissionMode, w.sessionId && `session ${w.sessionId.slice(0, 8)}`, w.pid && `pid ${w.pid}`, w.cwd].filter(Boolean).join(' · ');
   renderMemos(w);
   $('#queue').innerHTML = w.queue.length
-    ? `<div class="qh" title="현재 턴이 끝나면 위에서부터 투입">대기 중인 지시 ${w.queue.length}건</div>` +
+    ? (w.queueHeld
+      ? `<div class="qh held" title="지시가 CLI 에 들어가지 않아 보류 중 — 중복 투입을 막으려고 자동으로 다시 보내지 않습니다">⚠ 보류된 지시 ${w.queue.length}건 · 터미널 확인 후 <button data-resume title="맨 위부터 다시 투입">▶ 재개</button></div>`
+      : `<div class="qh" title="현재 턴이 끝나면 위에서부터 투입">대기 중인 지시 ${w.queue.length}건</div>`) +
       w.queue.map((q, i) => `<div class="qi"><span class="n">${i + 1}</span><span class="tx">${esc(q)}</span><button data-unqueue="${i}" title="큐에서 빼기">✕</button></div>`).join('')
     : '';
   const fmt = (t) => new Date(t + clockSkew).toLocaleTimeString('ko-KR', { hour12: false });
@@ -1832,6 +1834,7 @@ async function memoDrop(e) {
 }
 
 $('#queue').addEventListener('click', (e) => {
+  if (e.target.closest('[data-resume]') && selected) { api(`/api/workers/${selected}/resume`, {}); return; }
   const i = e.target.closest('[data-unqueue]')?.dataset.unqueue;
   if (i != null && selected) api(`/api/workers/${selected}/unqueue`, { index: Number(i) });
 });

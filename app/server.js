@@ -304,42 +304,63 @@ function setStatus(w, status, note) {
 }
 
 // 업무 지시: 입력 대기 상태면 즉시, 아니면 큐에 쌓았다가 Stop 시점에 투입.
-// CLI 입력창에 사람이 쓰던 글이 있으면 그 뒤에 붙어 한 요청으로 나가 버리므로, 그때도 큐에 넣고 입력창이 빌 때까지 기다린다
+// CLI 입력창에 사람이 쓰던 글이 있으면 그 뒤에 붙어 한 요청으로 나가 버리므로, 그때도 큐에 넣고 입력창이 빌 때까지 기다린다.
+// 입력창이 아닌 화면(/resume·/model 선택창, ! 셸 모드 등)이면 지시가 검색칸·셸 명령으로 들어가 버리므로 그때도 기다린다
 const isIdle = (w) => w.status === 'idle' || w.status === 'done' || w.status === 'interrupted';
 async function assignTask(w, text) {
   text = String(text || '').trim();
   if (!text) return {};
-  if (isIdle(w) && !w.queue.length) {
-    const draft = await cliDraft(w);
-    if (isIdle(w) && !draft) { sendPrompt(w, text); return {}; }
-    if (draft) { w.queue.push(text); pushLog(w, 'queue', text); holdForDraft(w); emitState(); return { held: true }; }
+  if (isIdle(w) && w.queue.length) {
+    // 쉬는 중인데 대기열이 남아 있으면(중단됨·투입 실패로 보류) 새 지시를 뒤에 붙이고 맨 앞부터 이어서 투입
+    w.queueHeld = false;
+    w.queue.push(text); pushLog(w, 'queue', text); emitState();
+    dispatchQueued(w);
+    return {};
+  }
+  if (isIdle(w)) {
+    w.queueHeld = false;
+    const cli = await cliDraft(w);
+    if (isIdle(w) && !w.queue.length && cli.state === 'empty') { sendPrompt(w, text); return {}; }
+    if (isIdle(w) && cli.state !== 'empty') { w.queue.push(text); pushLog(w, 'queue', text); holdForDraft(w, cli.state); emitState(); return { held: true }; }
   }
   w.queue.push(text); pushLog(w, 'queue', text); emitState();
   return {};
 }
-// 큐 맨 앞 지시를 투입 — 턴이 끝났을 때. 입력창에 쓰던 글이 있으면 빌 때까지 기다린다
+// 큐 맨 앞 지시를 투입 — 턴이 끝났을 때. 입력창에 쓰던 글이 있거나 입력창이 아닌 화면이면 기다린다.
+// 투입 실패로 보류된 대기열(queueHeld)은 새 지시나 ▶ 재개가 있을 때까지 자동으로 보내지 않는다(실제로는 들어갔을 수도 있어 중복 위험)
 async function dispatchQueued(w) {
-  if (!w.queue.length || !isIdle(w)) return;
-  if (await cliDraft(w)) { holdForDraft(w); emitState(); return; }
-  if (!w.queue.length || !isIdle(w)) return;
+  if (!w.queue.length || !isIdle(w) || w.queueHeld) return;
+  const cli = await cliDraft(w);
+  if (cli.state !== 'empty') { holdForDraft(w, cli.state); emitState(); return; }
+  if (!w.queue.length || !isIdle(w) || w.queueHeld) return;
   sendPrompt(w, w.queue.shift());
 }
 // 입력창이 빌 때까지 1.5초마다 다시 본다. 사람이 그 글을 보내 턴이 시작되면 그만 — 그 턴이 끝날 때(Stop) 큐가 이어진다.
 // 타이머는 워커 객체 밖에 둔다 — 워커는 화면 상태·workers.json 으로 JSON 직렬화된다(Timeout 은 순환 참조라 서버가 죽었다)
 const draftTimers = new Map(); // 워커 id → setInterval
-function holdForDraft(w) {
+function holdForDraft(w, state) {
   if (draftTimers.has(w.id)) return;
-  pushLog(w, 'notice', 'CLI 입력창에 쓰던 글이 있어 업무 지시를 대기열에 두었습니다 — 그 글을 보내거나 지우면 이어서 투입');
+  pushLog(w, 'notice', state === 'blocked'
+    ? 'CLI 가 입력 대기 화면이 아니어서(/resume 같은 선택창, ! 셸 모드 등) 업무 지시를 대기열에 두었습니다 — 입력창으로 돌아오면 이어서 투입'
+    : 'CLI 입력창에 쓰던 글이 있어 업무 지시를 대기열에 두었습니다 — 그 글을 보내거나 지우면 이어서 투입');
   const stop = () => { clearInterval(draftTimers.get(w.id)); draftTimers.delete(w.id); };
+  let busy = false; // 화면 읽기가 주기보다 오래 걸려도 두 번 투입하지 않게
   draftTimers.set(w.id, setInterval(async () => {
-    if (!workers.has(w.id) || !w.queue.length || !isIdle(w)) { stop(); return; }
-    if (await cliDraft(w)) return;
+    if (busy) return;
+    if (!workers.has(w.id) || !w.queue.length || !isIdle(w) || w.queueHeld) { stop(); return; }
+    busy = true;
+    const cli = await cliDraft(w);
+    busy = false;
+    if (cli.state !== 'empty' || !draftTimers.has(w.id)) return;
     stop();
-    if (w.queue.length && isIdle(w)) sendPrompt(w, w.queue.shift());
+    if (w.queue.length && isIdle(w) && !w.queueHeld) sendPrompt(w, w.queue.shift());
   }, 1500));
 }
-// 호스트 원본 화면에서 Claude 입력창(❯ 줄, 위아래 가로선 사이)에 사람이 쓴 글이 있는지.
-// 비어 있을 때 보이는 안내 문구(Try "…")는 흐린 색이라 빼고, 기본 글자색 칸만 센다. 못 읽으면 빈 것으로 본다
+// 호스트 원본 화면에서 Claude 입력창(❯ 줄, 위아래 가로선 사이)을 찾아 상태를 본다.
+//   empty   — 입력창이 비어 있음(바로 투입해도 됨). 화면을 못 읽으면(호스트 끊김 등) 예전처럼 empty 로 본다
+//   draft   — 사람이 쓰던 글이 있음(text)
+//   blocked — 화면 맨 아래에 ❯ 입력창이 없음: /resume·/model 같은 선택창, ! 셸 모드 등
+// 비어 있을 때 보이는 안내 문구(Try "…")는 흐린 색이라 빼고, 기본 글자색 칸만 센다
 function hostSnapshot(id, ms = 1500) {
   return new Promise((resolve) => {
     if (host?.readyState !== 1) return resolve(null);
@@ -349,21 +370,28 @@ function hostSnapshot(id, ms = 1500) {
     hostSend({ op: 'snapshot', id, req });
   });
 }
+// 입력창 아래에는 상태 줄 몇 줄(권한 모드, statusLine)만 온다. 그보다 위에 있는 가로선 쌍은 지난 화면의 흔적으로 본다
+const BELOW_BOX_MAX = 8;
 async function cliDraft(w) {
   const snap = await hostSnapshot(w.id);
-  if (!snap?.data || !snap.cols) return '';
+  if (!snap?.data || !snap.cols) return { state: 'empty', text: '' };
   const t = new HeadlessTerminal({ cols: snap.cols, rows: snap.rows, scrollback: 0, allowProposedApi: true });
   try {
     await new Promise((r) => t.write(snap.data, r));
     const b = t.buffer.active, rows = [];
     for (let i = b.baseY; i < b.length; i++) rows.push(b.getLine(i));
-    const rule = rows.map((l, i) => (/^s*─{20,}s*$/.test(l.translateToString(true)) ? i : -1)).filter((i) => i >= 0);
+    let last = rows.length - 1;
+    while (last >= 0 && !rows[last].translateToString(true).trim()) last--;
+    // 세션에 이름이 있으면 위쪽 선 끝에 이름이 붙는다("────── 메인 ─") — 선으로 시작하기만 하면 가로선으로 본다
+    const rule = rows.map((l, i) => (/^\s*─{20,}/.test(l.translateToString(true)) ? i : -1)).filter((i) => i >= 0);
     for (let k = rule.length - 1; k > 0; k--) {
       const top = rule[k - 1], bottom = rule[k];
       if (bottom - top < 2) continue;
+      if (last - bottom > BELOW_BOX_MAX) break;
       const first = rows[top + 1].translateToString(true);
       const at = first.indexOf('❯');
-      if (at < 0) continue;
+      // 입력창 자리인데 ❯ 가 아니면(! 셸 모드 등) 지시를 넣으면 안 되는 상태
+      if (at < 0 || first.slice(0, at).trim()) return { state: 'blocked', text: first.trim() };
       let text = '';
       for (let i = top + 1; i < bottom; i++) {
         const line = rows[i];
@@ -372,12 +400,16 @@ async function cliDraft(w) {
           if (c && c.getChars().trim() && c.isFgDefault() && !c.isDim()) text += c.getChars();
         }
       }
-      return text.trim();
+      text = text.trim();
+      return { state: text ? 'draft' : 'empty', text };
     }
-    return '';
-  } catch { return ''; } finally { t.dispose(); }
+    return { state: 'blocked', text: '' };
+  } catch { return { state: 'empty', text: '' }; } finally { t.dispose(); }
 }
 
+// 투입 확인: 보낸 뒤 이 시간 안에 UserPromptSubmit 훅도, 트랜스크립트 새 기록도 없으면 들어가지 않은 것으로 본다
+const PROMPT_CONFIRM_MS = 8000;
+const confirmTimers = new Map(); // 워커 id → setTimeout (draftTimers 와 같은 이유로 워커 밖에 둔다)
 function sendPrompt(w, text) {
   // bracketed paste 로 넣어야 여러 줄 지시가 줄마다 전송되지 않는다
   w.term.write(`\x1b[200~${text}\x1b[201~`);
@@ -385,8 +417,33 @@ function sendPrompt(w, text) {
   // UserPromptSubmit 훅이 오기 전에 다음 지시가 들어오면 바로 투입돼 버리므로 선제적으로 작업 중 처리
   w.status = 'working';
   w.turnStartedAt = Date.now();
+  w.sentPrompt = { text, at: w.turnStartedAt }; // UserPromptSubmit 이 오면 지운다
   pushLog(w, 'assign', text);
   emitState();
+  clearTimeout(confirmTimers.get(w.id));
+  confirmTimers.set(w.id, setTimeout(() => confirmPrompt(w, w.turnStartedAt), PROMPT_CONFIRM_MS));
+}
+// 들어가지 않았으면(훅이 안 옴) '작업 중'에 영영 갇히고 뒤 대기열도 멈춘다 → 상태를 되돌리고 알린다.
+// 다시 보내지는 않는다 — 훅만 놓치고 실제로는 들어갔을 수도 있어서. 지시는 대기열 맨 앞에 보류해 두고 사람이 재개한다
+async function confirmPrompt(w, at) {
+  confirmTimers.delete(w.id);
+  const sent = w.sentPrompt;
+  if (!workers.has(w.id) || !sent || sent.at !== at) return;
+  if (w.status !== 'working') { w.sentPrompt = null; return; } // 다른 훅(권한 요청·Stop 등)이 왔다 = 들어갔다
+  if (w.tx) { try { readProfile(w.tx); } catch {} }
+  if (w.tx && w.tx.lastTs >= at) { w.sentPrompt = null; return; } // 트랜스크립트가 움직였다 = 들어갔다
+  const cli = await cliDraft(w);
+  if (w.sentPrompt !== sent || w.status !== 'working') return;
+  w.sentPrompt = null;
+  if (cli.state === 'draft' && cli.text.replace(/\s+/g, '').includes(sent.text.replace(/\s+/g, '').slice(0, 20))) {
+    // Enter 만 먹히지 않아 지시가 입력창에 그대로 있다 — 그 글이 곧 '쓰던 글'이니 사람이 보내거나 지우면 된다
+    setStatus(w, 'idle', '업무 지시가 CLI 입력창에 남아 있음 — Enter 로 보내거나 지우세요');
+    return;
+  }
+  w.queue.unshift(sent.text);
+  w.queueHeld = true;
+  pushLog(w, 'notice', `업무 지시가 CLI 에 들어가지 않은 것 같습니다${cli.state === 'blocked' ? '(입력 대기 화면이 아님)' : ''} — 대기열 맨 앞에 보류했습니다. 터미널을 확인하고 ▶ 재개하거나 새 지시를 보내세요`);
+  setStatus(w, 'idle', '업무 지시 투입 실패');
 }
 
 function summarizeTool(name, input = {}) {
@@ -427,6 +484,7 @@ function onHook(w, ev, res) {
       w.lastPrompt = ev.prompt ?? ev.prompt_text ?? w.lastPrompt;
       w.turnStartedAt = Date.now();
       w.notice = null;
+      w.sentPrompt = null; // 투입 확인
       progress.open(w);
       setStatus(w, 'working', w.lastPrompt);
       break;
@@ -993,13 +1051,14 @@ const server = http.createServer(async (req, res) => {
   }
 
   let m;
-  if (req.method === 'POST' && (m = p.match(/^\/api\/workers\/(W\d+)\/(task|kill|remove|interrupt|unqueue|rename)$/))) {
+  if (req.method === 'POST' && (m = p.match(/^\/api\/workers\/(W\d+)\/(task|kill|remove|interrupt|unqueue|resume|rename)$/))) {
     const w = workers.get(m[1]);
     if (!w) return json(res, 404, { error: 'no worker' });
     const body = await readBody(req);
     if (m[2] === 'task') return json(res, 200, { ok: true, ...(await assignTask(w, body.text)) });
     if (m[2] === 'interrupt' && w.status !== 'exited') { w.term.write('\x1b'); pushLog(w, 'status', '관리자가 중단(Esc)'); emitState(); setTimeout(() => scheduleProfile(w), 700); }
     if (m[2] === 'unqueue') { w.queue.splice(Number(body.index), 1); emitState(); }
+    if (m[2] === 'resume') { w.queueHeld = false; emitState(); dispatchQueued(w); }
     if (m[2] === 'rename') {
       const r = renameRole(w.name, body.name, w);
       if (r.error) return json(res, 409, r);
