@@ -406,13 +406,15 @@ const FONT_MIN = 11, FONT_MAX = 16;
 function fitTerm(now = false) {
   if (!selected || $('#detail').hidden) return;
   try {
-    let dims = null;
-    // 큰 글자부터 내려가며, 고정 칸 수가 들어가는 가장 큰 글자 크기를 고른다
-    for (let fs = FONT_MAX; fs >= FONT_MIN; fs--) {
-      if (term.options.fontSize !== fs) term.options.fontSize = fs;
-      dims = fit.proposeDimensions();
-      if (dims && dims.cols >= TERM_COLS) break;
-    }
+    // 고정 칸 수가 들어가는 가장 큰 글자 크기. 예전엔 큰 글자부터 하나씩 바꿔 가며 쟀는데, 글자 크기를 바꿀 때마다
+    // 터미널 전체를 다시 그려(실측 1회 ~175ms, CPU 4배 느림) 최대 6번이면 워커 선택·크게 보기가 1초 넘게 멈췄다.
+    // 칸 너비는 글자 크기에 비례하므로 지금 크기로 한 번 재서 맞는 크기를 계산해 한 번만 바꾸고, 넘치면 한 단계만 더 줄인다
+    let dims = fit.proposeDimensions();
+    if (!dims) return;
+    const cur = term.options.fontSize;
+    const want = Math.max(FONT_MIN, Math.min(FONT_MAX, Math.floor((cur * dims.cols) / TERM_COLS)));
+    if (want !== cur) { term.options.fontSize = want; dims = fit.proposeDimensions(); }
+    if (dims && dims.cols < TERM_COLS && want > FONT_MIN) { term.options.fontSize = want - 1; dims = fit.proposeDimensions(); }
     if (!dims) return;
     // 아주 좁아 최소 글자로도 안 들어가면 그때만 칸 수를 줄인다
     const cols = Math.min(TERM_COLS, dims.cols), rows = dims.rows;
