@@ -361,7 +361,7 @@ main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24p
 .mt-r { color: var(--dim); font-size: 11px; font-variant-numeric: tabular-nums; min-width: 34px; }
 /* 보통 화면: 오른쪽 끝을 터미널(CLI) 오른쪽 가장자리에, 높이는 역할 이름 줄에 맞춘다 — 위치는 app.js placeMeters 가 잰다 */
 .detail-head .meters { position: absolute; right: var(--mt-right, 0px); top: var(--mt-top, 0px); height: var(--mt-h, 20px); }
-.term-wrap.full .term-bar .meters { flex: none; margin-left: auto; margin-right: 8px; font-size: 12px; }
+.term-wrap.full .term-bar .meters { flex: 0 1 auto; min-width: 0; margin-left: auto; margin-right: 8px; font-size: 12px; }
 .term-wrap.full .term-bar .mt-bar { width: 110px; height: 18px; }
 .term-wrap.full .term-bar .mt-bar b { font-size: 12px; }
 @media (max-width: 900px) { .meters .mt-bar { width: 64px; } }
@@ -733,7 +733,12 @@ i.info:hover, .kpi[data-info]:hover i.info { color: var(--text-2); }
   display: flex; flex-direction: column; background: var(--term-bg);
 }
 .term-wrap.full .term-bar { display: flex; align-items: center; gap: 10px; padding: 8px 2px; color: var(--text-2); font-size: 13px; }
-.term-wrap.full .term-bar #term-title { font-size: 17px; font-weight: 600; color: var(--text); letter-spacing: .01em; } /* 워커 역할 이름 */
+.term-wrap.full .term-bar #term-title { flex: none; white-space: nowrap; font-size: 17px; font-weight: 600; color: var(--text); letter-spacing: .01em; } /* 워커 역할 이름 — 폭이 줄어도 줄지 않는다 */
+/* 옆 패널을 넓혀 막대 폭이 줄면 역할 이름 대신 미터가 단계적으로 양보: 남은 시간(↻) → 짧은 막대 → 숨김 */
+.term-wrap.full .term-bar { container-type: inline-size; container-name: tbar; }
+@container tbar (max-width: 760px) { .term-bar .mt-r { display: none; } }
+@container tbar (max-width: 620px) { .term-bar .mt-bar { width: 64px !important; } .term-bar .mt-l { display: none; } }
+@container tbar (max-width: 440px) { .term-bar .meters { display: none; } }
 /* 옆 패널을 넓혀 터미널 위를 덮으면, 닫기 버튼이 덮개 가장자리를 따라 왼쪽으로 옮겨 가려지지 않게 */
 body.term-full .term-wrap.full .term-bar { padding-right: calc(2px + var(--side-extra, 0px)); }
 .term-wrap.full #term { flex: 1; min-height: 0; }
