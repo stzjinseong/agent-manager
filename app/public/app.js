@@ -528,8 +528,8 @@ function renderXpBar() {
   const r = max || pending ? 1 : (p.xp - p.stageMin) / (p.nextMin - p.stageMin);
   bar.classList.toggle('max', max);
   bar.firstElementChild.style.width = `${Math.max(0, Math.min(1, r)) * 100}%`;
-  bar.title = max ? `${p.themeName} 최종 단계 · 누적 ${p.xp.toLocaleString()} XP`
-    : `${p.themeName} Lv.${p.stage} · ${(p.xp - p.stageMin).toLocaleString()} / ${(p.nextMin - p.stageMin).toLocaleString()} XP (누적 ${p.xp.toLocaleString()})`;
+  bar.title = max ? `최종 단계 · 누적 ${p.xp.toLocaleString()} XP`
+    : `Lv.${p.stage} · ${(p.xp - p.stageMin).toLocaleString()} / ${(p.nextMin - p.stageMin).toLocaleString()} XP (누적 ${p.xp.toLocaleString()})`;
 }
 function renderStats() {
   renderXpBar();
@@ -549,7 +549,7 @@ function renderStats() {
   dot.classList.toggle('busy', busy > 0);
   dot.classList.toggle('alert', pend > 0);
   const shown = mgrStageSync();
-  dot.title = `매니저 · ${busy}명 작업 중${pend ? ` · 결정 대기 ${pend}건` : ''}${state.progress ? ` · ${state.progress.themeName} Lv.${shown} · ${NEAR_TEXT[shown < state.progress.stage ? 'near' : state.progress.near]}` : ''}`;
+  dot.title = `매니저 · ${busy}명 작업 중${pend ? ` · 결정 대기 ${pend}건` : ''}${state.progress ? ` · Lv.${shown} · ${NEAR_TEXT[shown < state.progress.stage ? 'near' : state.progress.near]}` : ''}`;
   document.title = pend ? `(${pend}) 클로드 키우기` : '클로드 키우기';
   setFavicon(pend > 0);
 }
