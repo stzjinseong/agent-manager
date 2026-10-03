@@ -225,6 +225,37 @@ term.onData((data) => {
   if (enterAs && (data === '\r' || data === '\x1b\r')) { data = enterAs; enterAs = null; }
   if (selected) send({ type: 'input', id: selected, data });
 });
+// ---------- Safari: 조합 이벤트 없이 들어오는 한글 ----------
+// Safari 는 가끔 터미널 입력칸에서 조합 이벤트(compositionstart…)를 전혀 보내지 않고, 첫 자모는 insertText 로 넣은 뒤
+// 마지막 글자를 insertReplacementText 로 갈아끼우며 조합한다(ㅈ → 지 → 진). xterm 은 insertText 만(그것도 키 상태에 따라)
+// 보내고 갈아끼우기는 무시해서 CLI 엔 자모만 들어갔다(실측 Safari 18.6, 키·입력 이벤트 기록).
+// 그 경우만 직접 처리한다: 입력칸의 바뀌기 전·후를 비교해 바뀐 글자 수만큼 DEL, 새 글자를 보낸다(ㅈ→지 = DEL + 지).
+// xterm 보다 먼저 받도록 바깥 요소(#term)의 캡처 단계에서 듣고, 처리한 이벤트는 xterm 에 넘기지 않는다
+const IS_SAFARI = /safari/i.test(navigator.userAgent) && !/chrome|chromium|crios|fxios|android/i.test(navigator.userAgent);
+const HANGUL_RE = /[\u1100-\u11FF\u3130-\u318F\uAC00-\uD7A3]/;
+let imeComposing = false, imeCompEndAt = 0, imeBefore = '', imeRunStart = 0;
+if (IS_SAFARI && term.textarea) {
+  const ta = term.textarea, box = $('#term');
+  ta.addEventListener('compositionstart', () => { imeComposing = true; });
+  ta.addEventListener('compositionend', () => { imeComposing = false; imeCompEndAt = Date.now(); });
+  // 한글이 아닌 키(Backspace·Enter·방향키 등)를 누르면 거기서부터 새로 센다 — 갈아끼우기가 그 앞 글자까지 지우지 않게
+  ta.addEventListener('keydown', (e) => { if (e.keyCode !== 229) imeRunStart = ta.value.length; }, true);
+  const plain = (e) => !imeComposing && !e.isComposing && Date.now() - imeCompEndAt > 100;
+  const ours = (e) => plain(e) && (e.inputType === 'insertReplacementText' || (e.inputType === 'insertText' && HANGUL_RE.test(e.data || '')));
+  box.addEventListener('beforeinput', (e) => { if (e.target === ta && ours(e)) imeBefore = ta.value; }, true);
+  box.addEventListener('input', (e) => {
+    if (e.target !== ta || !ours(e)) return;
+    e.stopPropagation(); // xterm 이 insertText 를 한 번 더 보내지 않게
+    const before = imeBefore, after = ta.value;
+    let p = 0;
+    while (p < before.length && p < after.length && before[p] === after[p]) p++;
+    p = Math.max(p, Math.min(imeRunStart, before.length, after.length));
+    const data = '\x7f'.repeat(before.length - p) + after.slice(p);
+    imeBefore = after;
+    if (!data) return;
+    if (selected) send({ type: 'input', id: selected, data });
+  }, true);
+}
 
 // ---------- 클립보드 (Windows Terminal 방식) ----------
 // Ctrl+C: 선택 영역이 있으면 복사, 없으면 그대로 인터럽트(^C) 전달
@@ -249,6 +280,12 @@ term.attachCustomKeyEventHandler((e) => {
     enterAs = e.altKey || e.metaKey ? '\r' : '\n';
     return true;
   }
+  // 한글 조합 중 보조키(⌘ 등)만 누른 것은 xterm 에 넘기지 않는다. xterm 은 Shift·Ctrl·Alt 만 보조키로 알고 ⌘(Meta)는 몰라서
+  // 거기서 조합을 끝난 것으로 보내 버리는데, 입력기는 조합을 계속해 다음 키에 글자가 바뀌면(이→잉) xterm 이 입력칸에 쌓인
+  // 글 전체를 다시 보냈다(실측 Safari: '입력입력ㅇ…김잉' 이 통째로 들어감). 조합은 입력기가 끝낼 때(compositionend) 보낸다
+  if ((e.isComposing || imeComposing) && ['Meta', 'OS', 'Control', 'Alt', 'Shift', 'CapsLock'].includes(e.key)) return false;
+  // Safari 의 조합 이벤트 없는 한글은 위 입력 처리기가 보낸다 — xterm 의 229 키 처리(입력칸 비교 전송)까지 돌면 두 번 간다
+  if (IS_SAFARI && e.keyCode === 229 && !e.isComposing && !imeComposing) return false;
   const mod = e.ctrlKey || e.metaKey;
   // e.key 가 아니라 물리 키(e.code)로 판정 — 한글 입력 상태면 Ctrl+V 의 key 가 'ㅍ', Ctrl+C 는 'ㅊ' 로 온다
   if (mod && e.code === 'KeyC' && (term.hasSelection() || e.shiftKey || e.metaKey)) { e.preventDefault(); copySelection(); return false; }
