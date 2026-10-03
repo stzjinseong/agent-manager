@@ -408,6 +408,22 @@ $('#term').addEventListener('contextmenu', async (e) => {
 
 let fitTimer;
 new ResizeObserver(() => { clearTimeout(fitTimer); fitTimer = setTimeout(fitTerm, 60); }).observe($('.term-wrap'));
+// 미터(컨텍스트·5시간·주간) 자리: 보통 화면에선 오른쪽 끝 = 터미널 오른쪽 가장자리, 높이 = 역할 이름 줄.
+// 터미널 폭은 옆 패널 넓히기·창 크기에 따라 바뀌어 잴 때마다 맞춘다(크게 보기에선 닫기 버튼 왼쪽 — CSS 만으로)
+function placeMeters() {
+  const head = $('.detail-head'), wrap = $('#term-wrap'), name = $('#detail-name'), box = $('#meters');
+  if (!head || wrap.classList.contains('full') || $('#detail').hidden) return;
+  const h = head.getBoundingClientRect(), t = wrap.getBoundingClientRect(), n = name.getBoundingClientRect();
+  if (!t.width) return;
+  // 좁은 화면에서 옆 패널이 터미널 아래로 내려가면 터미널이 전체 폭이라 오른쪽 버튼과 겹친다 → 버튼 왼쪽까지만
+  const btn = $('#btn-full').getBoundingClientRect();
+  const right = Math.min(t.right, btn.left - 14);
+  box.style.setProperty('--mt-right', `${Math.max(0, h.right - right)}px`);
+  box.style.setProperty('--mt-top', `${n.top - h.top}px`);
+  box.style.setProperty('--mt-h', `${n.height}px`);
+}
+new ResizeObserver(() => requestAnimationFrame(placeMeters)).observe($('#term-wrap'));
+new ResizeObserver(() => requestAnimationFrame(placeMeters)).observe($('.detail-head'));
 // 터미널 칸 수(가로 글자 수)를 고정하고, 공간이 넓으면 글자를 키워 채운다.
 // 칸 수가 줄면 화면 위로 밀려난 기록(스크롤백)은 Claude 가 다시 그릴 수 없어서, 넓을 때 줄 끝까지
 // 배경을 칠한 줄(diff 등)이 접히며 배경만 남은 조각 줄이 줄무늬처럼 생겼다(실측: 163→101칸에서 125줄).
@@ -544,6 +560,7 @@ function renderXpBar() {
 }
 function renderStats() {
   renderXpBar();
+  renderUsage();
   const n = (st) => state.workers.filter((w) => viewStatus(w) === st).length;
   const pend = pendingCount();
   $('#stats').innerHTML = [
@@ -872,7 +889,7 @@ function renderDetail() {
   const wasHidden = $('#detail').hidden;
   $('#detail').hidden = !w;
   if (!w) return;
-  if (wasHidden) requestAnimationFrame(() => fitTerm());
+  if (wasHidden) requestAnimationFrame(() => { fitTerm(); placeMeters(); });
   const av = $('#detail-avatar');
   if (!av.firstChild) av.innerHTML = clawdSVG();
   av.className = `detail-avatar s-${viewStatus(w)}`;
@@ -1491,8 +1508,50 @@ function select(id) {
   });
 }
 
+// ---------- 계정 사용량 (상단, 구독 5시간·주간 한도) ----------
+// 서버가 워커 상태줄에서 받은 rate_limits(statusline.mjs). 초기화 시각이 지나면 0% 로 본다. 30분 넘게 새 값이 없으면 흐리게
+const fmtLeft = (ms) => {
+  const m = Math.max(0, Math.round(ms / 60000));
+  if (m < 60) return `${m}분`;
+  const h = Math.floor(m / 60);
+  return h < 24 ? `${h}시간 ${m % 60}분` : `${Math.floor(h / 24)}일 ${h % 24}시간`;
+};
+function renderUsage() {
+  const boxes = [$('#meters'), $('#meters-full')].filter(Boolean);
+  if (!boxes.length) return;
+  const u = state.usage, now = Date.now();
+  const m = (label, pct, color, tip, dim = false, after = '') =>
+    `<span class="mt${dim ? ' dim' : ''}" title="${esc(tip)}"><span class="mt-l">${label}</span><span class="mt-bar" style="--p:${pct ?? 0}%;--uc:${color}"><b>${pct == null ? '—' : `${Math.round(pct)}%`}</b></span>${after}</span>`;
+  // 초기화까지 남은 시간은 큰 단위 하나로 짧게(32분 · 4시간 · 6일) — 정확한 시각은 마우스를 올리면
+  const short = (ms) => { const mins = Math.max(0, Math.floor(ms / 60000)); return mins < 60 ? `${mins}분` : mins < 1440 ? `${Math.floor(mins / 60)}시간` : `${Math.floor(mins / 1440)}일`; };
+  // 색은 항목별로 고정(style.css --m-ctx · --m-5h · --m-wk) — 사용률에 따라 바꾸지 않는다
+  const parts = [];
+  // 컨텍스트: 선택한 워커의 현재 대화가 차지한 양 / 모델 컨텍스트 창 — 워커 비교 표와 같은 값·같은 경고 기준(ctxLevel)
+  const w = selected && state.workers.find((x) => x.id === selected);
+  const p = w?.profile;
+  if (p && p.context) {
+    const ctx = ctxLevel(p), pct = Math.min(100, ctx.pct * 100);
+    parts.push(m('컨텍스트', pct, 'var(--m-ctx)', `${w.name} 컨텍스트 ${fmtN(p.context)} / ${fmtN(p.window || 200_000)} (${Math.round(pct)}%)${ctx.text ? ` · ${ctx.text}` : ''}`));
+  }
+  // 5시간·주간: 계정 한도(서버가 워커 상태줄에서 받은 rate_limits). 초기화 시각이 지나면 0%, 30분 넘게 새 값이 없으면 흐리게
+  const stale = u && now - (u.at + clockSkew) > 30 * 60_000;
+  const limit = (label, x, base) => {
+    if (!x) return m(label, null, base, `${label} 한도 — 새로 띄운 워커가 일하기 시작하면 표시됩니다(이 기능 이전에 띄운 워커로는 받을 수 없음)`, true);
+    const reset = x.resetsAt && x.resetsAt <= now;
+    const pct = reset ? 0 : Math.max(0, Math.min(100, x.pct));
+    const at = x.resetsAt ? new Date(x.resetsAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false }) : '';
+    const when = reset ? '초기화됨' : x.resetsAt ? `${at} 초기화 (${fmtLeft(x.resetsAt - now)} 후)` : '';
+    const after = x.resetsAt ? `<span class="mt-r">${reset ? '초기화됨' : `↻ ${short(x.resetsAt - now)}`}</span>` : '';
+    return m(label, pct, base, `${label} 한도 ${Math.round(pct)}% 사용${when ? ` · ${when}` : ''}${stale ? ` · 마지막 갱신 ${fmtLeft(now - (u.at + clockSkew))} 전` : ''}`, stale, after);
+  };
+  parts.push(limit('5시간', u?.fiveHour, 'var(--m-5h)'), limit('주간', u?.sevenDay, 'var(--m-wk)'));
+  const html = parts.join('');
+  for (const box of boxes) if (box._html !== html) box.innerHTML = box._html = html;
+}
+
 // 매초: 경과 시간 텍스트만 갱신
 function tick() {
+  renderUsage();
   document.querySelectorAll('[data-since]').forEach((n) => {
     const t = Number(n.dataset.since);
     n.textContent = t ? (n.classList.contains('age') ? ` · ${dur(t)} 전` : dur(t)) : '';
@@ -2320,7 +2379,7 @@ function setTermFull(on) {
   $('#btn-full').textContent = on ? '⛶ 원래대로' : '⛶ 크게';
   const w = state.workers.find((x) => x.id === selected);
   $('#term-title').textContent = w ? w.name : '';
-  const done = () => { fitTerm(); term.focus(); inner.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 140, easing: 'ease-out' }); inner.style.opacity = ''; };
+  const done = () => { fitTerm(); placeMeters(); term.focus(); inner.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 140, easing: 'ease-out' }); inner.style.opacity = ''; };
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) { requestAnimationFrame(done); return; }
   const last = wrap.getBoundingClientRect();
   termAnim?.cancel();

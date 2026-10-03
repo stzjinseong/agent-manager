@@ -81,6 +81,24 @@ function judgeCache(w) {
 setInterval(() => progress.sample(workers.values()), progress.SAMPLE_MS);
 const config = loadConfig();
 
+// ---------- 계정 사용량 (구독 5시간·주간 한도) ----------
+// 워커의 상태줄 명령(statusline.mjs)이 Claude Code 가 준 rate_limits 를 보낸다. 계정 단위라 어느 워커에서 오든 같은 값 —
+// 가장 최근 것만 들고 화면 상단에 보인다. 재시작해도 남게 data/usage.json 에 둔다
+const USAGE_PATH = path.join(DATA_DIR, 'usage.json');
+let usage = (() => { try { return JSON.parse(fs.readFileSync(USAGE_PATH, 'utf8')); } catch { return null; } })();
+function onStatusLine(body) {
+  const rl = body?.rate_limits;
+  if (!rl || typeof rl !== 'object') return;
+  const pick = (x) => (x && Number.isFinite(x.used_percentage) ? { pct: x.used_percentage, resetsAt: Number.isFinite(x.resets_at) ? x.resets_at * 1000 : null } : null);
+  const next = { fiveHour: pick(rl.five_hour), sevenDay: pick(rl.seven_day), at: Date.now() };
+  if (!next.fiveHour && !next.sevenDay) return;
+  const changed = JSON.stringify([next.fiveHour, next.sevenDay]) !== JSON.stringify([usage?.fiveHour, usage?.sevenDay]);
+  usage = next;
+  if (!changed) return;
+  try { fs.writeFileSync(USAGE_PATH, JSON.stringify(usage)); } catch {}
+  emitState();
+}
+
 function loadConfig() {
   try {
     const c = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
@@ -177,8 +195,10 @@ function hookSettings() {
   hooks.PreToolUse = [{ matcher: '*', hooks: h() }];
   hooks.PostToolUse = [{ matcher: '*', hooks: h() }];
   hooks.PermissionRequest = [{ matcher: '*', hooks: h(600) }];
+  // 상태줄 명령으로 계정 사용량(5시간·주간 한도)을 받는다 — 사용자가 원래 쓰던 상태줄은 statusline.mjs 가 대신 실행해 그대로 보인다
+  const statusLine = { type: 'command', command: `"${slash(process.execPath)}" "${slash(path.join(APP_DIR, 'statusline.mjs'))}"` };
   const theme = workerTheme();
-  return theme ? { hooks, theme } : { hooks };
+  return theme ? { hooks, statusLine, theme } : { hooks, statusLine };
 }
 
 // 워커 터미널은 검정 배경이라, 전역 Claude 테마가 라이트 계열이면 짝이 맞는 다크 테마로 띄운다.
@@ -679,6 +699,7 @@ function publicState() {
     recentCwds: config.recentCwds,
     progress: progress.public(),
     shotKeep: SHOT_KEEP, // 화면 안내 문구용 (워커당 캡처 보관 장수)
+    usage, // 계정 사용량 { fiveHour: { pct, resetsAt }, sevenDay, at }
   };
 }
 
@@ -990,6 +1011,11 @@ const server = http.createServer(async (req, res) => {
       ...(ext === 'pdf' ? {} : { 'content-security-policy': 'sandbox allow-scripts allow-popups allow-modals allow-downloads' }),
     });
     return fs.createReadStream(d.path).pipe(res);
+  }
+
+  if (req.method === 'POST' && p === '/statusline') {
+    onStatusLine(await readBody(req));
+    return json(res, 200, {});
   }
 
   if (req.method === 'POST' && p === '/hook') {

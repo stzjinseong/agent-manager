@@ -104,6 +104,7 @@
         <span id="detail-meta"></span>
       </div>
       <span class="spacer"></span>
+      <div class="meters" id="meters"></div>
       <button id="btn-full" class="btn" title="터미널 크게 보기 (다시 누르거나 ✕ 로 복귀)">⛶ 크게</button>
       <button id="btn-interrupt" class="btn" title="진행 중인 작업 중단 (Esc 전송)">⏸ 중단</button>
       <button id="btn-remove" class="btn">제거</button>
@@ -111,7 +112,7 @@
     </div>
     <div class="detail-body">
       <div class="term-wrap" id="term-wrap">
-        <div class="term-bar"><span id="term-title"></span><button id="btn-full-exit" class="btn ghost" title="원래 크기로">✕ 닫기</button></div>
+        <div class="term-bar"><span id="term-title"></span><div class="meters" id="meters-full"></div><button id="btn-full-exit" class="btn ghost" title="원래 크기로">✕ 닫기</button></div>
         <div id="term"></div>
       </div>
       <aside class="side">
