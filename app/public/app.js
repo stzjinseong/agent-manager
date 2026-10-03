@@ -200,11 +200,22 @@ function setFavicon(alert) {
 setFavicon(false);
 
 // ---------- 터미널 ----------
+// 터미널 색: 다크는 검정 바탕, 라이트는 업무 지시 입력칸과 같은 바탕(--bg #f4f3ef)에 먹색 글자.
+// 워커 CLI 는 다크 테마 색(흰 글자 등)으로 그리지만 아래 minimumContrastRatio 가 밝은 바탕에 맞게 글자색을 어둡게 보정한다.
+// 기본 16색(ANSI)은 밝은 바탕에서 읽히게 진한 쪽으로
+function termTheme(light) {
+  if (!light) return { background: '#07080a', foreground: '#e6e4de', cursor: '#d97757', selectionBackground: '#d9775744' };
+  return {
+    background: '#f4f3ef', foreground: '#1b1d23', cursor: '#c8623f', cursorAccent: '#f4f3ef', selectionBackground: '#c8623f33',
+    black: '#1b1d23', red: '#c4342b', green: '#2f7d3a', yellow: '#946200', blue: '#2a5fc0', magenta: '#9b3aa8', cyan: '#1a7f8e', white: '#5c606b',
+    brightBlack: '#6b6f7a', brightRed: '#d9473d', brightGreen: '#3a9147', brightYellow: '#a87000', brightBlue: '#3a72d6', brightMagenta: '#ae4cbb', brightCyan: '#22909f', brightWhite: '#3d4049',
+  };
+}
 const term = new Terminal({
   fontFamily: 'ui-monospace, SFMono-Regular, Menlo, "Cascadia Mono", Consolas, monospace', // 시스템 고정폭 (style.css --mono 와 같음)
   fontSize: 13, cursorBlink: true, scrollback: 12000, // PTY 호스트 기록(10000줄)보다 넉넉히
   allowProposedApi: true, // unicode 버전 전환에 필요
-  theme: { background: '#07080a', foreground: '#e6e4de', cursor: '#d97757', selectionBackground: '#d9775744' },
+  theme: termTheme(document.documentElement.dataset.theme === 'light'),
   // 배경과 대비가 모자란 글자색은 자동으로 밝혀 그린다. 라이트 테마로 뜬 워커는 질문 창 문구 등을 순수 검정(rgb 0,0,0)으로
   // 그려 이 검정 배경에서 드래그해야만 보였다(실측). 새 워커는 서버가 다크 테마로 띄우지만, 이미 떠 있는 워커도 바로 보이게
   minimumContrastRatio: 4.5,
@@ -1927,6 +1938,7 @@ function setThemeSwitch(light) {
 }
 function applyTheme(light) {
   if (light) document.documentElement.dataset.theme = 'light'; else delete document.documentElement.dataset.theme;
+  term.options.theme = termTheme(light); // 터미널도 같이
   try { light ? localStorage.setItem('am.theme', 'light') : localStorage.removeItem('am.theme'); } catch {}
 }
 setThemeSwitch(document.documentElement.dataset.theme === 'light');

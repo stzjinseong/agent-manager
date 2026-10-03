@@ -1,8 +1,9 @@
 /* ---------- 토큰 ----------
    색 원칙: 면(surface)을 3단으로 쌓아 깊이를 만들고, 강조색은 Claude 코랄 하나.
    상태색은 LED·회로선·글로우처럼 작은 신호로만 쓰고 넓은 면이나 테두리에는 쓰지 않는다. */
-:root, .term-wrap {
+:root {
   color-scheme: dark;
+  --term-bg: #07080a; /* 터미널 바탕 — 라이트에선 업무 지시 입력칸과 같은 색 */
   --ink: 255 255 255; /* 면 위의 반투명 선·격자·테두리 색(RGB) — 다크는 흰색, 라이트는 먹색 */
   --shade: 1; /* 그림자 진하기 배율 — 라이트에선 옅게 */
   --av-l: 0.76; /* 워커 캐릭터 색 밝기(OKLCH L) */
@@ -336,7 +337,7 @@ main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24p
 .detail-head .spacer { display: none; }
 .spacer { flex: 1; }
 .detail-body { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 14px; }
-.term-wrap { min-width: 0; height: var(--term-h, 580px); background: #07080a; border: 1px solid var(--line); border-radius: 12px; padding: 8px; overflow: hidden; }
+.term-wrap { min-width: 0; height: var(--term-h, 580px); background: var(--term-bg); border: 1px solid var(--line); border-radius: 12px; padding: 8px; overflow: hidden; }
 #term { width: 100%; height: 100%; }
 .side { display: flex; flex-direction: column; gap: 12px; min-width: 0; height: var(--term-h, 580px); position: relative; }
 /* 옆 패널 넓히기: 격자 칸(360px)은 그대로 두고 패널만 왼쪽으로 늘려 터미널 위를 덮는다 — 터미널 크기가 안 바뀌니
@@ -696,7 +697,7 @@ i.info:hover, .kpi[data-info]:hover i.info { color: var(--text-2); }
 .term-bar { display: none; }
 .term-wrap.full {
   position: fixed; inset: 0; z-index: 100; height: auto; border-radius: 0; border: 0; padding: 0 10px 10px;
-  display: flex; flex-direction: column; background: #07080a;
+  display: flex; flex-direction: column; background: var(--term-bg);
 }
 .term-wrap.full .term-bar { display: flex; align-items: center; gap: 10px; padding: 8px 2px; color: var(--text-2); font-size: 13px; }
 .term-wrap.full .term-bar span { flex: 1; font-size: 17px; font-weight: 600; color: var(--text); letter-spacing: .01em; } /* 워커 역할 이름 */
@@ -1090,10 +1091,10 @@ body.resizing-term { cursor: row-resize; user-select: none; }
 .memos .att { margin-top: 0; }
 
 /* ---------- 라이트 테마 (상단 ☀/🌙 토글, 브라우저에 기억) ----------
-   다크와 같은 역할의 값을 밝은 면 기준으로. 터미널 영역(.term-wrap)은 위에서 다크 값을 다시 선언해 그대로 어둡다
-   (워커 CLI 는 다크 테마로 뜨고 그 색은 어두운 바탕에 맞춰져 있다) */
+   다크와 같은 역할의 값을 밝은 면 기준으로. 터미널도 밝아진다(바탕 = 업무 지시 입력칸 색, app.js termTheme) */
 :root[data-theme="light"] {
   color-scheme: light;
+  --term-bg: #f4f3ef;
   --ink: 20 22 28;
   --shade: .4;
   --av-l: 0.62;
