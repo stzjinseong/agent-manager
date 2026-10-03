@@ -261,6 +261,9 @@ function spawnWorker({ name, cwd, args = '', permissionMode = 'default' }) {
   const env = { ...process.env, AGENT_MANAGER_WORKER: id, AGENT_MANAGER_PORT: String(PORT) };
   // 관제탑이 Claude 세션 안에서 실행된 경우 중첩 세션 표식이 새지 않게 한다
   for (const k of Object.keys(env)) if (/^(CLAUDECODE|CLAUDE_CODE_.*|CLAUDE_PID|CLAUDE_EFFORT)$/.test(k)) delete env[k];
+  // Claude Code 가 전체 화면 모드(대체 화면 ESC[?1049h)로 뜨면 터미널 기록(스크롤백)이 화면 한 장뿐이라
+  // 타임라인 요청 → 터미널 위치 이동, 지난 대화 스크롤이 안 된다(실측 v2.1.288 macOS 기본값). 일반 모드로 띄운다
+  env.CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN = '1';
   // macOS 에서 Finder 로 연 Launch.app 은 로케일 환경변수 없이 뜬다. 그대로 두면 워커 CLI 가 UTF-8 이 아닌
   // 로케일로 돈다 — Mac 에서 한글 완성 음절(가)만 안 보이던 문제(단독 자모 ㄱ·ㅏ 는 보임)의 유력 원인. 터미널이 주던 값과 맞춘다
   if (process.platform === 'darwin' && !env.LANG && !env.LC_ALL && !env.LC_CTYPE) env.LANG = 'en_US.UTF-8';
