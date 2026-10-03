@@ -702,7 +702,7 @@ body.term-full { overflow: hidden; }
 .down-box .dim { color: var(--dim); font-size: 13px; margin-top: 14px; }
 .down-mark svg { width: 90px; height: 50px; filter: grayscale(.6); }
 
-/* ---------- 이미지 첨부 ---------- */
+/* ---------- 파일 첨부 ---------- */
 .dropping { outline: 2px dashed var(--accent) !important; outline-offset: -4px; background-color: color-mix(in srgb, var(--accent) 8%, transparent) !important; }
 .toast {
   position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 400;

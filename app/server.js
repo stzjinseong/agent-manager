@@ -939,19 +939,25 @@ const server = http.createServer(async (req, res) => {
     return json(res, 200, { ok: true });
   }
 
-  // 이미지 첨부: 브라우저는 보안상 드롭한 파일의 원래 경로를 모르므로, 받은 내용을 data/uploads 에 저장하고
-  // 그 절대 경로를 돌려준다. 이 경로를 프롬프트에 넣으면 Claude Code 가 이미지로 첨부한다(터미널에 파일을 끌어다 놓은 것과 같음)
+  // 파일 첨부: 브라우저는 보안상 드롭한 파일의 원래 경로를 모르므로, 받은 내용을 data/uploads 에 저장하고
+  // 그 절대 경로를 돌려준다. 이 경로를 프롬프트에 넣으면 Claude Code 가 이미지는 이미지로 첨부하고(터미널에 파일을 끌어다 놓은 것과 같음),
+  // 그 밖의 파일은 경로로 받아 Read 로 읽는다. 이미지가 아닌 파일은 Claude 가 알아보게 원래 이름을 살려 둔다
   if (req.method === 'POST' && p === '/api/upload') {
-    const type = String(req.headers['content-type'] || '');
-    const ext = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' }[type.split(';')[0]];
-    if (!ext) { req.resume(); return json(res, 415, { error: `이미지(png/jpg/gif/webp)만 첨부할 수 있습니다 (${type || '형식 없음'})` }); }
+    const type = String(req.headers['content-type'] || '').split(';')[0];
+    let orig = '';
+    try { orig = decodeURIComponent(String(req.headers['x-file-name'] || '')); } catch {}
+    const imgExt = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' }[type];
+    // 경로에 띄어쓰기·따옴표가 들어가면 프롬프트에서 경로가 끊기므로 글자·숫자·. - _ 만 남긴다(한글 포함)
+    const safe = path.basename(orig).normalize('NFC').replace(/[^\p{L}\p{N}._-]+/gu, '_').replace(/^[._]+/, '').slice(-80);
     const chunks = []; let size = 0, tooBig = false;
     req.on('data', (c) => { size += c.length; if (size > UPLOAD_LIMIT) tooBig = true; else chunks.push(c); });
     req.on('end', () => {
-      if (tooBig) return json(res, 413, { error: '20MB 를 넘는 이미지는 첨부할 수 없습니다' });
+      if (tooBig) return json(res, 413, { error: '20MB 를 넘는 파일은 첨부할 수 없습니다' });
       fs.mkdirSync(UPLOAD_DIR, { recursive: true });
       const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
-      const file = path.join(UPLOAD_DIR, `${stamp}-${Math.random().toString(36).slice(2, 7)}.${ext}`);
+      const base = `${stamp}-${Math.random().toString(36).slice(2, 7)}`;
+      // 이미지는 기존 이름 규칙 그대로(타임라인 썸네일 /uploads/ 가 이 규칙으로 찾는다)
+      const file = path.join(UPLOAD_DIR, imgExt ? `${base}.${imgExt}` : `${base}-${safe || 'file'}`);
       fs.writeFileSync(file, Buffer.concat(chunks));
       json(res, 200, { path: file });
     });

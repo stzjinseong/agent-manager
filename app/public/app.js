@@ -255,16 +255,22 @@ term.attachCustomKeyEventHandler((e) => {
   if (mod && e.code === 'KeyV') return false; // 기본 paste 이벤트로 넘김
   return true;
 });
-// ---------- 이미지 첨부 ----------
+// ---------- 파일 첨부 ----------
 // 브라우저는 드롭한 파일의 원래 경로를 알 수 없다 → 서버에 올려 data/uploads 에 저장하고 그 경로를 넣는다.
-// Claude Code 는 프롬프트의 이미지 경로를 이미지로 첨부한다(터미널에 파일을 끌어다 놓은 것과 같은 방식)
-async function uploadImage(file) {
-  const r = await fetch('/api/upload', { method: 'POST', headers: { 'content-type': file.type }, body: file });
+// Claude Code 는 프롬프트의 이미지 경로를 이미지로 첨부하고(터미널에 파일을 끌어다 놓은 것과 같은 방식),
+// 그 밖의 파일(html·pdf·txt 등)은 경로 글자로 받아 필요하면 Read 로 읽는다
+async function uploadFile(file) {
+  const r = await fetch('/api/upload', {
+    method: 'POST',
+    headers: { 'content-type': file.type || 'application/octet-stream', 'x-file-name': encodeURIComponent(file.name || '') },
+    body: file,
+  });
   const j = await r.json();
   if (!r.ok) throw new Error(j.error || r.status);
   return j.path;
 }
-const imageFiles = (dt) => [...(dt?.files || [])].filter((f) => f.type.startsWith('image/'));
+const droppedFiles = (dt) => [...(dt?.files || [])];
+const isImage = (f) => f.type.startsWith('image/');
 function toast(text, ms = 2200) {
   let t = $('#toast');
   if (!t) { t = el('<div id="toast" class="toast"></div>'); document.body.append(t); }
@@ -308,37 +314,42 @@ function ask({ title, body = '', ok = '확인', danger = false, input = null }) 
     back.addEventListener('keydown', onKey, true);
   });
 }
-async function attachImages(files, insert) {
+async function attachFiles(files, insert) {
   for (const f of files) {
-    toast(`이미지 첨부 중… ${f.name || '클립보드 이미지'}`, 60_000);
-    try { insert(await uploadImage(f)); toast('이미지 첨부됨'); }
-    catch (err) { toast(`이미지 첨부 실패: ${err.message}`, 4000); }
+    const kind = isImage(f) ? '이미지' : '파일';
+    toast(`${kind} 첨부 중… ${f.name || `클립보드 ${kind}`}`, 60_000);
+    try { insert(await uploadFile(f)); toast(`${kind} 첨부됨`); }
+    catch (err) { toast(`${kind} 첨부 실패: ${err.message}`, 4000); }
   }
 }
-// 드롭 영역 공통: 이미지가 끌려 오면 테두리 강조
+const hasFiles = (e) => [...(e.dataTransfer?.types || [])].includes('Files');
+// 드롭 영역 공통: 파일이 끌려 오면 테두리 강조
 function dropZone(zone, onFiles) {
   zone.addEventListener('dragover', (e) => {
-    if (![...e.dataTransfer.types].includes('Files')) return;
-    e.preventDefault(); zone.classList.add('dropping');
+    if (!hasFiles(e)) return;
+    e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; zone.classList.add('dropping');
   });
   zone.addEventListener('dragleave', (e) => { if (!zone.contains(e.relatedTarget)) zone.classList.remove('dropping'); });
   zone.addEventListener('drop', (e) => {
     zone.classList.remove('dropping');
-    const files = imageFiles(e.dataTransfer);
-    if (!files.length) return;
+    if (!hasFiles(e)) return;
     e.preventDefault();
-    onFiles(files);
+    const files = droppedFiles(e.dataTransfer);
+    if (files.length) onFiles(files);
   });
 }
-// 터미널: 경로를 붙여넣기로 보낸다 (Claude 입력칸에 [Image #N] 으로 붙음)
+// 드롭 영역 밖에 파일을 놓으면 브라우저가 그 파일을 열어 화면이 바뀌어 버린다(html 등) → 막고 '놓을 수 없음' 표시
+document.addEventListener('dragover', (e) => { if (hasFiles(e) && !e.defaultPrevented) { e.preventDefault(); e.dataTransfer.dropEffect = 'none'; } });
+document.addEventListener('drop', (e) => { if (hasFiles(e)) e.preventDefault(); });
+// 터미널: 경로를 붙여넣기로 보낸다 (이미지는 Claude 입력칸에 [Image #N] 으로 붙고, 그 밖의 파일은 경로 그대로)
 const termInsert = (p) => selected && term.paste(`${p} `);
-dropZone($('#term-wrap'), (files) => attachImages(files, termInsert));
-// 터미널에서 Ctrl+V 로 클립보드 이미지 붙여넣기 — xterm 보다 먼저 가로챈다(텍스트 붙여넣기는 그대로 둔다)
+dropZone($('#term-wrap'), (files) => attachFiles(files, termInsert));
+// 터미널에서 Ctrl+V 로 클립보드 파일 붙여넣기 — xterm 보다 먼저 가로챈다(텍스트 붙여넣기는 그대로 둔다)
 $('#term').addEventListener('paste', (e) => {
-  const files = imageFiles(e.clipboardData);
+  const files = droppedFiles(e.clipboardData);
   if (!files.length) return;
   e.preventDefault(); e.stopImmediatePropagation();
-  attachImages(files, termInsert);
+  attachFiles(files, termInsert);
 }, true);
 
 $('#term').addEventListener('contextmenu', async (e) => {
@@ -1583,7 +1594,7 @@ function autoGrow(ta) {
   ta.style.overflowY = h > max ? 'auto' : 'hidden';
 }
 for (const ta of document.querySelectorAll('.task-form textarea, .memo-form textarea')) ta.addEventListener('input', () => autoGrow(ta));
-// 업무 지시 칸: 이미지 드롭·붙여넣기 → 커서 위치에 경로 삽입
+// 업무 지시 칸: 파일 드롭·붙여넣기 → 커서 위치에 경로 삽입
 function insertAtCursor(ta, text) {
   const s = ta.selectionStart ?? ta.value.length, e = ta.selectionEnd ?? s;
   const before = ta.value.slice(0, s), pad = before && !/\s$/.test(before) ? ' ' : '';
@@ -1592,18 +1603,18 @@ function insertAtCursor(ta, text) {
   autoGrow(ta);
   ta.focus();
 }
-// 이미지 드롭·Ctrl+V 붙여넣기 → 커서 위치에 경로 삽입 (업무 지시 · 나중에 할 작업 공통)
-function acceptImages(ta) {
-  dropZone(ta, (files) => attachImages(files, (p) => insertAtCursor(ta, p)));
+// 파일 드롭·Ctrl+V 붙여넣기 → 커서 위치에 경로 삽입 (업무 지시 · 나중에 할 작업 공통)
+function acceptFiles(ta) {
+  dropZone(ta, (files) => attachFiles(files, (p) => insertAtCursor(ta, p)));
   ta.addEventListener('paste', (e) => {
-    const files = imageFiles(e.clipboardData);
+    const files = droppedFiles(e.clipboardData);
     if (!files.length) return;
     e.preventDefault();
-    attachImages(files, (p) => insertAtCursor(ta, p));
+    attachFiles(files, (p) => insertAtCursor(ta, p));
   });
 }
-acceptImages(taskForm.text);
-acceptImages($('#memo-form').text);
+acceptFiles(taskForm.text);
+acceptFiles($('#memo-form').text);
 taskForm.onsubmit = async (e) => {
   e.preventDefault();
   const text = taskForm.text.value.trim();
@@ -1650,7 +1661,7 @@ function editMemo(li, w) {
   const keep = [...li.children];
   keep.forEach((c) => (c.hidden = true));
   li.append(ta, bar);
-  acceptImages(ta);
+  acceptFiles(ta);
   ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
   const done = () => { ta.remove(); bar.remove(); keep.forEach((c) => (c.hidden = false)); li.classList.remove('editing'); li.draggable = true; memoSig = ''; renderMemos(w); };
   const save = async () => {
