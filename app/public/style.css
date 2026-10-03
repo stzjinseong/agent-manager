@@ -691,11 +691,18 @@ i.info:hover, .kpi[data-info]:hover i.info { color: var(--text-2); }
   display: flex; flex-direction: column; background: #07080a;
 }
 .term-wrap.full .term-bar { display: flex; align-items: center; gap: 10px; padding: 8px 2px; color: var(--text-2); font-size: 13px; }
-.term-wrap.full .term-bar span { flex: 1; }
+.term-wrap.full .term-bar span { flex: 1; font-size: 17px; font-weight: 600; color: var(--text); letter-spacing: .01em; } /* 워커 역할 이름 */
 /* 옆 패널을 넓혀 터미널 위를 덮으면, 닫기 버튼이 덮개 가장자리를 따라 왼쪽으로 옮겨 가려지지 않게 */
 body.term-full .term-wrap.full .term-bar { padding-right: calc(2px + var(--side-extra, 0px)); }
 .term-wrap.full #term { flex: 1; min-height: 0; }
 body.term-full { overflow: hidden; }
+/* 크게 보기 바탕막: 누르는 순간 화면 전체를 옆 패널과 같은 색으로 덮는다. 옆 패널은 서서히 나타나고 터미널은 원래 자리에서
+   커지는데, 그동안 뒤의 원래 화면(워커 카드·회로 기판 등)이 비쳐 보여 거슬렸다 → 그 자리를 빈 패널 바탕처럼 보이게 */
+body.term-full::before {
+  content: ''; position: fixed; inset: 0; z-index: 99; background: var(--bg); pointer-events: none;
+  animation: full-backdrop .08s ease-out;
+}
+@keyframes full-backdrop { from { opacity: 0; } to { opacity: 1; } }
 /* 크게 보기에서도 오른쪽에 업무 지시·나중에 할 작업·타임라인을 둔다. 터미널은 110칸 고정이라 넓은 화면에선
    어차피 오른쪽이 비었다 — 그 자리를 옆 패널로 쓴다. 좁은 화면(1100px 이하)은 지금처럼 터미널만 꽉 채운다 */
 @media (min-width: 1101px) {
