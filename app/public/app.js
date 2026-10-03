@@ -1965,6 +1965,32 @@ themeSw.addEventListener('click', (e) => {
   const fallback = setTimeout(finish, THEME_ANIM_MS + 200); // 애니메이션 이벤트를 못 받아도 잠기지 않게
 });
 
+// ---------- Chrome 권장 띠 ----------
+// Safari 에선 터미널 그리기가 느리고 한글 입력이 조합 이벤트 없이 들어오는 등(실측) Chrome 기준으로 맞춘 부분이 많다.
+// Chrome 이 아니면 늘 띠를 보인다(닫기 없음). Edge·Whale 등도 사용자 에이전트 문자열엔 'Chrome/' 이 있어
+// 브라우저가 밝히는 브랜드(userAgentData)로 가린다 — 그게 없는 브라우저(Safari·Firefox)는 문자열로
+function browserName() {
+  const ua = navigator.userAgent;
+  const brands = (navigator.userAgentData?.brands || []).map((b) => b.brand);
+  if (brands.includes('Google Chrome')) return 'Chrome';
+  const named = [[/Edg\//, 'Edge'], [/Whale\//, 'Whale'], [/OPR\//, 'Opera'], [/SamsungBrowser\//, 'Samsung Internet'], [/Firefox\//, 'Firefox'], [/FxiOS\//, 'Firefox'], [/CriOS\//, 'Chrome']];
+  for (const [re, name] of named) if (re.test(ua)) return name;
+  if (/Chrome\//.test(ua)) return brands.find((b) => !/not.?a.?brand|chromium/i.test(b)) || (brands.length ? 'Chromium' : 'Chrome');
+  if (/Safari\//.test(ua)) return 'Safari';
+  return '알 수 없는 브라우저';
+}
+{
+  const name = browserName();
+  if (name !== 'Chrome') {
+    $('#browser-name').textContent = name;
+    $('#browser-bar').hidden = false;
+  }
+  $('#btn-copy-url').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(location.href); toast('주소를 복사했습니다 — Chrome 주소창에 붙여넣으세요'); }
+    catch { toast(`주소: ${location.href}`, 6000); }
+  });
+}
+
 // ---------- 서버 재시작 ----------
 // 서버가 실행기를 '기다렸다 띄우기'로 남기고 내려간다 → 돌아오면 화면이 스스로 새로고침(ws.onopen 의 serverDown 처리)
 async function restartServer() {
