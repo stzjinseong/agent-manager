@@ -2099,14 +2099,20 @@ function laterSame(i) {
   const row = timelineCache[i];
   return timelineCache.slice(i + 1).filter((r) => r.kind === 'req' && normText(r.text) === normText(row.text)).length;
 }
+// Claude Code 가 전체 화면 모드(대체 화면)로 떠 있으면 지난 대화를 Claude 가 화면 안에서 다시 그려, 터미널엔 지금 보이는
+// 한 화면만 있다 — 위로 넘어간 요청 줄은 지워진 게 아니라 찾을 수 없을 뿐이다. 새로 띄우는 워커는 일반 모드(server.js
+// CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN)라 기록이 남는다. 그 전에 띄운 워커만 이 경우
+const termFullscreen = () => term.buffer.active.type === 'alternate';
+const FULLSCREEN_MSG = '이 워커는 전체 화면 모드로 떠 있어 지난 대화로 이동할 수 없습니다 — 워커를 새로 띄우면 됩니다';
 function markGoneReqs() {
   if (!selected || $('#detail').hidden) return;
+  const full = termFullscreen();
   for (const li of $('#log').querySelectorAll('li.k-req')) {
     const i = Number(li.dataset.i), row = timelineCache[i];
     if (!row) continue;
     const gone = findPromptLine(row.text, laterSame(i)) < 0 && findTurnEndBefore(row.t + clockSkew) < 0;
-    li.classList.toggle('gone', gone);
-    li.title = gone ? '만료된 요청이라 처리할 수 없습니다.' : '클릭: 터미널에서 이 요청 위치로 이동';
+    li.classList.toggle('gone', gone && !full); // 전체 화면 모드는 만료가 아니라 흐리게 하지 않는다
+    li.title = !gone ? '클릭: 터미널에서 이 요청 위치로 이동' : full ? FULLSCREEN_MSG : '만료된 요청이라 처리할 수 없습니다.';
   }
 }
 let goneTimer = null;
@@ -2162,10 +2168,11 @@ $('#log').addEventListener('click', (e) => {
     // 앞 턴이 끝나는 바로 그 순간 투입된 요청은 Claude 가 '❯ 요청' 줄을 남기지 않는 경우가 있다 →
     // 그 시각 직전에 끝난 턴의 요약 줄(✻ … · done 오후 4:15)로 대신 이동
     line = findTurnEndBefore(row.t + clockSkew);
-    if (line < 0) { toast('만료된 요청이라 처리할 수 없습니다.', 3200); return; }
+    if (line < 0) { toast(termFullscreen() ? FULLSCREEN_MSG : '만료된 요청이라 처리할 수 없습니다.', termFullscreen() ? 5000 : 3200); return; }
     toast('요청 줄이 터미널에 남지 않아 그 무렵(직전 턴 종료) 위치로 이동했습니다', 2800);
   }
-  term.scrollToLine(Math.max(0, line - 2));
+  // 요청 줄이 터미널 맨 위에 오게 — 이미 보이고 있어도 옮긴다. 끝에 가까워 맨 위로 못 올리면 맨 아래까지만(xterm 이 baseY 로 자른다)
+  term.scrollToLine(Math.min(line, term.buffer.active.baseY));
   term.selectLines(line, line); // 잠깐 강조
   clearTimeout(findPromptLine.t);
   findPromptLine.t = setTimeout(() => term.clearSelection(), 1600);
