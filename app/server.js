@@ -86,17 +86,45 @@ const config = loadConfig();
 // 가장 최근 것만 들고 화면 상단에 보인다. 재시작해도 남게 data/usage.json 에 둔다
 const USAGE_PATH = path.join(DATA_DIR, 'usage.json');
 let usage = (() => { try { return JSON.parse(fs.readFileSync(USAGE_PATH, 'utf8')); } catch { return null; } })();
-function onStatusLine(body) {
+// 받은 값은 항목(5시간·주간)마다 받은 시각(at)·보낸 워커(from)와 함께 둔다. 새로 받은 값에 한 항목이 빠져 있으면
+// (실측: 10/04 받은 값에 five_hour 가 없었다) 이전 값이 아직 초기화 전이면 그대로 둔다 — 빠졌다고 지우면 막대가 '—' 로 바뀌었다
+function onStatusLine(body, from) {
   const rl = body?.rate_limits;
   if (!rl || typeof rl !== 'object') return;
-  const pick = (x) => (x && Number.isFinite(x.used_percentage) ? { pct: x.used_percentage, resetsAt: Number.isFinite(x.resets_at) ? x.resets_at * 1000 : null } : null);
-  const next = { fiveHour: pick(rl.five_hour), sevenDay: pick(rl.seven_day), at: Date.now() };
-  if (!next.fiveHour && !next.sevenDay) return;
-  const changed = JSON.stringify([next.fiveHour, next.sevenDay]) !== JSON.stringify([usage?.fiveHour, usage?.sevenDay]);
+  const now = Date.now();
+  const pick = (x) => (x && Number.isFinite(x.used_percentage)
+    ? { pct: x.used_percentage, resetsAt: Number.isFinite(x.resets_at) ? x.resets_at * 1000 : null, at: now, from: from || null } : null);
+  const keep = (prev) => (prev && prev.resetsAt && prev.resetsAt > now ? prev : null);
+  const got = { fiveHour: pick(rl.five_hour), sevenDay: pick(rl.seven_day) };
+  if (!got.fiveHour && !got.sevenDay) return;
+  const next = { fiveHour: got.fiveHour || keep(usage?.fiveHour), sevenDay: got.sevenDay || keep(usage?.sevenDay), at: now, from: from || null };
+  const sig = (u) => JSON.stringify([u?.fiveHour?.pct, u?.fiveHour?.resetsAt, u?.sevenDay?.pct, u?.sevenDay?.resetsAt]);
+  const changed = sig(next) !== sig(usage);
   usage = next;
-  if (!changed) return;
+  // 값이 같아도 받은 시각은 화면(마지막 갱신 · 흐리게)에 쓰이므로 가끔은 내보낸다 — 매번 내보내면 상태줄 갱신마다 방송이라 1분 간격으로
+  if (!changed && now - (lastUsageEmit || 0) < 60_000) return;
+  lastUsageEmit = now;
   try { fs.writeFileSync(USAGE_PATH, JSON.stringify(usage)); } catch {}
   emitState();
+}
+let lastUsageEmit = 0;
+
+// 사용량을 보낼 수 있는 워커: 상태줄(statusline.mjs)을 넣어 띄운 살아 있는 워커. 이 기능 이전에 띄운 워커는 설정에 없어 못 보낸다
+// 설정 파일은 띄울 때 한 번 쓰고 바뀌지 않으므로 pid 별로 한 번만 읽는다(같은 id 로 다시 띄우면 pid 가 다르다)
+const statusLineOf = new Map();
+function usageReporters() {
+  const ok = [], missing = [];
+  for (const w of workers.values()) {
+    if (w.status === 'exited') continue;
+    const key = `${w.id}:${w.pid}`;
+    if (!statusLineOf.has(key)) {
+      let has = false;
+      try { has = fs.readFileSync(path.join(DATA_DIR, `${w.id}.settings.json`), 'utf8').includes('statusline.mjs'); } catch {}
+      statusLineOf.set(key, has);
+    }
+    (statusLineOf.get(key) ? ok : missing).push(w.id);
+  }
+  return { ok, missing };
 }
 
 function loadConfig() {
@@ -699,7 +727,8 @@ function publicState() {
     recentCwds: config.recentCwds,
     progress: progress.public(),
     shotKeep: SHOT_KEEP, // 화면 안내 문구용 (워커당 캡처 보관 장수)
-    usage, // 계정 사용량 { fiveHour: { pct, resetsAt }, sevenDay, at }
+    usage, // 계정 사용량 { fiveHour: { pct, resetsAt, at, from }, sevenDay, at, from }
+    usageReporters: usageReporters(), // { ok: [보낼 수 있는 워커 id], missing: [상태줄 없이 뜬 워커 id] }
   };
 }
 
@@ -1014,7 +1043,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === 'POST' && p === '/statusline') {
-    onStatusLine(await readBody(req));
+    onStatusLine(await readBody(req), url.searchParams.get('w'));
     return json(res, 200, {});
   }
 

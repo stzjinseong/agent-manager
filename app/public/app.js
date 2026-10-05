@@ -1542,16 +1542,26 @@ function renderUsage() {
     const ctx = ctxLevel(p), pct = Math.min(100, ctx.pct * 100);
     parts.push(m('컨텍스트', pct, 'var(--m-ctx)', `${w.name} 컨텍스트 ${fmtN(p.context)} / ${fmtN(p.window || 200_000)} (${Math.round(pct)}%)${ctx.text ? ` · ${ctx.text}` : ''}`));
   }
-  // 5시간·주간: 계정 한도(서버가 워커 상태줄에서 받은 rate_limits). 초기화 시각이 지나면 0%, 30분 넘게 새 값이 없으면 흐리게
-  const stale = u && now - (u.at + clockSkew) > 30 * 60_000;
+  // 5시간·주간: 계정 한도(서버가 워커 상태줄에서 받은 rate_limits). 초기화 시각이 지나면 0%, 30분 넘게 새 값이 없으면 흐리게.
+  // 서버는 항목마다 받은 시각(at)·보낸 워커(from)를 붙이고, 새 값에 한 항목이 빠지면 초기화 전인 이전 값을 유지한다
+  const rep = state.usageReporters || { ok: [], missing: [] };
+  const wname = (id) => { const x = state.workers.find((v) => v.id === id); return x && x.name !== id ? `${x.name}(${id})` : id; };
+  const names = (ids) => ids.map(wname).join(', ');
+  const noReporter = rep.ok.length ? '' : `사용량을 보내는 워커가 없습니다${rep.missing.length ? ` — ${names(rep.missing)}은(는) 이 기능 이전에 떠서 보내지 못합니다. 새로 띄우면(추가 인자 --resume 으로 대화 이어받기) 보냅니다` : ' — 워커를 띄우면 일하는 동안 받아 옵니다'}`;
   const limit = (label, x, base) => {
-    if (!x) return m(label, null, base, `${label} 한도 — 새로 띄운 워커가 일하기 시작하면 표시됩니다(이 기능 이전에 띄운 워커로는 받을 수 없음)`, true);
+    if (!x) {
+      const why = noReporter || (u ? `최근 받은 값에 ${label} 한도가 없었습니다 — 진행 중인 ${label} 구간이 없을 때 빠지는 것으로 보입니다. ${names(rep.ok)} 워커가 다음에 일하면 갱신됩니다`
+        : `아직 받은 값이 없습니다 — ${names(rep.ok)} 워커가 일하기 시작하면 표시됩니다`);
+      return m(label, null, base, `${label} 한도 — ${why}`, true);
+    }
+    const age = now - ((x.at ?? u.at) + clockSkew), stale = age > 30 * 60_000;
     const reset = x.resetsAt && x.resetsAt <= now;
     const pct = reset ? 0 : Math.max(0, Math.min(100, x.pct));
     const at = x.resetsAt ? new Date(x.resetsAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false }) : '';
     const when = reset ? '초기화됨' : x.resetsAt ? `${at} 초기화 (${fmtLeft(x.resetsAt - now)} 후)` : '';
     const after = x.resetsAt ? `<span class="mt-r">${reset ? '초기화됨' : `↻ ${short(x.resetsAt - now)}`}</span>` : '';
-    return m(label, pct, base, `${label} 한도 ${Math.round(pct)}% 사용${when ? ` · ${when}` : ''}${stale ? ` · 마지막 갱신 ${fmtLeft(now - (u.at + clockSkew))} 전` : ''}`, stale, after);
+    const got = `${age < 60_000 ? '방금' : `${fmtLeft(age)} 전`} 받은 값${x.from || u.from ? ` · ${wname(x.from || u.from)}` : ''}`;
+    return m(label, pct, base, `${label} 한도 ${Math.round(pct)}% 사용${when ? ` · ${when}` : ''}\n${got}${stale && noReporter ? `\n${noReporter}` : ''}`, stale, after);
   };
   parts.push(limit('5시간', u?.fiveHour, 'var(--m-5h)'), limit('주간', u?.sevenDay, 'var(--m-wk)'));
   const html = parts.join('');
