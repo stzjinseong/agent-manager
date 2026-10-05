@@ -736,6 +736,7 @@ i.info:hover, .kpi[data-info]:hover i.info { color: var(--text-2); }
 }
 .term-wrap.full .term-bar { display: flex; align-items: center; gap: 10px; padding: 8px 2px; color: var(--text-2); font-size: 13px; }
 .term-wrap.full .term-bar #term-title { flex: none; white-space: nowrap; font-size: 17px; font-weight: 600; color: var(--text); letter-spacing: .01em; } /* 워커 역할 이름 — 폭이 줄어도 줄지 않는다 */
+.term-wrap.full .term-bar .btn { flex: none; white-space: nowrap; } /* 옆 패널을 넓혀도 '✕ 닫기'·diff 가 두 줄로 접히지 않게 — 대신 미터가 양보 */
 /* 옆 패널을 넓혀 막대 폭이 줄면 역할 이름 대신 미터가 단계적으로 양보: 남은 시간(↻) → 짧은 막대 → 숨김 */
 .term-wrap.full .term-bar { container-type: inline-size; container-name: tbar; }
 @container tbar (max-width: 640px) { .term-bar .mt-r { display: none; } }
