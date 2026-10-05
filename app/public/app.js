@@ -925,6 +925,10 @@ function renderDetail() {
   }
   renderProfile(w);
   renderDiffButton(w);
+  // 접은 영역 제목줄에 건수를 보여 준다 (펼쳐 있으면 안에 보이므로 비움)
+  const memoN = (state.memos?.[w.name] || []).length;
+  setSecCount('sec-task', w.queue.length ? `대기 ${w.queue.length}` : '');
+  setSecCount('sec-memo', memoN ? `${memoN}건` : '');
 }
 
 // 타임라인 정리: 사용자 요청을 한 줄로 모아 강조한다.
@@ -2366,6 +2370,31 @@ for (const handle of document.querySelectorAll('.side-resizer')) {
     handle.addEventListener('pointercancel', up, { once: true });
   });
   handle.addEventListener('dblclick', () => { setSecH(sec, null); try { localStorage.removeItem(key); } catch {} });
+}
+
+// ---------- 옆 패널 영역 접기 (업무 지시 · 나중에 할 작업 · 타임라인 제목줄 클릭) ----------
+// 영역마다 브라우저에 기억. 접은 영역 아래 가로선(높이 조절)은 쓸 일이 없어 숨긴다
+const SEC_FOLD_KEY = (id) => `am.secFold.${id}`;
+function setSecCount(id, text) {
+  const el = document.querySelector(`#${id} .sec-count`);
+  const t = $('#' + id).classList.contains('collapsed') ? text : '';
+  if (el && el.textContent !== t) el.textContent = t;
+}
+function setSecFolded(sec, on, save = true) {
+  sec.classList.toggle('collapsed', on);
+  sec.querySelector('.sec-toggle').setAttribute('aria-expanded', String(!on));
+  for (const r of document.querySelectorAll('.side-resizer')) {
+    r.classList.toggle('off', $('#' + r.dataset.sec).classList.contains('collapsed') || $('#sec-log').classList.contains('collapsed'));
+  }
+  if (save) try { on ? localStorage.setItem(SEC_FOLD_KEY(sec.id), '1') : localStorage.removeItem(SEC_FOLD_KEY(sec.id)); } catch {}
+  const w = state?.workers?.find((x) => x.id === selected);
+  if (w) renderDetail();
+}
+for (const h of document.querySelectorAll('.side .sec-toggle')) {
+  const sec = h.closest('.side-sec');
+  try { if (localStorage.getItem(SEC_FOLD_KEY(sec.id))) setSecFolded(sec, true, false); } catch {}
+  h.addEventListener('click', () => setSecFolded(sec, !sec.classList.contains('collapsed')));
+  h.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); h.click(); } });
 }
 
 // 크게/원래대로 전환은 FLIP 애니메이션: 바뀌기 전 위치·크기(First)와 바뀐 뒤(Last)를 재서, 원래 자리에서

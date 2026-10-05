@@ -129,7 +129,7 @@
       <aside class="side">
         <div class="side-grip" id="side-grip" title="왼쪽으로 끌어 넓히기(터미널 위를 덮음) · 더블클릭: 기본 폭"><i></i></div>
         <div class="side-sec" id="sec-task">
-          <h3 class="side-h">업무 지시 <small>바로 투입 · 작업 중이면 대기열에 쌓임</small></h3>
+          <h3 class="side-h sec-toggle" role="button" tabindex="0" aria-expanded="true" title="클릭해서 접기/펼치기"><span class="chev">▾</span>업무 지시 <small>바로 투입 · 작업 중이면 대기열에 쌓임</small><span class="sec-count"></span></h3>
           <form id="task-form" class="task-form">
             <textarea name="text" rows="3" placeholder="전송 : Alt(⌘)+Enter&#10;개행 : Enter&#10;*CLI에서도 동일하게 작동"></textarea>
           </form>
@@ -137,15 +137,15 @@
         </div>
         <div class="side-resizer" data-sec="sec-task" title="위아래로 끌어 높이 조절 · 더블클릭: 기본 높이"><i></i></div>
         <div class="memo side-sec" id="sec-memo">
-          <h3>나중에 할 작업 <small>자동 실행 안 됨 · ▶ 지시를 눌러야 투입</small></h3>
+          <h3 class="sec-toggle" role="button" tabindex="0" aria-expanded="true" title="클릭해서 접기/펼치기"><span class="chev">▾</span>나중에 할 작업 <small>자동 실행 안 됨 · ▶ 지시를 눌러야 투입</small><span class="sec-count"></span></h3>
           <form id="memo-form" class="memo-form">
             <textarea name="text" rows="3" placeholder="추가 : Alt(⌘)+Enter&#10;개행 : Enter&#10;*CLI에서도 동일하게 작동"></textarea>
           </form>
           <ol class="memos" id="memos"></ol>
         </div>
         <div class="side-resizer" data-sec="sec-memo" title="위아래로 끌어 높이 조절 · 더블클릭: 기본 높이"><i></i></div>
-        <div class="timeline">
-          <h3>타임라인</h3>
+        <div class="timeline side-sec" id="sec-log">
+          <h3 class="sec-toggle" role="button" tabindex="0" aria-expanded="true" title="클릭해서 접기/펼치기"><span class="chev">▾</span>타임라인</h3>
           <div class="tl-pin" id="tl-pin" hidden title="클릭: 터미널에서 이 요청 위치로 이동"></div>
           <ol id="log"></ol>
         </div>

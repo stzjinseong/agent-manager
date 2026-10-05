@@ -945,8 +945,28 @@ body.resizing-term { cursor: row-resize; user-select: none; }
    끈 영역에 높이를 주고(.sized) 남는 자리는 타임라인이 갖는다. 안 끈 영역은 원래대로 내용 크기 */
 #sec-task { display: flex; flex-direction: column; gap: 12px; }
 /* min-height: min-content — 입력칸이 줄 수만큼 늘면(autoGrow) 정해 둔 높이보다 커져도 잘리지 않게 */
-.side-sec.sized { height: var(--sec-h); flex-shrink: 0; min-height: min-content; overflow: hidden; }
-#sec-task.sized .queue, .memo.sized .memos { max-height: none; flex: 1; min-height: 0; }
+/* 옆 패널은 터미널 높이로 고정이다. 예전엔 업무 지시·나중에 할 작업이 내용 크기 아래로 줄지 못해, 입력칸·대기열·메모가 길어지면
+   타임라인만 0 까지 줄고도 모자라 패널 아래로 뚫고 나갔다. 이제 자리가 모자라면 각 영역의 목록(대기열·메모)이 먼저 줄어 스크롤되고,
+   그래도 모자라면 영역 자체가 스크롤된다. 타임라인은 최소 높이(--log-min)를 지킨다 */
+.side > .side-sec:not(.timeline) { flex: 0 1 auto; min-height: 0; overflow: auto; }
+.side > .side-sec > :is(h3, form) { flex-shrink: 0; }
+.side > .side-sec > :is(.queue, .memos) { flex: 0 1 auto; min-height: 0; }
+.timeline { --log-min: 120px; min-height: min(var(--log-min), 100%); }
+/* 끌어서 정한 높이는 '바라는 높이' — 자리가 모자라면 그보다 줄어든다 */
+.side > .side-sec.sized { flex: 0 1 var(--sec-h); height: auto; }
+#sec-task.sized .queue, .memo.sized .memos { max-height: none; flex: 1 1 0; min-height: 0; }
+/* 접기: 제목줄만 남긴다. 접힌 동안은 끌어서 정한 높이도 쓰지 않는다 */
+.sec-toggle { cursor: pointer; user-select: none; border-radius: 6px; margin-left: -4px !important; padding: 2px 4px; display: flex; align-items: center; gap: 0; }
+.sec-toggle:hover { background: var(--surface-2); }
+.sec-toggle .chev { color: var(--dim); font-size: 13px; line-height: 1; width: 16px; text-align: center; flex: none; display: inline-block; transition: transform .2s; }
+.side-sec.collapsed .sec-toggle .chev { transform: rotate(-90deg); }
+.sec-toggle small { align-self: baseline; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sec-count { margin-left: auto; padding-left: 8px; flex: none; font: 600 11px var(--mono); color: var(--accent-hi); letter-spacing: 0; }
+.sec-count:empty { display: none; }
+.side > .side-sec.collapsed { flex: none !important; height: auto; min-height: 0; overflow: visible; }
+.side-sec.collapsed > :not(h3) { display: none !important; }
+.side-sec.collapsed > h3 { margin-bottom: 0 !important; }
+.side-resizer.off { visibility: hidden; pointer-events: none; }
 .side-resizer { height: 10px; margin: -8px 0; flex-shrink: 0; cursor: row-resize; display: grid; place-items: center; touch-action: none; }
 .side-resizer i { display: block; width: 100%; height: 1px; background: transparent; position: relative; transition: background .15s; }
 .side-resizer i::after { content: ""; position: absolute; left: 50%; top: -2px; width: 32px; height: 5px; margin-left: -16px; border-radius: 3px; background: var(--surface-3); border: 1px solid var(--line-2); opacity: .55; transition: background .15s, border-color .15s, opacity .15s; }
