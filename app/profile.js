@@ -8,6 +8,8 @@
 //    메인 트랜스크립트에서 그 서브에이전트를 띄운 tool_use id 다 → 해당 턴에 귀속.
 //  - 파일 수정: Edit/Write 결과가 담긴 user 줄의 toolUseResult{ filePath, structuredPatch[{oldStart, oldLines, newStart,
 //    newLines, lines['+…'|'-…'|' …']}], userModified }. 새로 만든 파일(Write, type 'create')은 patch 가 비고 content 만 있다.
+//    서브에이전트 트랜스크립트에도 같은 모양으로 남는다 → 띄운 메인 턴에 귀속. 셸 명령(Bash)으로 바뀐 파일은
+//    트랜스크립트에 내용이 없어 서버가 git 으로 명령 전후를 비교해 p.shellEdits 에 넣는다(shelldiff.js).
 import fs from 'node:fs';
 import path from 'node:path';
 import { priceFor, costOf, windowFor } from './pricing.js';
@@ -39,6 +41,7 @@ export function createProfile(file) {
     toolErrors: 0, toolErrBy: {}, // 도구 결과 is_error
     compactLog: [], // compact_boundary.compactMetadata
     edits: [], editSeen: new Set(), // Edit/Write 로 고친 파일 이력 (diff 보기) — editOf. editSeen: 같은 결과가 두 번 기록돼도 한 번만
+    shellEdits: [], // 셸 명령으로 바뀐 파일 (서버가 git 비교로 채운다 — 트랜스크립트엔 없음)
   };
 }
 
@@ -55,6 +58,11 @@ function editOf(r, id, tool, turn, ts) {
     const lines = r.content.replace(/\n$/, '').split('\n');
     hunks = [{ oldStart: 0, oldLines: 0, newStart: 1, newLines: lines.length, lines: lines.map((l) => `+${l}`) }];
   } else return null;
+  return { id, ts, turn: turn?.n ?? null, tool: tool || null, file: r.filePath, kind: r.type === 'create' ? 'create' : 'edit',
+    ...trimHunks(hunks), userModified: Boolean(r.userModified) };
+}
+// +/− 를 세고, 아주 긴 변경은 앞 MAX_EDIT_LINES 줄만 남긴다 (cut). 셸 명령 비교 결과도 같은 규칙
+export function trimHunks(hunks) {
   let add = 0, del = 0, budget = MAX_EDIT_LINES, cut = false;
   hunks = hunks.map((h) => {
     const lines = Array.isArray(h.lines) ? h.lines : [];
@@ -64,8 +72,11 @@ function editOf(r, id, tool, turn, ts) {
     budget -= keep.length;
     return { oldStart: h.oldStart, oldLines: h.oldLines, newStart: h.newStart, newLines: h.newLines, lines: keep };
   }).filter((h) => h.lines.length);
-  return { id, ts, turn: turn?.n ?? null, tool: tool || null, file: r.filePath, kind: r.type === 'create' ? 'create' : 'edit',
-    add, del, cut, userModified: Boolean(r.userModified), hunks };
+  return { add, del, cut, hunks };
+}
+function pushEdit(p, ed) {
+  p.edits.push(ed);
+  if (p.edits.length > MAX_EDITS) p.edits.shift();
 }
 
 function usageOf(m, p) {
@@ -169,11 +180,7 @@ function apply(p, e, line) {
       if (!b.is_error && !p.editSeen.has(b.tool_use_id)) {
         const st = p.toolStart.get(b.tool_use_id);
         const ed = editOf(e.toolUseResult, b.tool_use_id, st?.name, st?.turn || p.toolTurn.get(b.tool_use_id), ts);
-        if (ed) {
-          p.editSeen.add(b.tool_use_id);
-          p.edits.push(ed);
-          if (p.edits.length > MAX_EDITS) p.edits.shift();
-        }
+        if (ed) { p.editSeen.add(b.tool_use_id); pushEdit(p, ed); }
       }
       // 이미지 블록: { type:'image', source:{ type:'base64', media_type, data } } — 실측 Read 134건 모두 이 모양
       if (Array.isArray(b.content)) b.content.forEach((x, i) => {
@@ -299,12 +306,20 @@ function readSubagents(p) {
       let meta = {};
       try { meta = JSON.parse(fs.readFileSync(full.replace(/\.jsonl$/, '.meta.json'), 'utf8')); } catch {}
       const agentId = f.replace(/^agent-/, '').replace(/\.jsonl$/, '');
-      s = { agentId, offset: 0, rest: '', meta, msgs: new Map(), model: null, calls: 0, start: null, end: null, ...empty() };
+      s = { agentId, offset: 0, rest: '', meta, msgs: new Map(), model: null, calls: 0, start: null, end: null, tools: new Map(), ...empty() };
       p.subs.set(f, s);
     }
     const r = readLines(s, full, (e) => {
       const ts = Date.parse(e.timestamp) || null;
       if (ts) { s.start ??= ts; s.end = ts; }
+      // 서브에이전트가 Edit/Write 로 고친 파일 — 그 서브에이전트를 띄운 메인 턴의 수정으로 (시간이 없으면 그 시각의 턴)
+      if (e.type === 'assistant') for (const b of e.message?.content || []) if (b.type === 'tool_use') s.tools.set(b.id, b.name);
+      if (e.type === 'user' && Array.isArray(e.message?.content)) for (const b of e.message.content) {
+        if (b.type !== 'tool_result' || !b.tool_use_id || b.is_error || p.editSeen.has(b.tool_use_id)) continue;
+        const turn = p.toolTurn.get(s.meta.toolUseId) || turnAt(p, ts);
+        const ed = editOf(e.toolUseResult, b.tool_use_id, s.tools.get(b.tool_use_id), turn, ts || Date.now());
+        if (ed) { ed.agent = s.meta.agentType || 'subagent'; p.editSeen.add(b.tool_use_id); pushEdit(p, ed); }
+      }
       if (e.type !== 'assistant' || !e.message?.usage) return;
       const usage = usageOf(e.message, p), prev = s.msgs.get(e.message.id);
       if (!prev) s.calls++;
@@ -345,10 +360,22 @@ export function readProfile(p) {
   return Boolean(r || s);
 }
 
+// 그 시각에 진행 중이던 턴 (턴 시작이 그 시각 이전인 마지막 턴)
+function turnAt(p, ts) {
+  if (!ts) return p.turns.at(-1) || null;
+  for (let i = p.turns.length - 1; i >= 0; i--) if (p.turns[i].start <= ts) return p.turns[i];
+  return null;
+}
+// Edit/Write(메인·서브에이전트) + 셸 명령 수정을 시간순으로. 셸 수정의 턴은 그 Bash 호출의 턴(서브에이전트 Bash 면 그 시각의 턴)
+function allEdits(p) {
+  const shell = p.shellEdits.map((ed) => ({ ...ed, turn: (p.toolTurn.get(ed.toolUseId) || turnAt(p, ed.ts))?.n ?? null }));
+  return shell.length ? [...p.edits, ...shell].sort((a, b) => a.ts - b.ts) : p.edits;
+}
+
 // diff 보기: 파일별로 묶은 수정 이력(최근에 고친 파일이 위)과, 파일을 고친 요청 목록(최근 요청이 위)
 export function editLog(p) {
   const files = new Map(), reqs = new Map();
-  for (const ed of p.edits) {
+  for (const ed of allEdits(p)) {
     const f = files.get(ed.file) || { file: ed.file, add: 0, del: 0, last: 0, created: false, edits: [] };
     f.add += ed.add; f.del += ed.del; f.last = Math.max(f.last, ed.ts);
     if (ed.kind === 'create') f.created = true;
@@ -437,8 +464,11 @@ export function profileSummary(p, waits = []) {
     toolErrors: p.toolErrors,
     toolErrTop: Object.entries(p.toolErrBy).sort((a, b) => b[1] - a[1]).slice(0, 5),
     compactLog: p.compactLog.slice(-5),
-    edits: { n: p.edits.length, files: new Set(p.edits.map((x) => x.file)).size,
-      add: p.edits.reduce((a, x) => a + x.add, 0), del: p.edits.reduce((a, x) => a + x.del, 0), last: p.edits.at(-1)?.ts || 0 },
+    edits: (() => {
+      const all = allEdits(p);
+      return { n: all.length, files: new Set(all.map((x) => x.file)).size,
+        add: all.reduce((a, x) => a + x.add, 0), del: all.reduce((a, x) => a + x.del, 0), last: all.at(-1)?.ts || 0 };
+    })(),
     sub, subagents: subagents.slice(0, 12),
     bgTasks: runningTasks(p).map(({ id, kind, desc, startedAt, expiresAt }) => ({ id, kind, desc, startedAt, expiresAt })),
     bgRunning: subagents.filter((s) => s.running).length + runningTasks(p).length,

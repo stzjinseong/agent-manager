@@ -2512,7 +2512,7 @@ function setTermFull(on) {
 let sideAnim = null;
 
 // ---------- diff 보기 ----------
-// 워커가 Edit·Write 로 고친 파일의 변경을 터미널 자리에 덮어 보여 준다. 터미널은 그 아래 그대로 있어(크기도 그대로)
+// 워커가 고친 파일의 변경을 터미널 자리에 덮어 보여 준다 — Edit·Write(메인·서브에이전트)와 셸 명령(서버가 명령 전후를 git 으로 비교). 터미널은 그 아래 그대로 있어(크기도 그대로)
 // 닫으면 다시 맞출 것 없이 바로 돌아온다. 내용은 열 때·새 수정이 생길 때만 서버에서 가져온다(상태 방송엔 개수만)
 let diffOpen = false, diffData = null, diffKey = '', diffTimer = null;
 // 왼쪽 목록은 파일을 고친 요청을 오래된 것부터(오름차순) 나열하고, 요청을 누르면 그 요청에서 바뀐 파일이 펼쳐진다.
@@ -2528,7 +2528,7 @@ function renderDiffButton(w) {
     if (b._html !== html) b.innerHTML = b._html = html;
     b.classList.toggle('on', diffOpen);
     b.classList.toggle('none', !n);
-    b.title = n ? `고친 파일 ${n}개 · +${e.add} −${e.del} — 누르면 변경 내용${diffOpen ? ' (다시 누르면 터미널로)' : ''}` : '아직 Edit·Write 로 고친 파일이 없습니다';
+    b.title = n ? `고친 파일 ${n}개 · +${e.add} −${e.del} — 누르면 변경 내용${diffOpen ? ' (다시 누르면 터미널로)' : ''}` : '아직 고친 파일이 없습니다';
   }
   // 열려 있는 동안 새 수정이 생기거나 다른 워커로 바뀌면 다시 가져온다
   if (diffOpen && diffKeyOf(w) !== diffKey) { clearTimeout(diffTimer); diffTimer = setTimeout(loadDiff, 150); }
@@ -2567,6 +2567,7 @@ function diffGroups() {
     const x = m.get(f.file) || { ...f, edits: [], add: 0, del: 0, first: Infinity, last: 0, created: false };
     x.edits.push(ed); x.add += ed.add; x.del += ed.del; x.first = Math.min(x.first, ed.ts); x.last = Math.max(x.last, ed.ts);
     if (ed.kind === 'create') x.created = true;
+    x.deleted = ed.kind === 'delete'; // 시간순이라 마지막 수정이 지운 것이면 지금은 없는 파일
     m.set(f.file, x);
   }
   const reqOf = new Map((diffData?.requests || []).map((r) => [turnKey(r.turn), r]));
@@ -2596,7 +2597,7 @@ function renderDiff() {
     const slash = x.rel.lastIndexOf('/') + 1 || x.rel.lastIndexOf('\\') + 1;
     const on = diffSel && diffSel.turn === g.key && diffSel.file === x.file;
     return `<li class="df${on ? ' sel' : ''}" data-turn="${g.key}" data-file="${esc(x.file)}" title="${esc(x.file)}">
-      <span class="df-name">${esc(x.rel.slice(slash))}${x.created ? ' <i class="df-new">새 파일</i>' : ''}</span>
+      <span class="df-name">${esc(x.rel.slice(slash))}${x.deleted ? ' <i class="df-gone">삭제</i>' : x.created ? ' <i class="df-new">새 파일</i>' : ''}</span>
       <span class="df-dir"><bdi>${esc(x.rel.slice(0, slash))}</bdi></span>
       <span class="df-stat"><span class="d-add">+${x.add}</span> <span class="d-del">−${x.del}</span>${x.edits.length > 1 ? ` · ${x.edits.length}번` : ''}</span></li>`;
   };
@@ -2619,11 +2620,15 @@ function renderDiff() {
   }
   const g = diffSel && groups.find((x) => x.key === diffSel.turn), f = g && find(diffSel);
   const main = $('#diff-main');
-  if (!f) { main.innerHTML = '<div class="diff-empty">이 워커가 Edit·Write 로 고친 파일이 아직 없습니다.<br><small>셸 명령(sed, 스크립트 등)으로 바꾼 파일은 여기 나오지 않습니다.</small></div>'; main._file = main._html = null; return; }
+  // git 저장소가 아니면 셸 명령 비교를 못 한다 — 비어 있는 게 '안 고침'으로 읽히지 않게 늘 알린다
+  const shellNote = diffData && diffData.shellTracked === false
+    ? '<div class="diff-warn">이 작업 폴더는 git 저장소가 아니라, 셸 명령(sed·스크립트 등)으로 바뀐 파일은 여기 나오지 않습니다.</div>' : '';
+  if (!f) { main.innerHTML = `${shellNote}<div class="diff-empty">이 워커가 고친 파일이 아직 없습니다.</div>`; main._file = main._html = null; return; }
   // 고른 요청 안에서 이 파일을 고친 순서대로(위에서 아래로)
   const reqLine = `<div class="diff-reqline"><b>요청 ${g.turn != null ? `#${g.turn}` : '#?'}</b>${esc(reqText(g.prompt) || '(지난 요청 — 글이 남아 있지 않음)')}</div>`;
-  const html = `<div class="diff-path">${reqLine}${esc(f.rel)}<small>수정 ${f.edits.length}번</small></div>` + f.edits.map((ed) => {
-    const head = [fmtClock(ed.ts), ed.tool || (ed.kind === 'create' ? 'Write' : 'Edit'), ed.kind === 'create' ? '새 파일' : '']
+  const html = shellNote + `<div class="diff-path">${reqLine}${esc(f.rel)}<small>수정 ${f.edits.length}번</small></div>` + f.edits.map((ed) => {
+    const tool = ed.tool === 'Bash' ? `셸 명령 $ ${ed.cmd || ''}` : ed.tool || (ed.kind === 'create' ? 'Write' : 'Edit');
+    const head = [fmtClock(ed.ts), ed.agent ? `🤖 ${ed.agent}` : '', tool, ed.kind === 'create' ? '새 파일' : ed.kind === 'delete' ? '삭제' : '']
       .filter(Boolean).join(' · ');
     const body = ed.hunks.map((h) => {
       let o = h.oldStart, n = h.newStart;
@@ -2635,8 +2640,8 @@ function renderDiff() {
         return `<tr><td>${o++}</td><td>${n++}</td><td class="dl-s"></td><td>${text}</td></tr>`;
       }).join('');
       return `<tr class="dl-hunk"><td colspan="4">@@ −${h.oldStart},${h.oldLines} +${h.newStart},${h.newLines} @@</td></tr>${rows}`;
-    }).join('');
-    return `<section class="diff-edit"><div class="de-head"><span>${esc(head)}</span><span class="d-add">+${ed.add}</span><span class="d-del">−${ed.del}</span>${ed.userModified ? '<i class="de-user" title="승인 창에서 사람이 내용을 고쳐서 반영됨">사람이 고침</i>' : ''}${ed.cut ? '<i title="너무 길어 앞부분만 보여 줌">일부만</i>' : ''}</div><table class="diff-tbl">${body}</table></section>`;
+    }).join('') || (ed.binary ? '<tr class="dl-meta"><td></td><td></td><td></td><td>바이너리 파일 — 내용은 비교하지 않음</td></tr>' : '');
+    return `<section class="diff-edit"><div class="de-head"><span title="${esc(head)}">${esc(head)}</span><span class="d-add">+${ed.add}</span><span class="d-del">−${ed.del}</span>${ed.userModified ? '<i class="de-user" title="승인 창에서 사람이 내용을 고쳐서 반영됨">사람이 고침</i>' : ''}${ed.cut ? '<i title="너무 길어 앞부분만 보여 줌">일부만</i>' : ''}</div><table class="diff-tbl">${body}</table></section>`;
   }).join('');
   const view = `${g.key}|${f.file}`; // 같은 요청·파일을 다시 그릴 땐 보던 스크롤 자리를 지킨다
   if (main._html !== html) {

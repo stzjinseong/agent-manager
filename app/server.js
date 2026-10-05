@@ -11,7 +11,8 @@ import { execSync, execFile, spawn as spawnProcess } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import WebSocket, { WebSocketServer } from 'ws';
 import { createRequire } from 'node:module';
-import { createProfile, readProfile, profileSummary, runningSubagents, editLog } from './profile.js';
+import { createProfile, readProfile, profileSummary, runningSubagents, editLog, trimHunks } from './profile.js';
+import { snapshot, changedSince } from './shelldiff.js';
 import { createProgress, isCommit } from './progress.js';
 const { Terminal: HeadlessTerminal } = createRequire(import.meta.url)('@xterm/headless');
 
@@ -222,6 +223,8 @@ function hookSettings() {
   const hooks = Object.fromEntries(events.map((e) => [e, [{ hooks: h() }]]));
   hooks.PreToolUse = [{ matcher: '*', hooks: h() }];
   hooks.PostToolUse = [{ matcher: '*', hooks: h() }];
+  // 실패한 셸 명령도 파일을 바꿨을 수 있다 — diff 보기의 명령 전후 비교를 닫는다 (shelldiff.js)
+  hooks.PostToolUseFailure = [{ matcher: 'Bash', hooks: h() }];
   hooks.PermissionRequest = [{ matcher: '*', hooks: h(600) }];
   // 상태줄 명령으로 계정 사용량(5시간·주간 한도)을 받는다 — 사용자가 원래 쓰던 상태줄은 statusline.mjs 가 대신 실행해 그대로 보인다
   const statusLine = { type: 'command', command: `"${slash(process.execPath)}" "${slash(path.join(APP_DIR, 'statusline.mjs'))}"` };
@@ -541,6 +544,74 @@ function summarizeTool(name, input = {}) {
   return `${name}${pick ? ` · ${String(pick).replace(/\s+/g, ' ').slice(0, 120)}` : ''}`;
 }
 
+// ---------- 셸 명령으로 바뀐 파일 (diff 보기) ----------
+// 트랜스크립트엔 명령만 남으므로, Bash 실행 전(PreToolUse — 응답 전에 찍어야 명령보다 먼저다)과 후(PostToolUse/Failure)의
+// 작업 폴더를 git 으로 비교한다(shelldiff.js). 결과는 세션(트랜스크립트)별 파일에 쌓아 서버를 재시작해도 남는다.
+// 한계: 백그라운드 명령(run_in_background)은 결과가 곧바로 와서 그 뒤의 변경은 못 잡는다 · 명령이 도는 사이 같은 저장소에서
+// 다른 워커나 사람이 바꾼 것도 이 명령의 변경으로 잡힌다
+const SHELL_DIR = path.join(DATA_DIR, 'shell-edits');
+const MAX_SHELL_EDITS = 400;
+const shellFile = (txPath) => path.join(SHELL_DIR, `${path.basename(txPath, '.jsonl')}.jsonl`);
+function openProfile(txPath) {
+  const p = createProfile(txPath);
+  try {
+    p.shellEdits = fs.readFileSync(shellFile(txPath), 'utf8').split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } })
+      .filter(Boolean).slice(-MAX_SHELL_EDITS);
+  } catch {}
+  return p;
+}
+const repoChecks = new Map(); // cwd → Promise<bool> (git 저장소인지 — diff 화면 안내용)
+function snapshotRepo(cwd) {
+  if (!cwd) return Promise.resolve(false);
+  if (!repoChecks.has(cwd)) repoChecks.set(cwd, snapshot(cwd).then(Boolean));
+  return repoChecks.get(cwd);
+}
+const withTimeout = (pr, ms) => Promise.race([pr, new Promise((r) => setTimeout(() => r(null), ms))]);
+async function shellHook(w, ev) {
+  try {
+    const name = ev.hook_event_name, scope = ev.agent_id || 'main';
+    w.shellPending ||= new Map(); // tool_use_id → { pre, cmd, agent, scope, txPath }
+    if (name === 'PreToolUse') {
+      // 같은 쪽(메인·같은 서브에이전트)의 다음 도구가 시작됐으면 앞 명령은 끝난 것 — 거절·중단돼 끝 알림이 안 온 명령을 여기서 닫는다.
+      // 다음 도구(Edit 등)가 파일을 쓰기 전에 찍어야 그 수정이 셸 변경으로 섞이지 않는다 → 응답 전에 기다린다
+      const stale = [...w.shellPending].filter(([id, x]) => x.scope === scope && id !== ev.tool_use_id).map(([id]) => closeShell(w, id));
+      if (stale.length) await withTimeout(Promise.all(stale), 3000);
+      if (ev.tool_name === 'Bash' && !ev.tool_input?.run_in_background) {
+        const pre = await withTimeout(snapshot(ev.cwd || w.cwd), 5000); // 훅 제한(10초) 안에 (앞 명령 닫기 3초 + 5초) — 못 찍으면 이 명령은 건너뛴다
+        if (pre) w.shellPending.set(ev.tool_use_id, { pre, scope, cmd: String(ev.tool_input?.command || ''), agent: ev.agent_id ? (ev.agent_type || 'subagent') : null, txPath: ev.transcript_path });
+      }
+    } else if ((name === 'PostToolUse' || name === 'PostToolUseFailure') && ev.tool_name === 'Bash') {
+      await withTimeout(closeShell(w, ev.tool_use_id), 4000);
+    } else if (name === 'UserPromptSubmit' || name === 'Stop' || name === 'SessionStart' || (name === 'SubagentStop' && ev.agent_id)) {
+      const ids = [...w.shellPending].filter(([, x]) => name !== 'SubagentStop' || x.scope === ev.agent_id).map(([id]) => id);
+      await withTimeout(Promise.all(ids.map((id) => closeShell(w, id))), 4000);
+    }
+  } catch {}
+}
+// 명령 뒤 상태를 찍고(이 약속이 끝나면 찍힌 것) 바뀐 파일을 기록한다
+function closeShell(w, id) {
+  const pend = w.shellPending?.get(id);
+  if (!pend) return Promise.resolve();
+  w.shellPending.delete(id);
+  return changedSince(pend.pre).then((files) => {
+    if (!files.length) return;
+    const ts = Date.now();
+    const recs = files.map((f, i) => ({
+      id: `${id}:${i}`, toolUseId: id, ts, tool: 'Bash', cmd: pend.cmd.slice(0, 500), agent: pend.agent, file: f.file, kind: f.kind,
+      binary: f.binary || undefined, ...trimHunks(f.hunks),
+    }));
+    const txPath = pend.txPath || w.tx?.path;
+    if (txPath) {
+      try { fs.mkdirSync(SHELL_DIR, { recursive: true }); fs.appendFileSync(shellFile(txPath), recs.map((r) => JSON.stringify(r)).join('\n') + '\n'); } catch {}
+    }
+    if (w.tx && (!txPath || w.tx.path === txPath)) {
+      w.tx.shellEdits.push(...recs);
+      if (w.tx.shellEdits.length > MAX_SHELL_EDITS) w.tx.shellEdits.splice(0, w.tx.shellEdits.length - MAX_SHELL_EDITS);
+      emitState();
+    }
+  }).catch(() => {});
+}
+
 // ---------- 훅 수신 ----------
 
 function onHook(w, ev, res) {
@@ -549,7 +620,7 @@ function onHook(w, ev, res) {
   if (ev.session_id) w.sessionId = ev.session_id;
   const prevTx = w.tx; // /clear 직전 세션 — 그 세션의 컨텍스트 크기로 /clear 경험치를 정한다
   if (ev.transcript_path) {
-    if (!w.tx || w.tx.path !== ev.transcript_path) w.tx = createProfile(ev.transcript_path);
+    if (!w.tx || w.tx.path !== ev.transcript_path) w.tx = openProfile(ev.transcript_path);
     scheduleProfile(w);
   }
 
@@ -805,7 +876,7 @@ function onHostHello({ ptys }) {
   for (const rec of saved) {
     if (workers.has(rec.id)) continue;
     const p = alive.get(rec.id);
-    const w = { ...rec, term: hostTerm(rec.id), tx: rec.txPath ? createProfile(rec.txPath) : null };
+    const w = { ...rec, term: hostTerm(rec.id), tx: rec.txPath ? openProfile(rec.txPath) : null };
     delete w.txPath;
     if (!p || p.exited) w.status = 'exited';
     else { w.pid = p.pid; pushLog(w, 'status', '관제 서버 재시작 — 워커 다시 연결'); }
@@ -1052,6 +1123,7 @@ const server = http.createServer(async (req, res) => {
     const ev = await readBody(req);
     if (process.env.AM_DEBUG) fs.appendFileSync(path.join(DATA_DIR, 'hook-debug.jsonl'), JSON.stringify({ w: url.searchParams.get('w'), ...ev }) + '\n');
     if (!w) return json(res, 200, {});
+    await shellHook(w, ev);
     return onHook(w, ev, res);
   }
 
@@ -1064,7 +1136,8 @@ const server = http.createServer(async (req, res) => {
     if (!w) return json(res, 404, { error: '워커가 없습니다' });
     const rel = (f) => { const r = path.relative(w.cwd || ROOT, f); return r && !r.startsWith('..') && !path.isAbsolute(r) ? r : f; };
     const log = w.tx ? editLog(w.tx) : { files: [], requests: [] };
-    return json(res, 200, { cwd: w.cwd, files: log.files.map((x) => ({ ...x, rel: rel(x.file) })), requests: log.requests });
+    const shellTracked = Boolean(await snapshotRepo(w.cwd));
+    return json(res, 200, { cwd: w.cwd, shellTracked, files: log.files.map((x) => ({ ...x, rel: rel(x.file) })), requests: log.requests });
   }
 
   if (req.method === 'POST' && p === '/api/workers') {

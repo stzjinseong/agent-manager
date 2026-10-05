@@ -1246,6 +1246,8 @@ body.resizing-term { cursor: row-resize; user-select: none; }
 .dr-files li.df:hover { background: var(--surface-2); }
 .dr-files li.df.sel { background: var(--surface-3); box-shadow: inset 2px 0 0 var(--avatar, var(--accent)); }
 .df-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.df-gone { font-style: normal; font-weight: 500; font-size: 10.5px; color: var(--d-del); margin-left: 4px; }
+.diff-warn { margin: 10px 10px 0; padding: 7px 10px; border-radius: 8px; font-size: 12px; color: var(--decision); background: color-mix(in srgb, var(--decision) 10%, transparent); border: 1px solid color-mix(in srgb, var(--decision) 30%, transparent); }
 .df-new { font-style: normal; font-weight: 500; font-size: 10.5px; color: var(--d-add); margin-left: 4px; }
 .df-dir { color: var(--dim); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; } /* 긴 경로는 앞쪽을 줄임표로 */
 .df-dir bdi { direction: ltr; unicode-bidi: isolate; }
@@ -1258,7 +1260,7 @@ body.resizing-term { cursor: row-resize; user-select: none; }
 .diff-path small { margin-left: 10px; font-weight: 400; color: var(--dim); font-family: inherit; }
 .diff-edit { margin: 10px 10px 0; border: 1px solid var(--line-2); border-radius: 8px; overflow: hidden; }
 .de-head { display: flex; align-items: center; gap: 8px; padding: 5px 10px; background: var(--surface); color: var(--text-2); font-size: 12px; }
-.de-head > span:first-child { margin-right: auto; }
+.de-head > span:first-child { margin-right: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .de-head .d-add, .de-head .d-del { font-family: var(--mono); }
 .de-head i { font-style: normal; font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--surface-3); color: var(--text-2); }
 .de-head .de-user { color: var(--decision); }
