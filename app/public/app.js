@@ -1917,14 +1917,18 @@ memoForm.onsubmit = (e) => {
 
 // ---------- 지시·메모 추가 연출: 워커 색 작은 쪽지가 입력 칸에서 그 워커 카드의 캐릭터로 날아간다 ----------
 // 직선으로 날아가며 꼬리(트레일)를 남기고, 도착하면 캐릭터가 통 튀고 무대가 워커 색으로 번쩍인다. 순수 연출이라 실패해도 무시
+// 최소화(회로 기판 숨김) 중엔 헤더 아래 칩·매니저가 연출의 출발·도착점 — 숨은 카드는 크기가 0 이라 화면 왼쪽 위로 날아갔다
+const floorMin = () => $('#floor').hidden;
+const workerAvatar = (id) => (floorMin() ? dockEls : nodeEls).get(id)?.querySelector('.avatar');
+const managerEl = () => (floorMin() ? $('#dock-mgr') : $('.core-dot'));
 function flyToWorker(id, fromEl, kind) {
-  const w = state.workers.find((x) => x.id === id), target = nodeEls.get(id)?.querySelector('.avatar');
+  const w = state.workers.find((x) => x.id === id), target = workerAvatar(id);
   if (!w || !target || !fromEl) return;
   const color = avatarColor(w.name) || 'var(--accent)';
   flyNote(fromEl, target, color, `fly-note ${kind}`, () => {
-    const nd = nodeEls.get(id);
+    const nd = (floorMin() ? dockEls : nodeEls).get(id);
     if (!nd?.isConnected) return;
-    const stage = nd.querySelector('.stage');
+    const stage = nd.querySelector('.stage') || nd;
     stage.style.setProperty('--fc', color);
     stage.classList.remove('got'); void stage.offsetWidth; stage.classList.add('got');
     setTimeout(() => stage.classList.remove('got'), 900);
@@ -1934,7 +1938,7 @@ function flyToWorker(id, fromEl, kind) {
 // reason: 'clear'(/clear) · 'cache'(턴 캐시 적중률, detail = %) · 없음(작업 완료). 잃은 경험치는 날아가지 않고 매니저 위에 빨갛게
 const XP_REASON = { clear: () => ' · /clear', cache: (d) => ` · 캐시 ${d}%` };
 function flyXpToManager(id, xp, reason, detail) {
-  const from = nodeEls.get(id)?.querySelector('.avatar'), dot = $('.core-dot');
+  const from = workerAvatar(id), dot = managerEl();
   if (!dot) return;
   const label = XP_REASON[reason]?.(detail) || '';
   const show = () => {

@@ -1284,7 +1284,7 @@ body.resizing-term { cursor: row-resize; user-select: none; }
   padding: 7px 24px; background: color-mix(in srgb, var(--floor) 88%, transparent);
   backdrop-filter: blur(10px); border-bottom: 1px solid var(--line);
 }
-.dock-mgr { flex: none; display: grid; place-items: center; padding: 2px 4px; }
+.dock-mgr { position: relative; flex: none; display: grid; place-items: center; padding: 2px 4px; }
 .dock-mark svg { width: 34px; height: 19px; display: block; overflow: visible; }
 .dock-mark .clawd .body { fill: #f3f1ec; }
 .dock-mark .clawd .eye { fill: #14161c; }
@@ -1317,3 +1317,9 @@ body.resizing-term { cursor: row-resize; user-select: none; }
 .dchip .dst { flex: none; color: var(--c); font-size: 11.5px; }
 .dchip.unseen .dst { font-weight: 700; }
 .dock-expand { flex: none; padding: 4px 10px; font-size: 12px; }
+/* 최소화 중 연출 도착: 칩이 빛나고 캐릭터가 통 튐 · 매니저 '+N XP' 는 헤더에 가리지 않게 아래로 떠내려감 */
+.dchip.got { box-shadow: 0 0 0 1.5px var(--fc), 0 0 14px color-mix(in srgb, var(--fc) 60%, transparent); }
+.dchip.got .avatar .clawd { animation: got-hop .55s cubic-bezier(.3, 1.6, .5, 1); transform-origin: 50% 100%; }
+.dock-mgr.xp-got { animation: xp-got .7s ease-out; }
+.dock-mgr .mgr-xp { top: 100%; animation-name: mgr-xp-down; }
+@keyframes mgr-xp-down { 0% { opacity: 0; transform: translate(-50%, -6px); } 15% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, 22px); } }
