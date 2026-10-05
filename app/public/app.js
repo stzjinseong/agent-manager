@@ -2460,8 +2460,12 @@ let sideAnim = null;
 // ---------- diff 보기 ----------
 // 워커가 Edit·Write 로 고친 파일의 변경을 터미널 자리에 덮어 보여 준다. 터미널은 그 아래 그대로 있어(크기도 그대로)
 // 닫으면 다시 맞출 것 없이 바로 돌아온다. 내용은 열 때·새 수정이 생길 때만 서버에서 가져온다(상태 방송엔 개수만)
-let diffOpen = false, diffData = null, diffSel = null, diffKey = '', diffTimer = null;
-let diffReq = 'all'; // 'all' 이거나 요청(턴) 번호 — 그 요청에서 바뀐 것만
+let diffOpen = false, diffData = null, diffKey = '', diffTimer = null;
+// 왼쪽 목록은 파일을 고친 요청을 오래된 것부터(오름차순) 나열하고, 요청을 누르면 그 요청에서 바뀐 파일이 펼쳐진다.
+// diffSel: 보고 있는 { turn, file } — turn 은 문자열 키(번호 없는 요청은 'null'). diffExpanded: 펼친 요청 키.
+// diffFollow: 마지막 요청을 보고 있으면 새 요청이 생길 때 따라간다(사람이 지난 요청을 고르면 멈춤)
+let diffSel = null, diffExpanded = new Set(), diffFollow = true;
+const turnKey = (t) => String(t ?? null);
 const diffKeyOf = (w) => `${w.id}:${w.profile?.edits?.n || 0}:${w.profile?.edits?.last || 0}`;
 function renderDiffButton(w) {
   const e = w.profile?.edits, n = e?.files || 0;
@@ -2482,7 +2486,7 @@ async function loadDiff() {
   let data;
   try { data = await (await fetch(`/api/workers/${w.id}/diff`)).json(); } catch { toast('변경 내용을 가져오지 못했습니다', 3000); return; }
   if (!diffOpen || selected !== w.id) return;
-  if (diffData?.wid !== w.id) { diffSel = null; diffReq = 'all'; } // 다른 워커면 전체 · 맨 위 파일부터
+  if (diffData?.wid !== w.id) { diffSel = null; diffExpanded = new Set(); diffFollow = true; } // 다른 워커면 마지막 요청부터
   diffData = { ...data, wid: w.id };
   diffKey = key;
   renderDiff();
@@ -2497,53 +2501,75 @@ function setDiffOpen(on) {
   else term.focus();
 }
 const fmtClock = (t) => new Date(t + clockSkew).toLocaleTimeString('ko-KR', { hour12: false });
-// 요청 하나만 볼 땐 그 요청의 수정만 남기고 파일별 +/− 도 그 수정들로 다시 센다
-function diffFiles() {
-  const all = diffData?.files || [];
-  if (diffReq === 'all') return all;
-  return all.map((f) => {
-    const edits = f.edits.filter((ed) => String(ed.turn) === diffReq);
-    if (!edits.length) return null;
-    return { ...f, edits, add: edits.reduce((a, x) => a + x.add, 0), del: edits.reduce((a, x) => a + x.del, 0),
-      last: Math.max(...edits.map((x) => x.ts)), created: edits.some((x) => x.kind === 'create') };
-  }).filter(Boolean).sort((a, b) => b.last - a.last);
-}
 // 요청 글: 붙여 넣은 글 표시(<pasted_content …>) 같은 태그는 빼고 한 줄로
 const reqText = (t) => String(t || '').replace(/<\/?[a-z_-]+[^>]*>/gi, ' ').replace(/\s+/g, ' ').trim();
-function renderDiffReqs() {
-  const reqs = diffData?.requests || [];
-  if (diffReq !== 'all' && !reqs.some((r) => String(r.turn) === diffReq)) diffReq = 'all';
-  const short = (t) => { const s = reqText(t); return s.length > 48 ? `${s.slice(0, 48)}…` : s; };
-  const html = `<option value="all">전체 요청 (${reqs.length}개)</option>` + reqs.map((r) =>
-    `<option value="${r.turn}">${r.turn != null ? `#${r.turn}` : '(번호 없음)'} · ${fmtClock(r.start ?? r.last).slice(0, -3)} · ${esc(short(r.prompt) || '(지난 요청)')} — 파일 ${r.files}</option>`).join('');
-  const sel = $('#diff-req');
-  if (sel._html !== html) sel.innerHTML = sel._html = html;
-  sel.value = diffReq;
-  const cur = reqs.find((r) => String(r.turn) === diffReq);
-  sel.title = cur?.prompt ? `요청 #${cur.turn}: ${reqText(cur.prompt)}` : '어느 요청에서 바뀐 것을 볼지';
+// 요청별로 묶기: 요청(오름차순) → 그 요청에서 고친 파일(처음 고친 순) · 파일별 +/− 는 그 요청 안의 수정만 센다
+function diffGroups() {
+  const files = diffData?.files || [], byTurn = new Map();
+  for (const f of files) for (const ed of f.edits) {
+    const k = turnKey(ed.turn);
+    if (!byTurn.has(k)) byTurn.set(k, new Map());
+    const m = byTurn.get(k);
+    const x = m.get(f.file) || { ...f, edits: [], add: 0, del: 0, first: Infinity, last: 0, created: false };
+    x.edits.push(ed); x.add += ed.add; x.del += ed.del; x.first = Math.min(x.first, ed.ts); x.last = Math.max(x.last, ed.ts);
+    if (ed.kind === 'create') x.created = true;
+    m.set(f.file, x);
+  }
+  const reqOf = new Map((diffData?.requests || []).map((r) => [turnKey(r.turn), r]));
+  return [...byTurn.entries()].map(([k, m]) => {
+    const fs = [...m.values()].sort((a, b) => a.first - b.first);
+    for (const x of fs) x.edits.sort((a, b) => a.ts - b.ts);
+    const r = reqOf.get(k) || {};
+    return { key: k, turn: r.turn ?? (k === 'null' ? null : Number(k)), prompt: r.prompt, start: r.start ?? fs[0].first, files: fs,
+      add: fs.reduce((a, x) => a + x.add, 0), del: fs.reduce((a, x) => a + x.del, 0) };
+  }).sort((a, b) => (a.turn ?? -1) - (b.turn ?? -1));
 }
 function renderDiff() {
-  renderDiffReqs();
-  const files = diffFiles();
-  if (!files.some((f) => f.file === diffSel)) diffSel = files[0]?.file || null;
-  const add = files.reduce((a, f) => a + f.add, 0), del = files.reduce((a, f) => a + f.del, 0);
-  $('#diff-sum').innerHTML = files.length ? `고친 파일 <b>${files.length}</b> <span class="d-add">+${add}</span> <span class="d-del">−${del}</span>` : '고친 파일 없음';
+  const groups = diffGroups(), latest = groups.at(-1);
+  const find = (sel) => sel && groups.find((g) => g.key === sel.turn)?.files.find((x) => x.file === sel.file);
+  // 고른 것이 없거나 사라졌으면, 또는 마지막 요청을 따라가는 중이면 마지막 요청의 첫 파일
+  if (latest && (!find(diffSel) || (diffFollow && diffSel.turn !== latest.key))) {
+    diffSel = { turn: latest.key, file: latest.files[0].file };
+    diffExpanded.add(latest.key);
+  }
+  if (!latest) diffSel = null;
+  const allFiles = diffData?.files || [];
+  const add = allFiles.reduce((a, f) => a + f.add, 0), del = allFiles.reduce((a, f) => a + f.del, 0);
+  $('#diff-sum').innerHTML = allFiles.length
+    ? `요청 <b>${groups.length}</b> · 파일 <b>${allFiles.length}</b> <span class="d-add">+${add}</span> <span class="d-del">−${del}</span>` : '고친 파일 없음';
   const list = $('#diff-files');
-  const listHtml = files.map((f) => {
-    const slash = f.rel.lastIndexOf('/') + 1 || f.rel.lastIndexOf('\\') + 1;
-    return `<li data-file="${esc(f.file)}" class="${f.file === diffSel ? 'sel' : ''}" title="${esc(f.file)}">
-      <span class="df-name">${esc(f.rel.slice(slash))}${f.created ? ' <i class="df-new">새 파일</i>' : ''}</span>
-      <span class="df-dir"><bdi>${esc(f.rel.slice(0, slash))}</bdi></span>
-      <span class="df-stat"><span class="d-add">+${f.add}</span> <span class="d-del">−${f.del}</span> · ${fmtClock(f.last)}</span></li>`;
+  const fileRow = (g, x) => {
+    const slash = x.rel.lastIndexOf('/') + 1 || x.rel.lastIndexOf('\\') + 1;
+    const on = diffSel && diffSel.turn === g.key && diffSel.file === x.file;
+    return `<li class="df${on ? ' sel' : ''}" data-turn="${g.key}" data-file="${esc(x.file)}" title="${esc(x.file)}">
+      <span class="df-name">${esc(x.rel.slice(slash))}${x.created ? ' <i class="df-new">새 파일</i>' : ''}</span>
+      <span class="df-dir"><bdi>${esc(x.rel.slice(0, slash))}</bdi></span>
+      <span class="df-stat"><span class="d-add">+${x.add}</span> <span class="d-del">−${x.del}</span>${x.edits.length > 1 ? ` · ${x.edits.length}번` : ''}</span></li>`;
+  };
+  const listHtml = groups.map((g) => {
+    const open = diffExpanded.has(g.key), cur = diffSel?.turn === g.key;
+    const text = reqText(g.prompt) || '(지난 요청 — 글이 남아 있지 않음)';
+    return `<li class="dr${open ? ' open' : ''}${cur ? ' cur' : ''}">
+      <div class="dr-head" data-turn="${g.key}" role="button" tabindex="0" aria-expanded="${open}" title="${esc(text)}">
+        <span class="chev">▾</span>
+        <span class="dr-main"><span class="dr-top"><b>${g.turn != null ? `#${g.turn}` : '#?'}</b><time>${fmtClock(g.start).slice(0, -3)}</time>
+          <span class="dr-stat">파일 ${g.files.length} · <span class="d-add">+${g.add}</span> <span class="d-del">−${g.del}</span></span></span>
+        <span class="dr-text">${esc(text)}</span></span>
+      </div>
+      ${open ? `<ul class="dr-files">${g.files.map((x) => fileRow(g, x)).join('')}</ul>` : ''}</li>`;
   }).join('');
-  if (list._html !== listHtml) list.innerHTML = list._html = listHtml;
-  const main = $('#diff-main'), f = files.find((x) => x.file === diffSel);
+  if (list._html !== listHtml) {
+    const first = !list._html;
+    list.innerHTML = list._html = listHtml;
+    if (first) list.querySelector('.df.sel')?.scrollIntoView({ block: 'nearest' }); // 처음 열 땐 마지막 요청이 보이게
+  }
+  const g = diffSel && groups.find((x) => x.key === diffSel.turn), f = g && find(diffSel);
+  const main = $('#diff-main');
   if (!f) { main.innerHTML = '<div class="diff-empty">이 워커가 Edit·Write 로 고친 파일이 아직 없습니다.<br><small>셸 명령(sed, 스크립트 등)으로 바꾼 파일은 여기 나오지 않습니다.</small></div>'; main._file = main._html = null; return; }
-  // 수정 한 건씩, 최근 것이 위. 같은 파일을 다시 그릴 땐 보던 스크롤 자리를 지킨다
-  const req = diffReq !== 'all' && diffData.requests.find((r) => String(r.turn) === diffReq);
-  const reqLine = req ? `<div class="diff-reqline"><b>요청 #${req.turn}</b>${esc(reqText(req.prompt) || '(지난 요청 — 글이 남아 있지 않음)')}</div>` : '';
-  const html = `<div class="diff-path">${reqLine}${esc(f.rel)}<small>수정 ${f.edits.length}번</small></div>` + f.edits.slice().reverse().map((ed) => {
-    const head = [ed.turn != null ? `요청 #${ed.turn}` : '', fmtClock(ed.ts), ed.tool || (ed.kind === 'create' ? 'Write' : 'Edit'), ed.kind === 'create' ? '새 파일' : '']
+  // 고른 요청 안에서 이 파일을 고친 순서대로(위에서 아래로)
+  const reqLine = `<div class="diff-reqline"><b>요청 ${g.turn != null ? `#${g.turn}` : '#?'}</b>${esc(reqText(g.prompt) || '(지난 요청 — 글이 남아 있지 않음)')}</div>`;
+  const html = `<div class="diff-path">${reqLine}${esc(f.rel)}<small>수정 ${f.edits.length}번</small></div>` + f.edits.map((ed) => {
+    const head = [fmtClock(ed.ts), ed.tool || (ed.kind === 'create' ? 'Write' : 'Edit'), ed.kind === 'create' ? '새 파일' : '']
       .filter(Boolean).join(' · ');
     const body = ed.hunks.map((h) => {
       let o = h.oldStart, n = h.newStart;
@@ -2558,7 +2584,7 @@ function renderDiff() {
     }).join('');
     return `<section class="diff-edit"><div class="de-head"><span>${esc(head)}</span><span class="d-add">+${ed.add}</span><span class="d-del">−${ed.del}</span>${ed.userModified ? '<i class="de-user" title="승인 창에서 사람이 내용을 고쳐서 반영됨">사람이 고침</i>' : ''}${ed.cut ? '<i title="너무 길어 앞부분만 보여 줌">일부만</i>' : ''}</div><table class="diff-tbl">${body}</table></section>`;
   }).join('');
-  const view = `${diffReq}|${f.file}`; // 같은 요청·파일을 다시 그릴 땐 보던 스크롤 자리를 지킨다
+  const view = `${g.key}|${f.file}`; // 같은 요청·파일을 다시 그릴 땐 보던 스크롤 자리를 지킨다
   if (main._html !== html) {
     const keep = main._file === view ? main.scrollTop : 0;
     main.innerHTML = main._html = html;
@@ -2566,15 +2592,27 @@ function renderDiff() {
     main._file = view;
   }
 }
-$('#diff-files').addEventListener('click', (e) => {
-  const li = e.target.closest('li[data-file]');
-  if (!li) return;
-  diffSel = li.dataset.file;
+// 요청 줄: 펼치기/접기 · 파일 줄: 그 요청에서 이 파일의 변경 보기
+function toggleDiffReq(key) {
+  if (diffExpanded.has(key)) diffExpanded.delete(key); else diffExpanded.add(key);
   renderDiff();
+}
+$('#diff-files').addEventListener('click', (e) => {
+  const head = e.target.closest('.dr-head');
+  if (head) { toggleDiffReq(head.dataset.turn); return; }
+  const li = e.target.closest('li.df');
+  if (!li) return;
+  const groups = diffGroups();
+  diffSel = { turn: li.dataset.turn, file: li.dataset.file };
+  diffFollow = li.dataset.turn === groups.at(-1)?.key; // 마지막 요청을 고르면 다시 따라간다
+  renderDiff();
+});
+$('#diff-files').addEventListener('keydown', (e) => {
+  const head = e.target.closest('.dr-head');
+  if (head && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggleDiffReq(head.dataset.turn); }
 });
 for (const b of document.querySelectorAll('.btn-diff')) b.onclick = () => setDiffOpen(!diffOpen);
 $('#btn-diff-close').onclick = () => setDiffOpen(false);
-$('#diff-req').onchange = (e) => { diffReq = e.target.value; diffSel = null; renderDiff(); };
 $('#btn-full').onclick = () => setTermFull(!$('#term-wrap').classList.contains('full'));
 $('#btn-full-exit').onclick = () => setTermFull(false);
 $('#btn-remove').onclick = async () => {

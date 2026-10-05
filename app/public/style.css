@@ -1219,22 +1219,31 @@ body.resizing-term { cursor: row-resize; user-select: none; }
 .btn-diff.none { opacity: .55; }
 .btn-diff.on { background: var(--surface-3); border-color: var(--line-2); color: var(--text); }
 .diff-view {
-  position: absolute; inset: 0; z-index: 5; display: grid; grid-template-columns: minmax(170px, 240px) 1fr;
+  position: absolute; inset: 0; z-index: 5; display: grid; grid-template-columns: minmax(200px, 290px) 1fr;
   background: var(--term-bg); color: var(--text); font-size: 12.5px; border-radius: 6px; overflow: hidden;
 }
 .diff-files { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line-2); }
 .diff-files-head { display: flex; align-items: center; gap: 6px; padding: 4px 4px 6px 8px; color: var(--text-2); border-bottom: 1px solid var(--line); }
 .diff-files-head #diff-sum { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .diff-files-head .btn { padding: 3px 8px; font-size: 12px; }
-.diff-req {
-  margin: 6px 6px 2px; padding: 5px 8px; min-width: 0; font: inherit; font-size: 12px; color: var(--text);
-  background: var(--surface-2); border: 1px solid var(--line-2); border-radius: 6px; cursor: pointer;
-}
-.diff-req:hover { border-color: var(--dim); }
 #diff-files { list-style: none; margin: 0; padding: 4px; overflow: auto; flex: 1; }
-#diff-files li { display: grid; padding: 6px 8px; border-radius: 6px; cursor: pointer; line-height: 1.35; }
-#diff-files li:hover { background: var(--surface-2); }
-#diff-files li.sel { background: var(--surface-3); box-shadow: inset 2px 0 0 var(--avatar, var(--accent)); }
+/* 요청(오름차순) → 펼치면 그 요청에서 고친 파일 */
+#diff-files .dr { margin-bottom: 2px; }
+.dr-head { display: flex; gap: 2px; align-items: flex-start; padding: 6px 6px 6px 2px; border-radius: 6px; cursor: pointer; user-select: none; }
+.dr-head:hover { background: var(--surface-2); }
+.dr-head .chev { flex: none; width: 16px; text-align: center; color: var(--dim); font-size: 12px; line-height: 18px; transition: transform .15s; }
+.dr:not(.open) .dr-head .chev { transform: rotate(-90deg); }
+.dr-main { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.dr-top { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; }
+.dr-top b { color: var(--accent-hi); font-weight: 600; }
+.dr-top time { color: var(--dim); font: 11px var(--mono); }
+.dr-stat { margin-left: auto; color: var(--dim); font: 11px var(--mono); }
+.dr-text { color: var(--text-2); font-size: 12px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-all; }
+.dr.cur > .dr-head .dr-text { color: var(--text); }
+.dr-files { list-style: none; margin: 2px 0 6px 16px; padding: 0 0 0 6px; border-left: 1px solid var(--line-2); }
+.dr-files li.df { display: grid; padding: 5px 8px; border-radius: 6px; cursor: pointer; line-height: 1.35; }
+.dr-files li.df:hover { background: var(--surface-2); }
+.dr-files li.df.sel { background: var(--surface-3); box-shadow: inset 2px 0 0 var(--avatar, var(--accent)); }
 .df-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .df-new { font-style: normal; font-weight: 500; font-size: 10.5px; color: var(--d-add); margin-left: 4px; }
 .df-dir { color: var(--dim); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; } /* 긴 경로는 앞쪽을 줄임표로 */
