@@ -1244,7 +1244,7 @@ body.resizing-term { cursor: row-resize; user-select: none; }
 .dr-files { list-style: none; margin: 2px 0 6px 16px; padding: 0 0 0 6px; border-left: 1px solid var(--line-2); }
 .dr-files li.df { display: grid; padding: 5px 8px; border-radius: 6px; cursor: pointer; line-height: 1.35; }
 .dr-files li.df:hover { background: var(--surface-2); }
-.dr-files li.df.sel { background: var(--surface-3); box-shadow: inset 2px 0 0 var(--avatar, var(--accent)); }
+.dr-files li.df.sel { background: var(--surface-3); }
 .df-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .df-gone { font-style: normal; font-weight: 500; font-size: 10.5px; color: var(--d-del); margin-left: 4px; }
 .diff-warn { margin: 10px 10px 0; padding: 7px 10px; border-radius: 8px; font-size: 12px; color: var(--decision); background: color-mix(in srgb, var(--decision) 10%, transparent); border: 1px solid color-mix(in srgb, var(--decision) 30%, transparent); }
@@ -1321,3 +1321,37 @@ body.resizing-term { cursor: row-resize; user-select: none; }
 .brand-mark.xp-got { animation: xp-got .7s ease-out; }
 .brand-mark .mgr-xp { top: 100%; animation-name: mgr-xp-down; }
 @keyframes mgr-xp-down { 0% { opacity: 0; transform: translate(-50%, -6px); } 15% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, 22px); } }
+
+/* ---------- 빈 자리 안내 (워커를 열지 않았을 때) ---------- */
+.hint { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; padding: 56px 24px 72px; color: var(--text-2); }
+.hint h2 { margin: 6px 0 0; font-size: 19px; font-weight: 700; color: var(--text); letter-spacing: -.01em; }
+.hint p { margin: 0; max-width: 460px; font-size: 13.5px; line-height: 1.6; color: var(--dim); }
+.hint p b { color: var(--text-2); font-weight: 600; }
+.hint .btn { margin-top: 8px; }
+.hint-art { position: relative; width: 150px; height: 96px; display: grid; place-items: center; }
+.hint-art .avatar { width: 72px; height: 40px; }
+/* 만들기: 점선 빈 자리에 흐린 캐릭터, 위에서 + 가 통통 */
+.hint-slot { display: grid; place-items: center; width: 118px; height: 78px; border: 1.5px dashed rgb(var(--ink) / .2); border-radius: 14px; }
+.hint-art.create .avatar { opacity: .35; filter: grayscale(1); animation: breathe 3.2s ease-in-out infinite; }
+.hint-plus {
+  position: absolute; top: -4px; right: 4px; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--accent); color: #fff; font: 700 19px/1 var(--mono); box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 55%, transparent);
+  animation: hint-pop 1.6s ease-in-out infinite;
+}
+@keyframes hint-pop { 50% { transform: translateY(-4px) scale(1.08); } }
+/* 누르기: 캐릭터 쪽으로 커서가 다가가 콕 누르면 물결이 퍼지고 캐릭터가 통 튄다 (2.4초 반복) */
+.hint-art.click .avatar { --avatar: var(--accent); animation: hint-hop 2.4s ease-in-out infinite; transform-origin: 50% 100%; }
+.hint-cursor { position: absolute; left: 50%; top: 50%; width: 22px; height: 33px; overflow: visible; animation: hint-cursor 2.4s ease-in-out infinite; }
+.hint-cursor path { fill: #f3f1ec; stroke: #14161c; stroke-width: 1; stroke-linejoin: round; }
+:root[data-theme="light"] .hint-cursor path { fill: #14161c; stroke: #f3f1ec; }
+.hint-ring { position: absolute; left: 50%; top: 50%; width: 26px; height: 26px; margin: -6px 0 0 -6px; border-radius: 50%; border: 2px solid var(--accent); opacity: 0; animation: hint-ring 2.4s ease-out infinite; }
+@keyframes hint-cursor {
+  0% { transform: translate(46px, 34px); }
+  40% { transform: translate(6px, 6px); }
+  48% { transform: translate(6px, 6px) scale(.85); }
+  56%, 75% { transform: translate(6px, 6px); }
+  100% { transform: translate(46px, 34px); }
+}
+@keyframes hint-ring { 0%, 46% { opacity: 0; transform: scale(.4); } 50% { opacity: .9; } 80%, 100% { opacity: 0; transform: scale(2.2); } }
+@keyframes hint-hop { 0%, 48%, 70%, 100% { transform: translateY(0); } 56% { transform: translateY(-8px) scaleY(1.04); } }
+@media (prefers-reduced-motion: reduce) { .hint-art *, .hint-plus { animation: none !important; } .hint-ring { display: none; } }

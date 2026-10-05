@@ -535,6 +535,7 @@ function render() {
   renderDock();
   renderCompare();
   renderDetail();
+  renderHint();
   mgrUpdate();
   $('#recent-cwds').innerHTML = state.recentCwds.map((c) => `<option value="${esc(c)}">`).join('');
 }
@@ -823,6 +824,7 @@ function setFloorMin(on) {
   $('#dock').hidden = !on;
   try { on ? localStorage.setItem(FLOOR_MIN_KEY, '1') : localStorage.removeItem(FLOOR_MIN_KEY); } catch {}
   renderDock();
+  renderHint();
   if (!on) requestAnimationFrame(() => { traceSig = ''; drawTraces(); mgrUpdate(); });
 }
 $('#btn-floor-min').addEventListener('click', () => setFloorMin(true));
@@ -937,6 +939,29 @@ function roundedPath(pts, r) {
 }
 
 new ResizeObserver(() => requestAnimationFrame(drawTraces)).observe($('#floor'));
+
+// ---------- 빈 자리 안내 ----------
+// 워커를 열지 않았으면 아래가 비어 보인다 — 살아 있는 워커가 없으면 만들기를, 있으면 카드 누르기를 권한다.
+// 그림 애니메이션이 매번 처음부터 시작하지 않게 종류가 바뀔 때만 다시 그린다
+const CURSOR_SVG = '<svg class="hint-cursor" viewBox="0 0 12 18" shape-rendering="crispEdges"><path d="M1 1 L1 15 L4.5 11.5 L7 17 L9 16 L6.5 10.5 L11 10.5 Z"/></svg>';
+function renderHint() {
+  const box = $('#hint');
+  box.hidden = !$('#detail').hidden;
+  if (box.hidden) return;
+  const live = state.workers.some((w) => w.status !== 'exited');
+  const min = !$('#dock').hidden, kind = live ? 'click' : 'create';
+  if (box.dataset.kind === `${kind}|${min}`) return;
+  box.dataset.kind = `${kind}|${min}`;
+  box.innerHTML = kind === 'create'
+    ? `<div class="hint-art create"><span class="hint-slot"><span class="avatar">${clawdSVG()}</span></span><span class="hint-plus">+</span></div>
+       <h2>워커를 생성해보세요!</h2>
+       <p>${state.profiles.length ? '대기실 카드의 <b>▶ 투입</b>이나 ' : ''}<b>+ 워커</b>로 첫 Claude 를 투입하면 여기서 터미널·업무 지시·타임라인을 볼 수 있어요.</p>
+       <button class="btn primary" data-hint="new">+ 워커</button>`
+    : `<div class="hint-art click"><span class="avatar">${clawdSVG()}</span><span class="hint-ring"></span>${CURSOR_SVG}</div>
+       <h2>워커를 클릭해보세요!</h2>
+       <p>위의 워커 ${min ? '칩을' : '카드를'} 누르면 여기에 그 워커의 터미널·업무 지시·타임라인이 열려요.</p>`;
+}
+$('#hint').addEventListener('click', (e) => { if (e.target.closest('[data-hint="new"]')) $('#btn-new').click(); });
 
 // ---------- 상세 ----------
 function renderDetail() {
