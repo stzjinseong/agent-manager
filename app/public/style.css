@@ -187,18 +187,20 @@ main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24p
   50% { filter: drop-shadow(0 0 9px var(--decision)) drop-shadow(0 0 28px color-mix(in srgb, var(--decision) 55%, transparent)); }
 }
 
-/* 칩을 끄는 동안만 뜨는 휴지통. 높이 0 짜리 sticky 라 자리를 차지하지 않고, 칩 영역 끝이 화면 아래로 넘어가면 화면 아래에 붙는다 */
-.trash { position: sticky; bottom: 16px; height: 0; z-index: 5; display: flex; justify-content: center; pointer-events: none; }
+/* 칩을 끄는 동안만 뜨는 휴지통. 화면 아래 가운데에 떠 있다(fixed) — 예전엔 칩 영역 끝에 붙어 마지막 줄 카드 아래쪽을
+   덮었는데, 반투명 배경이라 카드에 묻혀 뒤에 있는 것처럼 보여 놓기 어려웠다. 이제 모든 카드 위에, 불투명 배경·진한 그림자로 */
+.trash { position: fixed; left: 0; right: 0; bottom: 28px; height: 0; z-index: 60; display: flex; justify-content: center; pointer-events: none; }
 .trash .bin {
-  position: absolute; bottom: -8px; display: flex; align-items: center; gap: 8px; padding: 12px 26px;
-  border: 1.5px dashed rgb(var(--ink) / .35); border-radius: 999px; background: color-mix(in srgb, var(--surface) 92%, transparent);
-  backdrop-filter: blur(6px); box-shadow: 0 8px 24px rgb(0 0 0 / calc(.45 * var(--shade))); color: var(--text-2); font-size: 13px; white-space: nowrap;
-  opacity: 0; transform: translateY(10px) scale(.96); pointer-events: none;
-  transition: opacity .15s, transform .15s, border-color .15s, background .15s, color .15s;
+  position: absolute; bottom: 0; display: flex; align-items: center; gap: 10px; padding: 14px 30px;
+  border: 2px dashed rgb(var(--ink) / .5); border-radius: 999px; background: var(--surface-3);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--bg) 70%, transparent), 0 14px 40px rgb(0 0 0 / calc(.6 * var(--shade))), 0 4px 12px rgb(0 0 0 / calc(.4 * var(--shade)));
+  color: var(--text); font-size: 14px; font-weight: 600; white-space: nowrap;
+  opacity: 0; transform: translateY(16px) scale(.96); pointer-events: none;
+  transition: opacity .15s, transform .18s cubic-bezier(.2, .8, .2, 1), border-color .15s, background .15s, color .15s;
 }
-.trash .ic { font-size: 20px; line-height: 1; }
+.trash .ic { font-size: 22px; line-height: 1; }
 .trash.show .bin { opacity: 1; transform: none; pointer-events: auto; }
-.trash.over .bin { border-style: solid; border-color: #e0655a; background: color-mix(in srgb, #e0655a 22%, var(--surface)); color: #fff; transform: scale(1.06); }
+.trash.over .bin { border-style: solid; border-color: #e0655a; background: color-mix(in srgb, #e0655a 30%, var(--surface-3)); color: var(--text); transform: scale(1.08); }
 .nodes { position: relative; display: grid; grid-template-columns: repeat(auto-fill, minmax(236px, 1fr)); gap: 34px 22px; }
 .empty { grid-column: 1 / -1; text-align: center; color: var(--dim); padding: 18px 0 6px; }
 
@@ -912,7 +914,8 @@ body.term-full::before {
 .memos .ma { display: flex; align-items: center; gap: 6px; }
 .memos .ma time { flex: 1; color: var(--dim); font: 11px var(--mono); }
 /* 건수 머리줄: 대기 중인 지시(.queue .qh)와 같은 모양, 스크롤해도 위에 고정 */
-.memos li.mh { background: var(--surface); border: 0; border-radius: 0; padding: 0 0 2px; font-size: 12px; color: var(--dim); position: sticky; top: 0; z-index: 1; }
+/* 목록 위쪽 여백(2px)만큼 위로 붙여(top·margin −2px) 그 틈으로 스크롤되는 카드가 비치지 않게 — padding 으로 글자 자리는 그대로 */
+.memos li.mh { background: var(--surface); border: 0; border-radius: 0; padding: 2px 0 2px; margin-top: -2px; font-size: 12px; color: var(--dim); position: sticky; top: -2px; z-index: 1; }
 .memos .empty-memo { background: none; border: 0; color: var(--dim); padding: 2px 0; }
 .btn.mini { font-size: 11.5px; padding: 3px 9px; border-radius: 7px; }
 .memo-form { display: flex; flex-direction: column; gap: 6px; }
@@ -948,7 +951,9 @@ body.resizing-term { cursor: row-resize; user-select: none; }
 /* 옆 패널은 터미널 높이로 고정이다. 예전엔 업무 지시·나중에 할 작업이 내용 크기 아래로 줄지 못해, 입력칸·대기열·메모가 길어지면
    타임라인만 0 까지 줄고도 모자라 패널 아래로 뚫고 나갔다. 이제 자리가 모자라면 각 영역의 목록(대기열·메모)이 먼저 줄어 스크롤되고,
    그래도 모자라면 영역 자체가 스크롤된다. 타임라인은 최소 높이(--log-min)를 지킨다 */
-.side > .side-sec:not(.timeline) { flex: 0 1 auto; min-height: 0; overflow: auto; }
+/* --sec-min = 제목+입력칸 높이(app.js 가 잰다). 그 아래로는 줄지 않게 해, 자리가 모자랄 때 입력칸이 아니라 목록이 줄어든다
+   (그냥 두면 영역들이 크기 비율대로 같이 줄어, 나중에 할 작업을 펼치면 업무 지시 입력칸 아래가 잘렸다) */
+.side > .side-sec:not(.timeline) { flex: 0 1 auto; min-height: var(--sec-min, 0px); overflow: auto; }
 .side > .side-sec > :is(h3, form) { flex-shrink: 0; }
 .side > .side-sec > :is(.queue, .memos) { flex: 0 1 auto; min-height: 0; }
 .timeline { --log-min: 120px; min-height: min(var(--log-min), 100%); }

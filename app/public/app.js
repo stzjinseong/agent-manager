@@ -204,9 +204,13 @@ setFavicon(false);
 // 워커 CLI 는 다크 테마 색(흰 글자 등)으로 그리지만 아래 minimumContrastRatio 가 밝은 바탕에 맞게 글자색을 어둡게 보정한다.
 // 기본 16색(ANSI)은 밝은 바탕에서 읽히게 진한 쪽으로
 function termTheme(light) {
-  if (!light) return { background: '#07080a', foreground: '#e6e4de', cursor: '#d97757', selectionBackground: '#d9775744' };
+  // 스크롤바는 드래그 하이라이트(selectionBackground)와 같은 코랄색. 하이라이트만큼 옅으면(대비 1.3~1.5:1) 안 보여서 더 진하게 —
+  // 평소 대비 약 2.5:1(다크 55%·라이트 70%), 올리면·끄는 중엔 더 진하게. xterm 기본값은 글자색 20%(라이트에서 거의 안 보였다)
+  if (!light) return { background: '#07080a', foreground: '#e6e4de', cursor: '#d97757', selectionBackground: '#d9775744',
+    scrollbarSliderBackground: '#d977578c', scrollbarSliderHoverBackground: '#d97757b3', scrollbarSliderActiveBackground: '#d97757cc' };
   return {
     background: '#f4f3ef', foreground: '#1b1d23', cursor: '#c8623f', cursorAccent: '#f4f3ef', selectionBackground: '#c8623f33',
+    scrollbarSliderBackground: '#c8623fb3', scrollbarSliderHoverBackground: '#c8623fcc', scrollbarSliderActiveBackground: '#c8623fe6',
     black: '#1b1d23', red: '#c4342b', green: '#2f7d3a', yellow: '#946200', blue: '#2a5fc0', magenta: '#9b3aa8', cyan: '#1a7f8e', white: '#5c606b',
     brightBlack: '#6b6f7a', brightRed: '#d9473d', brightGreen: '#3a9147', brightYellow: '#a87000', brightBlue: '#3a72d6', brightMagenta: '#ae4cbb', brightCyan: '#22909f', brightWhite: '#3d4049',
   };
@@ -1728,8 +1732,9 @@ newForm.onsubmit = async (e) => {
 
 const taskForm = $('#task-form');
 // 업무 지시·나중에 할 작업 입력칸: 쓴 줄 수만큼 높이가 늘고 줄어든다(최소 3줄 = rows,
-// 옆 패널 높이의 40% 까지 늘고 그 뒤로는 칸 안에서 스크롤 — 타임라인 자리를 남긴다). 코드로 값을 바꾼 뒤에도 불러 준다
-const GROW_MAX = 0.4;
+// 옆 패널 높이의 30% 까지 늘고 그 뒤로는 칸 안에서 스크롤 — 두 칸이 다 늘어도 기본 높이(580px)에서 타임라인 최소 높이(120px)가 남게).
+// 코드로 값을 바꾼 뒤에도 불러 준다
+const GROW_MAX = 0.3;
 function autoGrow(ta) {
   if (!ta.matches('.task-form textarea, .memo-form textarea')) return;
   ta.style.height = 'auto';
@@ -2347,8 +2352,16 @@ function setSecH(sec, h) {
   sec.classList.add('sized');
   sec.style.setProperty('--sec-h', `${Math.round(h)}px`);
 }
-// 제목과 입력칸까지는 항상 보이게 — 그 아래 목록(대기열·메모)만 줄어든다
-const secMinH = (sec) => sec.querySelector('form').getBoundingClientRect().bottom - sec.getBoundingClientRect().top;
+// 제목과 입력칸까지는 항상 보이게 — 그 아래 목록(대기열·메모)만 줄어든다 (영역이 스크롤돼 있어도 같은 값이 나오게 scrollTop 을 더함)
+const secMinH = (sec) => sec.querySelector('form').getBoundingClientRect().bottom - sec.getBoundingClientRect().top + sec.scrollTop;
+// 입력칸 높이가 바뀔 때마다(줄 수만큼 늘어남·첨부 표시) 영역의 최소 높이를 맞춘다 — style.css 의 --sec-min
+const secMinObs = new ResizeObserver((entries) => {
+  for (const e of entries) {
+    const sec = e.target.closest('.side-sec');
+    if (sec && !sec.classList.contains('collapsed')) sec.style.setProperty('--sec-min', `${Math.ceil(secMinH(sec))}px`);
+  }
+});
+for (const f of document.querySelectorAll('.side > .side-sec form')) secMinObs.observe(f);
 for (const handle of document.querySelectorAll('.side-resizer')) {
   const sec = $('#' + handle.dataset.sec), key = `am.secH.${handle.dataset.sec}`;
   try { const saved = Number(localStorage.getItem(key)); if (saved) setSecH(sec, saved); } catch {}
