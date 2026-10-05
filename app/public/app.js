@@ -532,6 +532,7 @@ function render() {
   renderStale();
   renderInbox();
   renderFloor();
+  renderDock();
   renderCompare();
   renderDetail();
   mgrUpdate();
@@ -778,6 +779,54 @@ function renderFloor() {
   tick();
   requestAnimationFrame(drawTraces);
 }
+
+// ---------- 최소화한 회로 기판 (헤더 아래 한 줄) ----------
+// 칩은 회로 기판과 같은 항목·순서(대기실 슬롯은 빼고). id 별로 한 번 만들고 내용만 갱신 — 캐릭터 애니메이션이 리셋되지 않게
+const dockEls = new Map();
+function renderDock() {
+  if ($('#dock').hidden) return;
+  const mgr = $('#dock-mgr'), core = $('.core-dot');
+  mgr.classList.toggle('busy', core.classList.contains('busy'));
+  mgr.classList.toggle('alert', core.classList.contains('alert'));
+  mgr.title = core.title;
+  const list = $('#dock-list');
+  const ids = [...nodeEls.values()].filter((n) => n.isConnected && n.dataset.id).map((n) => n.dataset.id);
+  for (const [id, c] of dockEls) if (!ids.includes(id)) { c.remove(); dockEls.delete(id); }
+  let prev = null;
+  for (const id of ids) {
+    const w = state.workers.find((x) => x.id === id);
+    if (!w) continue;
+    let c = dockEls.get(id);
+    if (!c) { c = el(`<button class="dchip"><span class="led"></span><span class="avatar">${clawdSVG()}</span><span class="dname"></span><span class="dst"></span></button>`); dockEls.set(id, c); }
+    const st = viewStatus(w);
+    c.className = `dchip s-${st}${w.id === selected ? ' sel' : ''}${isUnseenDone(w) ? ' unseen' : ''}`;
+    c.dataset.id = id;
+    c.style.setProperty('--avatar', avatarColor(w.name) || 'var(--accent)');
+    $('.dname', c).textContent = w.name;
+    $('.dst', c).textContent = STATUS_LABEL[st];
+    c.title = `${w.name} · ${STATUS_LABEL[st]} — 클릭해서 열기`;
+    const want = prev ? prev.nextSibling : list.firstChild;
+    if (want !== c) list.insertBefore(c, want);
+    prev = c;
+  }
+  let empty = $('.dock-empty', list);
+  if (!dockEls.size && !empty) list.append(el('<span class="dock-empty">워커 없음</span>'));
+  if (dockEls.size && empty) empty.remove();
+}
+$('#dock-list').addEventListener('click', (e) => { const c = e.target.closest('.dchip'); if (c) select(c.dataset.id); });
+
+const FLOOR_MIN_KEY = 'am.floorMin';
+function setFloorMin(on) {
+  $('#floor').hidden = on;
+  $('#dock').hidden = !on;
+  try { on ? localStorage.setItem(FLOOR_MIN_KEY, '1') : localStorage.removeItem(FLOOR_MIN_KEY); } catch {}
+  if (on) renderDock();
+  else requestAnimationFrame(() => { traceSig = ''; drawTraces(); mgrUpdate(); });
+}
+$('#btn-floor-min').addEventListener('click', () => setFloorMin(true));
+$('#btn-dock-expand').addEventListener('click', () => setFloorMin(false));
+// 헤더 높이만큼 아래에 붙인다 (헤더가 줄바꿈되면 높이가 바뀜)
+new ResizeObserver(() => document.documentElement.style.setProperty('--topbar-h', `${$('.topbar').offsetHeight}px`)).observe($('.topbar'));
 
 // 작업 중인 선: MANAGER → 워커 방향으로 Claude 코랄 전류가 흐른다.
 // 짧은 전류 두 줄기(pathLength=100 으로 정규화한 dash 이동) + 선을 따라 달리는 불꽃 머리(animateMotion)
@@ -2278,6 +2327,7 @@ function setCompareCollapsed(on) {
   try { on ? localStorage.setItem(COMPARE_KEY, '1') : localStorage.removeItem(COMPARE_KEY); } catch {}
 }
 try { if (localStorage.getItem(COMPARE_KEY)) setCompareCollapsed(true); } catch {}
+try { if (localStorage.getItem(FLOOR_MIN_KEY)) setFloorMin(true); } catch {}
 $('#compare-toggle').addEventListener('click', () => setCompareCollapsed(!$('#compare').classList.contains('collapsed')));
 $('#compare-toggle').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('#compare-toggle').click(); } });
 

@@ -1275,3 +1275,45 @@ body.resizing-term { cursor: row-resize; user-select: none; }
 .diff-empty { padding: 40px 20px; text-align: center; color: var(--text-2); line-height: 1.7; }
 .diff-empty small { color: var(--dim); }
 @media (max-width: 700px) { .diff-view { grid-template-columns: 1fr; grid-template-rows: minmax(90px, 30%) 1fr; } .diff-files { border-right: 0; border-bottom: 1px solid var(--line-2); } }
+
+/* ---------- 최소화한 회로 기판: 헤더 바로 아래 한 줄 (매니저 + 워커 칩) ---------- */
+.floor-min { position: absolute; top: 12px; right: 14px; z-index: 2; padding: 4px 10px; font-size: 12px; color: var(--dim); }
+.floor-min:hover { color: var(--text); }
+.dock {
+  position: sticky; top: var(--topbar-h, 59px); z-index: 9; display: flex; align-items: center; gap: 12px;
+  padding: 7px 24px; background: color-mix(in srgb, var(--floor) 88%, transparent);
+  backdrop-filter: blur(10px); border-bottom: 1px solid var(--line);
+}
+.dock-mgr { flex: none; display: grid; place-items: center; padding: 2px 4px; }
+.dock-mark svg { width: 34px; height: 19px; display: block; overflow: visible; }
+.dock-mark .clawd .body { fill: #f3f1ec; }
+.dock-mark .clawd .eye { fill: #14161c; }
+.dock-mark { filter: drop-shadow(0 0 4px rgba(255, 255, 255, .3)); }
+.dock-mgr.busy .dock-mark { animation: bob .36s steps(2, jump-none) infinite alternate; }
+.dock-mgr.busy .clawd .legs-a { animation: legA .36s steps(1) infinite; }
+.dock-mgr.busy .clawd .legs-b { animation: legB .36s steps(1) infinite; }
+.dock-mgr.alert .dock-mark { filter: drop-shadow(0 0 5px color-mix(in srgb, var(--decision) 80%, transparent)); }
+:root[data-theme="light"] .dock-mark .clawd { filter: drop-shadow(0 0 3px rgb(20 22 28 / .35)); }
+:root[data-theme="light"] .dock-mark { filter: none; }
+.dock-list { flex: 1; min-width: 0; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: thin; padding: 2px 0; }
+.dock-empty { color: var(--dim); font-size: 12.5px; align-self: center; }
+.dchip {
+  --c: var(--idle); flex: none; display: inline-flex; align-items: center; gap: 7px; max-width: 220px;
+  padding: 4px 10px 4px 8px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface);
+  color: var(--text); font: inherit; font-size: 12.5px; cursor: pointer; transition: border-color .15s, background .15s;
+}
+.dchip:hover { border-color: rgb(var(--ink) / .2); }
+.dchip.sel { border-color: color-mix(in srgb, var(--c) 60%, transparent); background: linear-gradient(180deg, var(--sel-a), var(--sel-b)); }
+.dchip.s-working { --c: var(--working); } .dchip.s-decision { --c: var(--decision); } .dchip.s-waiting { --c: var(--waiting); }
+.dchip.s-done { --c: var(--done); } .dchip.s-checked { --c: var(--checked); } .dchip.s-exited { --c: var(--exited); opacity: .7; }
+.dchip.s-decision { background: color-mix(in srgb, var(--decision) 12%, var(--surface)); border-color: color-mix(in srgb, var(--decision) 40%, transparent); }
+.dchip .led { width: 7px; height: 7px; }
+.dchip .avatar { width: 25px; height: 14px; }
+/* 작은 캐릭터라 카드용 들썩임(4px)·점프는 너무 커서 줄인다 */
+.dchip.s-working .avatar { animation: bob-sm .36s steps(2, jump-none) infinite alternate; }
+.dchip.s-decision .avatar { animation: bob-sm .5s ease-in-out infinite alternate; }
+@keyframes bob-sm { to { transform: translateY(-2px); } }
+.dchip .dname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.dchip .dst { flex: none; color: var(--c); font-size: 11.5px; }
+.dchip.unseen .dst { font-weight: 700; }
+.dock-expand { flex: none; padding: 4px 10px; font-size: 12px; }

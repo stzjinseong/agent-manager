@@ -32,6 +32,13 @@
     <button id="btn-power" class="btn ghost power" title="서버 종료">⏻</button>
   </header>
 
+  <!-- 최소화한 회로 기판: 헤더 바로 아래에 매니저 + 워커 칩 한 줄 (펼침 상태는 브라우저에 기억) -->
+  <nav class="dock" id="dock" hidden aria-label="워커 (최소화됨)">
+    <span class="dock-mgr" id="dock-mgr"><span class="dock-mark" data-clawd></span></span>
+    <div class="dock-list" id="dock-list"></div>
+    <button class="btn ghost dock-expand" id="btn-dock-expand" title="매니저·워커 카드 다시 펼치기">▾ 펼치기</button>
+  </nav>
+
   <section id="new-panel" class="panel new-panel" hidden>
     <form id="new-form">
       <label class="f-name"><span>역할 이름</span><input name="name" placeholder="예: 클라 구현" required autocomplete="off"></label>
@@ -74,6 +81,7 @@
   <section id="inbox"></section>
 
   <section class="floor" id="floor">
+    <button class="btn ghost floor-min" id="btn-floor-min" title="매니저·워커 카드를 헤더 아래 한 줄로 최소화">▴ 최소화</button>
     <svg class="traces" id="traces" aria-hidden="true"></svg>
     <div class="core" id="core">
       <div class="core-dot">
