@@ -11,7 +11,7 @@ import { execSync, execFile, spawn as spawnProcess } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import WebSocket, { WebSocketServer } from 'ws';
 import { createRequire } from 'node:module';
-import { createProfile, readProfile, profileSummary, runningSubagents } from './profile.js';
+import { createProfile, readProfile, profileSummary, runningSubagents, editLog } from './profile.js';
 import { createProgress, isCommit } from './progress.js';
 const { Terminal: HeadlessTerminal } = createRequire(import.meta.url)('@xterm/headless');
 
@@ -1027,6 +1027,16 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === 'GET' && p === '/api/state') return json(res, 200, publicState());
+
+  // diff 보기: 워커가 Edit/Write 로 고친 파일과 그 변경(트랜스크립트의 structuredPatch). 상태 방송에는 개수만 싣고 내용은 열 때 가져간다
+  const dm = req.method === 'GET' && p.match(/^\/api\/workers\/(W\d+)\/diff$/);
+  if (dm) {
+    const w = workers.get(dm[1]);
+    if (!w) return json(res, 404, { error: '워커가 없습니다' });
+    const rel = (f) => { const r = path.relative(w.cwd || ROOT, f); return r && !r.startsWith('..') && !path.isAbsolute(r) ? r : f; };
+    const log = w.tx ? editLog(w.tx) : { files: [], requests: [] };
+    return json(res, 200, { cwd: w.cwd, files: log.files.map((x) => ({ ...x, rel: rel(x.file) })), requests: log.requests });
+  }
 
   if (req.method === 'POST' && p === '/api/workers') {
     const body = await readBody(req);

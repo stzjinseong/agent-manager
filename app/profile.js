@@ -6,6 +6,8 @@
 //  - user 줄: content 가 문자열(또는 text 블록)이면 사람이 보낸 질문 = 턴 경계. tool_result 는 턴 내부.
 //  - 서브에이전트: <세션파일명>/subagents/agent-*.jsonl, 옆의 .meta.json 의 toolUseId 가
 //    메인 트랜스크립트에서 그 서브에이전트를 띄운 tool_use id 다 → 해당 턴에 귀속.
+//  - 파일 수정: Edit/Write 결과가 담긴 user 줄의 toolUseResult{ filePath, structuredPatch[{oldStart, oldLines, newStart,
+//    newLines, lines['+…'|'-…'|' …']}], userModified }. 새로 만든 파일(Write, type 'create')은 patch 가 비고 content 만 있다.
 import fs from 'node:fs';
 import path from 'node:path';
 import { priceFor, costOf, windowFor } from './pricing.js';
@@ -36,10 +38,35 @@ export function createProfile(file) {
     apiErrors: [], quota: null, // API 오류(429 등)·사용량 한도 — Claude Code 가 '<synthetic>' 응답 줄로 남긴다
     toolErrors: 0, toolErrBy: {}, // 도구 결과 is_error
     compactLog: [], // compact_boundary.compactMetadata
+    edits: [], editSeen: new Set(), // Edit/Write 로 고친 파일 이력 (diff 보기) — editOf. editSeen: 같은 결과가 두 번 기록돼도 한 번만
   };
 }
 
 const empty = () => Object.fromEntries(KEYS.map((k) => [k, 0]));
+
+const MAX_EDITS = 400, MAX_EDIT_LINES = 3000; // 아주 큰 파일을 통째로 쓴 경우 메모리·전송량이 커지지 않게 줄 수를 자른다
+
+// 도구 결과(toolUseResult) → 수정 이력 한 건. 수정이 아니면 null
+function editOf(r, id, tool, turn, ts) {
+  if (!r || typeof r !== 'object' || typeof r.filePath !== 'string') return null;
+  let hunks;
+  if (Array.isArray(r.structuredPatch) && r.structuredPatch.length) hunks = r.structuredPatch;
+  else if (r.type === 'create' && typeof r.content === 'string') {
+    const lines = r.content.replace(/\n$/, '').split('\n');
+    hunks = [{ oldStart: 0, oldLines: 0, newStart: 1, newLines: lines.length, lines: lines.map((l) => `+${l}`) }];
+  } else return null;
+  let add = 0, del = 0, budget = MAX_EDIT_LINES, cut = false;
+  hunks = hunks.map((h) => {
+    const lines = Array.isArray(h.lines) ? h.lines : [];
+    for (const l of lines) { if (l[0] === '+') add++; else if (l[0] === '-') del++; }
+    const keep = lines.slice(0, Math.max(0, budget));
+    if (keep.length < lines.length) cut = true;
+    budget -= keep.length;
+    return { oldStart: h.oldStart, oldLines: h.oldLines, newStart: h.newStart, newLines: h.newLines, lines: keep };
+  }).filter((h) => h.lines.length);
+  return { id, ts, turn: turn?.n ?? null, tool: tool || null, file: r.filePath, kind: r.type === 'create' ? 'create' : 'edit',
+    add, del, cut, userModified: Boolean(r.userModified), hunks };
+}
 
 function usageOf(m, p) {
   const u = m.usage;
@@ -139,6 +166,15 @@ function apply(p, e, line) {
     if (Array.isArray(c)) for (const b of c) {
       if (b.type !== 'tool_result' || !b.tool_use_id) continue;
       p.toolResults.add(b.tool_use_id);
+      if (!b.is_error && !p.editSeen.has(b.tool_use_id)) {
+        const st = p.toolStart.get(b.tool_use_id);
+        const ed = editOf(e.toolUseResult, b.tool_use_id, st?.name, st?.turn || p.toolTurn.get(b.tool_use_id), ts);
+        if (ed) {
+          p.editSeen.add(b.tool_use_id);
+          p.edits.push(ed);
+          if (p.edits.length > MAX_EDITS) p.edits.shift();
+        }
+      }
       // 이미지 블록: { type:'image', source:{ type:'base64', media_type, data } } — 실측 Read 134건 모두 이 모양
       if (Array.isArray(b.content)) b.content.forEach((x, i) => {
         if (x?.type !== 'image' || x.source?.type !== 'base64' || !x.source.data) return;
@@ -309,6 +345,26 @@ export function readProfile(p) {
   return Boolean(r || s);
 }
 
+// diff 보기: 파일별로 묶은 수정 이력(최근에 고친 파일이 위)과, 파일을 고친 요청 목록(최근 요청이 위)
+export function editLog(p) {
+  const files = new Map(), reqs = new Map();
+  for (const ed of p.edits) {
+    const f = files.get(ed.file) || { file: ed.file, add: 0, del: 0, last: 0, created: false, edits: [] };
+    f.add += ed.add; f.del += ed.del; f.last = Math.max(f.last, ed.ts);
+    if (ed.kind === 'create') f.created = true;
+    f.edits.push(ed);
+    files.set(ed.file, f);
+    const r = reqs.get(ed.turn) || { turn: ed.turn, files: new Set(), add: 0, del: 0, last: 0 };
+    r.files.add(ed.file); r.add += ed.add; r.del += ed.del; r.last = Math.max(r.last, ed.ts);
+    reqs.set(ed.turn, r);
+  }
+  // 요청 글은 들고 있는 최근 턴(MAX_TURNS)에서 찾는다 — 그보다 오래된 요청은 번호만
+  const turnOf = new Map(p.turns.map((t) => [t.n, t]));
+  const requests = [...reqs.values()].map((r) => ({ ...r, files: r.files.size, prompt: turnOf.get(r.turn)?.prompt ?? null, start: turnOf.get(r.turn)?.start ?? null }))
+    .sort((a, b) => (b.turn ?? -1) - (a.turn ?? -1));
+  return { files: [...files.values()].sort((a, b) => b.last - a.last), requests };
+}
+
 // waits: 관제탑 결정함을 거친 권한 승인 대기 [{ toolUseId, ms }] — 트랜스크립트에는 없는 정보라 서버가 넘겨준다
 export function profileSummary(p, waits = []) {
   const approvalByTurn = new Map();
@@ -381,6 +437,8 @@ export function profileSummary(p, waits = []) {
     toolErrors: p.toolErrors,
     toolErrTop: Object.entries(p.toolErrBy).sort((a, b) => b[1] - a[1]).slice(0, 5),
     compactLog: p.compactLog.slice(-5),
+    edits: { n: p.edits.length, files: new Set(p.edits.map((x) => x.file)).size,
+      add: p.edits.reduce((a, x) => a + x.add, 0), del: p.edits.reduce((a, x) => a + x.del, 0), last: p.edits.at(-1)?.ts || 0 },
     sub, subagents: subagents.slice(0, 12),
     bgTasks: runningTasks(p).map(({ id, kind, desc, startedAt, expiresAt }) => ({ id, kind, desc, startedAt, expiresAt })),
     bgRunning: subagents.filter((s) => s.running).length + runningTasks(p).length,

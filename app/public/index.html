@@ -105,6 +105,7 @@
       </div>
       <span class="spacer"></span>
       <div class="meters" id="meters"></div>
+      <button id="btn-diff" class="btn btn-diff" title="이 워커가 고친 파일의 변경 내용 (Edit·Write) — 터미널 자리에 보여 줌">diff</button>
       <button id="btn-full" class="btn" title="터미널 크게 보기 (다시 누르거나 ✕ 로 복귀)">⛶ 크게</button>
       <button id="btn-interrupt" class="btn" title="진행 중인 작업 중단 (Esc 전송)">⏸ 중단</button>
       <button id="btn-remove" class="btn">제거</button>
@@ -112,8 +113,18 @@
     </div>
     <div class="detail-body">
       <div class="term-wrap" id="term-wrap">
-        <div class="term-bar"><span id="term-title"></span><div class="meters" id="meters-full"></div><button id="btn-full-exit" class="btn ghost" title="원래 크기로">✕ 닫기</button></div>
-        <div id="term"></div>
+        <div class="term-bar"><span id="term-title"></span><div class="meters" id="meters-full"></div><button id="btn-diff-full" class="btn ghost btn-diff" title="이 워커가 고친 파일의 변경 내용">diff</button><button id="btn-full-exit" class="btn ghost" title="원래 크기로">✕ 닫기</button></div>
+        <div class="term-stage">
+          <div id="term"></div>
+          <div class="diff-view" id="diff-view" hidden>
+            <div class="diff-files">
+              <div class="diff-files-head"><span id="diff-sum"></span><button id="btn-diff-close" class="btn ghost" title="터미널로 돌아가기">✕ 터미널</button></div>
+              <select id="diff-req" class="diff-req" title="어느 요청에서 바뀐 것을 볼지"></select>
+              <ul id="diff-files"></ul>
+            </div>
+            <div class="diff-main" id="diff-main"></div>
+          </div>
+        </div>
       </div>
       <aside class="side">
         <div class="side-grip" id="side-grip" title="왼쪽으로 끌어 넓히기(터미널 위를 덮음) · 더블클릭: 기본 폭"><i></i></div>
