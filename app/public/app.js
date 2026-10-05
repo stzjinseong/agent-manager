@@ -784,11 +784,13 @@ function renderFloor() {
 // 칩은 회로 기판과 같은 항목·순서(대기실 슬롯은 빼고). id 별로 한 번 만들고 내용만 갱신 — 캐릭터 애니메이션이 리셋되지 않게
 const dockEls = new Map();
 function renderDock() {
-  if ($('#dock').hidden) return;
-  const mgr = $('#dock-mgr'), core = $('.core-dot');
-  mgr.classList.toggle('busy', core.classList.contains('busy'));
-  mgr.classList.toggle('alert', core.classList.contains('alert'));
-  mgr.title = core.title;
+  // 최소화 중엔 헤더 로고가 매니저 역할 — 작업 중이면 걷고, 결정 대기면 주황 빛, 경험치 구슬도 여기로 (따로 두면 같은 캐릭터가 둘)
+  const min = !$('#dock').hidden, mgr = $('.brand-mark'), core = $('.core-dot');
+  mgr.classList.toggle('mgr-on', min);
+  mgr.classList.toggle('busy', min && core.classList.contains('busy'));
+  mgr.classList.toggle('alert', min && core.classList.contains('alert'));
+  if (min) mgr.title = core.title; else mgr.removeAttribute('title');
+  if (!min) return;
   const list = $('#dock-list');
   const ids = [...nodeEls.values()].filter((n) => n.isConnected && n.dataset.id).map((n) => n.dataset.id);
   for (const [id, c] of dockEls) if (!ids.includes(id)) { c.remove(); dockEls.delete(id); }
@@ -820,8 +822,8 @@ function setFloorMin(on) {
   $('#floor').hidden = on;
   $('#dock').hidden = !on;
   try { on ? localStorage.setItem(FLOOR_MIN_KEY, '1') : localStorage.removeItem(FLOOR_MIN_KEY); } catch {}
-  if (on) renderDock();
-  else requestAnimationFrame(() => { traceSig = ''; drawTraces(); mgrUpdate(); });
+  renderDock();
+  if (!on) requestAnimationFrame(() => { traceSig = ''; drawTraces(); mgrUpdate(); });
 }
 $('#btn-floor-min').addEventListener('click', () => setFloorMin(true));
 $('#btn-dock-expand').addEventListener('click', () => setFloorMin(false));
@@ -1920,7 +1922,7 @@ memoForm.onsubmit = (e) => {
 // 최소화(회로 기판 숨김) 중엔 헤더 아래 칩·매니저가 연출의 출발·도착점 — 숨은 카드는 크기가 0 이라 화면 왼쪽 위로 날아갔다
 const floorMin = () => $('#floor').hidden;
 const workerAvatar = (id) => (floorMin() ? dockEls : nodeEls).get(id)?.querySelector('.avatar');
-const managerEl = () => (floorMin() ? $('#dock-mgr') : $('.core-dot'));
+const managerEl = () => (floorMin() ? $('.brand-mark') : $('.core-dot'));
 function flyToWorker(id, fromEl, kind) {
   const w = state.workers.find((x) => x.id === id), target = workerAvatar(id);
   if (!w || !target || !fromEl) return;
