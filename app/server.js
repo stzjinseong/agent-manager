@@ -1030,6 +1030,8 @@ function saveWorkersSoon() { if (!saveTimer) saveTimer = setTimeout(saveWorkersN
 const STATIC = {
   '/': ['public/index.html', 'text/html; charset=utf-8'],
   '/app.js': ['public/app.js', 'text/javascript; charset=utf-8'],
+  '/i18n.js': ['public/i18n.js', 'text/javascript; charset=utf-8'],
+  '/info-en.js': ['public/info-en.js', 'text/javascript; charset=utf-8'],
   '/style.css': ['public/style.css', 'text/css; charset=utf-8'],
   '/vendor/xterm.js': ['node_modules/@xterm/xterm/lib/xterm.js', 'text/javascript'],
   '/vendor/xterm.css': ['node_modules/@xterm/xterm/css/xterm.css', 'text/css'],

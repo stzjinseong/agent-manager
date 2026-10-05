@@ -3,13 +3,21 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>클로드 키우기</title>
+  <title data-i18n>클로드 키우기</title>
   <link rel="icon" id="favicon" type="image/svg+xml" href="">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
   <link rel="stylesheet" href="/vendor/xterm.css">
   <link rel="stylesheet" href="/style.css">
   <!-- 기억해 둔 테마를 그리기 전에 적용 — 새로고침할 때 다크로 번쩍이지 않게 -->
   <script>try { if (localStorage.getItem('am.theme') === 'light') document.documentElement.dataset.theme = 'light'; } catch {}</script>
+  <!-- 화면 언어: 고른 적이 있으면 그것, 아니면 브라우저 첫 언어(한국어면 ko, 그 밖엔 en). 한국어가 아니면 번역이 끝날 때까지
+       잠깐 가린다 — 한국어가 번쩍였다 바뀌지 않게 (app.js 가 풀고, 혹시 실패해도 1.5초 뒤엔 보이게) -->
+  <script>(function () {
+    var l = null; try { l = localStorage.getItem('am.lang'); } catch (e) {}
+    if (l !== 'ko' && l !== 'en') l = /^ko\b/i.test(navigator.language || '') ? 'ko' : 'en';
+    var h = document.documentElement; h.lang = l;
+    if (l !== 'ko') { h.classList.add('i18n-pending'); setTimeout(function () { h.classList.remove('i18n-pending'); }, 1500); }
+  })();</script>
 </head>
 <body>
   <!-- 테마 스위치의 물방울 필터: 가까운 두 방울을 흐렸다가 알파를 날카롭게 세워 하나로 녹아 붙어 보이게(gooey) -->
@@ -21,66 +29,73 @@
     </filter>
   </svg>
   <header class="topbar">
-    <div class="brand"><span class="brand-mark" data-clawd></span><h1>클로드 키우기</h1></div>
+    <div class="brand"><span class="brand-mark" data-clawd></span><h1 data-i18n>클로드 키우기</h1></div>
     <div class="stats" id="stats"></div>
-    <button id="btn-new" class="btn primary">+ 워커</button>
-    <button id="btn-theme" class="theme-switch" role="switch" aria-checked="false" aria-label="라이트 모드" title="라이트 모드로">
+    <button id="btn-new" class="btn primary" data-i18n>+ 워커</button>
+    <button id="btn-theme" class="theme-switch" role="switch" aria-checked="false" aria-label="라이트 모드" title="라이트 모드로" data-i18n-attr="title,aria-label">
       <span class="ts-ico moon" aria-hidden="true">🌙</span><span class="ts-ico sun" aria-hidden="true">☀</span>
       <span class="ts-goo" aria-hidden="true"><span class="ts-tail"></span><span class="ts-knob"></span></span>
       <span class="ts-face" aria-hidden="true">🌙</span>
     </button>
-    <button id="btn-power" class="btn ghost power" title="서버 종료">⏻</button>
+    <!-- 언어: 지구본을 누르면 작은 목록이 열리고, 지금 언어는 ✓ 로 표시만 하고 눌러도 반응하지 않는다 -->
+    <div class="lang-wrap">
+      <button id="btn-lang" class="btn ghost lang-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="lang-pop" title="언어" aria-label="언어" data-i18n-attr="title,aria-label">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.6 3.9 5.6 3.9 9s-1.3 6.4-3.9 9M12 3C9.4 5.6 8.1 8.6 8.1 12s1.3 6.4 3.9 9"/></svg>
+      </button>
+      <div class="lang-pop" id="lang-pop" role="menu" hidden></div>
+    </div>
+    <button id="btn-power" class="btn ghost power" title="서버 종료" data-i18n-attr="title">⏻</button>
   </header>
 
   <!-- 최소화한 회로 기판: 헤더 바로 아래에 매니저 + 워커 칩 한 줄 (펼침 상태는 브라우저에 기억) -->
-  <nav class="dock" id="dock" hidden aria-label="워커 (최소화됨)">
+  <nav class="dock" id="dock" hidden aria-label="워커 (최소화됨)" data-i18n-attr="aria-label">
     <div class="dock-list" id="dock-list"></div>
-    <button class="btn ghost dock-expand" id="btn-dock-expand" title="매니저·워커 카드 다시 펼치기">▾ 펼치기</button>
+    <button class="btn ghost dock-expand" id="btn-dock-expand" title="매니저·워커 카드 다시 펼치기" data-i18n data-i18n-attr="title">▾ 펼치기</button>
   </nav>
 
   <section id="new-panel" class="panel new-panel" hidden>
     <form id="new-form">
-      <label class="f-name"><span>역할 이름</span><input name="name" placeholder="예: 클라 구현" required autocomplete="off"></label>
-      <label class="f-cwd"><span>작업 폴더</span>
+      <label class="f-name"><span data-i18n>역할 이름</span><input name="name" placeholder="예: 클라 구현" required autocomplete="off" data-i18n-attr="placeholder"></label>
+      <label class="f-cwd"><span data-i18n>작업 폴더</span>
         <div class="with-btn">
-          <input name="cwd" list="recent-cwds" placeholder="최근 경로에서 고르거나 📁 로 선택" autocomplete="off">
-          <button type="button" id="btn-pick" class="btn" title="폴더 선택 창 열기">📁</button>
+          <input name="cwd" list="recent-cwds" placeholder="최근 경로에서 고르거나 📁 로 선택" autocomplete="off" data-i18n-attr="placeholder">
+          <button type="button" id="btn-pick" class="btn" title="폴더 선택 창 열기" data-i18n-attr="title">📁</button>
         </div>
       </label>
-      <label class="f-mode"><span>권한 모드</span>
+      <label class="f-mode"><span data-i18n>권한 모드</span>
         <select name="permissionMode">
-          <option value="default">승인 필요</option>
-          <option value="acceptEdits">편집 자동 허용</option>
-          <option value="plan">계획 먼저</option>
-          <option value="bypassPermissions">전부 허용</option>
+          <option value="default" data-i18n>승인 필요</option>
+          <option value="acceptEdits" data-i18n>편집 자동 허용</option>
+          <option value="plan" data-i18n>계획 먼저</option>
+          <option value="bypassPermissions" data-i18n>전부 허용</option>
         </select>
       </label>
-      <label class="f-args"><span>추가 인자</span><input name="args" placeholder="--model sonnet" autocomplete="off"></label>
-      <label class="f-save"><input type="checkbox" name="save" checked> 역할 저장</label>
+      <label class="f-args"><span data-i18n>추가 인자</span><input name="args" placeholder="--model sonnet" autocomplete="off"></label>
+      <label class="f-save"><input type="checkbox" name="save" checked> <span data-i18n>역할 저장</span></label>
       <div class="f-actions">
-        <button type="button" id="btn-cancel" class="btn ghost">취소</button>
-        <button class="btn primary">띄우기</button>
+        <button type="button" id="btn-cancel" class="btn ghost" data-i18n>취소</button>
+        <button class="btn primary" data-i18n>띄우기</button>
       </div>
     </form>
     <datalist id="recent-cwds"></datalist>
   </section>
 
   <div class="stale-bar" id="stale-bar" hidden>
-    <span>서버 코드가 바뀌었습니다 — 새 기능을 쓰려면 서버를 재시작하세요 (워커는 그대로 유지)</span>
-    <button class="btn" id="btn-restart">↻ 지금 재시작</button>
+    <span data-i18n>서버 코드가 바뀌었습니다 — 새 기능을 쓰려면 서버를 재시작하세요 (워커는 그대로 유지)</span>
+    <button class="btn" id="btn-restart" data-i18n>↻ 지금 재시작</button>
   </div>
 
   <!-- Chrome 이 아니면 늘 보이는 권장 띠 (app.js browserName) -->
   <div class="browser-bar" id="browser-bar" hidden>
-    <span>클로드 키우기는 <b>Chrome</b> 에 맞춰져 있습니다 — 지금 브라우저(<b id="browser-name"></b>)에서는 일부 기능이 느리거나 오작동하는 등 호환성 문제가 생길 수 있어요.</span>
-    <button class="btn ghost" id="btn-copy-url" title="이 주소를 복사해 Chrome 에 붙여넣기">이 주소 복사</button>
-    <a class="btn" href="https://www.google.com/chrome/" target="_blank" rel="noopener">Chrome 받기</a>
+    <span data-i18n>클로드 키우기는 <b>Chrome</b> 에 맞춰져 있습니다 — 지금 브라우저(<b id="browser-name"></b>)에서는 일부 기능이 느리거나 오작동하는 등 호환성 문제가 생길 수 있어요.</span>
+    <button class="btn ghost" id="btn-copy-url" title="이 주소를 복사해 Chrome 에 붙여넣기" data-i18n-attr="title" data-i18n>이 주소 복사</button>
+    <a class="btn" href="https://www.google.com/chrome/" target="_blank" rel="noopener" data-i18n>Chrome 받기</a>
   </div>
 
   <section id="inbox"></section>
 
   <section class="floor" id="floor">
-    <button class="btn ghost floor-min" id="btn-floor-min" title="매니저·워커 카드를 헤더 아래 한 줄로 최소화">▴ 최소화</button>
+    <button class="btn ghost floor-min" id="btn-floor-min" title="매니저·워커 카드를 헤더 아래 한 줄로 최소화" data-i18n data-i18n-attr="title">▴ 최소화</button>
     <svg class="traces" id="traces" aria-hidden="true"></svg>
     <div class="core" id="core">
       <div class="core-dot">
@@ -89,14 +104,14 @@
       </div>
     </div>
     <div class="nodes" id="nodes"></div>
-    <div class="trash" id="trash" aria-hidden="true"><div class="bin"><span class="ic">🗑</span><span class="tx">여기에 놓으면 제거</span></div></div>
+    <div class="trash" id="trash" aria-hidden="true"><div class="bin"><span class="ic">🗑</span><span class="tx" data-i18n>여기에 놓으면 제거</span></div></div>
     <!-- 워커 비교: 카드 아래에 붙은 접이식 표 (접힘 상태는 브라우저에 기억) -->
     <div class="compare" id="compare" hidden>
-      <div class="chart-head cmp-toggle" id="compare-toggle" role="button" tabindex="0" aria-expanded="true" title="클릭해서 접기/펼치기">
-        <h3><span class="chev">▾</span> 워커 비교 <i class="info" data-info="워커 비교">ⓘ</i></h3>
+      <div class="chart-head cmp-toggle" id="compare-toggle" role="button" tabindex="0" aria-expanded="true" title="클릭해서 접기/펼치기" data-i18n-attr="title">
+        <h3><span class="chev">▾</span> <span data-i18n>워커 비교</span> <i class="info" data-info="워커 비교">ⓘ</i></h3>
         <div class="legend">
-          <span><i style="background:var(--s-read)"></i>누적 토큰</span>
-          <span><i style="background:var(--text-2)"></i>컨텍스트 / 창</span>
+          <span><i style="background:var(--s-read)"></i><span data-i18n>누적 토큰</span></span>
+          <span><i style="background:var(--text-2)"></i><span data-i18n>컨텍스트 / 창</span></span>
         </div>
       </div>
       <div class="cmp-grid" id="cmp"></div>
@@ -115,20 +130,19 @@
       </div>
       <span class="spacer"></span>
       <div class="meters" id="meters"></div>
-      <button id="btn-diff" class="btn btn-diff" title="이 워커가 고친 파일의 변경 내용 — 터미널 자리에 보여 줌">diff</button>
-      <button id="btn-full" class="btn" title="터미널 크게 보기 (다시 누르거나 ✕ 로 복귀)">⛶ 크게</button>
-      <button id="btn-interrupt" class="btn" title="진행 중인 작업 중단 (Esc 전송)">⏸ 중단</button>
-      <button id="btn-remove" class="btn">제거</button>
-      <button id="btn-close" class="btn ghost" title="닫기">✕</button>
+      <button id="btn-diff" class="btn btn-diff" title="이 워커가 고친 파일의 변경 내용 — 터미널 자리에 보여 줌" data-i18n-attr="title">diff</button>
+      <button id="btn-full" class="btn" title="터미널 크게 보기 (다시 누르거나 ✕ 로 복귀)" data-i18n-attr="title" data-i18n>⛶ 크게</button>
+      <button id="btn-interrupt" class="btn" title="진행 중인 작업 중단 (Esc 전송)" data-i18n-attr="title" data-i18n>⏸ 중단</button>
+      <button id="btn-remove" class="btn" data-i18n>제거</button>
     </div>
     <div class="detail-body">
       <div class="term-wrap" id="term-wrap">
-        <div class="term-bar"><span id="term-title"></span><div class="meters" id="meters-full"></div><button id="btn-diff-full" class="btn ghost btn-diff" title="이 워커가 고친 파일의 변경 내용">diff</button><button id="btn-full-exit" class="btn ghost" title="원래 크기로">✕ 닫기</button></div>
+        <div class="term-bar"><span id="term-title"></span><div class="meters" id="meters-full"></div><button id="btn-diff-full" class="btn ghost btn-diff" title="이 워커가 고친 파일의 변경 내용" data-i18n-attr="title">diff</button><button id="btn-full-exit" class="btn ghost" title="원래 크기로" data-i18n-attr="title" data-i18n>✕ 닫기</button></div>
         <div class="term-stage">
           <div id="term"></div>
           <div class="diff-view" id="diff-view" hidden>
             <div class="diff-files">
-              <div class="diff-files-head"><span id="diff-sum"></span><button id="btn-diff-close" class="btn ghost" title="터미널로 돌아가기">✕ 터미널</button></div>
+              <div class="diff-files-head"><span id="diff-sum"></span><button id="btn-diff-close" class="btn ghost" title="터미널로 돌아가기" data-i18n-attr="title" data-i18n>✕ 터미널</button></div>
               <ul id="diff-files"></ul>
             </div>
             <div class="diff-main" id="diff-main"></div>
@@ -136,36 +150,36 @@
         </div>
       </div>
       <aside class="side">
-        <div class="side-grip" id="side-grip" title="왼쪽으로 끌어 넓히기(터미널 위를 덮음) · 더블클릭: 기본 폭"><i></i></div>
+        <div class="side-grip" id="side-grip" title="왼쪽으로 끌어 넓히기(터미널 위를 덮음) · 더블클릭: 기본 폭" data-i18n-attr="title"><i></i></div>
         <div class="side-sec" id="sec-task">
-          <h3 class="side-h sec-toggle" role="button" tabindex="0" aria-expanded="true" title="클릭해서 접기/펼치기"><span class="chev">▾</span>업무 지시 <small>바로 투입 · 작업 중이면 대기열에 쌓임</small><span class="sec-count"></span></h3>
+          <h3 class="side-h sec-toggle" role="button" tabindex="0" aria-expanded="true" title="클릭해서 접기/펼치기" data-i18n-attr="title"><span class="chev">▾</span><span data-i18n>업무 지시</span> <small data-i18n>바로 투입 · 작업 중이면 대기열에 쌓임</small><span class="sec-count"></span></h3>
           <form id="task-form" class="task-form">
-            <textarea name="text" rows="3" placeholder="전송 : Alt(⌘)+Enter&#10;개행 : Enter&#10;*CLI에서도 동일하게 작동"></textarea>
+            <textarea name="text" rows="3" placeholder="전송 : Alt(⌘)+Enter&#10;개행 : Enter&#10;*CLI에서도 동일하게 작동" data-i18n-attr="placeholder"></textarea>
           </form>
           <div class="queue" id="queue"></div>
         </div>
-        <div class="side-resizer" data-sec="sec-task" title="위아래로 끌어 높이 조절 · 더블클릭: 기본 높이"><i></i></div>
+        <div class="side-resizer" data-sec="sec-task" title="위아래로 끌어 높이 조절 · 더블클릭: 기본 높이" data-i18n-attr="title"><i></i></div>
         <div class="memo side-sec" id="sec-memo">
-          <h3 class="sec-toggle" role="button" tabindex="0" aria-expanded="true" title="클릭해서 접기/펼치기"><span class="chev">▾</span>나중에 할 작업 <small>자동 실행 안 됨 · ▶ 지시를 눌러야 투입</small><span class="sec-count"></span></h3>
+          <h3 class="sec-toggle" role="button" tabindex="0" aria-expanded="true" title="클릭해서 접기/펼치기" data-i18n-attr="title"><span class="chev">▾</span><span data-i18n>나중에 할 작업</span> <small data-i18n>자동 실행 안 됨 · ▶ 지시를 눌러야 투입</small><span class="sec-count"></span></h3>
           <form id="memo-form" class="memo-form">
-            <textarea name="text" rows="3" placeholder="추가 : Alt(⌘)+Enter&#10;개행 : Enter&#10;*CLI에서도 동일하게 작동"></textarea>
+            <textarea name="text" rows="3" placeholder="추가 : Alt(⌘)+Enter&#10;개행 : Enter&#10;*CLI에서도 동일하게 작동" data-i18n-attr="placeholder"></textarea>
           </form>
           <ol class="memos" id="memos"></ol>
         </div>
-        <div class="side-resizer" data-sec="sec-memo" title="위아래로 끌어 높이 조절 · 더블클릭: 기본 높이"><i></i></div>
+        <div class="side-resizer" data-sec="sec-memo" title="위아래로 끌어 높이 조절 · 더블클릭: 기본 높이" data-i18n-attr="title"><i></i></div>
         <div class="timeline side-sec" id="sec-log">
-          <h3 class="sec-toggle" role="button" tabindex="0" aria-expanded="true" title="클릭해서 접기/펼치기"><span class="chev">▾</span>타임라인</h3>
-          <div class="tl-pin" id="tl-pin" hidden title="클릭: 터미널에서 이 요청 위치로 이동"></div>
+          <h3 class="sec-toggle" role="button" tabindex="0" aria-expanded="true" title="클릭해서 접기/펼치기" data-i18n-attr="title"><span class="chev">▾</span><span data-i18n>타임라인</span></h3>
+          <div class="tl-pin" id="tl-pin" hidden title="클릭: 터미널에서 이 요청 위치로 이동" data-i18n-attr="title"></div>
           <ol id="log"></ol>
         </div>
       </aside>
     </div>
-    <div class="term-resizer" id="term-resizer" title="위아래로 끌어 터미널 높이 조절 · 더블클릭: 기본 높이"><i></i></div>
+    <div class="term-resizer" id="term-resizer" title="위아래로 끌어 터미널 높이 조절 · 더블클릭: 기본 높이" data-i18n-attr="title"><i></i></div>
 
     <div class="profile" id="profile">
-      <div class="profile-head" id="profile-toggle" role="button" tabindex="0" title="클릭해서 접기/펼치기">
+      <div class="profile-head" id="profile-toggle" role="button" tabindex="0" title="클릭해서 접기/펼치기" data-i18n-attr="title">
         <span class="chev">▾</span>
-        <h2>세션 프로파일</h2>
+        <h2 data-i18n>세션 프로파일</h2>
         <span id="profile-model"></span>
         <span id="profile-mini"></span>
       </div>
@@ -173,47 +187,47 @@
       <div class="charts">
         <div class="chart-card">
           <div class="chart-head">
-            <h3>턴별 입력 토큰 <small>최근 20턴</small> <i class="info" data-info="턴별 입력 토큰">ⓘ</i></h3>
+            <h3><span data-i18n>턴별 입력 토큰</span> <small data-i18n>최근 20턴</small> <i class="info" data-info="턴별 입력 토큰">ⓘ</i></h3>
             <div class="legend">
-              <span><i style="background:var(--s-read)"></i>캐시 읽기</span>
-              <span><i style="background:var(--s-write)"></i>캐시 쓰기</span>
-              <span><i style="background:var(--s-new)"></i>신규 입력</span>
+              <span><i style="background:var(--s-read)"></i><span data-i18n>캐시 읽기</span></span>
+              <span><i style="background:var(--s-write)"></i><span data-i18n>캐시 쓰기</span></span>
+              <span><i style="background:var(--s-new)"></i><span data-i18n>신규 입력</span></span>
             </div>
           </div>
           <div class="chart" id="chart-input"></div>
-          <div class="chart-head sub"><h3>턴별 출력 토큰 <i class="info" data-info="턴별 출력 토큰">ⓘ</i></h3></div>
+          <div class="chart-head sub"><h3><span data-i18n>턴별 출력 토큰</span> <i class="info" data-info="턴별 출력 토큰">ⓘ</i></h3></div>
           <div class="chart" id="chart-output"></div>
         </div>
         <div class="chart-card">
-          <div class="chart-head"><h3>도구 사용 <small>세션 누적</small> <i class="info" data-info="도구 사용">ⓘ</i></h3></div>
+          <div class="chart-head"><h3><span data-i18n>도구 사용</span> <small data-i18n>세션 누적</small> <i class="info" data-info="도구 사용">ⓘ</i></h3></div>
           <div id="chart-tools" class="hbars"></div>
-          <div class="chart-head sub"><h3>서브에이전트 <small>별도 트랜스크립트</small> <i class="info" data-info="서브에이전트 목록">ⓘ</i></h3></div>
+          <div class="chart-head sub"><h3><span data-i18n>서브에이전트</span> <small data-i18n>별도 트랜스크립트</small> <i class="info" data-info="서브에이전트 목록">ⓘ</i></h3></div>
           <div id="subagents" class="subagents"></div>
         </div>
       </div>
       <div class="charts">
         <div class="chart-card">
           <div class="chart-head">
-            <h3>턴별 소요 시간 <small>최근 20턴</small> <i class="info" data-info="턴별 소요 시간">ⓘ</i></h3>
+            <h3><span data-i18n>턴별 소요 시간</span> <small data-i18n>최근 20턴</small> <i class="info" data-info="턴별 소요 시간">ⓘ</i></h3>
             <div class="legend">
-              <span><i style="background:var(--t-model)"></i>모델 응답</span>
-              <span><i style="background:var(--t-tool)"></i>도구 실행</span>
-              <span><i style="background:var(--t-wait)"></i>승인 대기</span>
-              <span><i style="background:var(--t-other)"></i>기타</span>
+              <span><i style="background:var(--t-model)"></i><span data-i18n>모델 응답</span></span>
+              <span><i style="background:var(--t-tool)"></i><span data-i18n>도구 실행</span></span>
+              <span><i style="background:var(--t-wait)"></i><span data-i18n>승인 대기</span></span>
+              <span><i style="background:var(--t-other)"></i><span data-i18n>기타</span></span>
             </div>
           </div>
           <div class="chart" id="chart-time"></div>
         </div>
         <div class="chart-card">
-          <div class="chart-head"><h3>도구별 소요 시간 <small>세션 누적</small> <i class="info" data-info="도구별 소요 시간">ⓘ</i></h3></div>
+          <div class="chart-head"><h3><span data-i18n>도구별 소요 시간</span> <small data-i18n>세션 누적</small> <i class="info" data-info="도구별 소요 시간">ⓘ</i></h3></div>
           <div id="chart-tooltime" class="hbars"></div>
         </div>
       </div>
       <div class="chart-card">
-        <div class="chart-head"><h3>최근 요청 <i class="info" data-info="최근 요청">ⓘ</i></h3></div>
+        <div class="chart-head"><h3><span data-i18n>최근 요청</span> <i class="info" data-info="최근 요청">ⓘ</i></h3></div>
         <div class="table-wrap"><table class="turns" id="turns-table"></table></div>
       </div>
-      <p class="profile-note">트랜스크립트(.jsonl) 기준 집계 · 비용은 API 단가 환산 추정치(구독 사용 시 실제 청구액 아님) · 파일 형식은 Claude Code 버전에 따라 바뀔 수 있음</p>
+      <p class="profile-note" data-i18n>트랜스크립트(.jsonl) 기준 집계 · 비용은 API 단가 환산 추정치(구독 사용 시 실제 청구액 아님) · 파일 형식은 Claude Code 버전에 따라 바뀔 수 있음</p>
     </div>
   </section>
 
@@ -221,13 +235,13 @@
 
   <div class="modal-back" id="power-modal" hidden>
     <div class="modal panel">
-      <h3>서버 종료</h3>
-      <p>워커(Claude 세션)는 서버와 별도 프로세스라 <b>서버만 종료</b>하면 계속 돌고, 다음에 켜면 다시 붙습니다.</p>
+      <h3 data-i18n>서버 종료</h3>
+      <p data-i18n>워커(Claude 세션)는 서버와 별도 프로세스라 <b>서버만 종료</b>하면 계속 돌고, 다음에 켜면 다시 붙습니다.</p>
       <div class="modal-acts">
-        <button class="btn ghost" data-power="cancel">취소</button>
-        <button class="btn" data-power="restart">↻ 서버 재시작</button>
-        <button class="btn" data-power="server">서버만 종료</button>
-        <button class="btn deny" data-power="all">서버 + 워커 모두 종료</button>
+        <button class="btn ghost" data-power="cancel" data-i18n>취소</button>
+        <button class="btn" data-power="restart" data-i18n>↻ 서버 재시작</button>
+        <button class="btn" data-power="server" data-i18n>서버만 종료</button>
+        <button class="btn deny" data-power="all" data-i18n>서버 + 워커 모두 종료</button>
       </div>
     </div>
   </div>
@@ -239,8 +253,8 @@
       <p id="ask-body"></p>
       <textarea id="ask-input" rows="3" hidden></textarea>
       <div class="modal-acts">
-        <button class="btn ghost" data-ask="cancel">취소</button>
-        <button class="btn primary" data-ask="ok">확인</button>
+        <button class="btn ghost" data-ask="cancel" data-i18n>취소</button>
+        <button class="btn primary" data-ask="ok" data-i18n>확인</button>
       </div>
     </div>
   </div>
@@ -248,15 +262,17 @@
   <div class="down-screen" id="down-screen" hidden>
     <div class="down-box">
       <span class="down-mark" data-clawd></span>
-      <h2>서버가 종료되었습니다</h2>
+      <h2 data-i18n>서버가 종료되었습니다</h2>
       <p id="down-detail"></p>
-      <p class="dim">다시 켜려면 프로젝트 폴더의 <b>Launch.vbs</b> (또는 Launch.bat) 를 실행하세요.<br>서버가 다시 켜지면 이 화면은 자동으로 새로고침됩니다.</p>
+      <p class="dim" data-i18n>다시 켜려면 프로젝트 폴더의 <b>Launch.vbs</b> (또는 Launch.bat) 를 실행하세요.<br>서버가 다시 켜지면 이 화면은 자동으로 새로고침됩니다.</p>
     </div>
   </div>
 
   <script src="/vendor/xterm.js"></script>
   <script src="/vendor/addon-fit.js"></script>
   <script src="/vendor/addon-unicode11.js"></script>
+  <script src="/i18n.js"></script>
+  <script src="/info-en.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>
