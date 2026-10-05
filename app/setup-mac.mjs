@@ -8,9 +8,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { L } from './cli-lang.js';
 
 if (process.platform !== 'darwin') {
-  console.log('macOS 전용 설치 스크립트입니다. Windows 는 Launch.vbs / Launch.bat 을 쓰세요.');
+  console.log(L('macOS 전용 설치 스크립트입니다. Windows 는 Launch.vbs / Launch.bat 을 쓰세요.', 'This setup script is for macOS only. On Windows, use Launch.vbs / Launch.bat.'));
   process.exit(0);
 }
 
@@ -21,7 +22,7 @@ const q = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`; // sh 작은따옴표 
 // 1) Launch.command 실행 권한
 const cmd = path.join(ROOT, 'Launch.command');
 fs.chmodSync(cmd, 0o755);
-console.log('✓ Launch.command 실행 권한');
+console.log(L('✓ Launch.command 실행 권한', '✓ Launch.command made executable'));
 
 // 2) Launch.app — 앱 위치의 상위 폴더(프로젝트)에서 launch.mjs 를 백그라운드로 실행
 //    Finder 로 띄운 앱은 PATH 가 최소한이라 흔한 node 위치를 PATH 에 보탠다. 절대 경로를 박지 않는 이유:
@@ -36,7 +37,7 @@ const appleScript = [
 ].join('\n');
 fs.rmSync(appPath, { recursive: true, force: true });
 execFileSync('osacompile', ['-o', appPath, '-e', appleScript]);
-console.log(`✓ Launch.app 생성 (node: ${NODE})`);
+console.log(L(`✓ Launch.app 생성 (node: ${NODE})`, `✓ Launch.app created (node: ${NODE})`));
 
 // 3) agent-manager 명령 (Windows PowerShell 프로필과 같은 동작: 창 없는 실행기를 연다)
 const rc = path.join(os.homedir(), '.zshrc');
@@ -46,10 +47,10 @@ const cur = fs.existsSync(rc) ? fs.readFileSync(rc, 'utf8') : '';
 if (cur.includes(begin)) {
   // 경로가 바뀌었을 수 있으니 블록만 새로 쓴다
   fs.writeFileSync(rc, cur.replace(/# >>> agent-manager >>>[\s\S]*?# <<< agent-manager <<<\n?/, block));
-  console.log('✓ ~/.zshrc 의 agent-manager 명령 갱신');
+  console.log(L('✓ ~/.zshrc 의 agent-manager 명령 갱신', '✓ Updated the agent-manager command in ~/.zshrc'));
 } else {
   fs.appendFileSync(rc, `\n${block}`);
-  console.log('✓ ~/.zshrc 에 agent-manager 명령 추가 (새 터미널부터 적용, 지금 창은 `source ~/.zshrc`)');
+  console.log(L('✓ ~/.zshrc 에 agent-manager 명령 추가 (새 터미널부터 적용, 지금 창은 `source ~/.zshrc`)', '✓ Added the agent-manager command to ~/.zshrc (new terminals pick it up; in this one run `source ~/.zshrc`)'));
 }
 
-console.log('\n완료. Launch.app 을 처음 열 때 보안 경고가 뜨면 Finder 에서 우클릭 → 열기 를 한 번 하세요.');
+console.log(L('\n완료. Launch.app 을 처음 열 때 보안 경고가 뜨면 Finder 에서 우클릭 → 열기 를 한 번 하세요.', '\nDone. If a security warning appears the first time you open Launch.app, right-click → Open it once in Finder.'));

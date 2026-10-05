@@ -14,6 +14,7 @@ import { createRequire } from 'node:module';
 import { createProfile, readProfile, profileSummary, runningSubagents, editLog, trimHunks } from './profile.js';
 import { snapshot, changedSince } from './shelldiff.js';
 import { createProgress, isCommit } from './progress.js';
+import { L } from './cli-lang.js';
 const { Terminal: HeadlessTerminal } = createRequire(import.meta.url)('@xterm/headless');
 
 const APP_DIR = path.dirname(fileURLToPath(import.meta.url)); // app/ — 코드
@@ -855,7 +856,7 @@ function openHost() {
       const hello = JSON.parse(raw);
       host = ws;
       ws.on('message', (r) => { try { onHostMessage(JSON.parse(r)); } catch (e) { console.error('host msg', e); } });
-      ws.on('close', () => { host = null; console.log('PTY 호스트 연결 끊김 — 재접속 시도'); setTimeout(() => connectHost().catch(() => {}), 1000); });
+      ws.on('close', () => { host = null; console.log(L('PTY 호스트 연결 끊김 — 재접속 시도', 'Lost connection to the PTY host — reconnecting')); setTimeout(() => connectHost().catch(() => {}), 1000); });
       resolve(hello);
     });
   });
@@ -866,7 +867,7 @@ async function connectHost() {
     try { const hello = await openHost(); onHostHello(hello); return; }
     catch { if (i === 0) startHost(); await new Promise((r) => setTimeout(r, 250)); }
   }
-  throw new Error('PTY 호스트에 접속할 수 없습니다');
+  throw new Error(L('PTY 호스트에 접속할 수 없습니다', 'Cannot connect to the PTY host'));
 }
 
 // 호스트가 가진 터미널 목록으로 워커를 복원한다. 저장된 기록(workers.json)이 있으면 그 상태로.
@@ -1004,7 +1005,7 @@ function cleanupLegacyHook() {
     if (w.status === 'exited') return false;
     try { return fs.readFileSync(path.join(DATA_DIR, `${w.id}.settings.json`), 'utf8').includes(needle); } catch { return false; }
   });
-  if (!inUse) { try { fs.unlinkSync(LEGACY_HOOK); console.log('호환용 hook.mjs 정리'); } catch {} }
+  if (!inUse) { try { fs.unlinkSync(LEGACY_HOOK); console.log(L('호환용 hook.mjs 정리', 'Removed the legacy hook.mjs')); } catch {} }
 }
 setInterval(cleanupLegacyHook, 60_000);
 
@@ -1230,7 +1231,7 @@ const server = http.createServer(async (req, res) => {
   // 워커는 PTY 호스트에서 계속 돌고, 새 서버가 뜨면 다시 붙는다. 화면은 서버가 돌아오면 스스로 새로고침
   if (req.method === 'POST' && p === '/api/restart') {
     json(res, 200, { ok: true });
-    console.log('브라우저에서 서버 재시작 요청');
+    console.log(L('브라우저에서 서버 재시작 요청', 'Server restart requested from the browser'));
     spawnProcess(process.execPath, [path.join(APP_DIR, 'launch.mjs')], {
       cwd: ROOT, detached: true, stdio: 'ignore', windowsHide: true,
       env: { ...process.env, AM_NO_BROWSER: '1', AM_WAIT_FREE: '1' },
@@ -1243,7 +1244,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && p === '/api/shutdown') {
     const { workers: alsoWorkers } = await readBody(req);
     json(res, 200, { ok: true });
-    console.log(`브라우저에서 종료 요청 (${alsoWorkers ? '워커 포함' : '서버만'})`);
+    console.log(alsoWorkers ? L('브라우저에서 종료 요청 (워커 포함)', 'Shutdown requested from the browser (including workers)') : L('브라우저에서 종료 요청 (서버만)', 'Shutdown requested from the browser (server only)'));
     if (alsoWorkers) hostSend({ op: 'shutdown' });
     setTimeout(shutdown, 300);
     return;
@@ -1298,7 +1299,7 @@ wss.on('connection', (ws) => {
 
 await connectHost();
 server.listen(PORT, HOST, () => {
-  console.log(`클로드 키우기 http://${HOST}:${PORT}  (claude: ${CLAUDE_BIN})`);
+  console.log(`${L('클로드 키우기', 'Clawdgotchi')} http://${HOST}:${PORT}  (claude: ${CLAUDE_BIN})`);
   setTimeout(cleanupLegacyHook, 5000);
 });
 

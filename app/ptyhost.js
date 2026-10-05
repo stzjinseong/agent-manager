@@ -18,6 +18,7 @@ import http from 'node:http';
 import pty from '@lydell/node-pty';
 import { WebSocketServer } from 'ws';
 import { createRequire } from 'node:module';
+import { L } from './cli-lang.js';
 
 const require = createRequire(import.meta.url);
 const { Terminal } = require('@xterm/headless');
@@ -32,8 +33,8 @@ const IDLE_EXIT_MS = 60_000; // 워커도 접속한 서버도 없으면 스스�
 if (process.argv.includes('--shutdown')) {
   const { default: WebSocket } = await import('ws');
   const ws = new WebSocket(`ws://127.0.0.1:${PORT}`);
-  ws.on('open', () => { ws.send(JSON.stringify({ op: 'shutdown' })); console.log('워커 호스트 종료 요청 보냄'); setTimeout(() => process.exit(0), 500); });
-  ws.on('error', () => { console.log('실행 중인 워커 호스트 없음'); process.exit(0); });
+  ws.on('open', () => { ws.send(JSON.stringify({ op: 'shutdown' })); console.log(L('워커 호스트 종료 요청 보냄', 'Sent shutdown request to the worker host')); setTimeout(() => process.exit(0), 500); });
+  ws.on('error', () => { console.log(L('실행 중인 워커 호스트 없음', 'No worker host is running')); process.exit(0); });
   await new Promise(() => {});
 }
 

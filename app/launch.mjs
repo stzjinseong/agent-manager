@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { L, cliLocale } from './cli-lang.js';
 
 const APP_DIR = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.dirname(APP_DIR);
@@ -28,10 +29,10 @@ function openBrowser() {
 // 창 없이 실행됐을 때도 실패를 알 수 있게 메시지 상자로
 function alertBox(text) {
   if (IS_WIN) {
-    const ps = `Add-Type -AssemblyName PresentationFramework; [System.Windows.MessageBox]::Show('${text.replace(/'/g, "''")}', '클로드 키우기') | Out-Null`;
+    const ps = `Add-Type -AssemblyName PresentationFramework; [System.Windows.MessageBox]::Show('${text.replace(/'/g, "''")}', '${L('클로드 키우기', 'Clawdgotchi')}') | Out-Null`;
     spawn('powershell.exe', ['-NoProfile', '-Command', ps], { stdio: 'ignore', windowsHide: true });
   } else if (process.platform === 'darwin') {
-    const as = `display dialog "${text.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}" with title "클로드 키우기" buttons {"확인"} default button 1`;
+    const as = `display dialog "${text.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}" with title "${L('클로드 키우기', 'Clawdgotchi')}" buttons {"${L('확인', 'OK')}"} default button 1`;
     spawn('osascript', ['-e', as], { stdio: 'ignore', detached: true }).unref();
   }
 }
@@ -46,15 +47,15 @@ if (!(await isUp())) {
   // 로그가 5MB 를 넘으면 새로 시작
   try { if (fs.statSync(LOG).size > 5 * 1024 * 1024) fs.writeFileSync(LOG, ''); } catch {}
   const out = fs.openSync(LOG, 'a');
-  fs.writeSync(out, `\n===== ${new Date().toLocaleString('ko-KR')} 서버 시작 =====\n`);
+  fs.writeSync(out, `\n===== ${new Date().toLocaleString(cliLocale())} ${L('서버 시작', 'server start')} =====\n`);
   spawn(process.execPath, [path.join(APP_DIR, 'server.js')], {
     cwd: ROOT, detached: true, windowsHide: true, stdio: ['ignore', out, out],
   }).unref();
   let ok = false;
   for (let i = 0; i < 60 && !ok; i++) { await sleep(250); ok = await isUp(); }
   if (!ok) {
-    alertBox(`서버를 시작하지 못했습니다.\n로그: ${LOG}`);
-    console.error(`서버 시작 실패 — 로그: ${LOG}`);
+    alertBox(L(`서버를 시작하지 못했습니다.\n로그: ${LOG}`, `The server failed to start.\nLog: ${LOG}`));
+    console.error(L(`서버 시작 실패 — 로그: ${LOG}`, `Server failed to start — log: ${LOG}`));
     process.exit(1);
   }
 }

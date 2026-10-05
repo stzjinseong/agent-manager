@@ -1,10 +1,12 @@
 ---
-description: agent-manager 설치 (의존성 + OS별 실행기). 예) /setup --mac
+description: Install agent-manager (dependencies + OS launcher) · agent-manager 설치. e.g. /setup --mac
 argument-hint: "[--mac | --windows]"
 allowed-tools: Bash(node:*), Bash(npm:*), Bash(claude:*), Bash(uname:*), Bash(ls:*), Bash(test:*)
 ---
 
 agent-manager 를 이 컴퓨터에 설치한다. 인자: `$ARGUMENTS`
+
+사용자에게 하는 안내·결과 보고는 **사용자가 쓰는 언어로** 한다 (영어로 물으면 영어로). 설치 스크립트 출력도 OS 언어에 따라 한국어 또는 영어로 나온다.
 
 ## 대상 OS 정하기
 
