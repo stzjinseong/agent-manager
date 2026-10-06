@@ -47,7 +47,11 @@ export function createProfile(file) {
 
 const empty = () => Object.fromEntries(KEYS.map((k) => [k, 0]));
 
-const MAX_EDITS = 400, MAX_EDIT_LINES = 3000; // 아주 큰 파일을 통째로 쓴 경우 메모리·전송량이 커지지 않게 줄 수를 자른다
+const MAX_EDIT_LINES = 3000; // 아주 큰 파일을 통째로 쓴 경우 메모리·전송량이 커지지 않게 수정 하나의 줄 수를 자른다
+// diff 보관 기준: 파일을 고친 최근 요청 KEEP_REQUESTS 개까지, 바뀐 줄을 다 합쳐 MAX_DIFF_LINES 줄까지 — 넘으면 오래된 요청부터 통째로 뺀다
+// (가장 최근 요청은 늘 남김). 건수가 아니라 요청 단위라 한 요청의 기록이 중간에 잘리지 않는다. MAX_EDITS 는 줄이 없는 기록(삭제·바이너리)용 안전판
+export const KEEP_REQUESTS = 30, MAX_DIFF_LINES = 20_000;
+const MAX_EDITS = 2000;
 
 // 도구 결과(toolUseResult) → 수정 이력 한 건. 수정이 아니면 null
 function editOf(r, id, tool, turn, ts) {
@@ -76,7 +80,31 @@ export function trimHunks(hunks) {
 }
 function pushEdit(p, ed) {
   p.edits.push(ed);
-  if (p.edits.length > MAX_EDITS) p.edits.shift();
+  // 긴 트랜스크립트를 읽는 동안에도 메모리가 불지 않게 가끔 — 이때는 Edit/Write 만(셸 수정은 아직 안 읽은 턴에 속할 수 있어 다 읽은 뒤에)
+  if (p.edits.length % 50 === 0) pruneEdits(p, false);
+}
+const editLines = (ed) => (ed.hunks || []).reduce((a, h) => a + h.lines.length, 0);
+// 보관 기준(KEEP_REQUESTS · MAX_DIFF_LINES · MAX_EDITS)에 맞게 오래된 요청의 수정을 뺀다 — Edit/Write 와 셸 수정을 같은 요청 단위로
+export function pruneEdits(p, withShell = true) {
+  const all = withShell ? allEdits(p) : p.edits;
+  const lines = new Map(), count = new Map(), order = [];
+  for (let i = all.length - 1; i >= 0; i--) {
+    const t = all[i].turn ?? null;
+    if (!lines.has(t)) { lines.set(t, 0); count.set(t, 0); order.push(t); } // 최근에 고친 요청부터
+    lines.set(t, lines.get(t) + editLines(all[i])); count.set(t, count.get(t) + 1);
+  }
+  const keep = new Set();
+  let sumL = 0, sumN = 0;
+  for (const t of order) {
+    if (keep.size >= KEEP_REQUESTS) break;
+    if (keep.size && (sumL + lines.get(t) > MAX_DIFF_LINES || sumN + count.get(t) > MAX_EDITS)) break;
+    keep.add(t); sumL += lines.get(t); sumN += count.get(t);
+  }
+  if (keep.size === order.length) return false;
+  const turnOfShell = (ed) => (p.toolTurn.get(ed.toolUseId) || turnAt(p, ed.ts))?.n ?? null;
+  p.edits = p.edits.filter((ed) => keep.has(ed.turn ?? null));
+  if (withShell) p.shellEdits = p.shellEdits.filter((ed) => keep.has(turnOfShell(ed)));
+  return true;
 }
 
 function usageOf(m, p) {
@@ -378,6 +406,7 @@ function allEdits(p) {
 
 // diff 보기: 파일별로 묶은 수정 이력(최근에 고친 파일이 위)과, 파일을 고친 요청 목록(최근 요청이 위)
 export function editLog(p) {
+  pruneEdits(p);
   const files = new Map(), reqs = new Map();
   for (const ed of allEdits(p)) {
     const f = files.get(ed.file) || { file: ed.file, add: 0, del: 0, last: 0, created: false, edits: [] };
@@ -470,6 +499,7 @@ export function profileSummary(p, waits = []) {
     toolErrTop: Object.entries(p.toolErrBy).sort((a, b) => b[1] - a[1]).slice(0, 5),
     compactLog: p.compactLog.slice(-5),
     edits: (() => {
+      pruneEdits(p);
       const all = allEdits(p);
       return { n: all.length, files: new Set(all.map((x) => x.file)).size,
         add: all.reduce((a, x) => a + x.add, 0), del: all.reduce((a, x) => a + x.del, 0), last: all.at(-1)?.ts || 0 };

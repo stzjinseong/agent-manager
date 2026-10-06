@@ -11,7 +11,7 @@ import { execSync, execFile, spawn as spawnProcess } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import WebSocket, { WebSocketServer } from 'ws';
 import { createRequire } from 'node:module';
-import { createProfile, readProfile, profileSummary, runningSubagents, editLog, trimHunks } from './profile.js';
+import { createProfile, readProfile, profileSummary, runningSubagents, editLog, trimHunks, pruneEdits } from './profile.js';
 import { snapshot, changedSince } from './shelldiff.js';
 import { createProgress, isCommit } from './progress.js';
 import { L } from './cli-lang.js';
@@ -569,16 +569,44 @@ function summarizeTool(name, input = {}) {
 // 한계: 백그라운드 명령(run_in_background)은 결과가 곧바로 와서 그 뒤의 변경은 못 잡는다 · 명령이 도는 사이 같은 저장소에서
 // 다른 워커나 사람이 바꾼 것도 이 명령의 변경으로 잡힌다
 const SHELL_DIR = path.join(DATA_DIR, 'shell-edits');
-const MAX_SHELL_EDITS = 400;
+// 보관 기준은 Edit/Write 와 같다(profile.js pruneEdits — 최근 요청 30개 · 2만 줄). 파일은 덧붙이기만 하므로, 화면에 남는 것보다
+// 줄이 많이 쌓이면 남는 것만으로 다시 쓴다. 30일 넘게 손대지 않은 세션 파일은 지운다(cleanupShellEdits)
+const MAX_SHELL_LOAD = 2000; // 읽을 때 안전판 — 그 이상은 어차피 보관 기준에서 빠진다
+const SHELL_KEEP_DAYS = 30;
 const shellFile = (txPath) => path.join(SHELL_DIR, `${path.basename(txPath, '.jsonl')}.jsonl`);
+const shellLines = new Map(); // 파일 경로 → 디스크에 쌓인 줄 수
 function openProfile(txPath) {
   const p = createProfile(txPath);
   try {
-    p.shellEdits = fs.readFileSync(shellFile(txPath), 'utf8').split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } })
-      .filter(Boolean).slice(-MAX_SHELL_EDITS);
+    const lines = fs.readFileSync(shellFile(txPath), 'utf8').split('\n').filter(Boolean);
+    shellLines.set(shellFile(txPath), lines.length);
+    p.shellEdits = lines.map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean).slice(-MAX_SHELL_LOAD);
   } catch {}
   return p;
 }
+// 보관 기준으로 줄인 뒤, 디스크 파일이 남은 기록의 두 배(+100줄)보다 길면 남은 것만으로 다시 쓴다
+function compactShellFile(p) {
+  pruneEdits(p);
+  const f = shellFile(p.path), n = shellLines.get(f) || 0;
+  if (n <= p.shellEdits.length * 2 + 100) return;
+  try {
+    const body = p.shellEdits.map((r) => JSON.stringify(r)).join('\n');
+    fs.writeFileSync(`${f}.tmp`, body ? body + '\n' : '');
+    fs.renameSync(`${f}.tmp`, f);
+    shellLines.set(f, p.shellEdits.length);
+  } catch (e) { console.error(`diff(shell) compact ${path.basename(f)}: ${e.message}`); }
+}
+function cleanupShellEdits() {
+  let names = [];
+  try { names = fs.readdirSync(SHELL_DIR); } catch { return; }
+  const cutoff = Date.now() - SHELL_KEEP_DAYS * 86400_000;
+  for (const n of names) {
+    const f = path.join(SHELL_DIR, n);
+    try { if (fs.statSync(f).mtimeMs < cutoff) { fs.unlinkSync(f); shellLines.delete(f); } } catch {}
+  }
+}
+cleanupShellEdits();
+setInterval(cleanupShellEdits, 24 * 3600_000);
 const repoChecks = new Map(); // cwd → Promise<bool> (git 저장소인지 — diff 화면 안내용)
 function snapshotRepo(cwd) {
   if (!cwd) return Promise.resolve(false);
@@ -625,11 +653,15 @@ function closeShell(w, id) {
     }));
     const txPath = pend.txPath || w.tx?.path;
     if (txPath) {
-      try { fs.mkdirSync(SHELL_DIR, { recursive: true }); fs.appendFileSync(shellFile(txPath), recs.map((r) => JSON.stringify(r)).join('\n') + '\n'); } catch {}
+      try {
+        fs.mkdirSync(SHELL_DIR, { recursive: true });
+        fs.appendFileSync(shellFile(txPath), recs.map((r) => JSON.stringify(r)).join('\n') + '\n');
+        shellLines.set(shellFile(txPath), (shellLines.get(shellFile(txPath)) || 0) + recs.length);
+      } catch {}
     }
     if (w.tx && (!txPath || w.tx.path === txPath)) {
       w.tx.shellEdits.push(...recs);
-      if (w.tx.shellEdits.length > MAX_SHELL_EDITS) w.tx.shellEdits.splice(0, w.tx.shellEdits.length - MAX_SHELL_EDITS);
+      compactShellFile(w.tx);
       emitState();
     }
   }).catch(() => {});
