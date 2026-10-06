@@ -1625,22 +1625,69 @@ const fmtLeft = (ms) => {
   const h = Math.floor(m / 60);
   return h < 24 ? _t('{h}시간 {m}분', { h, m: m % 60 }) : _t('{d}일 {h}시간', { d: Math.floor(h / 24), h: h % 24 });
 };
+// 미터 툴팁: 마우스를 올리면 바로(브라우저 title 은 1초쯤 늦게 떠서) #tip 에 항목별 설명을 띄운다. 미터는 매초 다시 그려
+// 요소가 바뀌므로, 미터 위 마우스 위치를 들고 있다가 그릴 때마다 그 자리의 항목으로 다시 맞춘다
+const meterTips = {};
+let mtPt = null;
+function showMeterTip() {
+  const tip = $('#tip');
+  const el = mtPt && document.elementFromPoint(mtPt.x, mtPt.y)?.closest('[data-mt]');
+  const t = el && meterTips[el.dataset.mt];
+  if (!t) { if (tip.classList.contains('mt-tip')) { tip.hidden = true; tip.classList.remove('mt-tip'); tip._mt = ''; } return; }
+  const html = `<div class="tt">${esc(t.title)}</div>` +
+    (t.rows || []).map(([k, v]) => `<div class="row"><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join('') +
+    (t.note ? `<div class="mt-note">${esc(t.note)}</div>` : '');
+  tip.classList.remove('info-tip'); tip.classList.add('mt-tip');
+  if (tip._mt !== html) tip.innerHTML = tip._mt = html;
+  tip.hidden = false;
+  // 항목 아래에 고정(마우스를 따라다니지 않음) — 화면 오른쪽 끝을 넘지 않게
+  const r = el.getBoundingClientRect(), b = tip.getBoundingClientRect();
+  tip.style.left = `${Math.max(8, Math.min(r.left, innerWidth - b.width - 8))}px`;
+  tip.style.top = `${r.bottom + 8 + b.height < innerHeight ? r.bottom + 8 : Math.max(8, r.top - b.height - 8)}px`;
+}
+document.addEventListener('mousemove', (e) => {
+  const on = e.target.closest?.('.meters');
+  if (on) { mtPt = { x: e.clientX, y: e.clientY }; showMeterTip(); } else if (mtPt) { mtPt = null; showMeterTip(); }
+});
+document.addEventListener('mouseout', (e) => { if (!e.relatedTarget && mtPt) { mtPt = null; showMeterTip(); } }); // 창 밖으로
+
 function renderUsage() {
   const boxes = [$('#meters'), $('#meters-full')].filter(Boolean);
   if (!boxes.length) return;
   const u = state.usage, now = Date.now();
-  const m = (label, pct, color, tip, dim = false, after = '') =>
-    `<span class="mt${dim ? ' dim' : ''}" title="${esc(tip)}"><span class="mt-l">${_t(label)}</span><span class="mt-bar" style="--p:${pct ?? 0}%;--uc:${color}"><b>${pct == null ? '—' : `${Math.round(pct)}%`}</b></span>${after}</span>`;
+  for (const k in meterTips) delete meterTips[k];
+  const m = (key, label, pct, color, tip, dim = false, after = '') => {
+    meterTips[key] = tip;
+    return `<span class="mt${dim ? ' dim' : ''}" data-mt="${key}"><span class="mt-l">${_t(label)}</span><span class="mt-bar" style="--p:${pct ?? 0}%;--uc:${color}"><b>${pct == null ? '—' : `${Math.round(pct)}%`}</b></span>${after}</span>`;
+  };
   // 초기화까지 남은 시간은 큰 단위 하나로 짧게(32분 · 4시간 · 6일) — 정확한 시각은 마우스를 올리면
   const short = (ms) => { const mins = Math.max(0, Math.floor(ms / 60000)); return mins < 60 ? _t('{m}분', { m: mins }) : mins < 1440 ? _t('{h}시간', { h: Math.floor(mins / 60) }) : _t('{d}일', { d: Math.floor(mins / 1440) }); };
+  const clock = (t) => new Date(t).toLocaleTimeString(uiLocale(), { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
   // 색은 항목별로 고정(style.css --m-ctx · --m-5h · --m-wk) — 사용률에 따라 바꾸지 않는다
   const parts = [];
   // 컨텍스트: 선택한 워커의 현재 대화가 차지한 양 / 모델 컨텍스트 창 — 워커 비교 표와 같은 값·같은 경고 기준(ctxLevel)
   const w = selected && state.workers.find((x) => x.id === selected);
   const p = w?.profile;
   if (p && p.context) {
+    // 컨텍스트 왼쪽에 프롬프트 캐시가 만료되기까지 남은 시간(⏱ 분:초) — 마지막 API 호출 + TTL(5분/1시간). 지나면 다음 요청이 캐시를 새로 쓴다
+    const c = p.cache;
+    if (c) {
+      const left = c.at + c.ttl + clockSkew - now, ttlName = _t(c.ttl >= 3600_000 ? '1시간' : '5분');
+      const mmss = (ms) => { const sec = Math.ceil(ms / 1000); return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; };
+      meterTips.cache = {
+        title: _t('프롬프트 캐시'),
+        rows: [[_t('만료까지'), left > 0 ? mmss(left) : _t('만료됨')], ['TTL', ttlName], [_t('마지막 API 호출'), clock(c.at + clockSkew)]],
+        note: left > 0 ? _t('그 전에 요청하면 대화를 캐시에서 읽어 싸고 빠릅니다. 요청할 때마다 다시 {ttl} 연장됩니다', { ttl: ttlName })
+          : _t('다음 요청은 대화 전체를 캐시에 새로 써서 비용이 더 듭니다'),
+      };
+      parts.push(`<span class="mt-r mt-cache${left <= 0 ? ' gone' : ''}" data-mt="cache">${left > 0 ? `⏱ ${mmss(left)}` : _t('캐시 만료')}</span>`);
+    }
     const ctx = ctxLevel(p), pct = Math.min(100, ctx.pct * 100);
-    parts.push(m('컨텍스트', pct, 'var(--m-ctx)', `${w.name} ${_t('컨텍스트 {n}', { n: `${fmtN(p.context)} / ${fmtN(p.window || 200_000)}` })} (${Math.round(pct)}%)${ctx.text ? ` · ${ctx.text}` : ''}`));
+    parts.push(m('ctx', '컨텍스트', pct, 'var(--m-ctx)', {
+      title: `${_t('컨텍스트')} ${Math.round(pct)}%`,
+      rows: [[_t('대상 워커'), w.name], [_t('사용'), `${fmtN(p.context)} / ${fmtN(p.window || 200_000)}`]],
+      note: ctx.text || _t('지금 대화가 모델 컨텍스트 창을 차지한 양 — 가득 차면 자동 압축됩니다'),
+    }));
   }
   // 5시간·주간: 계정 한도(서버가 워커 상태줄에서 받은 rate_limits). 초기화 시각이 지나면 0%, 30분 넘게 새 값이 없으면 흐리게.
   // 서버는 항목마다 받은 시각(at)·보낸 워커(from)를 붙이고, 새 값에 한 항목이 빠지면 초기화 전인 이전 값을 유지한다
@@ -1648,26 +1695,28 @@ function renderUsage() {
   const wname = (id) => { const x = state.workers.find((v) => v.id === id); return x && x.name !== id ? `${x.name}(${id})` : id; };
   const names = (ids) => ids.map(wname).join(', ');
   const noReporter = rep.ok.length ? '' : `${_t('사용량을 보내는 워커가 없습니다')}${rep.missing.length ? _t(' — {names}은(는) 이 기능 이전에 떠서 보내지 못합니다. 새로 띄우면(추가 인자 --resume 으로 대화 이어받기) 보냅니다', { names: names(rep.missing) }) : _t(' — 워커를 띄우면 일하는 동안 받아 옵니다')}`;
-  const limit = (label, x, base) => {
+  const limit = (key, label, x, base) => {
     if (!x) {
       const why = noReporter || (u ? _t('최근 받은 값에 {label} 한도가 없었습니다 — 진행 중인 {label} 구간이 없을 때 빠지는 것으로 보입니다. {names} 워커가 다음에 일하면 갱신됩니다', { label: _t(label), names: names(rep.ok) })
         : _t('아직 받은 값이 없습니다 — {names} 워커가 일하기 시작하면 표시됩니다', { names: names(rep.ok) }));
-      return m(label, null, base, `${_t('{label} 한도', { label: _t(label) })} — ${why}`, true);
+      return m(key, label, null, base, { title: _t('{label} 한도', { label: _t(label) }), note: why }, true);
     }
     const age = now - ((x.at ?? u.at) + clockSkew), stale = age > 30 * 60_000;
     const reset = x.resetsAt && x.resetsAt <= now;
     const pct = reset ? 0 : Math.max(0, Math.min(100, x.pct));
     const at = x.resetsAt ? new Date(x.resetsAt).toLocaleString(uiLocale(), { month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false }) : '';
-    const when = reset ? _t('초기화됨') : x.resetsAt ? _t('{at} 초기화 ({left} 후)', { at, left: fmtLeft(x.resetsAt - now) }) : '';
     const after = x.resetsAt ? `<span class="mt-r">${reset ? _t('초기화됨') : `↻ ${short(x.resetsAt - now)}`}</span>` : '';
-    const got = `${age < 60_000 ? _t('방금 받은 값') : _t('{t} 전 받은 값', { t: fmtLeft(age) })}${x.from || u.from ? ` · ${wname(x.from || u.from)}` : ''}`;
-    return m(label, pct, base, `${_t('{label} 한도 {n}% 사용', { label: _t(label), n: Math.round(pct) })}${when ? ` · ${when}` : ''}\n${got}${stale && noReporter ? `\n${noReporter}` : ''}`, stale, after);
+    const rows = [];
+    if (x.resetsAt) rows.push([_t('초기화'), reset ? _t('초기화됨') : `${at} (${_t('{left} 후', { left: fmtLeft(x.resetsAt - now) })})`]);
+    rows.push([_t('받은 값'), `${age < 60_000 ? _t('방금') : _t('{t} 전', { t: fmtLeft(age) })}${x.from || u.from ? ` · ${wname(x.from || u.from)}` : ''}`]);
+    return m(key, label, pct, base, { title: _t('{label} 한도 {n}% 사용', { label: _t(label), n: Math.round(pct) }), rows, note: stale ? (noReporter || _t('30분 넘게 새 값이 없어 흐리게 표시합니다')) : '' }, stale, after);
   };
-  parts.push(limit('5시간', u?.fiveHour, 'var(--m-5h)'), limit('주간', u?.sevenDay, 'var(--m-wk)'));
+  parts.push(limit('h5', '5시간', u?.fiveHour, 'var(--m-5h)'), limit('wk', '주간', u?.sevenDay, 'var(--m-wk)'));
   const html = parts.join('');
   let changed = false;
   for (const box of boxes) if (box._html !== html) { box.innerHTML = box._html = html; changed = true; }
   if (changed) requestAnimationFrame(placeMeters); // 미터 폭이 바뀌었으면 양보 단계를 다시 고른다
+  if (mtPt) showMeterTip();
 }
 
 // 매초: 경과 시간 텍스트만 갱신

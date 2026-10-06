@@ -81,8 +81,12 @@ textarea { resize: vertical; }
 .brand-mark .clawd .body { fill: #f3f1ec; }
 .brand-mark .clawd .eye { fill: #14161c; }
 .brand-mark { filter: drop-shadow(0 0 4px rgba(255, 255, 255, .3)); }
-.stats { display: flex; gap: 6px; flex: 1; flex-wrap: wrap; }
-.stat { display: inline-flex; align-items: center; gap: 7px; padding: 4px 11px; border-radius: 999px; background: var(--surface-2); color: var(--text-2); font-size: 12.5px; }
+/* 헤더 높이는 늘리지 않는다 — 상태 칩은 한 줄 높이로 고정하고, 폭이 모자라면 넘친 칩은 다음 줄로 내려가 잘려 안 보인다
+   (오른쪽 칩부터 통째로 사라짐). 이름·버튼은 줄바꿈하지 않는다 */
+.stats { display: flex; gap: 6px; flex: 1; flex-wrap: wrap; min-width: 0; height: 26px; overflow: hidden; }
+.topbar > :not(.stats) { flex: none; }
+.brand h1, .topbar .btn { white-space: nowrap; }
+.stat { height: 26px; box-sizing: border-box; display: inline-flex; align-items: center; gap: 7px; padding: 4px 11px; border-radius: 999px; background: var(--surface-2); color: var(--text-2); font-size: 12.5px; }
 .stat b { color: var(--text); font-variant-numeric: tabular-nums; }
 .stat i { width: 7px; height: 7px; border-radius: 50%; background: var(--c); box-shadow: 0 0 8px var(--c); }
 .stat.hot { background: color-mix(in srgb, var(--decision) 16%, var(--surface-2)); color: var(--decision); }
@@ -361,6 +365,7 @@ main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24p
 :root[data-theme="light"] { --m-ctx: #2a6fd6; --m-5h: #c98500; --m-wk: #d6453b; }
 /* 초기화까지 남은 시간(↻ 32분) — 막대 오른쪽에 흐리고 작게 */
 .mt-r { color: var(--dim); font-size: 11px; font-variant-numeric: tabular-nums; min-width: 34px; }
+.mt-cache.gone { color: var(--decision); } /* 캐시가 만료됨 — 다음 요청은 캐시를 새로 쓴다 */
 /* 보통 화면: 오른쪽 끝을 터미널(CLI) 오른쪽 가장자리에, 높이는 역할 이름 줄에 맞춘다 — 위치는 app.js placeMeters 가 잰다 */
 .detail-head .meters { position: absolute; right: var(--mt-right, 0px); top: var(--mt-top, 0px); height: var(--mt-h, 20px); }
 .detail-head .meters:is(.y1, .y2) .mt-r, .detail-head .meters.y2 .mt-l { display: none; }
@@ -484,13 +489,15 @@ body.term-full .side-grip { left: -6px; }
   #log { max-height: 280px; }
   .term-wrap { height: var(--term-h, 460px); }
 }
+@media (max-width: 560px) { .brand h1 { display: none; } } /* 아주 좁으면 헤더는 클로드 아이콘만 — 버튼이 화면 밖으로 밀리지 않게 */
 @media (max-width: 640px) {
   main, .new-panel, #inbox, .floor, .detail { margin-left: 12px; margin-right: 12px; }
-  .topbar { padding: 10px 12px; }
+  .topbar { padding: 10px 12px; gap: 12px; }
   .detail, .floor, .new-panel { width: calc(100% - 24px); }
   #new-form { grid-template-columns: 1fr; }
   .decision { flex-wrap: wrap; }
 }
+@media (max-width: 400px) { .topbar { gap: 6px; padding-left: 10px; padding-right: 10px; } }
 
 /* ---------- 세션 프로파일 ----------
    차트 색: dataviz 기준 팔레트 dark 1~3번(검증 통과 — 패널 면 #15171d 대비, CVD all-pairs ΔE ≥ 9.4) */
@@ -548,6 +555,9 @@ body.term-full .side-grip { left: -6px; }
   background: var(--tip-bg); border: 1px solid var(--line-2); border-radius: 10px; padding: 9px 11px;
   font-size: 12px; color: var(--text-2); box-shadow: 0 10px 30px rgb(0 0 0 / calc(.5 * var(--shade)));
 }
+.tip.mt-tip { z-index: 200; max-width: 340px; } /* 크게 보기(z 100~101) 위에서도 보이게 */
+.tip .mt-note { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); line-height: 1.5; }
+.mt-cache { cursor: default; }
 .tip .tt { color: var(--text); font-weight: 600; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tip .row { display: flex; justify-content: space-between; gap: 14px; }
 .tip .row span:first-child { display: inline-flex; align-items: center; gap: 6px; }
@@ -981,6 +991,10 @@ body.resizing-term { cursor: row-resize; user-select: none; }
 /* 끈 높이는 상한으로만 — 내용이 적으면(메모가 비는 등) 내용만큼만 차지해 아래가 비지 않는다. 넘치면 그 높이에서 스크롤 */
 .side > .side-sec.sized:not(.timeline) { max-height: max-content; }
 #sec-task.sized .queue, .memo.sized .memos { max-height: none; flex: 0 1 auto; min-height: 0; } /* 내용 크기로 두되 영역보다 길면 줄어들며 스크롤 — 영역의 '내용만큼' 높이 계산에 목록이 들어가게 */
+/* 타임라인을 접으면 남는 자리를 가져갈 곳이 없다 → 목록 상한(대기열 150px · 메모 220px)과 끌어 둔 높이를 풀어 위 영역이 패널 끝까지
+   늘 수 있게 한다(넘치면 그때 목록이 스크롤). 타임라인을 펼치면 원래대로 */
+.side:has(#sec-log.collapsed) > .side-sec.sized:not(.timeline) { flex: 0 1 auto; max-height: none; }
+.side:has(#sec-log.collapsed) > .side-sec > :is(.queue, .memos) { max-height: none; }
 /* 접기: 제목줄만 남긴다. 접힌 동안은 끌어서 정한 높이도 쓰지 않는다 */
 .sec-toggle { cursor: pointer; user-select: none; border-radius: 6px; margin-left: -4px !important; padding: 2px 4px; display: flex; align-items: center; gap: 0; }
 .sec-toggle:hover { background: var(--surface-2); }

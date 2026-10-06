@@ -244,6 +244,10 @@ function apply(p, e, line) {
   // 모델 시간: 새 응답이면 요청을 보낸 시점(직전 이벤트)부터, 같은 응답의 다음 줄이면 이전 줄부터 (스트리밍)
   if (!prev) { closeSeg(p); target.modelMs += Math.max(0, ts - Math.max(p.lastTs, target.start)); }
   else target.modelMs += Math.max(0, ts - prev.end);
+  // 프롬프트 캐시 수명: 호출마다(읽기도) 다시 TTL 만큼 늘어난다 — 시작은 요청을 보낸 시점(직전 이벤트)으로 보수적으로.
+  // TTL 은 캐시를 쓸 때 기록된 종류(1시간/5분)로 알고, 읽기만 한 호출은 직전에 알던 값을 그대로 쓴다
+  if (!prev) p.cacheAt = p.lastTs || ts;
+  if (usage.w1h > 0) p.cacheTtl = 3600_000; else if (usage.w5 > 0) p.cacheTtl = 300_000;
   if (p.seg && p.seg.msgId === m.id) p.seg.modelEnd = ts;
   target.firstAt ??= ts;
   for (const k of [...KEYS, 'thinking']) { const d = usage[k] - (prev?.usage[k] || 0); target[k] += d; p.sess[k] += d; }
@@ -452,6 +456,7 @@ export function profileSummary(p, waits = []) {
     turnCount: p.turns.length,
     context: p.context,
     cacheHit: inputAll ? total.cacheRead / inputAll : null,
+    cache: p.cacheAt && p.cacheTtl ? { at: p.cacheAt, ttl: p.cacheTtl } : null, // 메인 대화 캐시가 살아 있는 기한(at + ttl)
     avgTurnMs: durN ? durSum / durN : null,
     compactions: p.compactions,
     unpriced: p.unpriced,
