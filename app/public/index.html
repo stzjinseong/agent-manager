@@ -44,6 +44,10 @@
       </button>
       <div class="lang-pop" id="lang-pop" role="menu" hidden></div>
     </div>
+    <!-- Chrome 이 아니면: 경고 아이콘. 마우스를 올리면 바로 설명, 누르면 이 주소를 복사(Chrome 에 붙여넣기) -->
+    <button id="btn-browser" class="btn ghost lang-btn warn-btn" hidden aria-label="브라우저 호환성 경고" data-i18n-attr="aria-label">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 21.5 20h-19z"/><path d="M12 10v4.5M12 17.2v.1"/></svg>
+    </button>
     <!-- 업데이트: 새 릴리즈·Claude Code 새 버전이 있으면 점. 누르면 다시 확인하고 결과·업데이트 방법을 보여 준다 -->
     <div class="upd-wrap">
       <button id="btn-upd" class="btn ghost lang-btn upd-btn" aria-haspopup="dialog" aria-expanded="false" aria-controls="upd-pop" title="업데이트 확인" aria-label="업데이트 확인" data-i18n-attr="title,aria-label">
@@ -91,13 +95,6 @@
   <div class="stale-bar" id="stale-bar" hidden>
     <span data-i18n>서버 코드가 바뀌었습니다 — 새 기능을 쓰려면 서버를 재시작하세요 (워커는 그대로 유지)</span>
     <button class="btn" id="btn-restart" data-i18n>↻ 지금 재시작</button>
-  </div>
-
-  <!-- Chrome 이 아니면 늘 보이는 권장 띠 (app.js browserName) -->
-  <div class="browser-bar" id="browser-bar" hidden>
-    <span data-i18n>클로드 키우기는 <b>Chrome</b> 에 맞춰져 있습니다 — 지금 브라우저(<b id="browser-name"></b>)에서는 일부 기능이 느리거나 오작동하는 등 호환성 문제가 생길 수 있어요.</span>
-    <button class="btn ghost" id="btn-copy-url" title="이 주소를 복사해 Chrome 에 붙여넣기" data-i18n-attr="title" data-i18n>이 주소 복사</button>
-    <a class="btn" href="https://www.google.com/chrome/" target="_blank" rel="noopener" data-i18n>Chrome 받기</a>
   </div>
 
   <section id="inbox"></section>

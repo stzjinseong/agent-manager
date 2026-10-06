@@ -638,6 +638,9 @@ function detailOf(d) {
 // ---------- 회로 기판 ----------
 const nodeEls = new Map(); // key(workerId | 'P:'+profileName) → element
 
+// 카드 경로는 앞쪽을 줄이려고 오른쪽→왼쪽(rtl)으로 그린다 — 그러면 맨 앞 '/' 가 끝으로 튀어 보여, 왼쪽→오른쪽 표시(LRM)를 앞에 붙인다
+const ltrPath = (p) => (p ? `\u200E${p}` : '');
+
 function nodeTemplate() {
   return el(`
     <div class="node">
@@ -646,7 +649,7 @@ function nodeTemplate() {
       <div class="bubble"></div>
       <div class="quest"><div class="quest-top"><span>${_t('할 일')}</span><b class="qn"></b></div><div class="qbar"><i></i></div></div>
       <div class="meta"></div>
-      <div class="path"></div>
+      <div class="path-row"><span class="branch" hidden></span><div class="path"></div></div>
     </div>`);
 }
 
@@ -749,8 +752,23 @@ function updateNode(node, w) {
   let badge = $('.ctx-badge', node);
   if (ctx.level && !badge) { badge = el('<div class="ctx-badge"></div>'); $('.stage', node).append(badge); }
   if (badge) { badge.hidden = !ctx.level; badge.textContent = ctx.level ? `⚠ ctx ${fmtN(w.profile.context)}` : ''; badge.title = ctx.text || ''; }
-  $('.path', node).textContent = w.cwd;
+  $('.path', node).textContent = ltrPath(w.cwd);
   $('.path', node).title = w.cwd;
+  setBranch($('.branch', node), w.branch);
+}
+// 작업 폴더의 git 브랜치(서버가 .git/HEAD 를 읽음) — 브랜치가 아니면(분리된 HEAD) 커밋 앞자리. 저장소가 아니면 숨김
+const BRANCH_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="4.5" cy="3.5" r="1.6"/><circle cx="4.5" cy="12.5" r="1.6"/><circle cx="11.5" cy="5.5" r="1.6"/><path d="M4.5 5.1v5.8M11.5 7.1c0 2.6-2.3 3.1-5.4 4.2"/></svg>';
+const branchTitle = (b) => _t(b.detached ? '브랜치 없음(분리된 HEAD) — 커밋 {name}' : 'git 브랜치: {name}', { name: b.name });
+function setBranch(elx, b) {
+  if (!elx) return;
+  elx.hidden = !b;
+  if (!b) return;
+  const key = `${b.name}|${b.detached}|${LANG}`;
+  if (elx.dataset.key === key) return;
+  elx.dataset.key = key;
+  elx.classList.toggle('detached', b.detached);
+  elx.innerHTML = `${BRANCH_SVG}<span>${esc(b.name)}</span>`;
+  elx.title = branchTitle(b);
 }
 
 function renderFloor() {
@@ -780,7 +798,7 @@ function renderFloor() {
     else {
       n.dataset.profile = it.p.name;
       if (!n.classList.contains('renaming')) $('.nname', n).textContent = it.p.name;
-      $('.path', n).textContent = it.p.cwd;
+      $('.path', n).textContent = ltrPath(it.p.cwd);
       $('.path', n).title = it.p.cwd;
     }
     // 순서 유지 (이미 제자리면 옮기지 않아 애니메이션이 끊기지 않음). 드래그 중엔 사용자가 옮긴 자리를 존중
@@ -998,7 +1016,11 @@ function renderDetail() {
   av.style.setProperty('--avatar', avatarColor(w.name) || 'var(--accent)');
   $('#term-wrap').style.setProperty('--avatar', avatarColor(w.name) || 'var(--accent)'); // 터미널 테두리 = 워커 색
   $("#detail-name").textContent = w.name; // 상태는 카드 배지·LED 로 보인다
-  $('#detail-meta').textContent = [w.id, w.model, w.permissionMode, w.sessionId && `session ${w.sessionId.slice(0, 8)}`, w.pid && `pid ${w.pid}`, w.cwd].filter(Boolean).join(' · ');
+  // 브랜치는 경로 앞에 — 경로가 길어 줄 끝이 잘려도 보이게
+  const metaHtml = [w.id, w.model, w.permissionMode, w.sessionId && `session ${w.sessionId.slice(0, 8)}`, w.pid && `pid ${w.pid}`].filter(Boolean).map(esc)
+    .concat(w.branch ? [`<span class="branch${w.branch.detached ? ' detached' : ''}" title="${esc(branchTitle(w.branch))}">${BRANCH_SVG}<span>${esc(w.branch.name)}</span></span>`] : [], w.cwd ? [esc(w.cwd)] : []).join(' · ');
+  const meta = $('#detail-meta');
+  if (meta._html !== metaHtml) meta.innerHTML = meta._html = metaHtml;
   renderMemos(w);
   const queueEl = $('#queue');
   const queueHtml = w.queue.length
@@ -1628,25 +1650,27 @@ const fmtLeft = (ms) => {
 // 미터 툴팁: 마우스를 올리면 바로(브라우저 title 은 1초쯤 늦게 떠서) #tip 에 항목별 설명을 띄운다. 미터는 매초 다시 그려
 // 요소가 바뀌므로, 미터 위 마우스 위치를 들고 있다가 그릴 때마다 그 자리의 항목으로 다시 맞춘다
 const meterTips = {};
+const hoverTips = {}; // 미터 밖에서 같은 툴팁을 쓰는 항목(data-mt) → 내용을 만드는 함수(언어가 바뀌어도 그때 문구로)
 let mtPt = null;
 function showMeterTip() {
   const tip = $('#tip');
   const el = mtPt && document.elementFromPoint(mtPt.x, mtPt.y)?.closest('[data-mt]');
-  const t = el && meterTips[el.dataset.mt];
+  const t = el && (meterTips[el.dataset.mt] || hoverTips[el.dataset.mt]?.());
   if (!t) { if (tip.classList.contains('mt-tip')) { tip.hidden = true; tip.classList.remove('mt-tip'); tip._mt = ''; } return; }
   const html = `<div class="tt">${esc(t.title)}</div>` +
     (t.rows || []).map(([k, v]) => `<div class="row"><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join('') +
-    (t.note ? `<div class="mt-note">${esc(t.note)}</div>` : '');
+    (t.note ? `<div class="mt-note">${esc(t.note)}</div>` : '') +
+    (t.act ? `<div class="tip-act">${esc(t.act)}</div>` : '');
   tip.classList.remove('info-tip'); tip.classList.add('mt-tip');
   if (tip._mt !== html) tip.innerHTML = tip._mt = html;
   tip.hidden = false;
-  // 항목 아래에 고정(마우스를 따라다니지 않음) — 화면 오른쪽 끝을 넘지 않게
+  // 항목 아래에 고정(마우스를 따라다니지 않음) — 화면 오른쪽 끝을 넘지 않게. 헤더 아이콘이면 오른쪽 끝을 맞춤
   const r = el.getBoundingClientRect(), b = tip.getBoundingClientRect();
   tip.style.left = `${Math.max(8, Math.min(r.left, innerWidth - b.width - 8))}px`;
   tip.style.top = `${r.bottom + 8 + b.height < innerHeight ? r.bottom + 8 : Math.max(8, r.top - b.height - 8)}px`;
 }
 document.addEventListener('mousemove', (e) => {
-  const on = e.target.closest?.('.meters');
+  const on = e.target.closest?.('.meters, [data-mt]');
   if (on) { mtPt = { x: e.clientX, y: e.clientY }; showMeterTip(); } else if (mtPt) { mtPt = null; showMeterTip(); }
 });
 document.addEventListener('mouseout', (e) => { if (!e.relatedTarget && mtPt) { mtPt = null; showMeterTip(); } }); // 창 밖으로
@@ -2090,8 +2114,9 @@ function flyNote(fromEl, toEl, color, cls, onArrive) {
     const sc = t < 0.15 ? 0.6 + (t / 0.15) * 0.5 : 1.1 - (t - 0.15) * 0.8;
     el.style.transform = `translate(${dx * e}px, ${dy * e}px) scale(${sc})`;
     el.style.opacity = t < 0.1 ? t / 0.1 : 1;
-    // 꼬리: 지난 프레임 위치에서 지금 위치까지 4px 간격으로 점을 떨군다 — 빠른 구간에서도 끊기지 않게
-    const seg = Math.hypot(x - lastX, y - lastY), n = Math.max(1, Math.floor(seg / 4));
+    // 꼬리: 지난 프레임 위치에서 지금 위치까지 7px 간격으로 점을 떨군다 — 빠른 구간에서도 끊기지 않게.
+    // 점(6px)이 겹칠 만큼만 — 더 촘촘하면 Safari 에서 빛나는 점 수백 개를 합성하느라 버벅이고 빛이 뭉개졌다
+    const seg = Math.hypot(x - lastX, y - lastY), n = Math.max(1, Math.floor(seg / 7));
     for (let i = 1; i <= n && t > 0.03; i++) {
       const d = document.createElement('i');
       d.className = 'fly-trail';
@@ -2222,7 +2247,6 @@ document.addEventListener('langchange', () => {
   delete $('#hint').dataset.kind;
   setThemeSwitch(document.documentElement.dataset.theme === 'light');
   // 통째로 번역된 안내 띠 안의 브라우저 이름은 새로 만들어져 비어 있다
-  if (!$('#browser-bar').hidden) $('#browser-name').textContent = browserName();
   // 내용이 같으면 다시 안 그리는 영역(결정함·프로파일·메모)도 새 언어로 다시 그리게
   inboxSig = ''; profileSig = ''; memoSig = '';
   render();
@@ -2326,15 +2350,30 @@ function browserName() {
   if (/Safari\//.test(ua)) return 'Safari';
   return _t('알 수 없는 브라우저');
 }
+// 띠 대신 헤더 🌐 오른쪽 경고 아이콘 — 마우스를 올리면 바로 설명(미터 툴팁과 같은 것).
+// 누르면 Chrome 이 설치돼 있으면 서버가 이 대시보드를 Chrome 으로 열고(브라우저는 다른 앱을 못 띄운다), 없으면 이 주소를 복사
 {
-  const name = browserName();
-  if (name !== 'Chrome') {
-    $('#browser-name').textContent = name;
-    $('#browser-bar').hidden = false;
-  }
-  $('#btn-copy-url').addEventListener('click', async () => {
+  const name = browserName(), btn = $('#btn-browser');
+  const copyUrl = async () => {
     try { await navigator.clipboard.writeText(location.href); toast(_t('주소를 복사했습니다 — Chrome 주소창에 붙여넣으세요')); }
     catch { toast(_t('주소: {url}', { url: location.href }), 6000); }
+  };
+  if (name !== 'Chrome') {
+    btn.hidden = false;
+    btn.dataset.mt = 'browser';
+    hoverTips.browser = () => ({
+      title: _t('Chrome 이 아닌 브라우저'),
+      rows: [[_t('지금 브라우저'), browserName()]],
+      note: _t('클로드 키우기는 Chrome 에 맞춰져 있습니다 — 지금 브라우저에서는 일부 기능이 느리거나 오작동하는 등 호환성 문제가 생길 수 있어요.'),
+      act: state.chrome ? _t('클릭: Chrome 으로 열기') : _t('클릭: 이 주소 복사 → Chrome 주소창에 붙여넣기 (이 PC 에서 Chrome 을 찾지 못했습니다)'),
+    });
+  }
+  btn.addEventListener('click', async () => {
+    if (state.chrome) {
+      const r = await api('/api/open-chrome');
+      if (r.ok) { toast(_t('Chrome 으로 열었습니다')); return; }
+    }
+    copyUrl();
   });
 }
 

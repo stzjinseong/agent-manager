@@ -249,9 +249,9 @@ main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24p
     linear-gradient(180deg, rgb(0 0 0 / calc(.25 * var(--shade))), rgb(0 0 0 / calc(.1 * var(--shade))));
   border: 1px solid var(--line);
 }
-.stage::after { /* 바닥 그림자 */
-  content: ""; position: absolute; bottom: 10px; left: 50%; width: 58px; height: 5px; margin-left: -29px;
-  border-radius: 50%; background: rgb(0 0 0 / calc(.45 * var(--shade))); filter: blur(2px);
+.stage::after { /* 바닥 그림자 — blur 필터 대신 가장자리가 흐린 그라데이션(Safari 는 캐릭터가 움직일 때 blur 주변을 다시 그리다 얼룩졌다) */
+  content: ""; position: absolute; bottom: 8px; left: 50%; width: 64px; height: 9px; margin-left: -32px;
+  border-radius: 50%; background: radial-gradient(closest-side, rgb(0 0 0 / calc(.45 * var(--shade))) 55%, transparent);
 }
 .avatar { position: relative; z-index: 1; width: 72px; height: 40px; }
 .avatar svg { width: 100%; height: 100%; display: block; overflow: visible; }
@@ -321,6 +321,15 @@ main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24p
 .meta { display: flex; gap: 12px; font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; }
 .meta span { display: inline-flex; align-items: center; gap: 4px; }
 .meta .q { color: var(--accent); }
+.path-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.path-row .path { flex: 1; min-width: 0; }
+/* git 브랜치 — 카드 경로 줄 앞과 상세 메타 줄에 작은 꼬리표. 분리된 HEAD(브랜치 아님)는 주황 */
+.branch { display: inline-flex; align-items: center; gap: 3px; flex: none; max-width: 50%; font: 11px/1.3 var(--mono); color: var(--text-2); vertical-align: -1px; }
+.branch[hidden] { display: none; }
+.branch > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.branch svg { width: 11px; height: 11px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; }
+.branch.detached { color: var(--decision); }
+#detail-meta .branch { max-width: none; font-size: 11.5px; }
 .path { font: 11px/1.3 var(--mono); color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
 
 /* 빈 소켓 (저장된 역할) */
@@ -956,14 +965,6 @@ body.term-full::before {
 }
 .stale-bar span { flex: 1; }
 @media (max-width: 640px) { .stale-bar { margin: 10px 12px 0; flex-wrap: wrap; } }
-/* Chrome 권장 띠: 재시작 띠와 같은 모양, 색만 강조색(코랄) 쪽으로 */
-.browser-bar {
-  margin: 12px 24px 0; padding: 9px 14px; border-radius: 10px; display: flex; align-items: center; gap: 10px; font-size: 13px;
-  background: color-mix(in srgb, var(--accent) 9%, var(--surface)); border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent); color: var(--text);
-}
-.browser-bar span { flex: 1; }
-.browser-bar a.btn { text-decoration: none; }
-@media (max-width: 640px) { .browser-bar { margin: 10px 12px 0; flex-wrap: wrap; } }
 
 /* ---------- 터미널 높이 조절 손잡이 (CLI 아래 가로선) ---------- */
 .term-resizer { height: 14px; margin: 2px 0 -4px; cursor: row-resize; display: grid; place-items: center; touch-action: none; }
@@ -1055,7 +1056,13 @@ body.resizing-term { cursor: row-resize; user-select: none; }
   background-image: linear-gradient(var(--fc), var(--fc)), linear-gradient(var(--fc), var(--fc));
   box-shadow: 0 0 10px color-mix(in srgb, var(--fc) 55%, transparent), 0 0 0 1.5px var(--fc) inset;
 }
-.stage.got { animation: got-glow .9s ease-out; }
+/* 도착 번쩍임: 무대 위에 워커 색 안쪽 빛을 미리 그린 층(::before)을 겹치고 투명도만 줄인다. 예전엔 무대의 box-shadow 자체를
+   애니메이션해 매 프레임 다시 그렸는데, Safari 는 둥근 모서리·잘라내기와 겹치면 조각조각 다시 그려 가장자리가 깨져 보였다 */
+.stage::before {
+  content: ""; position: absolute; inset: 0; z-index: 0; border-radius: inherit; pointer-events: none; opacity: 0;
+  box-shadow: inset 0 0 0 1px var(--fc, transparent), inset 0 0 26px color-mix(in srgb, var(--fc, transparent) 40%, transparent);
+}
+.stage.got::before { animation: got-glow .9s ease-out; }
 /* 경험치 = 금빛 구슬 (워커 → 매니저). 도착하면 매니저가 통 튀고 '+N XP' 가 떠오른다 */
 .fly-note.xp {
   width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; background-image: none;
@@ -1078,10 +1085,7 @@ body.resizing-term { cursor: row-resize; user-select: none; }
   40% { transform: translateY(-7px) scale(.94, 1.08); }
   100% { transform: none; }
 }
-@keyframes got-glow {
-  0% { box-shadow: inset 0 0 0 1px var(--fc), inset 0 0 26px color-mix(in srgb, var(--fc) 40%, transparent); }
-  100% { box-shadow: inset 0 0 0 1px transparent, inset 0 0 26px transparent; }
-}
+@keyframes got-glow { from { opacity: 1; } to { opacity: 0; } }
 /* 꼬리: 날아간 자리에 떨군 점이 작아지며 사라진다 */
 .fly-trail {
   position: fixed; z-index: 89; pointer-events: none; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%;
@@ -1327,7 +1331,9 @@ body.resizing-term { cursor: row-resize; user-select: none; }
 .brand-mark.mgr-on.busy .clawd .legs-a { animation: legA .36s steps(1) infinite; }
 .brand-mark.mgr-on.busy .clawd .legs-b { animation: legB .36s steps(1) infinite; }
 :root .brand-mark.mgr-on.alert .clawd { filter: drop-shadow(0 0 5px color-mix(in srgb, var(--decision) 85%, transparent)) !important; }
-.dock-list { flex: 1; min-width: 0; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: thin; padding: 2px 0; }
+/* 가로 스크롤 영역은 위아래도 잘라 낸다 — 도착 효과(칩 빛 번짐·캐릭터 통 튀기)가 잘리지 않게 안쪽 여백을 넉넉히 두고,
+   같은 만큼 음수 바깥 여백으로 줄 높이는 그대로 */
+.dock-list { flex: 1; min-width: 0; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: thin; padding: 9px 8px; margin: -7px -8px; }
 .dock-empty { color: var(--dim); font-size: 12.5px; align-self: center; }
 .dchip {
   --c: var(--idle); flex: none; display: inline-flex; align-items: center; gap: 7px; max-width: 220px;
@@ -1352,7 +1358,13 @@ body.resizing-term { cursor: row-resize; user-select: none; }
 .dock-expand { flex: none; padding: 4px 10px; font-size: 12px; }
 /* 최소화 중 연출 도착: 칩이 빛나고 캐릭터가 통 튐 · 매니저 '+N XP' 는 헤더에 가리지 않게 아래로 떠내려감 */
 .dchip.got { box-shadow: 0 0 0 1.5px var(--fc), 0 0 14px color-mix(in srgb, var(--fc) 60%, transparent); }
-.dchip.got .avatar .clawd { animation: got-hop .55s cubic-bezier(.3, 1.6, .5, 1); transform-origin: 50% 100%; }
+.dchip.got .avatar .clawd { animation: got-hop-sm .55s cubic-bezier(.3, 1.6, .5, 1); transform-origin: 50% 100%; }
+/* 칩 캐릭터는 작으니(14px) 카드보다 낮게 튄다 */
+@keyframes got-hop-sm {
+  0% { transform: scale(1.12, .82); }
+  40% { transform: translateY(-4px) scale(.94, 1.08); }
+  100% { transform: none; }
+}
 .brand-mark.xp-got { animation: xp-got .7s ease-out; }
 .brand-mark .mgr-xp { top: 100%; animation-name: mgr-xp-down; }
 @keyframes mgr-xp-down { 0% { opacity: 0; transform: translate(-50%, -6px); } 15% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, 22px); } }
@@ -1397,6 +1409,10 @@ html.i18n-pending body { visibility: hidden; }
 .lang-wrap { position: relative; display: flex; }
 .btn.lang-btn { padding: 4px 8px; color: var(--text-2); display: grid; place-items: center; }
 .btn.lang-btn:hover, .btn.lang-btn[aria-expanded="true"] { color: var(--text); background: var(--surface-3); }
+/* Chrome 이 아닐 때 경고 아이콘(🌐 오른쪽) — 주황 */
+.btn.warn-btn, .btn.warn-btn:hover { color: var(--decision); }
+.btn.warn-btn:hover { background: color-mix(in srgb, var(--decision) 14%, transparent); }
+.tip.mt-tip .tip-act { margin-top: 6px; color: var(--dim); font-size: 11.5px; }
 .lang-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; }
 .lang-pop {
   position: absolute; top: calc(100% + 8px); right: 0; z-index: 30; min-width: 150px; padding: 5px;

@@ -16,6 +16,8 @@ import { snapshot, changedSince } from './shelldiff.js';
 import { createProgress, isCommit } from './progress.js';
 import { L } from './cli-lang.js';
 import { createUpdates } from './updates.js';
+import { gitBranch } from './branch.js';
+import { chromePath, openInChrome } from './chrome.js';
 const { Terminal: HeadlessTerminal } = createRequire(import.meta.url)('@xterm/headless');
 
 const APP_DIR = path.dirname(fileURLToPath(import.meta.url)); // app/ — 코드
@@ -286,6 +288,20 @@ function serverStale() {
 
 // 워커 이벤트가 없어도 띠가 뜨도록, 바뀐 순간 상태를 한 번 밀어 준다
 setInterval(() => { const prev = staleCache.value; staleCache.at = 0; if (serverStale() !== prev) emitState(); }, 5000);
+
+// 워커 작업 폴더의 git 브랜치(branch.js) — 5초마다 다시 읽고 바뀌면 상태를 민다. 워커 객체 밖에 둔다(workers.json 에 저장되지 않게)
+const branchOf = new Map(); // cwd → { name, detached }
+let branchAt = 0;
+function refreshBranches() {
+  branchAt = Date.now();
+  let changed = false;
+  for (const cwd of new Set([...workers.values()].filter((w) => w.status !== 'exited').map((w) => w.cwd))) {
+    const b = gitBranch(cwd), prev = branchOf.get(cwd);
+    if ((b?.name ?? null) !== (prev?.name ?? null) || Boolean(b?.detached) !== Boolean(prev?.detached)) { b ? branchOf.set(cwd, b) : branchOf.delete(cwd); changed = true; }
+  }
+  return changed;
+}
+setInterval(() => { if (refreshBranches()) emitState(); }, 5000);
 
 const PERMISSION_MODES = ['default', 'acceptEdits', 'plan', 'bypassPermissions'];
 
@@ -793,9 +809,10 @@ function resolveDecision(did, decision) {
 // ---------- 상태 브로드캐스트 ----------
 
 function publicState() {
+  if (Date.now() - branchAt > 1000) refreshBranches(); // 새로 띄운 워커도 바로 보이게(상태를 보낼 때 1초에 한 번까지)
   return {
     now: Date.now(),
-    workers: [...workers.values()].map(({ term, tx, approvalWaits, pot, ...w }) => ({ ...w, profile: tx && profileSummary(tx, approvalWaits) })),
+    workers: [...workers.values()].map(({ term, tx, approvalWaits, pot, ...w }) => ({ ...w, branch: branchOf.get(w.cwd) || null, profile: tx && profileSummary(tx, approvalWaits) })),
     decisions: [...decisions.values()].map(({ res, timer, ...d }) => d),
     profiles: config.profiles,
     order: config.order,
@@ -808,6 +825,7 @@ function publicState() {
     usage, // 계정 사용량 { fiveHour: { pct, resetsAt, at, from }, sevenDay, at, from }
     usageReporters: usageReporters(), // { ok: [보낼 수 있는 워커 id], missing: [상태줄 없이 뜬 워커 id] }
     updates: updates.public(), // 새 릴리즈·Claude Code 새 버전 (updates.js)
+    chrome: Boolean(chromePath()), // Chrome 이 설치돼 있나 — 다른 브라우저에서 ⚠ 를 누르면 Chrome 으로 연다 (chrome.js)
   };
 }
 
@@ -1259,6 +1277,12 @@ const server = http.createServer(async (req, res) => {
     if (alsoWorkers) hostSend({ op: 'shutdown' });
     setTimeout(shutdown, 300);
     return;
+  }
+
+  // 헤더 ⚠(Chrome 이 아닌 브라우저): 이 대시보드를 설치된 Chrome 으로 연다 — 주소는 서버가 정한다
+  if (req.method === 'POST' && p === '/api/open-chrome') {
+    const ok = openInChrome(`http://${HOST}:${PORT}/`);
+    return json(res, 200, { ok });
   }
 
   if (req.method === 'POST' && p === '/api/pick-folder') {
