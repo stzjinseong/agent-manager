@@ -818,7 +818,7 @@ function renderDock() {
     let c = dockEls.get(id);
     if (!c) { c = el(`<button class="dchip"><span class="led"></span><span class="avatar">${clawdSVG()}</span><span class="dname"></span><span class="dst"></span></button>`); dockEls.set(id, c); }
     const st = viewStatus(w);
-    c.className = `dchip s-${st}${w.id === selected ? ' sel' : ''}${isUnseenDone(w) ? ' unseen' : ''}`;
+    c.className = `dchip s-${st}${w.id === selected ? ' sel' : ''}${isUnseenDone(w) ? ' unseen' : ''}${c.classList.contains('dropping') ? ' dropping' : ''}`;
     c.dataset.id = id;
     c.style.setProperty('--avatar', avatarColor(w.name) || 'var(--accent)');
     $('.dname', c).textContent = w.name;
@@ -2073,11 +2073,15 @@ $('#memos').addEventListener('click', async (e) => {
 
 // ---------- 메모 → 다른 워커 카드로 끌어 옮기기 ----------
 // 카드 순서 변경 드래그(dragEl)와 섞이지 않게 따로 표시한다. dragover 중엔 dataTransfer 를 읽을 수 없어 변수로 들고 다닌다
+// 놓을 곳: 워커 카드, 또는 카드를 최소화했을 때 헤더 아래 칩
 let memoDrag = null;
+const memoTargetName = (t) => t.classList.contains('dchip') ? state.workers.find((x) => x.id === t.dataset.id)?.name : t.dataset.name;
 const memoTarget = (e) => {
-  const n = e.target.closest?.('.node');
-  return n && n.dataset.name && n.dataset.name !== memoDrag.role ? n : null;
+  const n = e.target.closest?.('.node, .dchip');
+  const name = n && memoTargetName(n);
+  return name && name !== memoDrag.role ? n : null;
 };
+const clearMemoDrop = () => document.querySelectorAll('.node.dropping, .dchip.dropping').forEach((n) => n.classList.remove('dropping'));
 $('#memos').addEventListener('dragstart', (e) => {
   const li = e.target.closest?.('li[data-id]');
   const w = state.workers.find((x) => x.id === selected);
@@ -2090,27 +2094,32 @@ $('#memos').addEventListener('dragstart', (e) => {
 $('#memos').addEventListener('dragend', () => {
   memoDrag?.li.classList.remove('dragging');
   memoDrag = null;
-  nodesEl.querySelectorAll('.node.dropping').forEach((n) => n.classList.remove('dropping'));
+  clearMemoDrop();
 });
 function memoDragOver(e) {
   const n = memoTarget(e);
   if (!n) return; // 같은 역할 카드나 빈 곳에는 놓을 수 없다
   e.preventDefault();
   e.dataTransfer.dropEffect = 'move';
-  if (!n.classList.contains('dropping')) {
-    nodesEl.querySelectorAll('.node.dropping').forEach((x) => x.classList.remove('dropping'));
-    n.classList.add('dropping');
-  }
+  if (!n.classList.contains('dropping')) { clearMemoDrop(); n.classList.add('dropping'); }
 }
 async function memoDrop(e) {
   const n = memoTarget(e), d = memoDrag;
   if (!n) return;
   n.classList.remove('dropping');
   d.li.classList.add('busy');
-  const r = await api('/api/memos', { role: d.role, op: 'move', id: d.id, to: n.dataset.name });
+  const to = memoTargetName(n);
+  const r = await api('/api/memos', { role: d.role, op: 'move', id: d.id, to });
   if (r.error) { d.li.classList.remove('busy'); toast(r.error, 3000); }
-  else toast(_t("'{name}' 의 나중에 할 작업으로 옮겼습니다", { name: n.dataset.name }));
+  else toast(_t("'{name}' 의 나중에 할 작업으로 옮겼습니다", { name: to }));
 }
+const dockList = $('#dock-list');
+dockList.addEventListener('dragover', (e) => { if (memoDrag) memoDragOver(e); });
+dockList.addEventListener('drop', (e) => { if (memoDrag) { e.preventDefault(); memoDrop(e); } });
+dockList.addEventListener('dragleave', (e) => {
+  const c = e.target.closest?.('.dchip');
+  if (c && !c.contains(e.relatedTarget)) c.classList.remove('dropping');
+});
 
 $('#queue').addEventListener('click', (e) => {
   if (e.target.closest('[data-resume]') && selected) { api(`/api/workers/${selected}/resume`, {}); return; }
@@ -2523,12 +2532,18 @@ resizer.addEventListener('dblclick', () => { setTermH(null); try { localStorage.
 // ---------- 옆 패널 넓히기 (왼쪽 세로선을 끌기 — 터미널 위를 덮는다) ----------
 // 기본 폭(평소 격자 칸 360px · 크게 보기 고정 폭)이 최소. 늘린 만큼(--side-extra) 왼쪽으로 겹쳐 덮고, 터미널은 최소
 // 240px 이 보이게 남긴다. 터미널 크기는 그대로라 pty 크기도 안 바뀐다. 평소·크게 보기 폭을 따로 기억 · 더블클릭: 기본 폭
+// 기본 폭의 절반보다 더 줄이려고 오른쪽으로 끌면 스냅으로 완전히 접혀 '‹' 띠만 남는다(터미널이 그만큼 넓어짐).
+// 띠를 누르거나 다시 왼쪽으로 끌면 기본 폭으로 펼친다. 접힘도 모드별로 기억
 const TERM_KEEP = 240;
 const sideEl = $('.side'), sideGrip = $('#side-grip');
 const sideMode = () => (document.body.classList.contains('term-full') ? 'full' : 'normal');
 const SIDE_KEYS = { normal: 'am.sideExtra', full: 'am.sideExtraFull' };
-const sideWant = { normal: 0, full: 0 };
-try { for (const m in SIDE_KEYS) sideWant[m] = Number(localStorage.getItem(SIDE_KEYS[m])) || 0; } catch {}
+const SIDE_MIN_KEYS = { normal: 'am.sideMin', full: 'am.sideMinFull' };
+const sideWant = { normal: 0, full: 0 }, sideMin = { normal: false, full: false };
+try {
+  for (const m in SIDE_KEYS) sideWant[m] = Number(localStorage.getItem(SIDE_KEYS[m])) || 0;
+  for (const m in SIDE_MIN_KEYS) sideMin[m] = localStorage.getItem(SIDE_MIN_KEYS[m]) === '1';
+} catch {}
 function setSideExtra(px) {
   const maxExtra = Math.max(0, $('#term-wrap').getBoundingClientRect().width - TERM_KEEP);
   const extra = Math.round(Math.max(0, Math.min(maxExtra || px, px || 0)));
@@ -2539,31 +2554,60 @@ function setSideExtra(px) {
   requestAnimationFrame(() => updatePin());
   return extra;
 }
-// 지금 모드에 기억한 폭을 적용 — 처음, 크게 보기 전환 때, 창이 좁아져 터미널이 줄 때(상세가 숨겨져 폭이 0 이면 건너뜀)
-const applySideWant = () => { if (sideWant[sideMode()] || sideEl.classList.contains('cover')) setSideExtra(sideWant[sideMode()]); };
+// 접기/펼치기 — 클래스는 #detail 에 둔다(평소 화면은 격자 칸 폭, 크게 보기는 터미널 오른쪽 끝이 함께 바뀐다)
+function setSideMin(on) {
+  $('#detail').classList.toggle('side-min', on);
+  if (on) setSideExtra(0);
+  requestAnimationFrame(() => updatePin());
+}
+const saveSide = (mode) => {
+  try {
+    sideWant[mode] > 0 ? localStorage.setItem(SIDE_KEYS[mode], String(sideWant[mode])) : localStorage.removeItem(SIDE_KEYS[mode]);
+    sideMin[mode] ? localStorage.setItem(SIDE_MIN_KEYS[mode], '1') : localStorage.removeItem(SIDE_MIN_KEYS[mode]);
+  } catch {}
+};
+// 지금 모드에 기억한 폭·접힘을 적용 — 처음, 크게 보기 전환 때, 창이 좁아져 터미널이 줄 때(상세가 숨겨져 폭이 0 이면 건너뜀)
+const applySideWant = () => {
+  const m = sideMode();
+  if (sideMin[m] !== $('#detail').classList.contains('side-min')) setSideMin(sideMin[m]);
+  if (sideMin[m]) return;
+  if (sideWant[m] || sideEl.classList.contains('cover')) setSideExtra(sideWant[m]);
+};
 applySideWant();
 new ResizeObserver(() => { if ($('#term-wrap').getBoundingClientRect().width) applySideWant(); }).observe($('#term-wrap'));
 let sideLastMode = sideMode(); // body 클래스는 끌기 중에도 바뀌므로 크게 보기 전환일 때만 반응
 new MutationObserver(() => { if (sideMode() !== sideLastMode) { sideLastMode = sideMode(); applySideWant(); } }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+// 기본 폭(넓히지 않았을 때의 패널 폭) — 평소 화면은 격자 칸 360px, 크게 보기는 --full-side-w(style.css 의 clamp 와 같은 식)
+const sideBase = () => (sideMode() === 'full' ? Math.min(460, Math.max(340, innerWidth * 0.26)) : 360);
 sideGrip.addEventListener('pointerdown', (e) => {
   if (e.button !== 0) return;
   e.preventDefault();
   sideGrip.setPointerCapture(e.pointerId);
-  const startX = e.clientX, startExtra = parseFloat($('#detail').style.getPropertyValue('--side-extra')) || 0, mode = sideMode();
+  const mode = sideMode(), startX = e.clientX;
+  // 끌기 값 v: 기본 폭에서 늘린(+)/줄인(-) 양. 접힌 상태는 -기본 폭에서 시작 → 기본 폭의 절반보다 더 줄이면 접힘
+  const base = sideBase();
+  const startV = sideMin[mode] ? -base : (parseFloat($('#detail').style.getPropertyValue('--side-extra')) || 0);
   sideGrip.classList.add('dragging'); document.body.classList.add('resizing-side');
-  let extra = startExtra;
-  const move = (ev) => { extra = setSideExtra(startExtra + (startX - ev.clientX)); };
+  let extra = Math.max(0, startV), min = sideMin[mode];
+  const move = (ev) => {
+    const v = startV + (startX - ev.clientX);
+    const nowMin = v < -base / 2;
+    if (nowMin !== min) { min = sideMin[mode] = nowMin; setSideMin(min); } // 바로 반영 — 터미널 크기가 바뀌어 applySideWant 가 돌아도 되돌리지 않게
+    extra = min ? 0 : setSideExtra(v);
+  };
   const up = () => {
     sideGrip.removeEventListener('pointermove', move);
     sideGrip.classList.remove('dragging'); document.body.classList.remove('resizing-side');
-    sideWant[mode] = extra;
-    try { extra > 0 ? localStorage.setItem(SIDE_KEYS[mode], String(extra)) : localStorage.removeItem(SIDE_KEYS[mode]); } catch {}
+    sideWant[mode] = extra; sideMin[mode] = min;
+    saveSide(mode);
   };
   sideGrip.addEventListener('pointermove', move);
   sideGrip.addEventListener('pointerup', up, { once: true });
   sideGrip.addEventListener('pointercancel', up, { once: true });
 });
-sideGrip.addEventListener('dblclick', () => { const m = sideMode(); sideWant[m] = setSideExtra(0); try { localStorage.removeItem(SIDE_KEYS[m]); } catch {} });
+const resetSide = () => { const m = sideMode(); sideMin[m] = false; setSideMin(false); sideWant[m] = setSideExtra(0); saveSide(m); };
+sideGrip.addEventListener('dblclick', resetSide);
+$('#side-expand').addEventListener('click', resetSide);
 
 // ---------- 옆 패널 영역 높이 조절 (업무 지시 · 나중에 할 작업 · 타임라인 사이 가로선 끌기) ----------
 // 끈 영역(가로선 위쪽)에 높이를 주고, 남는 자리는 타임라인이 갖는다. 영역마다 브라우저에 기억 · 더블클릭: 기본(내용 크기)
