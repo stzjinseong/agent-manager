@@ -295,10 +295,12 @@ let branchAt = 0;
 function refreshBranches() {
   branchAt = Date.now();
   let changed = false;
-  for (const cwd of new Set([...workers.values()].filter((w) => w.status !== 'exited').map((w) => w.cwd))) {
+  const cwds = new Set([...workers.values()].map((w) => w.cwd)); // 종료된 워커도 — 사람이 브랜치를 바꾸면 그 카드도 따라가게
+  for (const cwd of cwds) {
     const b = gitBranch(cwd), prev = branchOf.get(cwd);
     if ((b?.name ?? null) !== (prev?.name ?? null) || Boolean(b?.detached) !== Boolean(prev?.detached)) { b ? branchOf.set(cwd, b) : branchOf.delete(cwd); changed = true; }
   }
+  for (const cwd of branchOf.keys()) if (!cwds.has(cwd)) branchOf.delete(cwd);
   return changed;
 }
 setInterval(() => { if (refreshBranches()) emitState(); }, 5000);
@@ -1076,6 +1078,13 @@ function loadSavedWorkers() {
   try { return JSON.parse(fs.readFileSync(WORKERS_PATH, 'utf8')); } catch { return []; }
 }
 
+// 워커 기록을 목록에서 지운다(PTY 호스트에도 잊게 하고, 받아 둔 스크린샷도 지움). 대화 기록(transcript)은 그대로
+function forgetWorker(w) {
+  hostSend({ op: 'forget', id: w.id });
+  workers.delete(w.id);
+  fs.rmSync(path.join(SHOT_DIR, w.id), { recursive: true, force: true });
+}
+
 function saveWorkersNow() {
   clearTimeout(saveTimer); saveTimer = null;
   const list = [...workers.values()].map(({ term, tx, ...w }) => ({ ...w, txPath: tx?.path || null }));
@@ -1256,11 +1265,16 @@ const server = http.createServer(async (req, res) => {
     return json(res, 200, { ok: true });
   }
 
+  // 대기실 카드를 휴지통에: 저장된 역할과, 그 카드 뒤에 숨어 있던 같은 이름의 종료된 워커 기록을 함께 지운다
+  // (역할만 지우면 숨어 있던 기록이 '종료됨' 카드로 드러났다). 실행 중인 같은 이름 워커는 건드리지 않는다
   if (req.method === 'POST' && p === '/api/profiles/delete') {
     const { name } = await readBody(req);
     config.profiles = config.profiles.filter((x) => x.name !== name);
     saveConfig();
-    return json(res, 200, { ok: true });
+    const gone = [...workers.values()].filter((w) => w.name === name && w.status === 'exited');
+    for (const w of gone) forgetWorker(w);
+    if (gone.length) emitState();
+    return json(res, 200, { ok: true, removed: gone.map((w) => w.id) });
   }
 
   // 파일 첨부: 브라우저는 보안상 드롭한 파일의 원래 경로를 모르므로, 받은 내용을 data/uploads 에 저장하고
@@ -1313,7 +1327,9 @@ const server = http.createServer(async (req, res) => {
 
   // 헤더 ⚠(Chrome 이 아닌 브라우저): 이 대시보드를 설치된 Chrome 으로 연다 — 주소는 서버가 정한다
   if (req.method === 'POST' && p === '/api/open-chrome') {
-    const ok = openInChrome(`http://${HOST}:${PORT}/`);
+    // 지금 접속한 주소(localhost 등)로 연다 — 주소가 다르면 Chrome 쪽 저장값(언어·패널 폭 등)이 따로 논다. 이 PC 주소만 허용
+    const host = /^(127\.0\.0\.1|localhost|\[::1\]):\d+$/.test(req.headers.host || '') ? req.headers.host : `${HOST}:${PORT}`;
+    const ok = openInChrome(`http://${host}/`);
     return json(res, 200, { ok });
   }
 
@@ -1336,7 +1352,7 @@ const server = http.createServer(async (req, res) => {
       if (r.error) return json(res, 409, r);
     }
     if (m[2] === 'kill') { try { w.term.kill(); } catch {} }
-    if (m[2] === 'remove') { hostSend({ op: 'forget', id: w.id }); workers.delete(w.id); fs.rmSync(path.join(SHOT_DIR, w.id), { recursive: true, force: true }); emitState(); }
+    if (m[2] === 'remove') { forgetWorker(w); emitState(); }
     return json(res, 200, { ok: true });
   }
 

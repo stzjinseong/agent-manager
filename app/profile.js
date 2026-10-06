@@ -86,6 +86,10 @@ function pushEdit(p, ed) {
 const editLines = (ed) => (ed.hunks || []).reduce((a, h) => a + h.lines.length, 0);
 // 보관 기준(KEEP_REQUESTS · MAX_DIFF_LINES · MAX_EDITS)에 맞게 오래된 요청의 수정을 뺀다 — Edit/Write 와 셸 수정을 같은 요청 단위로
 export function pruneEdits(p, withShell = true) {
+  // 상태를 보낼 때마다 불리므로(profileSummary) 수정·턴 수가 그대로면 건너뛴다
+  const key = `${withShell}:${p.edits.length}:${p.shellEdits.length}:${p.turns.length}:${p.turns.at(-1)?.n}`;
+  if (p.pruneKey === key) return false;
+  p.pruneKey = key;
   const all = withShell ? allEdits(p) : p.edits;
   const lines = new Map(), count = new Map(), order = [];
   for (let i = all.length - 1; i >= 0; i--) {
@@ -275,7 +279,8 @@ function apply(p, e, line) {
   // 프롬프트 캐시 수명: 호출마다(읽기도) 다시 TTL 만큼 늘어난다 — 시작은 요청을 보낸 시점(직전 이벤트)으로 보수적으로.
   // TTL 은 캐시를 쓸 때 기록된 종류(1시간/5분)로 알고, 읽기만 한 호출은 직전에 알던 값을 그대로 쓴다
   if (!prev) p.cacheAt = p.lastTs || ts;
-  if (usage.w1h > 0) p.cacheTtl = 3600_000; else if (usage.w5 > 0) p.cacheTtl = 300_000;
+  // 한 호출에 두 종류가 섞이면 짧은 쪽(5분)이 먼저 만료되므로 그쪽을 따른다
+  if (usage.w5 > 0) p.cacheTtl = 300_000; else if (usage.w1h > 0) p.cacheTtl = 3600_000;
   if (p.seg && p.seg.msgId === m.id) p.seg.modelEnd = ts;
   target.firstAt ??= ts;
   for (const k of [...KEYS, 'thinking']) { const d = usage[k] - (prev?.usage[k] || 0); target[k] += d; p.sess[k] += d; }
@@ -387,7 +392,8 @@ export function runningSubagents(p) {
 // 변화가 있으면 true
 export function readProfile(p) {
   let r = readLines(p, p.path, (e, line) => apply(p, e, line));
-  if (r === 'reset') { Object.assign(p, createProfile(p.path)); r = readLines(p, p.path, (e, line) => apply(p, e, line)); }
+  // 트랜스크립트가 줄었으면 처음부터 다시 읽는다 — 셸 수정은 트랜스크립트에 없는 서버 기록이라 그대로 둔다(비우면 다음 정리 때 디스크 파일까지 지워졌다)
+  if (r === 'reset') { const shell = p.shellEdits; Object.assign(p, createProfile(p.path)); p.shellEdits = shell; r = readLines(p, p.path, (e, line) => apply(p, e, line)); }
   const s = readSubagents(p);
   return Boolean(r || s);
 }

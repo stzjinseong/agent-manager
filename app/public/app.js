@@ -548,7 +548,7 @@ const el = (html) => { const t = document.createElement('template'); t.innerHTML
 function render() {
   renderStats();
   renderStale();
-  if (typeof renderUpd === 'function') renderUpd();
+  renderUpd();
   renderInbox();
   renderFloor();
   renderDock();
@@ -1812,8 +1812,14 @@ trashEl.addEventListener('drop', async (e) => {
   const n = dragEl;
   if (!n) return;
   if (n.classList.contains('socket')) {
+    // 대기실 카드 한 장이 같은 이름의 종료된 워커 기록들을 대신 보여 주고 있었다 → 역할과 함께 그 기록도 지운다(서버). 미리 알려 준다
     const name = n.dataset.profile;
-    if (name && await ask({ title: _t('저장된 역할 삭제'), body: _t('"{name}" 역할을 목록에서 지울까요?', { name }), ok: _t('삭제'), danger: true })) api('/api/profiles/delete', { name });
+    if (!name) return;
+    const past = state.workers.filter((w) => w.name === name && w.status === 'exited');
+    const body = _t('"{name}" 역할을 목록에서 지울까요?', { name }) + (past.length ? `\n${_t('지난 기록(종료된 워커 {n}개: {ids})도 함께 지웁니다. 대화 기록은 남아 claude --resume 으로 이어받을 수 있어요.', { n: past.length, ids: past.map((w) => w.id).join(', ') })}` : '');
+    if (!(await ask({ title: _t('저장된 역할 삭제'), body, ok: _t('삭제'), danger: true }))) return;
+    await api('/api/profiles/delete', { name });
+    if (past.some((w) => w.id === selected)) { selected = null; render(); }
     return;
   }
   const w = state.workers.find((x) => x.id === n.dataset.id);
@@ -2250,7 +2256,6 @@ document.addEventListener('langchange', () => {
   $('.dock-empty', $('#dock-list'))?.remove();
   delete $('#hint').dataset.kind;
   setThemeSwitch(document.documentElement.dataset.theme === 'light');
-  // 통째로 번역된 안내 띠 안의 브라우저 이름은 새로 만들어져 비어 있다
   // 내용이 같으면 다시 안 그리는 영역(결정함·프로파일·메모)도 새 언어로 다시 그리게
   inboxSig = ''; profileSig = ''; memoSig = '';
   render();
@@ -2269,6 +2274,7 @@ function updRow(title, x, kind) {
   if (!x) status = `<span class="upd-dim">${_t('확인 전')}</span>`;
   else if (x.error === 'git') status = `<span class="upd-dim">${_t('git 저장소가 아니라 확인할 수 없어요')}</span>`;
   else if (x.error === 'claude') status = `<span class="upd-dim">${_t('설치된 Claude Code 를 찾지 못했어요')}</span>`;
+  else if (x.error === 'version') status = `<span class="upd-dim">${_t('이 설치본의 릴리즈 버전을 알 수 없어요 (최신 release-{v})', { v: esc(x.latest) })}</span>`;
   else if (x.error === 'network') status = `<span class="upd-dim">${_t('인터넷에 접속하지 못해 최신 버전을 모르겠어요')}</span>`;
   else if (x.newer) {
     const latest = kind === 'app' ? `release-${x.latest}` : x.latest;

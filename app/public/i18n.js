@@ -198,6 +198,8 @@ const EN = {
   '그 전에 요청하면 대화를 캐시에서 읽어 싸고 빠릅니다. 요청할 때마다 다시 {ttl} 연장됩니다': 'Requests before then read the conversation from the cache — cheaper and faster. Each request extends it by {ttl} again',
   '다음 요청은 대화 전체를 캐시에 새로 써서 비용이 더 듭니다': 'The next request rewrites the whole conversation to the cache and costs more',
   '대상 워커': 'Worker',
+  '이 설치본의 릴리즈 버전을 알 수 없어요 (최신 release-{v})': "Can't tell this install's release (latest is release-{v})",
+  '지난 기록(종료된 워커 {n}개: {ids})도 함께 지웁니다. 대화 기록은 남아 claude --resume 으로 이어받을 수 있어요.': 'Its past records ({n} exited worker(s): {ids}) are removed too. The conversation history stays, so you can still pick it up with claude --resume.',
   '브라우저 호환성 경고': 'Browser compatibility warning',
   'Chrome 이 아닌 브라우저': 'Not Chrome',
   '지금 브라우저': 'Current browser',

@@ -5,8 +5,10 @@
 // 외부 접속은 이 두 곳뿐(GitHub 저장소·npm 레지스트리)이고, 실패하면 그 항목만 오류로 둔다
 import { execFile } from 'node:child_process';
 
+// 로그인·암호 물음을 띄우지 않게(서버를 띄운 터미널에 물음이 뜨고 10초를 기다렸다) — 물어야 하면 그냥 실패(network)로 둔다
+const NO_PROMPT = { ...process.env, GIT_TERMINAL_PROMPT: '0', GCM_INTERACTIVE: 'never', GIT_SSH_COMMAND: process.env.GIT_SSH_COMMAND || 'ssh -o BatchMode=yes' };
 const run = (cmd, args, cwd) => new Promise((resolve) => {
-  execFile(cmd, args, { cwd, timeout: 10_000, windowsHide: true, maxBuffer: 4 << 20 }, (err, out) => resolve(err ? null : String(out)));
+  execFile(cmd, args, { cwd, timeout: 10_000, windowsHide: true, maxBuffer: 4 << 20, env: NO_PROMPT }, (err, out) => resolve(err ? null : String(out)));
 });
 const relNum = (tag) => Number(String(tag).match(/release-(\d+)$/)?.[1] ?? NaN);
 const maxRelease = (tags) => {
@@ -28,7 +30,10 @@ async function checkApp(root) {
   if (remote == null) return { current: maxRelease(local.split('\n')), error: 'network' };
   const url = (await run('git', ['remote', 'get-url', 'origin'], root))?.trim().replace(/\.git$/, '').replace(/^git@github\.com:/, 'https://github.com/') || null;
   const current = maxRelease(local.split('\n')), latest = maxRelease(remote.split('\n').map((l) => l.split('refs/tags/')[1] || ''));
-  return { current, latest, newer: current != null && latest != null && latest > current, url: url && /^https:\/\/github\.com\//.test(url) ? url : null };
+  const gh = url && /^https:\/\/github\.com\//.test(url) ? url : null;
+  // 원격엔 릴리즈가 있는데 이 설치본에서 태그를 못 찾으면(얕은 클론·태그를 안 받은 경우) 지금 버전을 모른다 — '최신'이라 하지 않는다
+  if (current == null && latest != null) return { latest, url: gh, error: 'version' };
+  return { current, latest, newer: current != null && latest != null && latest > current, url: gh };
 }
 
 async function checkClaude(bin) {
