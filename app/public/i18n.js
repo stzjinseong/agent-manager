@@ -201,7 +201,7 @@ const EN = {
   '브라우저 호환성 경고': 'Browser compatibility warning',
   'Chrome 이 아닌 브라우저': 'Not Chrome',
   '지금 브라우저': 'Current browser',
-  '클로드 키우기는 Chrome 에 맞춰져 있습니다 — 지금 브라우저에서는 일부 기능이 느리거나 오작동하는 등 호환성 문제가 생길 수 있어요.': 'Clawdgotchi is built for Chrome — in this browser some features may be slow or misbehave.',
+  '클로드 키우기는 Chrome 에 맞춰 만들어져, Chrome 에서 더 쾌적하게 이용할 수 있어요.': 'Clawdgotchi is built for Chrome, so it runs more smoothly in Chrome.',
   '클릭: Chrome 으로 열기': 'Click: open in Chrome',
   '클릭: 이 주소 복사 → Chrome 주소창에 붙여넣기 (이 PC 에서 Chrome 을 찾지 못했습니다)': 'Click: copy this address → paste it into Chrome (Chrome was not found on this PC)',
   'Chrome 으로 열었습니다': 'Opened in Chrome',

@@ -418,9 +418,13 @@ let fitTimer;
 new ResizeObserver(() => { clearTimeout(fitTimer); fitTimer = setTimeout(fitTerm, 60); }).observe($('.term-wrap'));
 // 미터(컨텍스트·5시간·주간) 자리: 보통 화면에선 오른쪽 끝 = 터미널 오른쪽 가장자리, 높이 = 역할 이름 줄.
 // 터미널 폭은 옆 패널 넓히기·창 크기에 따라 바뀌어 잴 때마다 맞춘다(크게 보기에선 닫기 버튼 왼쪽 — CSS 만으로)
+let termAnim = null, revealTimer = 0; // 크게 보기 전환 애니메이션(setTermFull)
 function placeMeters() {
   const head = $('.detail-head'), wrap = $('#term-wrap'), name = $('#detail-name'), box = $('#meters');
   if (!head || wrap.classList.contains('full') || $('#detail').hidden) return;
+  // 크게 보기에서 돌아오는 동안엔 터미널 상자가 transform 으로 줄어드는 중이라 getBoundingClientRect 가 움직이는 값을 준다 —
+  // 그 값으로 맞추면 미터가 오른쪽으로 튀었다가 끝나고 돌아왔다. 애니메이션이 끝나면(setTermFull 의 done) 다시 맞춘다
+  if (termAnim) return;
   const h = head.getBoundingClientRect(), t = wrap.getBoundingClientRect(), n = name.getBoundingClientRect();
   if (!t.width) return;
   // 좁은 화면에서 옆 패널이 터미널 아래로 내려가면 터미널이 전체 폭이라 오른쪽 버튼과 겹친다 → 버튼 왼쪽까지만
@@ -2364,7 +2368,7 @@ function browserName() {
     hoverTips.browser = () => ({
       title: _t('Chrome 이 아닌 브라우저'),
       rows: [[_t('지금 브라우저'), browserName()]],
-      note: _t('클로드 키우기는 Chrome 에 맞춰져 있습니다 — 지금 브라우저에서는 일부 기능이 느리거나 오작동하는 등 호환성 문제가 생길 수 있어요.'),
+      note: _t('클로드 키우기는 Chrome 에 맞춰 만들어져, Chrome 에서 더 쾌적하게 이용할 수 있어요.'),
       act: state.chrome ? _t('클릭: Chrome 으로 열기') : _t('클릭: 이 주소 복사 → Chrome 주소창에 붙여넣기 (이 PC 에서 Chrome 을 찾지 못했습니다)'),
     });
   }
@@ -2766,7 +2770,6 @@ for (const h of document.querySelectorAll('.side .sec-toggle')) {
 // 크게/원래대로 전환은 FLIP 애니메이션: 바뀌기 전 위치·크기(First)와 바뀐 뒤(Last)를 재서, 원래 자리에서
 // 목표 자리로 늘어나고 줄어드는 것처럼 보이게 한다. 늘어나는 동안 글자가 찌그러져 보이지 않게 터미널 내용은
 // 잠깐 감췄다가, 크기를 맞춘(fit) 뒤 서서히 보여 준다.
-let termAnim = null;
 function setTermFull(on) {
   const wrap = $('#term-wrap'), inner = $('#term');
   const first = wrap.getBoundingClientRect();
@@ -2775,8 +2778,12 @@ function setTermFull(on) {
   $('#btn-full').textContent = _t(on ? '⛶ 원래대로' : '⛶ 크게');
   const w = state.workers.find((x) => x.id === selected);
   $('#term-title').textContent = w ? w.name : '';
-  const done = () => { fitTerm(); placeMeters(); if (!diffOpen) term.focus(); inner.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 140, easing: 'ease-out' }); inner.style.opacity = ''; };
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) { requestAnimationFrame(done); return; }
+  // 터미널 글자는 상자가 늘어나는 동안 찌그러져 보여 숨겨 둔다. 예전엔 상자가 다 커진 뒤에야 글자 크기를 맞추고(다시 그리기) 페이드해
+  // 옆 패널보다 한참 늦게 보였다 → 새 크기는 클래스를 바꾼 순간 이미 정해지므로(transform 은 배치에 영향 없음) 글자 크기는 바로 맞추고,
+  // 상자가 거의 다 커졌을 때(감속 곡선이라 60% 시점이면 크기 차이가 몇 %) 글자를 드러낸다
+  const reveal = () => { clearTimeout(revealTimer); inner.style.opacity = ''; inner.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 110, easing: 'ease-out' }); };
+  const done = () => { placeMeters(); if (!diffOpen) term.focus(); };
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) { requestAnimationFrame(() => { fitTerm(); done(); }); return; }
   const last = wrap.getBoundingClientRect();
   termAnim?.cancel();
   inner.style.opacity = '0';
@@ -2784,17 +2791,26 @@ function setTermFull(on) {
     { transformOrigin: '0 0', transform: `translate(${first.left - last.left}px, ${first.top - last.top}px) scale(${first.width / last.width}, ${first.height / last.height})` },
     { transformOrigin: '0 0', transform: 'none' },
   ], { duration: 280, easing: 'cubic-bezier(.2, .8, .2, 1)' });
-  termAnim.onfinish = () => { termAnim = null; done(); };
+  termAnim.onfinish = () => { termAnim = null; if (inner.style.opacity === '0') reveal(); done(); };
+  // 글자 크기 맞추기는 애니메이션(옆 패널 포함)을 먼저 띄운 뒤에 — 다시 그리기가 메인 스레드를 잡아도 transform·opacity 움직임은 멈추지 않는다.
+  // 첫 프레임이 그려진 다음(rAF → setTimeout)에 하고, 드러낼 시점은 클릭부터 170ms 로 잡는다
+  const t0 = performance.now();
+  clearTimeout(revealTimer);
+  requestAnimationFrame(() => setTimeout(() => {
+    fitTerm();
+    revealTimer = setTimeout(reveal, Math.max(0, 170 - (performance.now() - t0)));
+  }));
   // 옆 패널: 넓은 화면의 크게 보기에선 오른쪽에 따로 붙는다(style.css) → 터미널이 커지는 동안 오른쪽에서 밀려 들어오고,
   // 원래대로 돌아갈 땐 제자리에서 살짝 떠오르며 나타난다. 좁은 화면은 크게 보기에 옆 패널이 없다(터미널만)
   if (matchMedia('(min-width: 1101px)').matches) {
-    // 움직임과 페이드를 따로 돌린다 — 같은 감속 곡선에 묶으면 투명도가 처음 0.1초에 거의 다 차서 페이드가 안 보였다
+    // 움직임과 페이드를 따로 돌린다 — 같은 감속 곡선에 묶으면 투명도가 처음 0.1초에 거의 다 차서 페이드가 안 보였다.
+    // 지연 없이 터미널(280ms)과 같이 시작하고 그 안에 끝낸다 — 예전엔 지연 + 0.36~0.48초 페이드라 패널이 늦게 보였다
     sideAnim?.forEach((a) => a.cancel());
     const side = $('.side');
     sideAnim = [
-      side.animate(on ? [{ transform: 'translateX(48px)' }, { transform: 'none' }] : [{ transform: 'translateY(8px)' }, { transform: 'none' }],
-        { duration: on ? 320 : 240, delay: on ? 60 : 80, easing: 'cubic-bezier(.2, .8, .2, 1)', fill: 'backwards' }),
-      side.animate([{ opacity: 0 }, { opacity: 1 }], { duration: on ? 480 : 360, delay: on ? 60 : 80, easing: 'ease-in-out', fill: 'backwards' }),
+      side.animate(on ? [{ transform: 'translateX(32px)' }, { transform: 'none' }] : [{ transform: 'translateY(6px)' }, { transform: 'none' }],
+        { duration: on ? 260 : 200, easing: 'cubic-bezier(.2, .8, .2, 1)' }),
+      side.animate([{ opacity: 0 }, { opacity: 1 }], { duration: on ? 240 : 180, easing: 'ease-out' }),
     ];
   }
 }
