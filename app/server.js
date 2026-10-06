@@ -568,32 +568,36 @@ function snapshotRepo(cwd) {
   return repoChecks.get(cwd);
 }
 const withTimeout = (pr, ms) => Promise.race([pr, new Promise((r) => setTimeout(() => r(null), ms))]);
+// 명령 전 상태는 워커 객체 밖에 둔다 — 워커는 workers.json 으로 JSON 저장되는데 Map 은 {} 로 저장돼, 서버를 재시작해
+// 되살린 워커에선 {} 가 Map 자리를 차지해 기록이 매번 오류로 조용히 실패했다 (타이머를 밖에 두는 것과 같은 이유)
+const shellPendingBy = new Map(); // workerId → Map(tool_use_id → { pre, cmd, agent, scope, txPath })
+const pendingOf = (w) => { if (!shellPendingBy.has(w.id)) shellPendingBy.set(w.id, new Map()); return shellPendingBy.get(w.id); };
 async function shellHook(w, ev) {
   try {
     const name = ev.hook_event_name, scope = ev.agent_id || 'main';
-    w.shellPending ||= new Map(); // tool_use_id → { pre, cmd, agent, scope, txPath }
+    const pending = pendingOf(w);
     if (name === 'PreToolUse') {
       // 같은 쪽(메인·같은 서브에이전트)의 다음 도구가 시작됐으면 앞 명령은 끝난 것 — 거절·중단돼 끝 알림이 안 온 명령을 여기서 닫는다.
       // 다음 도구(Edit 등)가 파일을 쓰기 전에 찍어야 그 수정이 셸 변경으로 섞이지 않는다 → 응답 전에 기다린다
-      const stale = [...w.shellPending].filter(([id, x]) => x.scope === scope && id !== ev.tool_use_id).map(([id]) => closeShell(w, id));
+      const stale = [...pending].filter(([id, x]) => x.scope === scope && id !== ev.tool_use_id).map(([id]) => closeShell(w, id));
       if (stale.length) await withTimeout(Promise.all(stale), 3000);
       if (ev.tool_name === 'Bash' && !ev.tool_input?.run_in_background) {
         const pre = await withTimeout(snapshot(ev.cwd || w.cwd), 5000); // 훅 제한(10초) 안에 (앞 명령 닫기 3초 + 5초) — 못 찍으면 이 명령은 건너뛴다
-        if (pre) w.shellPending.set(ev.tool_use_id, { pre, scope, cmd: String(ev.tool_input?.command || ''), agent: ev.agent_id ? (ev.agent_type || 'subagent') : null, txPath: ev.transcript_path });
+        if (pre) pending.set(ev.tool_use_id, { pre, scope, cmd: String(ev.tool_input?.command || ''), agent: ev.agent_id ? (ev.agent_type || 'subagent') : null, txPath: ev.transcript_path });
       }
     } else if ((name === 'PostToolUse' || name === 'PostToolUseFailure') && ev.tool_name === 'Bash') {
       await withTimeout(closeShell(w, ev.tool_use_id), 4000);
     } else if (name === 'UserPromptSubmit' || name === 'Stop' || name === 'SessionStart' || (name === 'SubagentStop' && ev.agent_id)) {
-      const ids = [...w.shellPending].filter(([, x]) => name !== 'SubagentStop' || x.scope === ev.agent_id).map(([id]) => id);
+      const ids = [...pending].filter(([, x]) => name !== 'SubagentStop' || x.scope === ev.agent_id).map(([id]) => id);
       await withTimeout(Promise.all(ids.map((id) => closeShell(w, id))), 4000);
     }
-  } catch {}
+  } catch (e) { console.error(`diff(shell) ${w.id}: ${e?.message || e}`); } // 훅은 막지 않되 실패는 로그에 남긴다
 }
 // 명령 뒤 상태를 찍고(이 약속이 끝나면 찍힌 것) 바뀐 파일을 기록한다
 function closeShell(w, id) {
-  const pend = w.shellPending?.get(id);
+  const pend = pendingOf(w).get(id);
   if (!pend) return Promise.resolve();
-  w.shellPending.delete(id);
+  pendingOf(w).delete(id);
   return changedSince(pend.pre).then((files) => {
     if (!files.length) return;
     const ts = Date.now();
@@ -879,6 +883,7 @@ function onHostHello({ ptys }) {
     const p = alive.get(rec.id);
     const w = { ...rec, term: hostTerm(rec.id), tx: rec.txPath ? openProfile(rec.txPath) : null };
     delete w.txPath;
+    delete w.shellPending; // 예전 버전이 워커 객체에 두어 {} 로 저장된 것
     if (!p || p.exited) w.status = 'exited';
     else { w.pid = p.pid; pushLog(w, 'status', '관제 서버 재시작 — 워커 다시 연결'); }
     // 완료 시각 기록(doneAt) 이전에 끝난 워커도 '확인 안 한 완료'로 보이게 마지막 갱신 시각으로 채운다
