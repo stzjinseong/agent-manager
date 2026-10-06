@@ -635,7 +635,7 @@ body.term-full .side-grip { left: -6px; }
 .cmp-toggle:hover { background: color-mix(in srgb, var(--surface-2) 70%, transparent); }
 /* 제목은 세션 프로파일 제목(.profile-head h2)과 같은 크기·색 */
 .cmp-toggle h3 { font-size: 14px; font-weight: 650; color: var(--text); }
-.cmp-toggle .chev { margin-right: 4px; color: var(--dim); font-size: 12px; width: 12px; display: inline-block; transition: transform .2s; }
+.cmp-toggle .chev { margin-right: 4px; color: var(--dim); font-size: 12px; transition: transform .2s; }
 .compare.collapsed .cmp-toggle .chev { transform: rotate(-90deg); }
 .compare.collapsed .cmp-toggle { margin-bottom: -4px; }
 .compare.collapsed .legend, .compare.collapsed .cmp-grid { display: none; }
@@ -919,7 +919,7 @@ body.term-full::before {
 /* 건수 머리줄: 대기 중인 지시(.queue .qh)와 같은 모양, 스크롤해도 위에 고정 */
 /* 목록 위쪽 여백(2px)만큼 위로 붙여(top·margin −2px) 그 틈으로 스크롤되는 카드가 비치지 않게 — padding 으로 글자 자리는 그대로 */
 .memos li.mh { background: var(--surface); border: 0; border-radius: 0; padding: 2px 0 2px; margin-top: -2px; font-size: 12px; color: var(--dim); position: sticky; top: -2px; z-index: 1; }
-.memos .empty-memo { background: none; border: 0; color: var(--dim); padding: 2px 0; }
+.memos:empty { display: none; } /* 비면 여백(목록 위아래 패딩)도 남기지 않는다 */
 .btn.mini { font-size: 11.5px; padding: 3px 9px; border-radius: 7px; }
 .memo-form { display: flex; flex-direction: column; gap: 6px; }
 
@@ -962,7 +962,9 @@ body.resizing-term { cursor: row-resize; user-select: none; }
 .timeline { --log-min: 120px; min-height: min(var(--log-min), 100%); }
 /* 끌어서 정한 높이는 '바라는 높이' — 자리가 모자라면 그보다 줄어든다 */
 .side > .side-sec.sized { flex: 0 1 var(--sec-h); height: auto; }
-#sec-task.sized .queue, .memo.sized .memos { max-height: none; flex: 1 1 0; min-height: 0; }
+/* 끈 높이는 상한으로만 — 내용이 적으면(메모가 비는 등) 내용만큼만 차지해 아래가 비지 않는다. 넘치면 그 높이에서 스크롤 */
+.side > .side-sec.sized:not(.timeline) { max-height: max-content; }
+#sec-task.sized .queue, .memo.sized .memos { max-height: none; flex: 0 1 auto; min-height: 0; } /* 내용 크기로 두되 영역보다 길면 줄어들며 스크롤 — 영역의 '내용만큼' 높이 계산에 목록이 들어가게 */
 /* 접기: 제목줄만 남긴다. 접힌 동안은 끌어서 정한 높이도 쓰지 않는다 */
 .sec-toggle { cursor: pointer; user-select: none; border-radius: 6px; margin-left: -4px !important; padding: 2px 4px; display: flex; align-items: center; gap: 0; }
 .sec-toggle:hover { background: var(--surface-2); }
@@ -984,7 +986,7 @@ body.resizing-term { cursor: row-resize; user-select: none; }
 /* ---------- 세션 프로파일 접기 ---------- */
 .profile-head { cursor: pointer; user-select: none; border-radius: 8px; margin: -4px -6px; padding: 4px 6px; }
 .profile-head:hover { background: var(--surface-2); }
-.profile-head .chev { color: var(--dim); font-size: 12px; width: 12px; display: inline-block; transition: transform .2s; }
+.profile-head .chev { color: var(--dim); font-size: 12px; transition: transform .2s; }
 .profile.collapsed .profile-head .chev { transform: rotate(-90deg); }
 #profile-mini { display: none; margin-left: auto; color: var(--text-2) !important; font: 12px var(--mono); }
 .profile.collapsed #profile-mini { display: inline; }
@@ -1380,3 +1382,30 @@ html.i18n-pending body { visibility: hidden; }
 .lang-item.on { cursor: default; font-weight: 600; color: var(--accent-hi); }
 .lang-item.on:hover { background: none; }
 .lang-check { width: 12px; flex: none; text-align: center; }
+
+/* ---------- 업데이트 확인 (헤더, 🌐 오른쪽) ---------- */
+.upd-wrap { position: relative; display: flex; }
+.upd-btn { position: relative; }
+.upd-dot { position: absolute; top: 3px; right: 3px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--bg), 0 0 8px var(--accent); }
+.upd-pop {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 30; width: 300px; padding: 12px 14px;
+  border-radius: 11px; background: var(--surface); border: 1px solid var(--line-2); box-shadow: 0 12px 32px rgb(0 0 0 / calc(.18 + .3 * var(--shade)));
+  font-size: 12.5px; color: var(--text-2); animation: ask-pop .16s cubic-bezier(.3, 1.4, .5, 1);
+}
+.upd-h { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+.upd-row { padding: 9px 0; border-top: 1px solid var(--line); display: grid; gap: 3px; }
+.upd-top { display: flex; justify-content: space-between; gap: 10px; }
+.upd-top b { color: var(--text); font-weight: 600; }
+.upd-cur { font: 12px var(--mono); color: var(--dim); }
+.upd-ok { color: var(--done); }
+.upd-new { color: var(--accent-hi); font-weight: 600; }
+.upd-dim { color: var(--dim); }
+.upd-guide { color: var(--text-2); line-height: 1.5; }
+.upd-guide code { font: 11.5px var(--mono); padding: 1px 5px; border-radius: 4px; background: var(--surface-3); color: var(--text); }
+.upd-guide a { color: var(--accent-hi); }
+.upd-foot { padding-top: 8px; border-top: 1px solid var(--line); color: var(--dim); font-size: 11.5px; }
+.upd-guide a { white-space: nowrap; }
+
+/* 접기 화살표: 글자 크기만 한 정사각형 가운데에 두어 제자리에서 돈다 — 줄 높이만 한 칸의 왼쪽 아래에 있으면
+   회전 중심(칸 가운데)에서 벗어나 접을 때 ▸ 가 아래로 처져 보였다 */
+:is(.cmp-toggle, .profile-head) .chev { display: inline-grid; place-items: center; width: 12px; height: 12px; line-height: 1; vertical-align: middle; position: relative; top: -1px; }

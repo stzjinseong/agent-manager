@@ -263,7 +263,6 @@ const EN = {
   '수정': 'Edit',
   '업무 지시로 보내기 (작업 중이면 대기열)': 'Send as a task (queued if busy)',
   '업무 지시로 보내기': 'Send as a task',
-  '나중에 할 작업이 없습니다': 'Nothing saved for later',
   'Alt(⌘)+Enter 저장 · Esc 취소': 'Alt(⌘)+Enter to save · Esc to cancel',
   '저장': 'Save',
   '취소': 'Cancel',
@@ -367,6 +366,21 @@ const EN = {
   '서버 + 워커 모두 종료': 'Server + all workers',
   '서버가 종료되었습니다': 'The server has shut down',
   '다시 켜려면 프로젝트 폴더의 <b>Launch.vbs</b> (또는 Launch.bat) 를 실행하세요.<br>서버가 다시 켜지면 이 화면은 자동으로 새로고침됩니다.': 'To start it again, run <b>Launch.vbs</b> (or Launch.bat) in the project folder.<br>This page reloads automatically once the server is back.',
+  // 업데이트 확인
+  '업데이트 확인': 'Check for updates',
+  '업데이트': 'Updates',
+  '새 업데이트가 있어요': 'Updates available',
+  '확인 전': 'Not checked yet',
+  'git 저장소가 아니라 확인할 수 없어요': 'Can\'t check — not a git repository',
+  '설치된 Claude Code 를 찾지 못했어요': 'Couldn\'t find the installed Claude Code',
+  '인터넷에 접속하지 못해 최신 버전을 모르겠어요': 'Couldn\'t reach the internet to check the latest version',
+  '새 버전 {v}': 'New version {v}',
+  '프로젝트 폴더에서 <code>git pull</code> 후 <b>↻ 서버 재시작</b>': 'Run <code>git pull</code> in the project folder, then <b>↻ Restart server</b>',
+  '릴리즈 보기': 'View releases',
+  '터미널에서 <code>claude update</code> · 이미 떠 있는 워커는 새로 띄워야 적용돼요': 'Run <code>claude update</code> in a terminal · running workers need a relaunch to use it',
+  '최신 버전이에요': 'You\'re up to date',
+  '확인 중…': 'Checking…',
+  '마지막 확인 {t}': 'Last checked {t}',
 };
 const DICTS = { en: EN };
 // 서버가 만든 한국어 문구(타임라인 기록·알림·오류) — 서버는 언어를 모르니 화면에서 바꾼다. 이미 저장된 예전 기록에도 그대로 통한다.

@@ -8,7 +8,7 @@ Hand out tasks, watch their progress, and review what they changed and what it c
 ![Clawdgotchi overview](docs/screenshots/en/overview.png)
 
 - Each worker is the same `claude` CLI you already use, so your slash commands, skills, MCP servers and settings all work as usual.
-- A **local-only** tool that listens on `127.0.0.1` only (no outside communication, no remote access).
+- A **local-only** tool that listens on `127.0.0.1` only (no remote access · the only outside connection is the update check).
 - Restarting the dashboard **does not disconnect workers** — they reattach automatically.
 
 ## Installation
@@ -78,6 +78,7 @@ The bar at the top shows the context and your account's 5-hour and weekly usage 
 - **▴ Minimize** — collapse the cards into one row under the header. Click a chip to open that worker.
 - **🌐** — switch between 한국어 / English.
 - **🌙 / ☀** — dark / light mode.
+- **⬇ Updates** — a dot appears when there is a new Clawdgotchi release or Claude Code version. Click to check again and see how to update.
 
 ![Minimized view and language menu](docs/screenshots/en/minimized.png)
 

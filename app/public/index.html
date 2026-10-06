@@ -44,6 +44,14 @@
       </button>
       <div class="lang-pop" id="lang-pop" role="menu" hidden></div>
     </div>
+    <!-- 업데이트: 새 릴리즈·Claude Code 새 버전이 있으면 점. 누르면 다시 확인하고 결과·업데이트 방법을 보여 준다 -->
+    <div class="upd-wrap">
+      <button id="btn-upd" class="btn ghost lang-btn upd-btn" aria-haspopup="dialog" aria-expanded="false" aria-controls="upd-pop" title="업데이트 확인" aria-label="업데이트 확인" data-i18n-attr="title,aria-label">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19h14"/></svg>
+        <i class="upd-dot" hidden></i>
+      </button>
+      <div class="upd-pop" id="upd-pop" role="dialog" aria-label="업데이트" data-i18n-attr="aria-label" hidden></div>
+    </div>
     <button id="btn-power" class="btn ghost power" title="서버 종료" data-i18n-attr="title">⏻</button>
   </header>
 

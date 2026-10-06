@@ -15,6 +15,7 @@ import { createProfile, readProfile, profileSummary, runningSubagents, editLog, 
 import { snapshot, changedSince } from './shelldiff.js';
 import { createProgress, isCommit } from './progress.js';
 import { L } from './cli-lang.js';
+import { createUpdates } from './updates.js';
 const { Terminal: HeadlessTerminal } = createRequire(import.meta.url)('@xterm/headless');
 
 const APP_DIR = path.dirname(fileURLToPath(import.meta.url)); // app/ — 코드
@@ -40,6 +41,7 @@ if (!IS_WIN) {
 }
 
 const CLAUDE_BIN = resolveClaude();
+const updates = createUpdates({ root: ROOT, claudeBin: CLAUDE_BIN, onChange: () => emitState() });
 
 /** @type {Map<string, any>} */
 const workers = new Map();
@@ -805,6 +807,7 @@ function publicState() {
     shotKeep: SHOT_KEEP, // 화면 안내 문구용 (워커당 캡처 보관 장수)
     usage, // 계정 사용량 { fiveHour: { pct, resetsAt, at, from }, sevenDay, at, from }
     usageReporters: usageReporters(), // { ok: [보낼 수 있는 워커 id], missing: [상태줄 없이 뜬 워커 id] }
+    updates: updates.public(), // 새 릴리즈·Claude Code 새 버전 (updates.js)
   };
 }
 
@@ -1137,6 +1140,9 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === 'GET' && p === '/api/state') return json(res, 200, publicState());
 
+  // 업데이트 다시 확인 (화면의 업데이트 아이콘) — 결과는 상태 방송으로 간다
+  if (req.method === 'POST' && p === '/api/updates/check') { updates.check(); return json(res, 200, { ok: true }); }
+
   // diff 보기: 워커가 Edit/Write 로 고친 파일과 그 변경(트랜스크립트의 structuredPatch). 상태 방송에는 개수만 싣고 내용은 열 때 가져간다
   const dm = req.method === 'GET' && p.match(/^\/api\/workers\/(W\d+)\/diff$/);
   if (dm) {
@@ -1306,6 +1312,7 @@ await connectHost();
 server.listen(PORT, HOST, () => {
   console.log(`${L('클로드 키우기', 'Clawdgotchi')} http://${HOST}:${PORT}  (claude: ${CLAUDE_BIN})`);
   setTimeout(cleanupLegacyHook, 5000);
+  setTimeout(() => updates.check(), 3000); // 업데이트 확인은 시작할 때 한 번 + 화면의 아이콘을 누를 때
 });
 
 // 서버만 내린다. 워커(Claude 프로세스)는 PTY 호스트에서 계속 돈다 — 다음에 서버를 켜면 다시 붙는다

@@ -544,6 +544,7 @@ const el = (html) => { const t = document.createElement('template'); t.innerHTML
 function render() {
   renderStats();
   renderStale();
+  if (typeof renderUpd === 'function') renderUpd();
   renderInbox();
   renderFloor();
   renderDock();
@@ -1921,7 +1922,7 @@ function renderMemos(w) {
   $('#memos').innerHTML = list.length
     ? `<li class="mh">${_t('{n}건', { n: list.length })}</li>` + list.map((m) => `<li data-id="${m.id}" draggable="true" title="${_t('워커 카드에 끌어다 놓으면 그 워커의 나중에 할 작업으로 옮겨집니다')}"><span class="mt">${esc(m.text)}</span>${attachChips(m.text, 'sm')}
         <span class="ma"><time>${fmt(m.createdAt)}</time><button class="btn mini ghost" data-memo="edit" title="${_t('내용 수정')}">${_t('수정')}</button><button class="btn mini primary" data-memo="send" title="${_t('업무 지시로 보내기 (작업 중이면 대기열)')}" aria-label="${_t('업무 지시로 보내기')}">▶</button><button class="btn mini ghost" data-memo="remove" title="${_t('삭제')}">✕</button></span></li>`).join('')
-    : `<li class="empty-memo">${_t('나중에 할 작업이 없습니다')}</li>`;
+    : ''; // 비어 있으면 아무것도 두지 않는다 — 업무 지시처럼 입력칸에서 섹션이 끝나 타임라인과의 간격이 같다
 }
 // 수정: 본문 자리에 입력칸을 띄운다. Alt(⌘)+Enter 저장 · Esc 취소 — 추가 칸과 같은 키
 function editMemo(li, w) {
@@ -2132,7 +2133,7 @@ function renderLangPop() {
 function setLangPop(open) {
   langPop.hidden = !open;
   langBtn.setAttribute('aria-expanded', String(open));
-  if (open) { renderLangPop(); langPop.querySelector('.lang-item.on')?.focus(); }
+  if (open) { if (!updPop.hidden) setUpdPop(false); renderLangPop(); langPop.querySelector('.lang-item.on')?.focus(); }
 }
 langBtn.addEventListener('click', () => setLangPop(langPop.hidden));
 langPop.addEventListener('click', (e) => {
@@ -2172,6 +2173,49 @@ document.addEventListener('langchange', () => {
   if (w && !$('#profile').classList.contains('collapsed')) renderProfile(w, true);
   if (diffOpen) renderDiff();
 });
+
+// ---------- 업데이트 확인 (헤더, 🌐 오른쪽) ----------
+// 서버가 시작할 때 한 번 확인하고(updates.js), 아이콘을 누르면 다시 확인한다. 새 버전이 있으면 아이콘에 점.
+// 설치는 하지 않고 방법만 알려 준다
+const updBtn = $('#btn-upd'), updPop = $('#upd-pop');
+function updRow(title, x, kind) {
+  let status, guide = '';
+  if (!x) status = `<span class="upd-dim">${_t('확인 전')}</span>`;
+  else if (x.error === 'git') status = `<span class="upd-dim">${_t('git 저장소가 아니라 확인할 수 없어요')}</span>`;
+  else if (x.error === 'claude') status = `<span class="upd-dim">${_t('설치된 Claude Code 를 찾지 못했어요')}</span>`;
+  else if (x.error === 'network') status = `<span class="upd-dim">${_t('인터넷에 접속하지 못해 최신 버전을 모르겠어요')}</span>`;
+  else if (x.newer) {
+    const latest = kind === 'app' ? `release-${x.latest}` : x.latest;
+    status = `<b class="upd-new">${_t('새 버전 {v}', { v: esc(latest) })}</b>`;
+    guide = kind === 'app'
+      ? `<div class="upd-guide">${_t('프로젝트 폴더에서 <code>git pull</code> 후 <b>↻ 서버 재시작</b>')}${x.url ? ` · <a href="${esc(x.url)}/releases" target="_blank" rel="noopener">${_t('릴리즈 보기')}</a>` : ''}</div>`
+      : `<div class="upd-guide">${_t('터미널에서 <code>claude update</code> · 이미 떠 있는 워커는 새로 띄워야 적용돼요')}</div>`;
+  } else status = `<span class="upd-ok">${_t('최신 버전이에요')}</span>`;
+  const cur = x?.current != null ? (kind === 'app' ? `release-${x.current}` : x.current) : '—';
+  return `<div class="upd-row"><div class="upd-top"><b>${title}</b><span class="upd-cur">${esc(cur)}</span></div>${status}${guide}</div>`;
+}
+function renderUpd() {
+  const u = state.updates || {};
+  const any = !!(u.app?.newer || u.claude?.newer);
+  $('.upd-dot', updBtn).hidden = !any;
+  updBtn.title = _t(any ? '새 업데이트가 있어요' : '업데이트 확인');
+  if (updPop.hidden) return;
+  const when = u.checkedAt ? new Date(u.checkedAt + clockSkew).toLocaleTimeString(uiLocale(), { hour12: false, hour: '2-digit', minute: '2-digit' }) : null;
+  const html = `<div class="upd-h">${_t('업데이트')}</div>` +
+    updRow(_t('클로드 키우기'), u.app, 'app') + updRow('Claude Code', u.claude, 'claude') +
+    `<div class="upd-foot">${u.checking ? _t('확인 중…') : when ? _t('마지막 확인 {t}', { t: when }) : ''}</div>`;
+  if (updPop._html !== html) updPop.innerHTML = updPop._html = html;
+}
+function setUpdPop(open) {
+  updPop.hidden = !open;
+  updBtn.setAttribute('aria-expanded', String(open));
+  if (open) { setLangPop(false); fetch('/api/updates/check', { method: 'POST' }).catch(() => {}); }
+  renderUpd();
+}
+updBtn.addEventListener('click', () => setUpdPop(updPop.hidden));
+document.addEventListener('click', (e) => { if (!updPop.hidden && !e.target.closest('.upd-wrap')) setUpdPop(false); });
+document.addEventListener('keydown', (e) => { if (!updPop.hidden && e.key === 'Escape') { setUpdPop(false); updBtn.focus(); } });
+document.addEventListener('langchange', () => { updPop._html = ''; renderUpd(); });
 
 const themeSw = $('#btn-theme'), themeKnob = $('.ts-knob', themeSw), themeFace = $('.ts-face', themeSw);
 const THEME_ANIM_MS = 720;
