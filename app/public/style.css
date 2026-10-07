@@ -460,18 +460,18 @@ body.term-full .side-grip { left: -6px; }
 .tl-pin .tag { display: inline-block; font-size: 10.5px; font-weight: 600; padding: 0 6px; margin-right: 6px; border-radius: 4px; line-height: 17px; vertical-align: 1px; background: var(--accent); color: #1a0f0a; }
 .timeline h3 { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--text); letter-spacing: .04em; }
 #log { list-style: none; margin: 0; padding: 0; font-size: 12px; overflow: auto; flex: 1; }
-/* 옆 패널(타임라인·대기열·나중에 할 작업)과 세션 프로파일 서브에이전트 목록 스크롤바: 트랙 없이 얇은 둥근 막대, 올리면 조금 진하게.
+/* 옆 패널(타임라인·대기열·나중에 할 작업)·세션 프로파일 서브에이전트 목록·diff 요청 목록 스크롤바: 트랙 없이 얇은 둥근 막대, 올리면 조금 진하게.
    크롬 계열은 ::-webkit-scrollbar 로 다듬고(표준 scrollbar-color 를 같이 주면 이 규칙이 무시되므로 주지 않는다),
    그 밖의 브라우저만 표준 속성으로 얇게 */
-:is(#log, .queue, .memos, .subagents)::-webkit-scrollbar { width: 10px; }
-:is(#log, .queue, .memos, .subagents)::-webkit-scrollbar-track { background: transparent; }
-:is(#log, .queue, .memos, .subagents)::-webkit-scrollbar-thumb {
+:is(#log, .queue, .memos, .subagents, #diff-files)::-webkit-scrollbar { width: 10px; }
+:is(#log, .queue, .memos, .subagents, #diff-files)::-webkit-scrollbar-track { background: transparent; }
+:is(#log, .queue, .memos, .subagents, #diff-files)::-webkit-scrollbar-thumb {
   background: rgb(var(--ink) / .14); border-radius: 10px; border: 3px solid transparent; background-clip: padding-box; min-height: 32px;
 }
-:is(#log, .queue, .memos, .subagents)::-webkit-scrollbar-thumb:hover { background-color: rgb(var(--ink) / .3); }
-:is(#log, .queue, .memos, .subagents)::-webkit-scrollbar-button { display: none; }
+:is(#log, .queue, .memos, .subagents, #diff-files)::-webkit-scrollbar-thumb:hover { background-color: rgb(var(--ink) / .3); }
+:is(#log, .queue, .memos, .subagents, #diff-files)::-webkit-scrollbar-button { display: none; }
 @supports not selector(::-webkit-scrollbar) {
-  #log, .queue, .memos, .subagents { scrollbar-width: thin; scrollbar-color: rgb(var(--ink) / .18) transparent; }
+  #log, .queue, .memos, .subagents, #diff-files { scrollbar-width: thin; scrollbar-color: rgb(var(--ink) / .18) transparent; }
 }
 #log li { padding: 5px 0 5px 12px; border-left: 1px solid var(--line-2); position: relative; color: var(--text-2); word-break: break-all; }
 #log li::before { content: ""; position: absolute; left: -3.5px; top: 11px; width: 6px; height: 6px; border-radius: 50%; background: var(--surface-3); }
@@ -1526,7 +1526,7 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 .notes-x { width: 26px; height: 26px; padding: 0; border: 0; border-radius: 7px; background: none; color: var(--dim); cursor: pointer; }
 .notes-x:hover { background: var(--surface-3); color: var(--text); }
 .notes-body { overflow: auto; padding: 4px 18px 16px; overscroll-behavior: contain; }
-.notes-rel { padding: 14px 0 6px; border-bottom: 1px solid var(--line); }
+.notes-rel { padding: 16px 0 10px; border-bottom: 1px solid color-mix(in srgb, var(--text) 20%, transparent); }
 .notes-rel:last-child { border-bottom: 0; }
 .notes-rt { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .notes-rt a { color: var(--text); text-decoration: none; font-size: 14.5px; }
