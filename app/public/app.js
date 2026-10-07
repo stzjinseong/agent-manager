@@ -180,21 +180,22 @@ function termTheme(light) {
 }
 // Claude Code 는 이 터미널에 256색 번호로 색을 찍는다(실측: 24비트 아님). 그중 몇 번호를 이 화면에서만 다른 색으로 —
 //  · diff: 22 추가 줄 배경 · 28 추가 단어 · 52 삭제 줄 · 88 삭제 단어 · 77 '+' 글자 · 167 '-' 글자. 기본은 원색에 가까워 너무 진하다 → 차분한 초록/빨강
-//  · 237: 지난 요청(❯ 요청 글) 줄 배경 — 회색 대신 헤더 '+ 워커' 버튼과 같은 강조색(style.css --accent, 다크·라이트 각각)
+//  · 237: 지난 요청(❯ 요청 글) 줄 배경 — 회색 대신 타임라인 요청 행처럼 강조색(--accent)을 배경에 섞은 연한 색(라이트 11% · 다크는 바탕이 더 어두워 15%)
+//  · 231(흰 글자): 요청 줄 글자색. 라이트에선 대비 보정만으로는 회색으로 남아서 기본 글자색(검정)으로
 // 이 번호들은 diff·요청 줄 말고는 거의 쓰이지 않는다. 글자 대비는 minimumContrastRatio 가 맞춘다
 const TERM_256 = {
-  dark: { 22: '#173325', 28: '#24603d', 52: '#3d1f24', 88: '#6e2f37', 77: '#6fcf8e', 167: '#ef7b80', 237: '#d97757' },
-  light: { 22: '#dcefe0', 28: '#b4dfbf', 52: '#f7dfe0', 88: '#efb8bd', 77: '#2f8a4c', 167: '#c4434b', 237: '#c8623f' },
+  dark: { 22: '#173325', 28: '#24603d', 52: '#3d1f24', 88: '#6e2f37', 77: '#6fcf8e', 167: '#ef7b80', 237: '#271916' },
+  light: { 22: '#dcefe0', 28: '#b4dfbf', 52: '#f7dfe0', 88: '#efb8bd', 77: '#2f8a4c', 167: '#c4434b', 237: '#efe3dc', 231: '#1b1d23' },
 };
 const extAnsi = (map) => { const a = []; for (const [n, c] of Object.entries(map)) a[n - 16] = c; return a; }; // 16번부터, 빈 칸은 기본색
 function baseTermTheme(light) {
-  // 스크롤바는 드래그 하이라이트(selectionBackground)와 같은 코랄색. 하이라이트만큼 옅으면(대비 1.3~1.5:1) 안 보여서 더 진하게 —
-  // 평소 대비 약 2.5:1(다크 55%·라이트 70%), 올리면·끄는 중엔 더 진하게. xterm 기본값은 글자색 20%(라이트에서 거의 안 보였다)
+  // 스크롤바는 회색 둥근 막대(모양은 style.css #term .slider). xterm 기본값(글자색 20%)은 라이트에서 거의 안 보여서 조금 진하게,
+  // 올리면·끄는 중엔 더 진하게
   if (!light) return { background: '#07080a', foreground: '#e6e4de', cursor: '#d97757', selectionBackground: '#d9775744',
-    scrollbarSliderBackground: '#d977578c', scrollbarSliderHoverBackground: '#d97757b3', scrollbarSliderActiveBackground: '#d97757cc', extendedAnsi: extAnsi(TERM_256.dark) };
+    scrollbarSliderBackground: '#e6e4de40', scrollbarSliderHoverBackground: '#e6e4de66', scrollbarSliderActiveBackground: '#e6e4de85', extendedAnsi: extAnsi(TERM_256.dark) };
   return {
     background: '#f4f3ef', foreground: '#1b1d23', cursor: '#c8623f', cursorAccent: '#f4f3ef', selectionBackground: '#c8623f33',
-    scrollbarSliderBackground: '#c8623fb3', scrollbarSliderHoverBackground: '#c8623fcc', scrollbarSliderActiveBackground: '#c8623fe6',
+    scrollbarSliderBackground: '#1b1d234d', scrollbarSliderHoverBackground: '#1b1d2373', scrollbarSliderActiveBackground: '#1b1d2394',
     black: '#1b1d23', red: '#c4342b', green: '#2f7d3a', yellow: '#946200', blue: '#2a5fc0', magenta: '#9b3aa8', cyan: '#1a7f8e', white: '#5c606b',
     brightBlack: '#6b6f7a', brightRed: '#d9473d', brightGreen: '#3a9147', brightYellow: '#a87000', brightBlue: '#3a72d6', brightMagenta: '#ae4cbb', brightCyan: '#22909f', brightWhite: '#3d4049',
     extendedAnsi: extAnsi(TERM_256.light),
