@@ -1143,7 +1143,7 @@ function openThemeDir() {
 // 1~5 = 매니저 성장 단계(비워 두면 바로 앞 단계 그림). 파일 이름에 rev 를 넣어 그림을 바꾸면 주소도 바뀐다 → 오래 캐시해도 된다
 const CHAR_DIR = path.join(DATA_DIR, 'characters');
 const CHAR_ID = /^c[a-z0-9]{6,20}$/;
-const CHAR_FILE = /^(c[a-z0-9]{6,20})-[0-5]-[a-z0-9]{1,10}\.png$/;
+const CHAR_FILE = /^(c[a-z0-9]{6,20})-[0-5w]-[a-z0-9]{1,10}\.png$/;
 const CHAR_BODY_LIMIT = 16 * 1024 * 1024;
 const CHAR_PNG_LIMIT = 2 * 1024 * 1024;
 const CHAR_ICON_LIMIT = 64 * 1024;
@@ -1165,7 +1165,7 @@ function charPng(dataUrl, limit) {
   if (!w || !h || w > 1024 || h > 1024) return null;
   return { buf, w, h };
 }
-// 만들기(id 없음)·고치기(id). stages[n]: 새 그림 { data: PNG data URL, pixel: 도트 그림인지 } · null(그 단계 비우기, 0 은 못 비움) · 빠짐(그대로)
+// 만들기(id 없음)·고치기(id). stages[n] — n 은 0~5(매니저 성장 단계, 0 은 기본) · w(워커 그림, 없으면 0 을 같이 쓴다): 새 그림 { data: PNG data URL, pixel: 도트 그림인지 } · null(그 단계 비우기, 0 은 못 비움) · 빠짐(그대로)
 function saveChar(id, body) {
   const old = id ? readChar(id) : null;
   if (id && !old) return { code: 404, error: 'not found' };
@@ -1175,7 +1175,7 @@ function saveChar(id, body) {
     icon: old?.icon || '', stages: { ...(old?.stages || {}) }, createdAt: old?.createdAt || Date.now() };
   const writes = [], drops = [];
   for (const [k, v] of Object.entries(body.stages || {})) {
-    if (!/^[0-5]$/.test(k)) continue;
+    if (!/^([0-5]|w)$/.test(k)) continue;
     if (ch.stages[k]) drops.push(ch.stages[k].file);
     if (v === null) { if (k === '0') return { code: 400, error: 'stage 0' }; delete ch.stages[k]; continue; }
     const png = charPng(v?.data, CHAR_PNG_LIMIT);

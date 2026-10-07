@@ -55,7 +55,9 @@ const CLAWD = {
 };
 
 // ---------- 올린 그림 캐릭터 ----------
-// meta = 서버 data/characters/<id>.json: { id, name, icon, stages: { 0: { file, w, h, pixel }, 3: … } }
+// meta = 서버 data/characters/<id>.json: { id, name, icon, stages: { 0: { file, w, h, pixel }, 3: …, w: … } }
+// 0~5 는 매니저(0 = 기본, 1~5 = 성장 단계), w 는 워커 그림 — 없으면 워커도 0 을 쓴다.
+// 헤더 로고·확인 창·종료 화면(v = 'logo' | 'logo-full')은 앱의 얼굴이라 매니저 기본 그림으로
 // 그림은 원본 그대로(워커 색 칠하기·눈 깜빡임 없음). 도트 그림(pixel)은 키워도 흐려지지 않게 픽셀 그대로 키운다(단계마다 따로)
 // 작은 자리(head)는 세로로 긴 그림이면 위쪽 정사각형(대개 머리)만, 아니면 전체를 줄여서
 function imageChar(meta) {
@@ -69,7 +71,8 @@ function imageChar(meta) {
     // 매니저 그림이 단계마다 다른지 — 단계가 바뀌면 다시 그릴지 정할 때 쓴다
     stageKey: (n) => at(n).file,
     worker(v = 'full') {
-      const s = at(0);
+      const logo = v.startsWith('logo'), s = (!logo && meta.stages.w) || at(0);
+      if (logo) v = v === 'logo' ? 'head' : 'full';
       if (v === 'head') return `<svg class="clawd img" data-v="head" viewBox="0 0 ${s.w} ${headH(s)}" style="overflow:hidden">${img(s)}</svg>`;
       return `<svg class="clawd img" data-v="${v}" viewBox="0 0 ${s.w} ${s.h}" preserveAspectRatio="xMidYMax meet">${img(s)}</svg>`;
     },
@@ -82,10 +85,10 @@ function imageChar(meta) {
       const dot = alert ? '<circle cx="54" cy="10" r="9" fill="#f4b34a" stroke="#14161c" stroke-width="2"/>' : '';
       return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 64 64"><image href="${meta.icon}" xlink:href="${meta.icon}" width="64" height="64"${meta.stages[0].pixel ? ' style="image-rendering:pixelated"' : ''}/>${dot}</svg>`;
     },
-    // 자리별 크기를 정하는 CSS 변수 — 카드 높이 66px 기준, 도트 그림은 정수배로 맞춰 픽셀 크기가 고르게
+    // 자리별 크기를 정하는 CSS 변수 — 카드 높이 66px 기준, 도트 그림은 정수배로 맞춰 픽셀 크기가 고르게. 워커·매니저 그림이 다르면 각자 크기로
     sizes() {
-      const { h, pixel } = at(0), card = pixel && h <= 66 ? Math.floor(66 / h) * h : 66;
-      return { '--ch-card': `${card}px`, '--ch-mgr': `${Math.round(card * 1.5)}px` };
+      const fit = ({ h, pixel }) => (pixel && h <= 66 ? Math.floor(66 / h) * h : 66);
+      return { '--ch-card': `${fit(meta.stages.w || at(0))}px`, '--ch-logo': `${fit(at(0))}px`, '--ch-mgr': `${Math.round(fit(at(0)) * 1.5)}px` };
     },
   };
 }
@@ -106,7 +109,7 @@ function markChar() {
   const c = curChar(), root = document.documentElement;
   root.dataset.char = c.id;
   root.classList.toggle('char-img', !!c.custom);
-  for (const k of ['--ch-card', '--ch-mgr']) root.style.removeProperty(k);
+  for (const k of ['--ch-card', '--ch-logo', '--ch-mgr']) root.style.removeProperty(k);
   for (const [k, v] of Object.entries(c.sizes?.() || {})) root.style.setProperty(k, v);
 }
 markChar();

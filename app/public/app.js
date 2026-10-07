@@ -21,7 +21,7 @@ let selected = null;
 let ws;
 
 // ---------- 캐릭터 — 그림은 characters.js 의 컨셉이 그린다(clawdSVG · managerSVG · faviconSVG) ----------
-// data-clawd 값이 'head' 면 머리만(작은 자리)
+// data-clawd 값이 'head' 면 머리만(작은 자리) · 'logo' / 'logo-full' 은 앱의 얼굴 자리(올린 캐릭터면 워커 그림 대신 매니저 기본 그림)
 document.querySelectorAll('[data-clawd]').forEach((el) => (el.innerHTML = clawdSVG(el.dataset.clawd || 'full')));
 $('.core-mark').innerHTML = managerSVG(0);
 // 성장 단계 표시 — geN 클래스는 누적(3단계면 ge1~ge3). 4단계부터는 회로 스파크도 금빛
@@ -2354,7 +2354,7 @@ function renderCharPop() {
   charPop.innerHTML = CHARS.map((c) => {
     const on = c.id === charId;
     return `<div class="char-row"><button class="lang-item char-item${on ? ' on' : ''}" role="menuitemradio" aria-checked="${on}" data-id="${c.id}">
-      <span class="lang-check" aria-hidden="true">${on ? '✓' : ''}</span><span class="char-prev">${c.worker('head')}</span><span class="char-nm">${esc(c.custom ? c.name : _t(c.name))}</span></button>${c.custom
+      <span class="lang-check" aria-hidden="true">${on ? '✓' : ''}</span><span class="char-prev">${c.worker('logo')}</span><span class="char-nm">${esc(c.custom ? c.name : _t(c.name))}</span></button>${c.custom
       ? `<button class="char-act" data-edit="${c.id}" title="${_t('고치기')}" aria-label="${_t('고치기')}">✎</button><button class="char-act del" data-del="${c.id}" title="${_t('지우기')}" aria-label="${_t('지우기')}">✕</button>` : ''}</div>`;
   }).join('') + `<button class="lang-item char-add" data-add>${_t('+ 캐릭터 추가')}</button>`;
   charPop.insertAdjacentHTML('afterbegin', `<div class="pop-h">${_t('캐릭터')}</div>`);
@@ -2524,22 +2524,26 @@ async function charIcon(src, pixel) {
 }
 
 // ---------- 캐릭터 추가·고치기 창 ----------
-// 칸 6개: 기본(워커 + 매니저 시작 모습, 꼭 필요) · 1~5단계(매니저가 성장하면 바뀌는 모습, 비우면 바로 앞 단계 그림).
-// 칸을 누르거나 그림을 끌어다 놓으면 다듬은 결과가 바로 보인다. 저장해야 서버에 올라간다
+// 매니저 칸 6개: 기본(매니저 시작 모습 · 워커 그림이 없으면 워커도, 꼭 필요) · 1~5단계(매니저가 성장하면 바뀌는 모습, 비우면 바로 앞 단계 그림)
+// 워커 칸 1개(w): 워커 카드·칩에 쓰는 그림. 비우면 매니저 기본 그림을 같이 쓴다.
+// 칸 번호는 문자열('0'~'5', 'w'). 칸을 누르거나 그림을 끌어다 놓으면 다듬은 결과가 바로 보인다. 저장해야 서버에 올라간다
 const charModal = $('#char-modal'), charFile = $('#char-file');
 let ce = null; // { id, slots: { n: { src, w, h, pixel, data?, canvas? } }, cleared: Set, pick }
-function charStageLabel(n) { return n === 0 ? _t('기본') : _t('{n}단계', { n }); }
+const CHAR_MGR_SLOTS = ['0', '1', '2', '3', '4', '5'];
+function charStageLabel(n) { return n === 'w' ? _t('모든 워커') : n === '0' ? _t('기본') : _t('{n}단계', { n }); }
 function renderCharEditor() {
-  const html = [0, 1, 2, 3, 4, 5].map((n) => {
+  const slot = (n) => {
     let s = ce.slots[n], inherited = false;
-    if (!s) for (let k = n - 1; k >= 0 && !s; k--) if (ce.slots[k]) { s = ce.slots[k]; inherited = true; }
+    if (!s && n === 'w') { s = ce.slots[0]; inherited = !!s; }
+    if (!s) for (let k = Number(n) - 1; k >= 0 && !s; k--) if (ce.slots[k]) { s = ce.slots[k]; inherited = true; }
     const img = s ? `<img src="${s.src}" alt=""${s.pixel ? ' class="px"' : ''}>` : '';
     return `<div class="cs-slot${ce.slots[n] ? ' set' : ''}${inherited ? ' inh' : ''}" data-n="${n}" role="button" tabindex="0" title="${_t('눌러서 그림 고르기 · 끌어다 놓기')}">
       <div class="cs-prev">${img}${!ce.slots[n] ? `<span class="cs-plus">+</span>` : ''}</div>
-      <div class="cs-label">${charStageLabel(n)}${n === 0 ? ' <b>*</b>' : ''}</div>
-      ${ce.slots[n] && n > 0 ? `<button class="cs-clear" data-clear="${n}" title="${_t('비우기')}" aria-label="${_t('비우기')}">✕</button>` : ''}</div>`;
-  }).join('');
-  $('#char-stages').innerHTML = html;
+      <div class="cs-label">${charStageLabel(n)}${n === '0' ? ' <b>*</b>' : ''}</div>
+      ${ce.slots[n] && n !== '0' ? `<button class="cs-clear" data-clear="${n}" title="${_t('비우기')}" aria-label="${_t('비우기')}">✕</button>` : ''}</div>`;
+  };
+  $('#char-stages').innerHTML = `<div class="cs-group"><div class="cs-gh">${_t('매니저')}</div><div class="cs-row">${CHAR_MGR_SLOTS.map(slot).join('')}</div></div>
+    <div class="cs-group cs-worker"><div class="cs-gh">${_t('워커')}</div><div class="cs-row">${slot('w')}</div></div>`;
 }
 function openCharEditor(id) {
   const c = id && CHARS.find((x) => x.id === id);
@@ -2562,17 +2566,17 @@ async function setCharSlot(n, file) {
     if (!ce) return;
     ce.slots[n] = { src: r.data, data: r.data, w: r.w, h: r.h, pixel: r.pixel, canvas: r.canvas };
     ce.cleared.delete(n);
-    if (n === 0) ce.icon = await charIcon(r.canvas, r.pixel);
+    if (n === '0') ce.icon = await charIcon(r.canvas, r.pixel);
     if (!$('#char-name').value.trim()) $('#char-name').value = file.name.replace(/\.[^.]+$/, '').slice(0, 30);
     renderCharEditor();
   } catch (e) { err.textContent = e.message; err.hidden = false; }
 }
 $('#char-stages').addEventListener('click', (e) => {
   const clr = e.target.closest('[data-clear]')?.dataset.clear;
-  if (clr) { delete ce.slots[clr]; ce.cleared.add(Number(clr)); renderCharEditor(); return; }
+  if (clr) { delete ce.slots[clr]; ce.cleared.add(clr); renderCharEditor(); return; }
   const slot = e.target.closest('.cs-slot');
   if (!slot) return;
-  ce.pick = Number(slot.dataset.n);
+  ce.pick = slot.dataset.n;
   charFile.value = '';
   charFile.click();
 });
@@ -2593,7 +2597,7 @@ $('#char-stages').addEventListener('drop', (e) => {
   if (!slot) return;
   e.preventDefault(); e.stopPropagation();
   slot.classList.remove('dropping');
-  if (f) setCharSlot(Number(slot.dataset.n), f);
+  if (f) setCharSlot(slot.dataset.n, f);
 });
 async function saveCharEditor() {
   const err = $('#char-err'), name = $('#char-name').value.trim();

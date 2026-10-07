@@ -1435,7 +1435,12 @@ body.resizing-term { cursor: row-resize; user-select: none; }
 .char-tips b { color: var(--text-2); font-weight: 600; margin-right: 4px; }
 .char-name { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; font-size: 13px; color: var(--text-2); }
 .char-name input { flex: 1; min-width: 0; }
-.char-stages { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+.char-stages { display: grid; grid-template-columns: 6fr 1fr; gap: 14px; }
+.cs-group { min-width: 0; }
+.cs-gh { margin: 0 0 5px 2px; font-size: 11px; font-weight: 600; color: var(--dim); }
+.cs-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+.cs-worker { padding-left: 14px; border-left: 1px solid var(--line-2); }
+.cs-worker .cs-row { grid-template-columns: 1fr; }
 .cs-slot { position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 6px 4px 7px; border-radius: 10px;
   border: 1.5px dashed rgb(var(--ink) / .18); cursor: pointer; transition: border-color .15s, background .15s; }
 .cs-slot:hover, .cs-slot:focus-visible { border-color: color-mix(in srgb, var(--accent) 60%, transparent); outline: none; }
@@ -1453,10 +1458,10 @@ body.resizing-term { cursor: row-resize; user-select: none; }
 .cs-slot:hover .cs-clear, .cs-clear:focus-visible { opacity: 1; }
 .char-edit .char-note { font-size: 12px; color: var(--dim); margin: 10px 0 12px; }
 .char-err { margin: -4px 0 12px; font-size: 12.5px; color: #e0655a; }
-@media (max-width: 520px) { .char-stages { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 520px) { .char-stages { grid-template-columns: 1fr; } .cs-row { grid-template-columns: repeat(3, 1fr); } .cs-worker { padding-left: 0; border-left: 0; } .cs-worker .cs-row { grid-template-columns: repeat(3, 1fr); } }
 
 /* 올린 그림 캐릭터(.char-img) — 그림 비율이 제각각이라 자리마다 높이만 정하고 가로는 그림 비율대로.
-   카드 높이(--ch-card)와 매니저 높이(--ch-mgr)는 characters.js 가 그림 크기로 정한다(도트는 정수배) */
+   카드 높이(--ch-card · 워커 그림), 종료 화면 높이(--ch-logo)와 매니저 높이(--ch-mgr · 매니저 기본 그림)는 characters.js 가 그림 크기로 정한다(도트는 정수배) */
 html.char-img .avatar { width: auto; height: var(--ch-card, 66px); }
 html.char-img .avatar svg { width: auto; max-width: 160px; }
 html.char-img .dchip .avatar { height: 15px; }
@@ -1465,7 +1470,7 @@ html.char-img .detail-avatar svg { width: auto; height: 23px; max-width: 46px; }
 html.char-img .brand-mark svg { width: auto; height: 24px; max-width: 48px; }
 html.char-img .ask-mark { width: 38px; }
 html.char-img .core-mark svg { width: auto; height: var(--ch-mgr, 99px); max-width: 240px; }
-html.char-img .down-mark svg { width: auto; height: var(--ch-card, 66px); }
+html.char-img .down-mark svg { width: auto; height: var(--ch-logo, 66px); }
 
 /* ---------- 언어 (헤더 🌐) ---------- */
 /* 한국어가 아닌 언어로 처음 열 때, 번역이 끝날 때까지 잠깐 가린다 (index.html 머리 스크립트 · app.js 가 푼다) */

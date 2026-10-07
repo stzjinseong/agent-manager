@@ -41,7 +41,7 @@
     </filter>
   </svg>
   <header class="topbar">
-    <div class="brand"><span class="brand-mark" data-clawd="head"></span><h1 data-i18n>클로드 키우기</h1></div>
+    <div class="brand"><span class="brand-mark" data-clawd="logo"></span><h1 data-i18n>클로드 키우기</h1></div>
     <div class="stats" id="stats"></div>
     <button id="btn-new" class="btn primary" data-i18n>+ 워커</button>
     <button id="btn-theme" class="theme-switch" role="switch" aria-checked="false" aria-label="라이트 모드" data-i18n-attr="aria-label" data-mt="theme">
@@ -273,7 +273,7 @@
   <!-- 확인·입력 팝업 (브라우저 기본 confirm/prompt 대신) — app.js ask() -->
   <div class="modal-back" id="ask-modal" hidden>
     <div class="modal panel ask" role="dialog" aria-modal="true" aria-labelledby="ask-title">
-      <div class="ask-head"><span class="ask-mark" data-clawd="head"></span><h3 id="ask-title"></h3></div>
+      <div class="ask-head"><span class="ask-mark" data-clawd="logo"></span><h3 id="ask-title"></h3></div>
       <p id="ask-body"></p>
       <textarea id="ask-input" rows="3" hidden></textarea>
       <div class="modal-acts">
@@ -325,7 +325,7 @@
       </ul>
       <label class="char-name"><span data-i18n>이름</span><input id="char-name" maxlength="30" autocomplete="off" spellcheck="false"></label>
       <div class="char-stages" id="char-stages"></div>
-      <p class="char-note" data-i18n>기본 그림은 워커와 매니저가 함께 써요. 1~5단계는 매니저가 성장하면 바뀌는 모습이고, 비워 두면 바로 앞 단계 그림을 그대로 써요.</p>
+      <p class="char-note" data-i18n>매니저 1~5단계는 성장하면 바뀌는 모습이고, 비워 두면 바로 앞 단계 그림을 그대로 써요. 워커 그림을 넣으면 워커만 다른 모습이 되고, 비워 두면 매니저 기본 그림을 같이 써요.</p>
       <div class="char-err" id="char-err" hidden></div>
       <div class="modal-acts">
         <button class="btn ghost" data-ce="cancel" data-i18n>취소</button>
@@ -337,7 +337,7 @@
 
   <div class="down-screen" id="down-screen" hidden>
     <div class="down-box">
-      <span class="down-mark" data-clawd></span>
+      <span class="down-mark" data-clawd="logo-full"></span>
       <h2 data-i18n>서버가 종료되었습니다</h2>
       <p id="down-detail"></p>
       <p class="dim" data-i18n>다시 켜려면 프로젝트 폴더의 <b>Launch.vbs</b> (또는 Launch.bat) 를 실행하세요.<br>서버가 다시 켜지면 이 화면은 자동으로 새로고침됩니다.</p>
