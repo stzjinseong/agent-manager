@@ -85,6 +85,15 @@ The bar at the top shows **⏱ time until the cache expires**, the context, and 
 
 ![Light mode](docs/screenshots/en/light.png)
 
+### 6. Customize — your own characters and themes
+
+Pick a character and a theme from 👕 **Customize** in the header. Each browser remembers its choice.
+
+- **Characters** — **+ Add character** turns an uploaded image into your own character. Background removal and trimming are automatic, and you can add stage 1–5 images the manager switches to as it grows. Uploaded images are stored in `data/characters/`.
+- **Themes** — **+ Make a theme** copies the example into a new theme right away, or writes a request so a Claude worker builds one in the style you describe. A theme is a folder `themes/<name>/` (`theme.css` · `theme.json`); see [themes/README.md](themes/README.md) for how to make one (written in Korean).
+
+Characters and themes stay on this computer and are never committed (`.gitignore`). They survive updates.
+
 ## Good to know
 
 ### Input keys

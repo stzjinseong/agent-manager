@@ -169,7 +169,16 @@ setFavicon(false);
 // 터미널 색: 다크는 검정 바탕, 라이트는 업무 지시 입력칸과 같은 바탕(--bg #f4f3ef)에 먹색 글자.
 // 워커 CLI 는 다크 테마 색(흰 글자 등)으로 그리지만 아래 minimumContrastRatio 가 밝은 바탕에 맞게 글자색을 어둡게 보정한다.
 // 기본 16색(ANSI)은 밝은 바탕에서 읽히게 진한 쪽으로
+// 사용자 테마 목록(프로젝트 themes/ 폴더, 서버 /api/themes) — 터미널 색에도 쓰여 여기서 먼저 꺼낸다. 첫 화면용으로 브라우저에 기억(am.themes)
+let userThemes = [], themeDir = '';
+try { userThemes = JSON.parse(localStorage.getItem('am.themes') || '[]'); } catch {}
+const curTheme = () => userThemes.find((t) => t.id === document.documentElement.dataset.skin);
+// 터미널 색: 기본 다크/라이트 값에 지금 테마의 theme.json terminal.dark/light 를 덮어쓴다
 function termTheme(light) {
+  const t = curTheme()?.terminal?.[light ? 'light' : 'dark'];
+  return t ? { ...baseTermTheme(light), ...t } : baseTermTheme(light);
+}
+function baseTermTheme(light) {
   // 스크롤바는 드래그 하이라이트(selectionBackground)와 같은 코랄색. 하이라이트만큼 옅으면(대비 1.3~1.5:1) 안 보여서 더 진하게 —
   // 평소 대비 약 2.5:1(다크 55%·라이트 70%), 올리면·끄는 중엔 더 진하게. xterm 기본값은 글자색 20%(라이트에서 거의 안 보였다)
   if (!light) return { background: '#07080a', foreground: '#e6e4de', cursor: '#d97757', selectionBackground: '#d9775744',
@@ -2208,7 +2217,96 @@ document.addEventListener('keydown', (e) => {
     items[(i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length]?.focus();
   }
 });
-// ---------- 캐릭터 (헤더 👕) ----------
+// ---------- 꾸미기 (헤더 👕): 캐릭터 · 테마 ----------
+// 테마 = 오리지널(style.css 그대로) + 사용자가 프로젝트 themes/<id>/ 에 넣은 테마. 고르면 그 theme.css 를 style.css 뒤에 붙이고
+// html[data-skin=<id>] 를 단다. 브라우저에 기억(am.skin) — index.html 머리 스크립트가 첫 화면부터 붙인다.
+// theme.json 의 mode(light/dark)가 있으면 고를 때 그 모드로 넘어간다. 만드는 법은 themes/README.md
+const SKIN_KEY = 'am.skin';
+function themeLink(t) {
+  let link = document.getElementById('user-theme');
+  if (!t) { link?.remove(); return; }
+  if (!link) { link = document.createElement('link'); link.rel = 'stylesheet'; link.id = 'user-theme'; document.head.appendChild(link); }
+  const href = `/themes/${encodeURIComponent(t.id)}/theme.css?v=${encodeURIComponent(t.rev || '')}`;
+  if (link.getAttribute('href') !== href) link.setAttribute('href', href); // theme.css 를 고치면 rev 가 바뀌어 다시 읽는다
+}
+function setSkin(id) {
+  const root = document.documentElement, t = userThemes.find((x) => x.id === id);
+  if (t) root.dataset.skin = t.id; else delete root.dataset.skin;
+  themeLink(t);
+  try { t ? localStorage.setItem(SKIN_KEY, t.id) : localStorage.removeItem(SKIN_KEY); } catch {}
+  const light = root.dataset.theme === 'light';
+  if (t?.mode && (t.mode === 'light') !== light) { applyTheme(t.mode === 'light'); setThemeSwitch(t.mode === 'light'); }
+  else term.options.theme = termTheme(light);
+}
+// 서버 목록 받기 — 꾸미기 메뉴를 열 때마다 다시 읽어, 서버를 켜 둔 채 themes/ 에 폴더를 넣거나 theme.css 를 고쳐도 반영된다
+async function loadThemes() {
+  let list;
+  try { const j = await (await fetch('/api/themes')).json(); list = j.themes; themeDir = j.dir || themeDir; } catch { return; }
+  if (!Array.isArray(list)) return;
+  userThemes = list;
+  try { localStorage.setItem('am.themes', JSON.stringify(list)); } catch {}
+  const cur = document.documentElement.dataset.skin;
+  if (cur && !curTheme()) setSkin(''); // 폴더가 없어졌으면 오리지널로
+  else if (cur) { themeLink(curTheme()); term.options.theme = termTheme(document.documentElement.dataset.theme === 'light'); }
+  if (!charPop.hidden) renderCharPop();
+}
+// ---------- 내 테마 만들기 안내 ----------
+// ① 예시를 복사해 새 테마 폴더 만들기(바로 적용) · themes 폴더 열기 ② 원하는 느낌을 적으면 워커에게 줄 요청문 만들기(복사 · 입력칸에 넣기)
+const themeModal = $('#theme-modal');
+const tgId = () => $('#tg-id').value.trim();
+function tgFail(m) { const el = $('#tg-err'); el.textContent = m; el.hidden = !m; }
+function openThemeGuide() {
+  tgFail('');
+  themeModal.hidden = false;
+  loadThemes();
+  requestAnimationFrame(() => $('#tg-id').focus());
+}
+function closeThemeGuide() { themeModal.hidden = true; charBtn.focus(); }
+function themePrompt() {
+  const id = THEME_ID_RE.test(tgId()) ? tgId() : 'my-theme', mood = $('#tg-mood').value.trim() || _t('멋진 나만의');
+  const dir = themeDir ? `${themeDir.replace(/[\\/]+$/, '')}/${id}` : `themes/${id}`;
+  return _t('클로드 키우기(이 대시보드)의 사용자 테마를 만들어 줘. 먼저 {readme} 를 읽고 그 규칙대로, "{mood}" 느낌의 테마를 {dir}/ 폴더에 만들어 줘. 폴더가 없으면 {example} 을 복사해서 시작하고, theme.json(name · swatch · mode · terminal)과 theme.css 를 채워 줘. 색 변수 위주로 바꾸고, 배경은 .theme-bg 를 꾸며 줘. 글자가 잘 읽히고 작업 중 · 결정 대기 · 완료 상태색이 서로 구분되게 해 줘. 다 되면 👕 꾸미기 → 테마에서 고르면 된다고 알려 줘.', {
+    readme: themeDir ? `${themeDir.replace(/[\\/]+$/, '')}/README.md` : 'themes/README.md', mood, dir, example: themeDir ? `${themeDir.replace(/[\\/]+$/, '')}/_example` : 'themes/_example',
+  });
+}
+const THEME_ID_RE = /^[a-z0-9][a-z0-9_-]{0,40}$/i;
+themeModal.addEventListener('click', async (e) => {
+  const a = e.target.closest('[data-tg]')?.dataset.tg;
+  if (e.target === themeModal || a === 'close') return closeThemeGuide();
+  if (!a) return;
+  tgFail('');
+  if (a === 'create') {
+    const id = tgId();
+    if (!THEME_ID_RE.test(id)) { $('#tg-id').focus(); return tgFail(_t('이름은 영문 · 숫자 · - · _ 로, 영문이나 숫자로 시작해 주세요')); }
+    const r = await fetch('/api/themes', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id }) }).catch(() => null);
+    const j = await r?.json().catch(() => ({}));
+    if (r?.status === 409) return tgFail(_t('같은 이름의 테마가 이미 있어요'));
+    if (!r?.ok || !j?.theme) return tgFail(_t('테마를 만들지 못했어요'));
+    await loadThemes();
+    setSkin(j.theme.id);
+    themeModal.hidden = true;
+    toast(_t('{dir} 을 만들고 적용했어요 — theme.css 를 고쳐 보세요', { dir: j.dir || `themes/${id}` }), 6000);
+  } else if (a === 'open') {
+    const r = await fetch('/api/themes/open', { method: 'POST' }).catch(() => null);
+    if (!(await r?.json().catch(() => null))?.ok) tgFail(_t('폴더를 열지 못했어요'));
+  } else if (a === 'copy') {
+    try { await navigator.clipboard.writeText(themePrompt()); toast(_t('요청문을 복사했어요 — 워커 입력칸에 붙여넣으세요')); }
+    catch { tgFail(_t('복사하지 못했어요')); }
+  } else if (a === 'send') {
+    const ta = taskForm?.text;
+    if (!selected || !ta || $('#detail').hidden) return tgFail(_t('먼저 워커 카드를 눌러 열어 주세요'));
+    ta.value = ta.value.trim() ? `${ta.value.trimEnd()}\n${themePrompt()}` : themePrompt();
+    ta.dispatchEvent(new Event('input'));
+    themeModal.hidden = true;
+    ta.focus();
+    toast(_t('요청문을 입력칸에 넣었어요 — 확인하고 보내세요'));
+  }
+});
+// 캡처 단계에서 처리하고 막는다 — Esc 가 터미널(=Claude 중단)로 새지 않게
+themeModal.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeThemeGuide(); }
+}, true);
+// ---------- 캐릭터 ----------
 // 누르면 캐릭터 목록(머리 미리보기 + 이름)이 열린다. 고르면 화면의 캐릭터를 모두 새 캐릭터로 다시 그리고 브라우저에 기억(am.char).
 // 맨 아래 '+ 캐릭터 추가' 로 그림을 올려 새 캐릭터를 만들고, 올린 캐릭터는 ✎ 로 고치고 ✕ 로 지운다(기본 클로드는 그대로)
 const charBtn = $('#btn-char'), charPop = $('#char-pop');
@@ -2219,11 +2317,19 @@ function renderCharPop() {
       <span class="lang-check" aria-hidden="true">${on ? '✓' : ''}</span><span class="char-prev">${c.worker('head')}</span><span class="char-nm">${esc(c.custom ? c.name : _t(c.name))}</span></button>${c.custom
       ? `<button class="char-act" data-edit="${c.id}" title="${_t('고치기')}" aria-label="${_t('고치기')}">✎</button><button class="char-act del" data-del="${c.id}" title="${_t('지우기')}" aria-label="${_t('지우기')}">✕</button>` : ''}</div>`;
   }).join('') + `<button class="lang-item char-add" data-add>${_t('+ 캐릭터 추가')}</button>`;
+  charPop.insertAdjacentHTML('afterbegin', `<div class="pop-h">${_t('캐릭터')}</div>`);
+  const cur = document.documentElement.dataset.skin || '';
+  const skins = [{ id: '', name: _t('오리지널'), swatch: 'linear-gradient(135deg, #15171d 45%, #d97757)' }, ...userThemes];
+  charPop.insertAdjacentHTML('beforeend', `<div class="pop-h">${_t('테마')}</div>` + skins.map((k) => {
+    const on = k.id === cur;
+    return `<button class="lang-item skin-item${on ? ' on' : ''}" role="menuitemradio" aria-checked="${on}" data-skin="${esc(k.id)}">
+      <span class="lang-check" aria-hidden="true">${on ? '✓' : ''}</span><span class="skin-sw" style="background:${esc(k.swatch || 'var(--surface-3)')}"></span><span class="char-nm">${esc(k.name)}</span></button>`;
+  }).join('') + `<button class="lang-item char-add" data-theme-guide>${_t('+ 테마 만들기')}</button>`);
 }
 function setCharPop(open) {
   charPop.hidden = !open;
   charBtn.setAttribute('aria-expanded', String(open));
-  if (open) { setLangPop(false); if (!updPop.hidden) setUpdPop(false); renderCharPop(); charPop.querySelector('.char-item.on')?.focus(); }
+  if (open) { setLangPop(false); if (!updPop.hidden) setUpdPop(false); setPowerPop(false); renderCharPop(); charPop.querySelector('.char-item.on')?.focus(); loadThemes(); }
 }
 // 화면에 이미 그려진 캐릭터(svg.clawd)를 그 자리의 종류(data-v · 매니저)대로 지금 캐릭터로 바꿔 끼운다 — 목록 미리보기는 그대로
 function repaintChars() {
@@ -2252,9 +2358,11 @@ async function loadChars() {
   if (!charPop.hidden) renderCharPop();
 }
 loadChars();
+loadThemes();
 charBtn.addEventListener('click', () => setCharPop(charPop.hidden));
 charPop.addEventListener('click', async (e) => {
   if (e.target.closest('[data-add]')) { setCharPop(false); openCharEditor(null); return; }
+  if (e.target.closest('[data-theme-guide]')) { setCharPop(false); openThemeGuide(); return; }
   const ed = e.target.closest('[data-edit]')?.dataset.edit;
   if (ed) { setCharPop(false); openCharEditor(ed); return; }
   const del = e.target.closest('[data-del]')?.dataset.del;
@@ -2265,6 +2373,14 @@ charPop.addEventListener('click', async (e) => {
     const r = await fetch(`/api/characters/${del}`, { method: 'DELETE' }).catch(() => null);
     if (!r?.ok) { toast(_t('지우지 못했어요')); return; }
     await loadChars();
+    return;
+  }
+  const sk = e.target.closest('.skin-item');
+  if (sk) {
+    if (sk.dataset.skin === (document.documentElement.dataset.skin || '')) return;
+    setCharPop(false);
+    setSkin(sk.dataset.skin);
+    charBtn.focus();
     return;
   }
   const b = e.target.closest('[data-id]');
@@ -2279,7 +2395,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') { setCharPop(false); charBtn.focus(); }
   if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
     e.preventDefault();
-    const items = [...charPop.querySelectorAll('.char-item, .char-add')], i = items.indexOf(document.activeElement);
+    const items = [...charPop.querySelectorAll('.char-item, .char-add, .skin-item, [data-theme-guide]')], i = items.indexOf(document.activeElement);
     items[(i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length]?.focus();
   }
 });
@@ -2545,7 +2661,7 @@ const THEME_ANIM_MS = 720;
 let themeBusy = false;
 function setThemeSwitch(light) {
   themeSw.setAttribute('aria-checked', String(light));
-  themeSw.title = _t(light ? '다크 모드로' : '라이트 모드로');
+  themeSw.setAttribute('aria-label', _t(light ? '다크 모드로' : '라이트 모드로'));
   themeFace.textContent = light ? '☀' : '🌙';
 }
 function applyTheme(light) {
@@ -2554,6 +2670,12 @@ function applyTheme(light) {
   try { light ? localStorage.setItem('am.theme', 'light') : localStorage.removeItem('am.theme'); } catch {}
 }
 setThemeSwitch(document.documentElement.dataset.theme === 'light');
+// 마우스를 올리면 바로 설명(미터 툴팁과 같은 것) — 전환 방향과 직접 만든 테마 안내
+hoverTips.theme = () => ({
+  title: _t(themeSw.getAttribute('aria-checked') === 'true' ? '다크 모드로' : '라이트 모드로'),
+  note: _t('직접 만든 테마도 쓸 수 있어요. 👕 꾸미기 → 테마 → + 테마 만들기에서 새 테마를 만들거나 Claude 에게 맡길 수 있어요. 테마는 프로젝트의 themes 폴더에 있고 저장소에 올라가지 않아요.'),
+  act: _t('클릭: 라이트·다크 전환'),
+});
 themeSw.addEventListener('click', (e) => {
   e.preventDefault();
   if (themeBusy) return; // 연출 중 입력은 취소

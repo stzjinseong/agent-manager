@@ -1,0 +1,13 @@
+{
+  "name": "예시: 미드나잇",
+  "swatch": "linear-gradient(135deg, #0b1424 40%, #4f8cff)",
+  "mode": "dark",
+  "terminal": {
+    "dark": {
+      "background": "#070d18",
+      "foreground": "#dfe7f5",
+      "cursor": "#4f8cff",
+      "selectionBackground": "#4f8cff44"
+    }
+  }
+}

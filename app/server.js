@@ -1003,6 +1003,76 @@ function drainShots(w) {
 // ---------- 첨부 이미지 보관 ----------
 const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
 
+// ---------- 사용자 테마 ----------
+// 프로젝트 최상위 themes/<id>/ 폴더 하나 = 테마 하나(themes/README.md). 저장소에는 README 와 예시(_example)만 있고
+// 사용자가 만든 폴더는 .gitignore 로 빠진다. theme.json(이름·견본·모드·터미널 색) + theme.css(+ 그림·글꼴 같은 파일).
+// 고치면서 바로 보도록 캐시하지 않고, 목록도 요청마다 다시 읽는다. '_' 나 '.' 로 시작하는 폴더는 목록에서 뺀다
+const THEME_DIR = process.env.AM_THEMES || path.join(ROOT, 'themes');
+const THEME_ID = /^[a-z0-9][a-z0-9_-]{0,40}$/i;
+const THEME_TYPES = {
+  '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8',
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml',
+  '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.otf': 'font/otf',
+};
+function listThemes() {
+  let dirs = [];
+  try { dirs = fs.readdirSync(THEME_DIR, { withFileTypes: true }); } catch { return []; }
+  const out = [];
+  for (const d of dirs) {
+    if (!d.isDirectory() || !THEME_ID.test(d.name)) continue;
+    const dir = path.join(THEME_DIR, d.name);
+    if (!fs.existsSync(path.join(dir, 'theme.css'))) continue;
+    let meta = {};
+    try { meta = JSON.parse(fs.readFileSync(path.join(dir, 'theme.json'), 'utf8')) || {}; } catch {}
+    const str = (v, n) => (typeof v === 'string' ? v.slice(0, n) : '');
+    const term = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).filter(([k, x]) => /^[a-zA-Z]{1,40}$/.test(k) && typeof x === 'string' && x.length <= 40)) : undefined);
+    out.push({
+      id: d.name,
+      name: str(meta.name, 40) || d.name,
+      swatch: str(meta.swatch, 300),
+      mode: meta.mode === 'light' || meta.mode === 'dark' ? meta.mode : '',
+      terminal: meta.terminal && typeof meta.terminal === 'object' ? { dark: term(meta.terminal.dark), light: term(meta.terminal.light) } : undefined,
+      rev: Math.round(fs.statSync(path.join(dir, 'theme.css')).mtimeMs).toString(36),
+    });
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name));
+}
+function themeFile(rel) {
+  const parts = rel.split('/');
+  if (parts.length < 2 || !THEME_ID.test(parts[0]) || parts.some((x) => !x || x.startsWith('.'))) return null;
+  const full = path.resolve(THEME_DIR, ...parts);
+  if (!full.startsWith(path.resolve(THEME_DIR) + path.sep)) return null;
+  const type = THEME_TYPES[path.extname(full).toLowerCase()];
+  try { if (!type || !fs.statSync(full).isFile()) return null; } catch { return null; }
+  return { full, type };
+}
+
+// 새 테마: 저장소의 예시(themes/_example)를 themes/<id>/ 로 복사하고 이름만 바꾼다. 예시가 지워졌으면 최소 파일만 쓴다
+const THEME_EXAMPLE = path.join(ROOT, 'themes', '_example');
+function createTheme(id) {
+  if (typeof id !== 'string' || !THEME_ID.test(id) || id.startsWith('_')) return { code: 400, error: 'id' };
+  const dir = path.join(THEME_DIR, id);
+  if (fs.existsSync(dir)) return { code: 409, error: 'exists' };
+  fs.mkdirSync(THEME_DIR, { recursive: true });
+  let meta = {};
+  if (fs.existsSync(path.join(THEME_EXAMPLE, 'theme.css'))) {
+    fs.cpSync(THEME_EXAMPLE, dir, { recursive: true });
+    try { meta = JSON.parse(fs.readFileSync(path.join(dir, 'theme.json'), 'utf8')) || {}; } catch {}
+  } else {
+    fs.mkdirSync(dir);
+    fs.writeFileSync(path.join(dir, 'theme.css'), ':root:not([data-theme="light"]) {\n  --accent: #4f8cff;\n}\n');
+  }
+  meta.name = id;
+  fs.writeFileSync(path.join(dir, 'theme.json'), JSON.stringify(meta, null, 2) + '\n');
+  return { code: 200, theme: listThemes().find((t) => t.id === id) };
+}
+// themes 폴더를 이 PC 의 파일 관리자(Finder · 탐색기)로 연다 — 브라우저는 로컬 폴더를 못 연다
+function openThemeDir() {
+  fs.mkdirSync(THEME_DIR, { recursive: true });
+  const [cmd, args] = process.platform === 'darwin' ? ['open', [THEME_DIR]] : process.platform === 'win32' ? ['explorer', [THEME_DIR]] : ['xdg-open', [THEME_DIR]];
+  try { spawnProcess(cmd, args, { detached: true, stdio: 'ignore' }).on('error', () => {}).unref(); return true; } catch { return false; }
+}
+
 // ---------- 사용자 캐릭터 ----------
 // 헤더 👕 에서 올린 그림으로 만든 캐릭터. 브라우저가 여백 자르기·도트 원래 크기 되돌리기를 마친 PNG 를 보내면
 // data/characters/<id>.json(이름·단계별 파일·탭 아이콘) + <id>-<단계>-<rev>.png 로 둔다. 단계 0 = 기본(워커·매니저 시작 모습),
@@ -1378,6 +1448,22 @@ const server = http.createServer(async (req, res) => {
       json(res, 200, { path: file });
     });
     return;
+  }
+
+  // 사용자 테마 — 목록, 테마 폴더 안 파일(theme.css · 그림 · 글꼴)
+  if (req.method === 'GET' && p === '/api/themes') return json(res, 200, { themes: listThemes(), dir: THEME_DIR });
+  if (req.method === 'POST' && p === '/api/themes') {
+    const { id } = await readBody(req);
+    const r = createTheme(String(id || '').trim());
+    return json(res, r.code, r.theme ? { theme: r.theme, dir: path.join(THEME_DIR, r.theme.id) } : { error: r.error });
+  }
+  if (req.method === 'POST' && p === '/api/themes/open') return json(res, 200, { ok: openThemeDir() });
+  if (req.method === 'GET' && p.startsWith('/themes/')) {
+    let rel; try { rel = decodeURIComponent(p.slice('/themes/'.length)); } catch { return json(res, 404, {}); }
+    const f = themeFile(rel);
+    if (!f) return json(res, 404, {});
+    res.writeHead(200, { 'content-type': f.type, 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff' });
+    return fs.createReadStream(f.full).pipe(res);
   }
 
   // 사용자 캐릭터 — 목록 · 만들기 · 고치기 · 지우기, 그림 파일

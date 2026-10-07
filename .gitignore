@@ -2,3 +2,7 @@ node_modules/
 data/
 /hook.mjs
 Launch.app/
+# 사용자 테마: 각자 만든 테마 폴더는 로컬에만 — 안내서와 예시만 저장소에 둔다
+/themes/*
+!/themes/README.md
+!/themes/_example/

@@ -8,8 +8,18 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
   <link rel="stylesheet" href="/vendor/xterm.css">
   <link rel="stylesheet" href="/style.css">
-  <!-- 기억해 둔 테마를 그리기 전에 적용 — 새로고침할 때 다크로 번쩍이지 않게 -->
-  <script>try { if (localStorage.getItem('am.theme') === 'light') document.documentElement.dataset.theme = 'light'; } catch {}</script>
+  <!-- 기억해 둔 라이트/다크와 사용자 테마(themes/<id>/theme.css)를 그리기 전에 적용 — 새로고침할 때 번쩍이지 않게.
+       테마 CSS 는 style.css 뒤에 붙어야 같은 규칙을 덮어쓴다 -->
+  <script>try {
+    var h = document.documentElement;
+    if (localStorage.getItem('am.theme') === 'light') h.dataset.theme = 'light';
+    var k = localStorage.getItem('am.skin');
+    if (k && /^[a-z0-9][a-z0-9_-]{0,40}$/i.test(k)) {
+      h.dataset.skin = k;
+      var l = document.createElement('link'); l.rel = 'stylesheet'; l.id = 'user-theme'; l.href = '/themes/' + k + '/theme.css';
+      document.head.appendChild(l);
+    }
+  } catch (e) {}</script>
   <!-- 화면 언어: 고른 적이 있으면 그것, 아니면 브라우저 첫 언어(한국어면 ko, 그 밖엔 en). 한국어가 아니면 번역이 끝날 때까지
        잠깐 가린다 — 한국어가 번쩍였다 바뀌지 않게 (app.js 가 풀고, 혹시 실패해도 1.5초 뒤엔 보이게) -->
   <script>(function () {
@@ -20,6 +30,8 @@
   })();</script>
 </head>
 <body>
+  <!-- 사용자 테마용 배경 층(화면에 고정, 모든 내용 뒤) — 기본은 비어 있다. themes/README.md -->
+  <div class="theme-bg" aria-hidden="true"></div>
   <!-- 테마 스위치의 물방울 필터: 가까운 두 방울을 흐렸다가 알파를 날카롭게 세워 하나로 녹아 붙어 보이게(gooey) -->
   <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
     <filter id="ts-goo" x="-50%" y="-50%" width="200%" height="200%">
@@ -32,14 +44,14 @@
     <div class="brand"><span class="brand-mark" data-clawd="head"></span><h1 data-i18n>클로드 키우기</h1></div>
     <div class="stats" id="stats"></div>
     <button id="btn-new" class="btn primary" data-i18n>+ 워커</button>
-    <button id="btn-theme" class="theme-switch" role="switch" aria-checked="false" aria-label="라이트 모드" title="라이트 모드로" data-i18n-attr="title,aria-label">
+    <button id="btn-theme" class="theme-switch" role="switch" aria-checked="false" aria-label="라이트 모드" data-i18n-attr="aria-label" data-mt="theme">
       <span class="ts-ico moon" aria-hidden="true">🌙</span><span class="ts-ico sun" aria-hidden="true">☀</span>
       <span class="ts-goo" aria-hidden="true"><span class="ts-tail"></span><span class="ts-knob"></span></span>
       <span class="ts-face" aria-hidden="true">🌙</span>
     </button>
-    <!-- 캐릭터: 옷 아이콘을 누르면 컨셉 목록(미리보기 + 이름)이 열린다. 지금 캐릭터는 ✓ -->
+    <!-- 꾸미기: 옷 아이콘을 누르면 캐릭터 목록(미리보기 + 이름)과 테마 목록이 열린다. 지금 고른 것은 ✓ -->
     <div class="char-wrap">
-      <button id="btn-char" class="btn ghost lang-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="char-pop" title="캐릭터 바꾸기" aria-label="캐릭터 바꾸기" data-i18n-attr="title,aria-label">
+      <button id="btn-char" class="btn ghost lang-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="char-pop" title="꾸미기" aria-label="꾸미기" data-i18n-attr="title,aria-label">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 4.5 6.5l1.6 3.6 2-.9V20h7.8V9.2l2 .9 1.6-3.6L15 4c-.4 1.3-1.6 2.2-3 2.2S9.4 5.3 9 4z" stroke-linejoin="round"/></svg>
       </button>
       <div class="lang-pop char-pop" id="char-pop" role="menu" hidden></div>
@@ -270,6 +282,35 @@
   </div>
 
   <!-- 캐릭터 추가·고치기 — app.js openCharEditor() -->
+  <!-- 내 테마 만들기 안내 (꾸미기 → 테마 → + 테마 만들기) — app.js openThemeGuide -->
+  <div class="modal-back" id="theme-modal" hidden>
+    <div class="modal panel theme-guide" role="dialog" aria-modal="true" aria-labelledby="tg-title">
+      <h3 id="tg-title" data-i18n>내 테마 만들기</h3>
+      <p class="tg-lead" data-i18n>테마는 프로젝트 <code>themes</code> 폴더 안의 폴더 하나예요. <code>theme.css</code> 로 색·배경을 바꾸고, 이 컴퓨터에만 있어 저장소에 올라가지 않아요.</p>
+      <label class="char-name"><span data-i18n>테마 이름</span><input id="tg-id" maxlength="41" autocomplete="off" spellcheck="false" placeholder="my-theme"></label>
+      <div class="tg-sec">
+        <div class="tg-h" data-i18n>① 직접 만들기</div>
+        <p data-i18n>예시를 복사해 <code>themes/이름/</code> 을 만들고 바로 적용해요. <code>theme.css</code> 를 고친 뒤 새로고침하거나 꾸미기 메뉴를 다시 열면 반영돼요.</p>
+        <div class="tg-acts">
+          <button class="btn primary" data-tg="create" data-i18n>새 테마 만들기</button>
+          <button class="btn" data-tg="open" data-i18n>themes 폴더 열기</button>
+        </div>
+      </div>
+      <div class="tg-sec">
+        <div class="tg-h" data-i18n>② Claude 에게 맡기기</div>
+        <p data-i18n>원하는 느낌을 적으면 워커에게 줄 요청문을 만들어 드려요.</p>
+        <input id="tg-mood" autocomplete="off" placeholder="예: 벚꽃 핑크 파스텔, 반짝이는 별 배경" data-i18n-attr="placeholder">
+        <div class="tg-acts">
+          <button class="btn" data-tg="copy" data-i18n>요청문 복사</button>
+          <button class="btn" data-tg="send" data-i18n>지금 워커 입력칸에 넣기</button>
+        </div>
+      </div>
+      <p class="tg-foot" data-i18n>자세한 설명(색 변수 목록·배경 꾸미기·theme.json)은 <code>themes/README.md</code> 에 있어요.</p>
+      <div class="char-err" id="tg-err" hidden></div>
+      <div class="modal-acts"><button class="btn ghost" data-tg="close" data-i18n>닫기</button></div>
+    </div>
+  </div>
+
   <div class="modal-back" id="char-modal" hidden>
     <div class="modal panel char-edit" role="dialog" aria-modal="true" aria-labelledby="char-edit-title">
       <h3 id="char-edit-title"></h3>
