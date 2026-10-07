@@ -628,6 +628,11 @@ function nodeTemplate() {
     </div>`);
 }
 
+// 서버 시각 t 가 지금으로부터 얼마 전인지 짧게 (방금 · 5분 전 · 3시간 전 · 2일 전)
+function fmtAgo(t) {
+  const m = Math.max(0, Math.floor((Date.now() - (t + clockSkew)) / 60000));
+  return m < 1 ? _t('방금') : m < 60 ? _t('{m}분 전', { m }) : m < 1440 ? _t('{h}시간 전', { h: Math.floor(m / 60) }) : _t('{d}일 전', { d: Math.floor(m / 1440) });
+}
 function socketTemplate() {
   return el(`
     <div class="node socket">
@@ -775,6 +780,9 @@ function renderFloor() {
       if (!n.classList.contains('renaming')) $('.nname', n).textContent = it.p.name;
       $('.path', n).textContent = ltrPath(it.p.cwd);
       $('.path', n).title = it.p.cwd;
+      // ▶ 투입: 이 역할의 마지막 세션이 남아 있으면 이어서(--resume). Shift+클릭이면 새 세션
+      const at = state.resumable?.[it.p.name], lb = $('[data-act="launch"]', n);
+      lb.title = at ? _t('마지막 세션({t})을 이어서 시작 · Shift+클릭: 새 세션으로', { t: fmtAgo(at) }) : _t('새 세션으로 시작');
     }
     // 순서 유지 (이미 제자리면 옮기지 않아 애니메이션이 끊기지 않음). 드래그 중엔 사용자가 옮긴 자리를 존중
     if (!dragEl) {
@@ -1007,12 +1015,12 @@ function renderDetail() {
   // 상태가 올 때마다 통째로 바꾸면 썸네일이 다시 로드되고 누르는 중인 타일이 사라진다 → 바뀐 때만
   if (queueEl._html !== queueHtml) queueEl.innerHTML = queueEl._html = queueHtml;
   const fmt = (t) => new Date(t + clockSkew).toLocaleTimeString(uiLocale(), { hour12: false });
-  timelineCache = timelineRows(w.log, w.shots, w.docs);
+  timelineCache = timelineRows(w.log, w.shots, w.docs, w.past);
   // CLI 처럼 아래로 갈수록 최신. 맨 아래를 보고 있었거나 워커를 바꿨으면 새 줄을 따라 내려가고,
   // 위로 올려 지난 기록을 보는 중이면 그 자리를 지킨다
   const logEl = $('#log');
   const html = timelineCache.map((r, i) =>
-    `<li class="k-${r.kind}" data-i="${i}"${r.kind === 'req' ? ` title="${_t('클릭: 터미널에서 이 요청 위치로 이동')}"` : ''}><time>${fmt(r.t)}</time>${r.tag ? `<span class="tag">${r.tag}</span>` : ''}${esc(r.text)}${r.shot ? shotImg(r.shot, 'tl-shot') : ''}${r.doc ? docCard(r.doc) : ''}${r.kind === 'req' || r.kind === 'queued' ? attachChips(r.text, 'md') : ''}</li>`).join('');
+    `<li class="k-${r.kind}${r.past ? ' past' : ''}" data-i="${i}"${r.kind === 'req' ? ` title="${_t('클릭: 터미널에서 이 요청 위치로 이동')}"` : ''}><time>${fmt(r.t)}</time>${r.tag ? `<span class="tag">${r.tag}</span>` : ''}${esc(r.text)}${r.shot ? shotImg(r.shot, 'tl-shot') : ''}${r.doc ? docCard(r.doc) : ''}${r.kind === 'req' || r.kind === 'queued' ? attachChips(r.text, 'md') : ''}</li>`).join('');
   if (logEl._html !== html || logEl.dataset.w !== w.id) { // 브라우저가 innerHTML 을 정규화하므로 보낸 글로 비교
     const stick = logEl.dataset.w !== w.id || logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 40;
     logEl.dataset.w = w.id;
@@ -1035,11 +1043,14 @@ function renderDetail() {
 //  · 터미널에서 직접 친 요청은 'working: …' 만 찍힌다 → '요청'
 //  · 감시·백그라운드 완료 알림으로 생긴 턴('working: <task-notification>…')은 요청이 아니다 → '알림'
 //  · 'queue' 는 대기열에 들어간 지시 → '대기열'
-function timelineRows(log, shots = [], docs = []) {
+function timelineRows(log, shots = [], docs = [], past = []) {
   const rows = [];
   for (const l of log) {
     if (l.kind === 'assign') { rows.push({ t: l.t, kind: 'req', tag: _t('요청'), text: l.text }); continue; }
     if (l.kind === 'queue') { rows.push({ t: l.t, kind: 'queued', tag: _t('대기열'), text: l.text }); continue; }
+    // 예전 버전이 지난 요청을 타임라인 기록(w.log)에 직접 넣은 것 — 지금은 w.past 로 따로 온다(아래)
+    if (l.kind === 'past') { rows.push({ t: l.t, kind: 'req', past: true, tag: _t('지난 요청'), text: l.text }); continue; }
+    if (l.kind === 'pastnote') { rows.push({ t: l.t, kind: 'pastnote', text: _t('지난 세션 요청 {n}개 — 대화 기록에서 불러옴', { n: l.text }) }); continue; }
     const m = l.kind === 'status' && l.text.match(/^working: ([\s\S]*)$/);
     if (m) {
       const text = m[1];
@@ -1059,7 +1070,12 @@ function timelineRows(log, shots = [], docs = []) {
   for (const s of shots || []) rows.push({ t: s.t, kind: 'shot', tag: _t('📷 캡처'), text: [s.tool, s.arg].filter(Boolean).join(' · '), shot: s });
   // 워커가 쓴 결과물 문서: 마지막으로 쓴(고친) 시각 자리에 카드 줄로
   for (const d of docs || []) rows.push({ t: d.t, kind: 'doc', tag: _t('📄 결과물'), text: '', doc: d });
-  if (shots?.length || docs?.length) rows.sort((a, b) => a.t - b.t); // 안정 정렬이라 같은 시각의 로그 순서는 그대로
+  // 이어 붙인 세션의 지난 요청(서버가 대화 기록에서 채워 타임라인 한도와 따로 보관 — w.past): 맨 앞 것 바로 위에 머리 줄
+  if (past?.length) {
+    rows.push({ t: past[0].t - 1, kind: 'pastnote', text: _t('지난 세션 요청 {n}개 — 대화 기록에서 불러옴', { n: past.length }) });
+    for (const p of past) rows.push({ t: p.t, kind: 'req', past: true, tag: _t('지난 요청'), text: p.text });
+  }
+  if (shots?.length || docs?.length || past?.length) rows.sort((a, b) => a.t - b.t); // 안정 정렬이라 같은 시각의 로그 순서는 그대로
   return rows;
 }
 // 결과물 문서 카드. 미리보기(iframe)는 넣지 않는다 — 타임라인은 줄이 늘 때마다 통째로 다시 그려서 계속 다시 로드된다
@@ -1847,7 +1863,12 @@ $('#nodes').addEventListener('click', async (e) => {
   if (node.classList.contains('socket')) {
     const p = state.profiles.find((x) => x.name === node.dataset.profile);
     if (!p) return;
-    if (act === 'launch') { const { id } = await api('/api/workers', p); select(id); }
+    if (act === 'launch') {
+      const r = await api('/api/workers', { ...p, resume: !e.shiftKey });
+      if (!r.id) return;
+      select(r.id);
+      if (r.resumed) toast(_t('지난 세션을 이어서 시작했어요 — 새로 시작하려면 Shift+클릭'), 3500);
+    }
     if (act === 'forget' && await ask({ title: _t('저장된 역할 삭제'), body: _t('"{name}" 역할을 목록에서 지울까요?', { name: p.name }), ok: _t('삭제'), danger: true })) api('/api/profiles/delete', { name: p.name });
     return;
   }

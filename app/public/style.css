@@ -485,6 +485,12 @@ body.term-full .side-grip { left: -6px; }
 #log li.k-bgnote::before { background: var(--waiting); }
 #log .tag { display: inline-block; font-size: 10.5px; font-weight: 600; padding: 0 6px; margin-right: 6px; border-radius: 4px; line-height: 17px; vertical-align: 1px; }
 #log .k-req .tag { background: var(--accent); color: #1a0f0a; }
+/* 이어 붙인 세션의 지난 요청: 요청 줄을 흐리게 · 그 묶음 앞의 머리 줄 */
+#log li.k-req.past { background: color-mix(in srgb, var(--accent) 6%, transparent); border-left-color: color-mix(in srgb, var(--accent) 55%, transparent); color: var(--text-2); }
+#log .k-req.past .tag { background: color-mix(in srgb, var(--accent) 45%, var(--surface-3)); color: var(--text); }
+#log li.k-pastnote { display: flex; align-items: center; gap: 8px; margin: 6px 0 2px; color: var(--dim); font-size: 11.5px; }
+#log li.k-pastnote::before { display: none; }
+#log li.k-pastnote::after { content: ""; flex: 1; height: 1px; background: var(--line-2); }
 #log .k-queued .tag { border: 1px solid color-mix(in srgb, var(--accent) 60%, transparent); color: var(--accent); }
 #log .k-bgnote .tag { color: var(--waiting); padding: 0; }
 #log li.k-decision::before { background: var(--decision); }

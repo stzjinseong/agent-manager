@@ -136,8 +136,8 @@ function usageReporters() {
 function loadConfig() {
   try {
     const c = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
-    return { profiles: c.profiles || [], recentCwds: c.recentCwds || [], order: c.order || [], memos: c.memos || {}, colors: c.colors || {} };
-  } catch { return { profiles: [], recentCwds: [], order: [], memos: {}, colors: {} }; }
+    return { profiles: c.profiles || [], recentCwds: c.recentCwds || [], order: c.order || [], memos: c.memos || {}, colors: c.colors || {}, sessions: c.sessions || {} };
+  } catch { return { profiles: [], recentCwds: [], order: [], memos: {}, colors: {}, sessions: {} }; }
 }
 
 function saveConfig() {
@@ -149,6 +149,36 @@ function saveConfig() {
 function rememberCwd(cwd) {
   config.recentCwds = [cwd, ...config.recentCwds.filter((c) => c.toLowerCase() !== cwd.toLowerCase())].slice(0, 12);
   saveConfig();
+}
+
+// 역할(이름)마다 마지막 Claude 세션 — 대기실 카드의 ▶ 투입이 이 세션을 이어서(--resume) 띄운다.
+// { id, tx: 트랜스크립트 경로, cwd, at: 마지막으로 쓴 시각 }. 세션이 바뀔 때와 턴이 끝날 때 저장
+function rememberSession(w, ev, turnEnd) {
+  if (!ev.session_id || !ev.transcript_path || !config.profiles.some((x) => x.name === w.name)) return; // 대기실에 저장된 역할만
+  const s = config.sessions[w.name];
+  if (s?.id === ev.session_id && s.cwd === w.cwd && !turnEnd) return;
+  config.sessions[w.name] = { id: ev.session_id, tx: ev.transcript_path, cwd: w.cwd, at: Date.now() };
+  saveConfig();
+}
+// 훅 없이 워커 상태에서 기록 — 종료·제거될 때, 서버가 시작해 워커를 복원할 때. 재시작 뒤 한 번도 일하지 않고
+// 제거된 워커도(훅이 안 와서 위에서 기록되지 않음) 이어 갈 수 있게. 더 최근 기록이 있으면 덮지 않는다
+function noteWorkerSession(w, save = true) {
+  const tx = w.tx?.path;
+  if (!w.sessionId || !tx || !config.profiles.some((x) => x.name === w.name)) return;
+  const s = config.sessions[w.name], at = w.updatedAt || Date.now();
+  if (s?.id === w.sessionId || (s && s.at >= at)) return;
+  config.sessions[w.name] = { id: w.sessionId, tx, cwd: w.cwd, at };
+  if (save) saveConfig();
+}
+// 투입할 때 이어 갈 세션 id — 트랜스크립트가 남아 있고, 같은 폴더이고(claude --resume 은 그 폴더의 세션만 찾는다),
+// 그 세션을 쓰는 워커가 지금 없고, 역할 인자에 이미 --resume/--continue 가 없을 때만
+function resumableSession(name, cwd, args = '') {
+  const s = config.sessions[name];
+  if (!s?.id || !s.tx || !cwd || !fs.existsSync(s.tx)) return null;
+  if (path.resolve(cwd) !== path.resolve(s.cwd || '')) return null;
+  if (/(^|\s)(--resume|-r|--continue|-c)(\s|=|$)/.test(args)) return null;
+  if ([...workers.values()].some((x) => x.status !== 'exited' && x.sessionId === s.id)) return null;
+  return s;
 }
 
 function upsertProfile(p) {
@@ -170,6 +200,7 @@ function renameRole(from, to, worker) {
   config.profiles = config.profiles.map((x) => (x.name === from ? { ...x, name: to } : x));
   config.order = (config.order || []).map((x) => (x === from ? to : x));
   if (config.colors?.[from] != null && config.colors[to] == null) { config.colors[to] = config.colors[from]; delete config.colors[from]; }
+  if (config.sessions?.[from]) { config.sessions[to] = config.sessions[from]; delete config.sessions[from]; }
   if (config.memos?.[from]) { config.memos[to] = [...(config.memos[to] || []), ...config.memos[from]]; delete config.memos[from]; }
   saveConfig(); // emitState 포함
   return { ok: true };
@@ -324,7 +355,7 @@ function ensureRoleColor(name) {
   saveConfig();
 }
 
-function spawnWorker({ name, cwd, args = '', permissionMode = 'default' }) {
+function spawnWorker({ name, cwd, args = '', permissionMode = 'default', resume = null }) {
   let id;
   do id = `W${++seq}`; while (workers.has(id)); // 복원된 워커·호스트 터미널과 id 가 겹치면 안 된다
   cwd = cwd && fs.existsSync(cwd) ? cwd : ROOT;
@@ -343,6 +374,7 @@ function spawnWorker({ name, cwd, args = '', permissionMode = 'default' }) {
   if (process.platform === 'darwin' && !env.LANG && !env.LC_ALL && !env.LC_CTYPE) env.LANG = 'en_US.UTF-8';
 
   const extra = args.trim() ? args.trim().split(/\s+/) : [];
+  if (resume) extra.push('--resume', resume); // 역할의 마지막 세션 이어서 (저장되는 역할 인자에는 넣지 않는다)
   // 전역 설정이 bypassPermissions 여도 워커는 지정한 모드로 띄운다 — 그래야 권한 요청이 관제탑에 '결정 대기'로 보인다
   if (!PERMISSION_MODES.includes(permissionMode)) permissionMode = 'default';
   // 터미널은 PTY 호스트가 띄우고 붙잡는다 — 이 서버를 재시작해도 워커는 살아 있다
@@ -675,6 +707,7 @@ function onHook(w, ev, res) {
   const name = ev.hook_event_name;
   const reply = (obj = {}) => { if (!res.writableEnded) { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(obj)); } };
   if (ev.session_id) w.sessionId = ev.session_id;
+  rememberSession(w, ev, name === 'Stop');
   const prevTx = w.tx; // /clear 직전 세션 — 그 세션의 컨텍스트 크기로 /clear 경험치를 정한다
   if (ev.transcript_path) {
     if (!w.tx || w.tx.path !== ev.transcript_path) w.tx = openProfile(ev.transcript_path);
@@ -688,6 +721,7 @@ function onHook(w, ev, res) {
         w.todos = [];
         // 새 세션이니 타임라인(로그·캡처·결과물)도 비운다
         w.log = [];
+        w.past = []; // 이어 붙였던 지난 요청도
         for (const s of w.shots || []) fs.rmSync(path.join(SHOT_DIR, w.id, s.name), { force: true });
         w.shots = []; w.docs = [];
         // 터미널의 이전 대화 기록(스크롤백)도 지운다 — 호스트 원본 화면과 브라우저 터미널 둘 다.
@@ -696,6 +730,8 @@ function onHook(w, ev, res) {
         if (prevTx) { try { readProfile(prevTx); } catch {} }
         award(w, progress.clear(w, prevTx?.context), 'clear');
       }
+      // 지난 세션을 이어 붙였으면(▶ 투입의 --resume · 터미널의 /resume) 트랜스크립트를 다 읽은 뒤 지난 요청을 타임라인에 채운다
+      if (ev.source === 'resume') w.seedAt = Date.now();
       setStatus(w, 'idle', `세션 시작 (${ev.source || 'startup'})`);
       break;
     case 'UserPromptSubmit':
@@ -803,7 +839,29 @@ function scheduleProfile(w) {
   w.tx.timer = setTimeout(() => {
     w.tx.timer = null;
     if (readProfile(w.tx)) { drainShots(w); checkInterrupted(w); emitState(); }
+    if (w.seedAt) seedHistory(w);
   }, 300);
+}
+
+// ---------- 이어 붙인 세션의 지난 요청 → 타임라인 ----------
+// 타임라인(w.log)은 워커마다 서버가 쌓는 기록이라, 세션을 이어 붙인 새 워커에는 그 전 요청이 없다. 세션 프로파일이 이미 읽어 둔
+// 트랜스크립트의 턴(요청 글 200자 · 시각)으로 채운다 — 파일을 따로 읽지 않는다.
+// 타임라인 200줄 한도와 따로(w.past) 둔다 — 도구 줄이 쌓여도 밀려나지 않게. 최근 PAST_MAX 개까지(약 4KB/50개), 화면이 시각순으로 섞는다
+const PAST_MAX = 50;
+const normReq = (x) => String(x).replace(/^working: /, '').replace(/\s+/g, '').slice(0, 50);
+function seedHistory(w) {
+  const at = w.seedAt;
+  w.seedAt = null;
+  const past = w.past || [];
+  const known = [...past, ...w.log.filter((l) => l.kind === 'assign' || l.kind === 'past' || l.text.startsWith('working: '))];
+  const add = (w.tx?.turns || [])
+    .filter((t) => t.start < at - 1000 && t.prompt && t.prompt !== '(기록 시작 전)' && !/^[🔔/]/u.test(t.prompt)) // 알림 · /명령은 요청이 아니다
+    .slice(-PAST_MAX)
+    .filter((t) => !known.some((l) => Math.abs(l.t - t.start) < 60_000 && normReq(l.text) === normReq(t.prompt)))
+    .map((t) => ({ t: t.start, text: t.prompt }));
+  if (!add.length) return;
+  w.past = [...past, ...add].sort((a, b) => a.t - b.t).slice(-PAST_MAX);
+  emitState();
 }
 // 작업 중이거나, 턴은 끝났어도 백그라운드 서브에이전트가 돌고 있으면 계속 읽는다
 setInterval(() => { for (const w of workers.values()) if (w.status === 'working' || w.status === 'decision' || (w.status !== 'exited' && w.tx && runningSubagents(w.tx))) scheduleProfile(w); }, 2000);
@@ -852,6 +910,8 @@ function publicState() {
     order: config.order,
     memos: config.memos,
     colors: config.colors,
+    // 대기실 카드: 이어 갈 수 있는 마지막 세션의 시각 (역할 이름 → at)
+    resumable: Object.fromEntries(config.profiles.map((p) => [p.name, resumableSession(p.name, p.cwd, p.args)?.at]).filter(([, at]) => at != null)),
     serverStale: serverStale(),
     recentCwds: config.recentCwds,
     progress: progress.public(),
@@ -949,6 +1009,9 @@ function onHostHello({ ptys }) {
     if (w.tx) scheduleProfile(w);
   }
   for (const id of [...workers.keys(), ...alive.keys()]) seq = Math.max(seq, Number(String(id).replace(/\D/g, '')) || 0);
+  const before = JSON.stringify(config.sessions);
+  for (const w of [...workers.values()].sort((a, b) => (a.updatedAt || 0) - (b.updatedAt || 0))) noteWorkerSession(w, false);
+  if (JSON.stringify(config.sessions) !== before) saveConfig();
   emitState();
 }
 
@@ -967,6 +1030,7 @@ function onHostMessage(msg) {
   if (msg.ev === 'exit') {
     progress.drop(w);
     setStatus(w, 'exited', `프로세스 종료 (code ${msg.exitCode})${msg.error ? ` · ${msg.error}` : ''}`);
+    noteWorkerSession(w);
     for (const [did, d] of decisions) if (d.workerId === w.id) resolveDecision(did, null);
   }
 }
@@ -1227,6 +1291,7 @@ function loadSavedWorkers() {
 
 // 워커 기록을 목록에서 지운다(PTY 호스트에도 잊게 하고, 받아 둔 스크린샷도 지움). 대화 기록(transcript)은 그대로
 function forgetWorker(w) {
+  noteWorkerSession(w);
   hostSend({ op: 'forget', id: w.id });
   workers.delete(w.id);
   fs.rmSync(path.join(SHOT_DIR, w.id), { recursive: true, force: true });
@@ -1363,9 +1428,11 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === 'POST' && p === '/api/workers') {
     const body = await readBody(req);
-    const w = spawnWorker(body);
+    const s = body.resume ? resumableSession(String(body.name || '').trim(), body.cwd, body.args || '') : null;
+    const w = spawnWorker({ ...body, resume: s?.id || null });
+    if (s) { pushLog(w, 'status', `지난 세션 이어서 시작 (${s.id.slice(0, 8)})`); w.seedAt = Date.now(); }
     if (body.save) upsertProfile({ ...body, cwd: w.cwd });
-    return json(res, 200, { id: w.id });
+    return json(res, 200, { id: w.id, resumed: !!s });
   }
 
   if (req.method === 'POST' && p === '/api/profiles/rename') {
@@ -1418,6 +1485,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && p === '/api/profiles/delete') {
     const { name } = await readBody(req);
     config.profiles = config.profiles.filter((x) => x.name !== name);
+    delete config.sessions[name];
     saveConfig();
     const gone = [...workers.values()].filter((w) => w.name === name && w.status === 'exited');
     for (const w of gone) forgetWorker(w);
