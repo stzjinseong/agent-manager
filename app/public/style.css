@@ -1450,6 +1450,9 @@ html.i18n-pending body { visibility: hidden; }
 .upd-guide { color: var(--text-2); line-height: 1.5; }
 .upd-guide code { font: 11.5px var(--mono); padding: 1px 5px; border-radius: 4px; background: var(--surface-3); color: var(--text); }
 .upd-guide a { color: var(--accent-hi); }
+/* 클로드 키우기 릴리즈 노트(GitHub) — 작은 테두리 버튼, 줄 왼쪽에 */
+.upd-notes { justify-self: start; margin-top: 4px; padding: 3px 10px; border-radius: 7px; border: 1px solid var(--line-2); color: var(--text); font-size: 12px; text-decoration: none; white-space: nowrap; }
+.upd-notes:hover { border-color: var(--accent); color: var(--accent-hi); }
 .upd-foot { padding-top: 8px; border-top: 1px solid var(--line); color: var(--dim); font-size: 11.5px; }
 .upd-guide a { white-space: nowrap; }
 

@@ -2280,11 +2280,18 @@ function updRow(title, x, kind) {
     const latest = kind === 'app' ? `release-${x.latest}` : x.latest;
     status = `<b class="upd-new">${_t('새 버전 {v}', { v: esc(latest) })}</b>`;
     guide = kind === 'app'
-      ? `<div class="upd-guide">${_t('프로젝트 폴더에서 <code>git pull</code> 후 <b>↻ 서버 재시작</b>')}${x.url ? ` · <a href="${esc(x.url)}/releases" target="_blank" rel="noopener">${_t('릴리즈 보기')}</a>` : ''}</div>`
+      ? `<div class="upd-guide">${_t('프로젝트 폴더에서 <code>git pull</code> 후 <b>↻ 서버 재시작</b>')}</div>`
       : `<div class="upd-guide">${_t('터미널에서 <code>claude update</code> · 이미 떠 있는 워커는 새로 띄워야 적용돼요')}</div>`;
   } else status = `<span class="upd-ok">${_t('최신 버전이에요')}</span>`;
   const cur = x?.current != null ? (kind === 'app' ? `release-${x.current}` : x.current) : '—';
-  return `<div class="upd-row"><div class="upd-top"><b>${title}</b><span class="upd-cur">${esc(cur)}</span></div>${status}${guide}</div>`;
+  // 클로드 키우기: GitHub 릴리즈 노트 — 새 버전이 있으면 그 버전의 노트(무엇이 바뀌었나), 아니면 지금 버전의 노트, 버전을 모르면 릴리즈 목록
+  let notes = '';
+  if (kind === 'app' && x?.url) {
+    const tag = x.newer ? x.latest : x.current;
+    const href = `${x.url}/releases${tag != null ? `/tag/release-${tag}` : ''}`;
+    notes = `<a class="upd-notes" href="${esc(href)}" target="_blank" rel="noopener">${_t(x.newer ? '새 버전 릴리즈 노트 보기' : '릴리즈 노트 보기')} ↗</a>`;
+  }
+  return `<div class="upd-row"><div class="upd-top"><b>${title}</b><span class="upd-cur">${esc(cur)}</span></div>${status}${guide}${notes}</div>`;
 }
 function renderUpd() {
   const u = state.updates || {};
