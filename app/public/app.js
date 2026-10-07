@@ -2652,13 +2652,9 @@ function updRow(title, x, kind) {
       : `<div class="upd-guide">${_t('터미널에서 <code>claude update</code> · 이미 떠 있는 워커는 새로 띄워야 적용돼요')}</div>`;
   } else status = `<span class="upd-ok">${_t('최신 버전이에요')}</span>`;
   const cur = x?.current != null ? (kind === 'app' ? `release-${x.current}` : x.current) : '—';
-  // 클로드 키우기: GitHub 릴리즈 노트 — 새 버전이 있으면 그 버전의 노트(무엇이 바뀌었나), 아니면 지금 버전의 노트, 버전을 모르면 릴리즈 목록
+  // 클로드 키우기: 릴리즈 노트 — 누르면 큰 창에 모든 릴리즈(최신 → 과거)를 스크롤로
   let notes = '';
-  if (kind === 'app' && x?.url) {
-    const tag = x.newer ? x.latest : x.current;
-    const href = `${x.url}/releases${tag != null ? `/tag/release-${tag}` : ''}`;
-    notes = `<a class="upd-notes" href="${esc(href)}" target="_blank" rel="noopener">${_t(x.newer ? '새 버전 릴리즈 노트 보기' : '릴리즈 노트 보기')} ↗</a>`;
-  }
+  if (kind === 'app' && x?.url) notes = `<button class="upd-notes" data-notes>${_t(x.newer ? '새 버전 릴리즈 노트 보기' : '릴리즈 노트 보기')}</button>`;
   return `<div class="upd-row"><div class="upd-top"><b>${title}</b><span class="upd-cur">${esc(cur)}</span></div>${status}${guide}${notes}</div>`;
 }
 function renderUpd() {
@@ -2679,9 +2675,61 @@ function setUpdPop(open) {
   if (open) { setLangPop(false); setCharPop(false); setPowerPop(false); fetch('/api/updates/check', { method: 'POST' }).catch(() => {}); }
   renderUpd();
 }
-updBtn.addEventListener('click', () => setUpdPop(updPop.hidden));
+updBtn.addEventListener('click', () => { if (!notesPop.hidden) { setNotesPop(false); return; } setUpdPop(updPop.hidden); });
 document.addEventListener('click', (e) => { if (!updPop.hidden && !e.target.closest('.upd-wrap')) setUpdPop(false); });
 document.addEventListener('keydown', (e) => { if (!updPop.hidden && e.key === 'Escape') { setUpdPop(false); updBtn.focus(); } });
+updPop.addEventListener('click', (e) => { if (e.target.closest('[data-notes]')) { setUpdPop(false); setNotesPop(true); } });
+
+// ---------- 릴리즈 노트 (업데이트 창 → 릴리즈 노트 보기) ----------
+// 서버가 GitHub 에서 받은 릴리즈 전체(최신 → 과거)를 큰 창에 스크롤로. 본문은 GitHub 이 만든 HTML — 허용한 태그만 남기고
+// 링크는 http(s) 만 새 탭으로(그 밖의 속성·스크립트·그림은 버린다)
+const notesPop = $('#notes-pop');
+const NOTE_TAGS = new Set(['P', 'UL', 'OL', 'LI', 'BR', 'STRONG', 'B', 'EM', 'I', 'CODE', 'PRE', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'A', 'BLOCKQUOTE', 'HR', 'DEL', 'TABLE', 'THEAD', 'TBODY', 'TR', 'TH', 'TD']);
+function cleanNoteHtml(html) {
+  const doc = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html'), root = doc.body.firstChild;
+  const walk = (el) => {
+    for (const c of [...el.children]) {
+      walk(c);
+      if (!NOTE_TAGS.has(c.tagName)) { c.replaceWith(...c.childNodes); continue; }
+      const href = c.tagName === 'A' ? c.getAttribute('href') : null;
+      for (const a of [...c.attributes]) c.removeAttribute(a.name);
+      if (href && /^https?:\/\//i.test(href)) { c.setAttribute('href', href); c.setAttribute('target', '_blank'); c.setAttribute('rel', 'noopener'); }
+    }
+  };
+  walk(root);
+  return root.innerHTML;
+}
+let notesReq = 0;
+async function setNotesPop(open) {
+  notesPop.hidden = !open;
+  if (!open) return;
+  setLangPop(false); setCharPop(false); setPowerPop(false);
+  const head = (extra = '') => `<div class="notes-head"><div class="upd-h">${_t('릴리즈 노트')}</div>${extra}<button class="notes-x" data-notes-close aria-label="${_t('닫기')}">✕</button></div>`;
+  notesPop.innerHTML = head() + `<div class="notes-body"><div class="upd-dim">${_t('불러오는 중…')}</div></div>`;
+  const my = ++notesReq;
+  let d;
+  try { d = await (await fetch('/api/releases')).json(); } catch { d = { error: 'network' }; }
+  if (my !== notesReq || notesPop.hidden) return;
+  const gh = d.url ? `<a class="upd-notes" href="${esc(d.url)}/releases" target="_blank" rel="noopener">GitHub ↗</a>` : '';
+  if (d.error || !d.releases?.length) {
+    const why = d.error === 'git' ? _t('git 저장소가 아니라 릴리즈를 찾을 수 없어요') : d.error === 'limit' ? _t('GitHub 요청 한도에 걸렸어요 — 잠시 뒤 다시 열어 주세요')
+      : d.error ? _t('인터넷에 접속하지 못해 릴리즈 노트를 불러오지 못했어요') : _t('아직 릴리즈가 없어요');
+    notesPop.innerHTML = head(gh) + `<div class="notes-body"><div class="upd-dim">${why}</div></div>`;
+    return;
+  }
+  const num = (tag) => Number(String(tag).match(/release-(\d+)$/)?.[1] ?? NaN);
+  const items = d.releases.map((r) => {
+    const n = num(r.tag);
+    const badge = n === d.current ? `<span class="notes-badge cur">${_t('지금 버전')}</span>` : Number.isFinite(n) && d.current != null && n > d.current ? `<span class="notes-badge new">${_t('새 버전')}</span>` : '';
+    const date = r.at ? new Date(r.at).toLocaleDateString(uiLocale(), { year: 'numeric', month: 'short', day: 'numeric' }) : '';
+    const body = r.html ? cleanNoteHtml(r.html) : `<p class="upd-dim">${_t('작성된 노트가 없어요')}</p>`;
+    return `<section class="notes-rel"><div class="notes-rt"><a href="${esc(r.link)}" target="_blank" rel="noopener"><b>${esc(r.name)}</b></a>${badge}${r.pre ? `<span class="notes-badge">${_t('미리보기')}</span>` : ''}<time>${esc(date)}</time></div><div class="notes-md">${body}</div></section>`;
+  }).join('');
+  notesPop.innerHTML = head(gh) + `<div class="notes-body">${items}</div>`;
+}
+notesPop.addEventListener('click', (e) => { if (e.target.closest('[data-notes-close]')) { setNotesPop(false); updBtn.focus(); } });
+document.addEventListener('click', (e) => { if (!notesPop.hidden && !e.target.closest('.upd-wrap')) setNotesPop(false); });
+document.addEventListener('keydown', (e) => { if (!notesPop.hidden && e.key === 'Escape') { setNotesPop(false); updBtn.focus(); } });
 document.addEventListener('langchange', () => { updPop._html = ''; renderUpd(); });
 
 const themeSw = $('#btn-theme'), themeKnob = $('.ts-knob', themeSw), themeFace = $('.ts-face', themeSw);

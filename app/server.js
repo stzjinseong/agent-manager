@@ -1414,6 +1414,8 @@ const server = http.createServer(async (req, res) => {
 
   // 업데이트 다시 확인 (화면의 업데이트 아이콘) — 결과는 상태 방송으로 간다
   if (req.method === 'POST' && p === '/api/updates/check') { updates.check(); return json(res, 200, { ok: true }); }
+  // 릴리즈 노트 전체(최신 → 과거) — 업데이트 창의 '릴리즈 노트 보기'
+  if (req.method === 'GET' && p === '/api/releases') return json(res, 200, await updates.releases());
 
   // diff 보기: 워커가 Edit/Write 로 고친 파일과 그 변경(트랜스크립트의 structuredPatch). 상태 방송에는 개수만 싣고 내용은 열 때 가져간다
   const dm = req.method === 'GET' && p.match(/^\/api\/workers\/(W\d+)\/diff$/);

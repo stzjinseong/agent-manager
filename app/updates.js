@@ -48,6 +48,27 @@ async function checkClaude(bin) {
   return { current: installed.join('.'), latest: latest.join('.'), newer: newer(installed, latest) };
 }
 
+// 릴리즈 노트 전체 — 화면의 '릴리즈 노트 보기'를 누를 때만. GitHub 이 마크다운을 HTML 로 바꿔 준 본문(body_html)을 받는다
+// (화면이 허용한 태그만 남겨 넣는다). 인증 없는 GitHub API 는 시간당 60회라 10분 캐시하고, 실패는 캐시하지 않는다
+const REL_TTL = 10 * 60_000;
+async function fetchReleases(root) {
+  const url = (await run('git', ['remote', 'get-url', 'origin'], root))?.trim().replace(/\.git$/, '').replace(/^git@github\.com:/, 'https://github.com/') || null;
+  const m = url?.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)$/);
+  if (!m) return { error: 'git', url: null };
+  try {
+    const r = await fetch(`https://api.github.com/repos/${m[1]}/${m[2]}/releases?per_page=100`, {
+      headers: { accept: 'application/vnd.github.html+json', 'user-agent': 'clawdgotchi' }, signal: AbortSignal.timeout(8000),
+    });
+    if (!r.ok) return { error: r.status === 403 || r.status === 429 ? 'limit' : 'network', url };
+    const releases = (await r.json()).filter((x) => !x.draft).map((x) => ({
+      tag: x.tag_name, name: x.name || x.tag_name, at: x.published_at, html: x.body_html || '', pre: !!x.prerelease, link: x.html_url,
+    }));
+    // 최신 → 과거. release-N 이면 번호로, 아니면 날짜로
+    releases.sort((a, b) => (relNum(b.tag) - relNum(a.tag)) || String(b.at).localeCompare(String(a.at)));
+    return { url, releases };
+  } catch { return { error: 'network', url }; }
+}
+
 export function createUpdates({ root, claudeBin, onChange }) {
   const state = { checking: false, checkedAt: null, app: null, claude: null };
   let running = null;
@@ -59,5 +80,14 @@ export function createUpdates({ root, claudeBin, onChange }) {
     }).catch(() => { state.checking = false; }).finally(() => { running = null; onChange(); });
     return running;
   }
-  return { check, public: () => ({ ...state }) };
+  let rel = null; // { at, data }
+  async function releases() {
+    if (!rel || Date.now() - rel.at > REL_TTL) {
+      const data = await fetchReleases(root);
+      if (data.error) return { ...data, current: state.app?.current ?? null };
+      rel = { at: Date.now(), data };
+    }
+    return { ...rel.data, current: state.app?.current ?? null, latest: state.app?.latest ?? null };
+  }
+  return { check, releases, public: () => ({ ...state }) };
 }
