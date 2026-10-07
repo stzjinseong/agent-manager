@@ -1595,13 +1595,26 @@ const server = http.createServer(async (req, res) => {
   }
 
   let m;
-  if (req.method === 'POST' && (m = p.match(/^\/api\/workers\/(W\d+)\/(task|kill|remove|interrupt|unqueue|resume|rename)$/))) {
+  if (req.method === 'POST' && (m = p.match(/^\/api\/workers\/(W\d+)\/(task|kill|remove|interrupt|unqueue|tomemo|resume|rename)$/))) {
     const w = workers.get(m[1]);
     if (!w) return json(res, 404, { error: 'no worker' });
     const body = await readBody(req);
     if (m[2] === 'task') return json(res, 200, { ok: true, ...(await assignTask(w, body.text)) });
     if (m[2] === 'interrupt' && w.status !== 'exited') { w.term.write('\x1b'); pushLog(w, 'status', '관리자가 중단(Esc)'); emitState(); setTimeout(() => scheduleProfile(w), 700); }
-    if (m[2] === 'unqueue') { w.queue.splice(Number(body.index), 1); emitState(); }
+    // 대기열에서 빼기(unqueue) · 나중에 할 작업으로 되돌리기(tomemo). 화면이 본 번호와 글이 둘 다 맞는 항목만 —
+    // 그사이 CLI 로 나갔으면(dispatchQueued 가 앞에서 꺼냄) 번호가 밀리므로 글로 다시 찾고, 없으면 409(이미 전송).
+    // 꺼내기와 옮기기를 한 번에(중간에 await 없이) 하므로 자동 전송과 겹쳐 두 번 실행되지 않는다
+    if (m[2] === 'unqueue' || m[2] === 'tomemo') {
+      const idx = Number(body.index), text = body.text;
+      const i = text == null ? idx : w.queue[idx] === text ? idx : w.queue.indexOf(text);
+      if (!(i >= 0 && i < w.queue.length)) return json(res, 409, { error: '이미 CLI 로 보낸 지시입니다' });
+      const [q] = w.queue.splice(i, 1);
+      if (m[2] === 'tomemo') {
+        (config.memos[w.name] ||= []).push({ id: `m${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`, text: q, createdAt: Date.now() });
+        pushLog(w, 'status', `대기열 → 나중에 할 작업: ${q}`);
+        saveConfig(); // emitState 포함
+      } else emitState();
+    }
     if (m[2] === 'resume') { w.queueHeld = false; emitState(); dispatchQueued(w); }
     if (m[2] === 'rename') {
       const r = renameRole(w.name, body.name, w);

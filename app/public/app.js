@@ -1010,7 +1010,7 @@ function renderDetail() {
     ? (w.queueHeld
       ? `<div class="qh held" title="${_t('지시가 CLI 에 들어가지 않아 보류 중 — 중복 투입을 막으려고 자동으로 다시 보내지 않습니다')}">${_t('⚠ 보류된 지시 {n}건 · 터미널 확인 후', { n: w.queue.length })} <button data-resume title="${_t('맨 위부터 다시 투입')}">${_t('▶ 재개')}</button></div>`
       : `<div class="qh" title="${_t('현재 턴이 끝나면 위에서부터 투입')}">${_t('대기 중인 지시 {n}건', { n: w.queue.length })}</div>`) +
-      w.queue.map((q, i) => `<div class="qi"><span class="n">${i + 1}</span><span class="tx"><span class="qt">${esc(q)}</span>${attachChips(q, 'sm')}</span><button data-unqueue="${i}" title="${_t('큐에서 빼기')}">✕</button></div>`).join('')
+      w.queue.map((q, i) => `<div class="qi"><span class="n">${i + 1}</span><span class="tx"><span class="qt">${esc(q)}</span>${attachChips(q, 'sm')}</span><button data-tomemo="${i}" title="${_t('나중에 할 작업으로 되돌리기')}">↩</button><button data-unqueue="${i}" title="${_t('큐에서 빼기')}">✕</button></div>`).join('')
     : '';
   // 상태가 올 때마다 통째로 바꾸면 썸네일이 다시 로드되고 누르는 중인 타일이 사라진다 → 바뀐 때만
   if (queueEl._html !== queueHtml) queueEl.innerHTML = queueEl._html = queueHtml;
@@ -2199,8 +2199,15 @@ dockList.addEventListener('dragleave', (e) => {
 
 $('#queue').addEventListener('click', (e) => {
   if (e.target.closest('[data-resume]') && selected) { api(`/api/workers/${selected}/resume`, {}); return; }
-  const i = e.target.closest('[data-unqueue]')?.dataset.unqueue;
-  if (i != null && selected) api(`/api/workers/${selected}/unqueue`, { index: Number(i) });
+  // ✕ 빼기 · ↩ 나중에 할 작업으로 — 번호와 함께 글도 보내, 그사이 CLI 로 나간 지시면 서버가 거절한다(두 번 실행 방지)
+  const b = e.target.closest('[data-unqueue], [data-tomemo]');
+  const w = b && selected && state.workers.find((x) => x.id === selected);
+  if (!w) return;
+  const op = b.dataset.tomemo != null ? 'tomemo' : 'unqueue', i = Number(b.dataset.tomemo ?? b.dataset.unqueue);
+  b.disabled = true;
+  fetch(`/api/workers/${w.id}/${op}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ index: i, text: w.queue[i] }) })
+    .then((r) => { if (r.status === 409) toast(_t('이미 CLI 로 보낸 지시라 옮기지 못했어요')); else if (op === 'tomemo' && r.ok) toast(_t('나중에 할 작업으로 옮겼어요')); })
+    .catch(() => { b.disabled = false; });
 });
 
 // ---------- 다크/라이트 테마 ----------
