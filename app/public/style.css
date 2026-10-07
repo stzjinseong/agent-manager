@@ -1514,3 +1514,15 @@ html.i18n-pending body { visibility: hidden; }
 /* 접기 화살표: 글자 크기만 한 정사각형 가운데에 두어 제자리에서 돈다 — 줄 높이만 한 칸의 왼쪽 아래에 있으면
    회전 중심(칸 가운데)에서 벗어나 접을 때 ▸ 가 아래로 처져 보였다 */
 :is(.cmp-toggle, .profile-head) .chev { display: inline-grid; place-items: center; width: 12px; height: 12px; line-height: 1; vertical-align: middle; position: relative; top: -1px; }
+
+/* ---------- 서버 종료 창 (헤더 ⏻, 업데이트 창과 같은 틀) ---------- */
+.power-pop { width: 290px; }
+.power-note { padding-bottom: 8px; line-height: 1.5; }
+.power-act {
+  display: grid; gap: 1px; width: 100%; margin-top: 4px; padding: 8px 10px; border: 1px solid var(--line-2); border-radius: 9px;
+  background: var(--surface-2); color: var(--text-2); font: inherit; font-size: 11.5px; text-align: left; cursor: pointer; transition: background .15s, border-color .15s;
+}
+.power-act b { color: var(--text); font-size: 13px; font-weight: 600; }
+.power-act:hover, .power-act:focus-visible { background: var(--surface-3); border-color: rgb(var(--ink) / .2); outline: none; }
+.power-act.danger b { color: #e0655a; }
+.power-act.danger:hover, .power-act.danger:focus-visible { border-color: rgb(224 101 90 / .5); background: rgb(224 101 90 / .1); }

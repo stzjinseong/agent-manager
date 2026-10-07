@@ -2188,7 +2188,7 @@ function renderLangPop() {
 function setLangPop(open) {
   langPop.hidden = !open;
   langBtn.setAttribute('aria-expanded', String(open));
-  if (open) { if (!updPop.hidden) setUpdPop(false); setCharPop(false); renderLangPop(); langPop.querySelector('.lang-item.on')?.focus(); }
+  if (open) { if (!updPop.hidden) setUpdPop(false); setCharPop(false); setPowerPop(false); renderLangPop(); langPop.querySelector('.lang-item.on')?.focus(); }
 }
 langBtn.addEventListener('click', () => setLangPop(langPop.hidden));
 langPop.addEventListener('click', (e) => {
@@ -2532,7 +2532,7 @@ function renderUpd() {
 function setUpdPop(open) {
   updPop.hidden = !open;
   updBtn.setAttribute('aria-expanded', String(open));
-  if (open) { setLangPop(false); setCharPop(false); fetch('/api/updates/check', { method: 'POST' }).catch(() => {}); }
+  if (open) { setLangPop(false); setCharPop(false); setPowerPop(false); fetch('/api/updates/check', { method: 'POST' }).catch(() => {}); }
   renderUpd();
 }
 updBtn.addEventListener('click', () => setUpdPop(updPop.hidden));
@@ -2630,12 +2630,20 @@ async function restartServer() {
 
 // ---------- 서버 종료 ----------
 let serverDown = false;
-$('#btn-power').onclick = () => { $('#power-modal').hidden = false; };
-$('#power-modal').addEventListener('click', async (e) => {
+// ⏻ 를 누르면 종료 방법별 설명과 버튼이 든 작은 창(업데이트 창과 같은 모양). 버튼을 누르면 바로 실행
+const powerBtn = $('#btn-power'), powerPop = $('#power-pop');
+function setPowerPop(open) {
+  powerPop.hidden = !open;
+  powerBtn.setAttribute('aria-expanded', String(open));
+  if (open) { setLangPop(false); setCharPop(false); if (!updPop.hidden) setUpdPop(false); powerPop.querySelector('.power-act')?.focus(); }
+}
+powerBtn.addEventListener('click', () => setPowerPop(powerPop.hidden));
+document.addEventListener('click', (e) => { if (!powerPop.hidden && !e.target.closest('.power-wrap')) setPowerPop(false); });
+document.addEventListener('keydown', (e) => { if (!powerPop.hidden && e.key === 'Escape') { setPowerPop(false); powerBtn.focus(); } });
+powerPop.addEventListener('click', async (e) => {
   const act = e.target.closest('[data-power]')?.dataset.power;
-  if (!act && e.target !== $('#power-modal')) return;
-  $('#power-modal').hidden = true;
-  if (!act || act === 'cancel') return;
+  if (!act) return;
+  setPowerPop(false);
   if (act === 'restart') return restartServer();
   try { await api('/api/shutdown', { workers: act === 'all' }); } catch {}
   serverDown = true;

@@ -63,7 +63,17 @@
       </button>
       <div class="upd-pop" id="upd-pop" role="dialog" aria-label="업데이트" data-i18n-attr="aria-label" hidden></div>
     </div>
-    <button id="btn-power" class="btn ghost power" title="서버 종료" data-i18n-attr="title">⏻</button>
+    <!-- 서버 종료: 누르면 종료 방법별 설명과 버튼이 든 작은 창(업데이트 창과 같은 모양) -->
+    <div class="upd-wrap power-wrap">
+      <button id="btn-power" class="btn ghost power" aria-haspopup="dialog" aria-expanded="false" aria-controls="power-pop" title="서버 종료" aria-label="서버 종료" data-i18n-attr="title,aria-label">⏻</button>
+      <div class="upd-pop power-pop" id="power-pop" role="dialog" aria-label="서버 종료" data-i18n-attr="aria-label" hidden>
+        <div class="upd-h" data-i18n>서버 종료</div>
+        <div class="power-note" data-i18n>워커(Claude 세션)는 서버와 별도 프로세스라 서버만 종료하면 계속 돌고, 다음에 켜면 다시 붙습니다.</div>
+        <button class="power-act" data-power="restart"><b data-i18n>↻ 서버 재시작</b><span data-i18n>서버만 껐다 켜요 · 워커는 그대로</span></button>
+        <button class="power-act" data-power="server"><b data-i18n>서버만 종료</b><span data-i18n>워커는 계속 실행 · 다음에 켜면 다시 붙어요</span></button>
+        <button class="power-act danger" data-power="all"><b data-i18n>서버 + 워커 모두 종료</b><span data-i18n>Claude 세션도 모두 끝나요</span></button>
+      </div>
+    </div>
   </header>
 
   <!-- 최소화한 회로 기판: 헤더 바로 아래에 매니저 + 워커 칩 한 줄 (펼침 상태는 브라우저에 기억) -->
@@ -245,19 +255,6 @@
   </section>
 
   <div class="tip" id="tip" hidden></div>
-
-  <div class="modal-back" id="power-modal" hidden>
-    <div class="modal panel">
-      <h3 data-i18n>서버 종료</h3>
-      <p data-i18n>워커(Claude 세션)는 서버와 별도 프로세스라 <b>서버만 종료</b>하면 계속 돌고, 다음에 켜면 다시 붙습니다.</p>
-      <div class="modal-acts">
-        <button class="btn ghost" data-power="cancel" data-i18n>취소</button>
-        <button class="btn" data-power="restart" data-i18n>↻ 서버 재시작</button>
-        <button class="btn" data-power="server" data-i18n>서버만 종료</button>
-        <button class="btn deny" data-power="all" data-i18n>서버 + 워커 모두 종료</button>
-      </div>
-    </div>
-  </div>
 
   <!-- 확인·입력 팝업 (브라우저 기본 confirm/prompt 대신) — app.js ask() -->
   <div class="modal-back" id="ask-modal" hidden>
