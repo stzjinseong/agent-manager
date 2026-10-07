@@ -15,6 +15,7 @@ const viewStatus = (w) => {
 };
 
 let state = { workers: [], decisions: [], profiles: [], recentCwds: [], now: Date.now() };
+let gotState = false; // 서버 상태를 한 번이라도 받았는지 — 그 전의 빈 state 로 안내를 그리면 새로고침 때 잠깐 보였다 사라진다
 let clockSkew = 0;
 let selected = null;
 let ws;
@@ -480,7 +481,7 @@ function connect() {
     const msg = JSON.parse(e.data);
     if (msg.type === 'state') {
       const prevWorkers = state.workers;
-      state = msg.state; clockSkew = Date.now() - state.now;
+      state = msg.state; gotState = true; clockSkew = Date.now() - state.now;
       mgrOnState(prevWorkers, state.workers);
       // 주소 #W1 로 열면 해당 워커를 바로 선택
       const h = location.hash.slice(1);
@@ -979,7 +980,7 @@ new ResizeObserver(() => requestAnimationFrame(drawTraces)).observe($('#floor'))
 const CURSOR_SVG = '<svg class="hint-cursor" viewBox="0 0 12 18" shape-rendering="crispEdges"><path d="M1 1 L1 15 L4.5 11.5 L7 17 L9 16 L6.5 10.5 L11 10.5 Z"/></svg>';
 function renderHint() {
   const box = $('#hint');
-  box.hidden = !$('#detail').hidden;
+  box.hidden = !gotState || !$('#detail').hidden; // 상태가 오기 전엔 워커가 있는지 몰라 그리지 않는다
   if (box.hidden) return;
   const live = state.workers.some((w) => w.status !== 'exited');
   const min = !$('#dock').hidden, kind = live ? 'click' : 'create';
