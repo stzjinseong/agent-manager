@@ -1003,6 +1003,83 @@ function drainShots(w) {
 // ---------- 첨부 이미지 보관 ----------
 const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
 
+// ---------- 사용자 캐릭터 ----------
+// 헤더 👕 에서 올린 그림으로 만든 캐릭터. 브라우저가 여백 자르기·도트 원래 크기 되돌리기를 마친 PNG 를 보내면
+// data/characters/<id>.json(이름·단계별 파일·탭 아이콘) + <id>-<단계>-<rev>.png 로 둔다. 단계 0 = 기본(워커·매니저 시작 모습),
+// 1~5 = 매니저 성장 단계(비워 두면 바로 앞 단계 그림). 파일 이름에 rev 를 넣어 그림을 바꾸면 주소도 바뀐다 → 오래 캐시해도 된다
+const CHAR_DIR = path.join(DATA_DIR, 'characters');
+const CHAR_ID = /^c[a-z0-9]{6,20}$/;
+const CHAR_FILE = /^(c[a-z0-9]{6,20})-[0-5]-[a-z0-9]{1,10}\.png$/;
+const CHAR_BODY_LIMIT = 16 * 1024 * 1024;
+const CHAR_PNG_LIMIT = 2 * 1024 * 1024;
+const CHAR_ICON_LIMIT = 64 * 1024;
+function readChar(id) {
+  try { return JSON.parse(fs.readFileSync(path.join(CHAR_DIR, `${id}.json`), 'utf8')); } catch { return null; }
+}
+function listChars() {
+  let names = [];
+  try { names = fs.readdirSync(CHAR_DIR).filter((f) => f.endsWith('.json')); } catch {}
+  return names.map((f) => readChar(f.slice(0, -5))).filter(Boolean).sort((a, b) => a.createdAt - b.createdAt);
+}
+// data:image/png;base64,… → 버퍼. PNG 머리와 크기(IHDR)를 직접 확인한다 — 브라우저가 보낸 가로세로 숫자는 믿지 않는다
+function charPng(dataUrl, limit) {
+  const m = /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec(String(dataUrl || ''));
+  if (!m) return null;
+  const buf = Buffer.from(m[1], 'base64');
+  if (buf.length > limit || buf.length < 33 || buf.toString('latin1', 1, 4) !== 'PNG' || buf.toString('latin1', 12, 16) !== 'IHDR') return null;
+  const w = buf.readUInt32BE(16), h = buf.readUInt32BE(20);
+  if (!w || !h || w > 1024 || h > 1024) return null;
+  return { buf, w, h };
+}
+// 만들기(id 없음)·고치기(id). stages[n]: 새 그림 { data: PNG data URL, pixel: 도트 그림인지 } · null(그 단계 비우기, 0 은 못 비움) · 빠짐(그대로)
+function saveChar(id, body) {
+  const old = id ? readChar(id) : null;
+  if (id && !old) return { code: 404, error: 'not found' };
+  const name = String(body.name ?? old?.name ?? '').normalize('NFC').replace(/\s+/g, ' ').trim().slice(0, 30);
+  if (!name) return { code: 400, error: 'name' };
+  const ch = { id: id || `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, name,
+    icon: old?.icon || '', stages: { ...(old?.stages || {}) }, createdAt: old?.createdAt || Date.now() };
+  const writes = [], drops = [];
+  for (const [k, v] of Object.entries(body.stages || {})) {
+    if (!/^[0-5]$/.test(k)) continue;
+    if (ch.stages[k]) drops.push(ch.stages[k].file);
+    if (v === null) { if (k === '0') return { code: 400, error: 'stage 0' }; delete ch.stages[k]; continue; }
+    const png = charPng(v?.data, CHAR_PNG_LIMIT);
+    if (!png) return { code: 400, error: `stage ${k}` };
+    const file = `${ch.id}-${k}-${Math.random().toString(36).slice(2, 8)}.png`;
+    writes.push([file, png.buf]);
+    ch.stages[k] = { file, w: png.w, h: png.h, pixel: !!v.pixel };
+  }
+  if (!ch.stages[0]) return { code: 400, error: 'stage 0' };
+  // 탭 아이콘용 머리 그림(64px 안팎) — 목록과 함께 브라우저에 기억해 두고 바로 그리도록 data URL 로 들고 다닌다
+  if (body.icon !== undefined) {
+    if (!charPng(body.icon, CHAR_ICON_LIMIT)) return { code: 400, error: 'icon' };
+    ch.icon = body.icon;
+  }
+  fs.mkdirSync(CHAR_DIR, { recursive: true });
+  for (const [f, b] of writes) fs.writeFileSync(path.join(CHAR_DIR, f), b);
+  fs.writeFileSync(path.join(CHAR_DIR, `${ch.id}.json`), JSON.stringify(ch));
+  for (const f of drops) fs.rmSync(path.join(CHAR_DIR, f), { force: true });
+  return { code: 200, char: ch };
+}
+function deleteChar(id) {
+  const ch = readChar(id);
+  if (!ch) return false;
+  for (const s of Object.values(ch.stages)) fs.rmSync(path.join(CHAR_DIR, s.file), { force: true });
+  fs.rmSync(path.join(CHAR_DIR, `${id}.json`), { force: true });
+  return true;
+}
+function readJsonLimited(req, limit) {
+  return new Promise((resolve) => {
+    const chunks = []; let size = 0, tooBig = false;
+    req.on('data', (c) => { size += c.length; if (size > limit) tooBig = true; else chunks.push(c); });
+    req.on('end', () => {
+      if (tooBig) return resolve({ tooBig: true });
+      try { resolve({ body: JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}') }); } catch { resolve({ body: null }); }
+    });
+  });
+}
+
 // ---------- 결과물 문서 ----------
 // 워커가 Write/Edit 로 쓴 문서(html·md·pdf·svg)를 타임라인에 카드로 보여 주고, 누르면 새 탭으로 연다.
 // 열어 주는 것은 워커가 직접 쓴 바로 그 파일뿐이다 — w.docs 에 기록된 경로를 문서 id 로만 찾는다.
@@ -1100,6 +1177,7 @@ const STATIC = {
   '/app.js': ['public/app.js', 'text/javascript; charset=utf-8'],
   '/i18n.js': ['public/i18n.js', 'text/javascript; charset=utf-8'],
   '/info-en.js': ['public/info-en.js', 'text/javascript; charset=utf-8'],
+  '/characters.js': ['public/characters.js', 'text/javascript; charset=utf-8'],
   '/style.css': ['public/style.css', 'text/css; charset=utf-8'],
   '/vendor/xterm.js': ['node_modules/@xterm/xterm/lib/xterm.js', 'text/javascript'],
   '/vendor/xterm.css': ['node_modules/@xterm/xterm/css/xterm.css', 'text/css'],
@@ -1300,6 +1378,30 @@ const server = http.createServer(async (req, res) => {
       json(res, 200, { path: file });
     });
     return;
+  }
+
+  // 사용자 캐릭터 — 목록 · 만들기 · 고치기 · 지우기, 그림 파일
+  if (p === '/api/characters' || p.startsWith('/api/characters/')) {
+    const id = p.slice('/api/characters/'.length);
+    if (req.method === 'GET' && p === '/api/characters') return json(res, 200, { characters: listChars() });
+    if (p !== '/api/characters' && !CHAR_ID.test(id)) return json(res, 404, {});
+    if (req.method === 'DELETE' && id) return json(res, deleteChar(id) ? 200 : 404, {});
+    if ((req.method === 'POST' && !id) || (req.method === 'PUT' && id)) {
+      const { body, tooBig } = await readJsonLimited(req, CHAR_BODY_LIMIT);
+      if (tooBig) return json(res, 413, { error: 'too big' });
+      if (!body) return json(res, 400, { error: 'json' });
+      const r = saveChar(id || null, body);
+      return json(res, r.code, r.char ? { char: r.char } : { error: r.error });
+    }
+    return json(res, 405, {});
+  }
+  if (req.method === 'GET' && p.startsWith('/characters/')) {
+    const name = p.slice('/characters/'.length);
+    if (!CHAR_FILE.test(name)) return json(res, 404, {});
+    const full = path.join(CHAR_DIR, name);
+    if (!fs.existsSync(full)) return json(res, 404, {});
+    res.writeHead(200, { 'content-type': 'image/png', 'cache-control': 'public, max-age=31536000, immutable', 'x-content-type-options': 'nosniff' });
+    return fs.createReadStream(full).pipe(res);
   }
 
   // ↻ 서버 재시작: 실행기(launch.mjs)를 '포트가 빌 때까지 기다렸다 띄우기' 모드로 남겨 두고 이 서버는 내려간다.

@@ -29,7 +29,7 @@
     </filter>
   </svg>
   <header class="topbar">
-    <div class="brand"><span class="brand-mark" data-clawd></span><h1 data-i18n>클로드 키우기</h1></div>
+    <div class="brand"><span class="brand-mark" data-clawd="head"></span><h1 data-i18n>클로드 키우기</h1></div>
     <div class="stats" id="stats"></div>
     <button id="btn-new" class="btn primary" data-i18n>+ 워커</button>
     <button id="btn-theme" class="theme-switch" role="switch" aria-checked="false" aria-label="라이트 모드" title="라이트 모드로" data-i18n-attr="title,aria-label">
@@ -37,6 +37,13 @@
       <span class="ts-goo" aria-hidden="true"><span class="ts-tail"></span><span class="ts-knob"></span></span>
       <span class="ts-face" aria-hidden="true">🌙</span>
     </button>
+    <!-- 캐릭터: 옷 아이콘을 누르면 컨셉 목록(미리보기 + 이름)이 열린다. 지금 캐릭터는 ✓ -->
+    <div class="char-wrap">
+      <button id="btn-char" class="btn ghost lang-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="char-pop" title="캐릭터 바꾸기" aria-label="캐릭터 바꾸기" data-i18n-attr="title,aria-label">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 4.5 6.5l1.6 3.6 2-.9V20h7.8V9.2l2 .9 1.6-3.6L15 4c-.4 1.3-1.6 2.2-3 2.2S9.4 5.3 9 4z" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="lang-pop char-pop" id="char-pop" role="menu" hidden></div>
+    </div>
     <!-- 언어: 지구본을 누르면 작은 목록이 열리고, 지금 언어는 ✓ 로 표시만 하고 눌러도 반응하지 않는다 -->
     <div class="lang-wrap">
       <button id="btn-lang" class="btn ghost lang-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="lang-pop" title="언어" aria-label="언어" data-i18n-attr="title,aria-label">
@@ -255,13 +262,36 @@
   <!-- 확인·입력 팝업 (브라우저 기본 confirm/prompt 대신) — app.js ask() -->
   <div class="modal-back" id="ask-modal" hidden>
     <div class="modal panel ask" role="dialog" aria-modal="true" aria-labelledby="ask-title">
-      <div class="ask-head"><span class="ask-mark" data-clawd></span><h3 id="ask-title"></h3></div>
+      <div class="ask-head"><span class="ask-mark" data-clawd="head"></span><h3 id="ask-title"></h3></div>
       <p id="ask-body"></p>
       <textarea id="ask-input" rows="3" hidden></textarea>
       <div class="modal-acts">
         <button class="btn ghost" data-ask="cancel" data-i18n>취소</button>
         <button class="btn primary" data-ask="ok" data-i18n>확인</button>
       </div>
+    </div>
+  </div>
+
+  <!-- 캐릭터 추가·고치기 — app.js openCharEditor() -->
+  <div class="modal-back" id="char-modal" hidden>
+    <div class="modal panel char-edit" role="dialog" aria-modal="true" aria-labelledby="char-edit-title">
+      <h3 id="char-edit-title"></h3>
+      <p class="char-help" data-i18n>배경이 투명한 그림이 가장 잘 어울려요. 여백은 자동으로 자르고, 크게 키운 도트 그림은 원래 픽셀 크기로 되돌려요.</p>
+      <ul class="char-tips">
+        <li data-i18n><b>일반 그림</b> 긴 변 320px 이상의 투명 PNG (320~640px 이면 충분해요)</li>
+        <li data-i18n><b>도트 그림</b> 원본 크기 그대로 PNG 로 · 세로 22·33·66px 이면 픽셀이 가장 고르게 보여요</li>
+        <li data-i18n><b>모양</b> 세로형·정사각형이 잘 어울려요 · 작은 자리에는 위쪽 정사각형만 보이니 얼굴은 위쪽에</li>
+        <li data-i18n><b>배경</b> 투명하거나 한 가지 색이면 지워져요 · 그라데이션·사진 배경은 그대로 남아요</li>
+      </ul>
+      <label class="char-name"><span data-i18n>이름</span><input id="char-name" maxlength="30" autocomplete="off" spellcheck="false"></label>
+      <div class="char-stages" id="char-stages"></div>
+      <p class="char-note" data-i18n>기본 그림은 워커와 매니저가 함께 써요. 1~5단계는 매니저가 성장하면 바뀌는 모습이고, 비워 두면 바로 앞 단계 그림을 그대로 써요.</p>
+      <div class="char-err" id="char-err" hidden></div>
+      <div class="modal-acts">
+        <button class="btn ghost" data-ce="cancel" data-i18n>취소</button>
+        <button class="btn primary" data-ce="save" data-i18n>저장</button>
+      </div>
+      <input type="file" id="char-file" accept="image/png,image/gif,image/webp,image/jpeg" hidden>
     </div>
   </div>
 
@@ -279,6 +309,7 @@
   <script src="/vendor/addon-unicode11.js"></script>
   <script src="/i18n.js"></script>
   <script src="/info-en.js"></script>
+  <script src="/characters.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

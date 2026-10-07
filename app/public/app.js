@@ -19,43 +19,16 @@ let clockSkew = 0;
 let selected = null;
 let ws;
 
-// ---------- Claude 캐릭터 (Claude Code 시작 화면의 픽셀 마스코트) ----------
-// 터미널 반블록 비율을 따라 픽셀 하나 = 가로 1 × 세로 2
-function clawdSVG() {
-  const R = (x, y, w, h, cls = 'body') => `<rect class="${cls}" x="${x}" y="${y}" width="${w}" height="${h}"/>`;
-  return `<svg class="clawd" viewBox="0 0 18 10" shape-rendering="crispEdges">
-    ${R(3, 0, 12, 4)}${R(1, 4, 16, 2)}${R(3, 6, 12, 2)}
-    <g class="legs-a">${R(4, 8, 1, 2)}${R(6, 8, 1, 2)}${R(11, 8, 1, 2)}${R(13, 8, 1, 2)}</g>
-    <g class="legs-b">${R(5, 8, 1, 2)}${R(7, 8, 1, 2)}${R(10, 8, 1, 2)}${R(12, 8, 1, 2)}</g>
-    ${R(5, 2, 1, 2, 'eye')}${R(12, 2, 1, 2, 'eye')}
-  </svg>`;
-}
-document.querySelectorAll('[data-clawd]').forEach((el) => (el.innerHTML = clawdSVG()));
-
-// 매니저 클로드 — 같은 마스코트에 성장 단계별 액세서리 레이어를 겹친다 (왕 테마). 어떤 레이어를 보일지는 CSS 가 .core-dot 의 geN 클래스로 정한다.
-//  1 볼터치(+눈 깜빡임) · 2 헤드셋 · 3 망토 · 4 왕관(헤드셋 대신) + 금빛 스파크 · 5 후광 + 별가루
-// 바깥 g(.mgr-lean)는 시선 기울기, 안쪽 g(.mgr-act)는 끄덕임·인사 같은 반응 동작용 — 서로 transform 이 겹치지 않게 나눈다
-function managerSVG() {
-  const R = (x, y, w, h, cls = 'body') => `<rect class="${cls}" x="${x}" y="${y}" width="${w}" height="${h}"/>`;
-  return `<svg class="clawd mgr" viewBox="0 0 18 10" shape-rendering="crispEdges"><g class="mgr-lean"><g class="mgr-act">
-    <g class="acc acc-cape">${R(0, 5, 18, 4, 'cape')}${R(-1, 8, 3, 2, 'cape')}${R(16, 8, 3, 2, 'cape')}</g>
-    ${R(3, 0, 12, 4)}${R(1, 4, 16, 2)}${R(3, 6, 12, 2)}
-    <g class="legs-a">${R(4, 8, 1, 2)}${R(6, 8, 1, 2)}${R(11, 8, 1, 2)}${R(13, 8, 1, 2)}</g>
-    <g class="legs-b">${R(5, 8, 1, 2)}${R(7, 8, 1, 2)}${R(10, 8, 1, 2)}${R(12, 8, 1, 2)}</g>
-    ${R(5, 2, 1, 2, 'eye')}${R(12, 2, 1, 2, 'eye')}
-    <g class="acc acc-blush">${R(3, 4, 2, 1, 'blush')}${R(13, 4, 2, 1, 'blush')}</g>
-    <g class="acc acc-headset">${R(2, -2, 14, 1, 'band')}${R(2, -1, 1, 3, 'band')}${R(15, -1, 1, 3, 'band')}${R(1, 1, 2, 2, 'cup')}${R(15, 1, 2, 2, 'cup')}</g>
-    <g class="acc acc-crown">${R(6, -2, 6, 2, 'gold')}${R(6, -3, 1, 1, 'gold')}${R(8, -3, 2, 1, 'gold')}${R(11, -3, 1, 1, 'gold')}${R(8, -4, 2, 1, 'gold')}</g>
-    <g class="acc acc-party">${R(8, -5, 2, 1, 'pt-a')}${R(7, -4, 4, 1, 'pt-b')}${R(6, -3, 6, 1, 'pt-a')}${R(5, -2, 8, 1, 'pt-b')}${R(8, -6, 2, 1, 'pt-c')}</g>
-    <g class="acc acc-halo">${R(4, -6, 10, 1, 'halo')}${R(3, -5, 1, 1, 'halo')}${R(14, -5, 1, 1, 'halo')}</g>
-    <g class="acc acc-stars">${R(-3, 0, 1, 1, 'star s1')}${R(20, 2, 1, 1, 'star s2')}${R(19, -4, 1, 1, 'star s3')}${R(-2, -4, 1, 1, 'star s4')}</g>
-  </g></g></svg>`;
-}
-$('.core-mark').innerHTML = managerSVG();
+// ---------- 캐릭터 — 그림은 characters.js 의 컨셉이 그린다(clawdSVG · managerSVG · faviconSVG) ----------
+// data-clawd 값이 'head' 면 머리만(작은 자리)
+document.querySelectorAll('[data-clawd]').forEach((el) => (el.innerHTML = clawdSVG(el.dataset.clawd || 'full')));
+$('.core-mark').innerHTML = managerSVG(0);
 // 성장 단계 표시 — geN 클래스는 누적(3단계면 ge1~ge3). 4단계부터는 회로 스파크도 금빛
 let mgrStage = 0;
 function applyStage(stage) {
+  const c = curChar(), redraw = c.stageKey && c.stageKey(stage) !== c.stageKey(mgrStage);
   mgrStage = stage;
+  if (redraw) $('.core-mark').innerHTML = managerSVG(stage); // 올린 캐릭터: 단계마다 그림이 다르면 바꿔 그린다
   const dot = $('.core-dot');
   for (let i = 1; i <= 5; i++) dot.classList.toggle(`ge${i}`, stage >= i);
   $('#floor').classList.toggle('royal', stage >= 4);
@@ -183,21 +156,10 @@ setInterval(() => {
   if ($('.core-dot').classList.contains('sleepy') && Math.random() < 0.3) mgrAct('yawn', 1600);
 }, 30_000);
 
-// 브라우저 탭 아이콘 = 매니저와 같은 흰 클로드 캐릭터. 밝은 탭 바에서도 보이도록 어두운 둥근 사각형 바탕을 깐다.
-// 결정 대기가 있으면 오른쪽 위에 주황 점 (서버 재시작 없이 바뀌도록 파일 대신 data URI 로 넣는다)
-function faviconSVG(alert) {
-  const R = (x, y, w, h, c) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${c}"/>`;
-  const body = '#f3f1ec', eye = '#14161c';
-  // 18×10 캐릭터(픽셀 = 가로1×세로2)를 22×22 바탕 가운데에
-  const g = R(3, 0, 12, 4, body) + R(1, 4, 16, 2, body) + R(3, 6, 12, 2, body) +
-    [4, 6, 11, 13].map((x) => R(x, 8, 1, 2, body)).join('') + R(5, 2, 1, 2, eye) + R(12, 2, 1, 2, eye);
-  const bg = '<rect x="0" y="0" width="22" height="22" rx="5" fill="#14161c"/>';
-  const dot = alert ? '<circle cx="18.5" cy="3.5" r="3.5" fill="#f4b34a" stroke="#14161c" stroke-width="1"/>' : '';
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22" shape-rendering="crispEdges">${bg}<g transform="translate(2 6)">${g}</g>${dot}</svg>`;
-}
+// 브라우저 탭 아이콘 = 지금 캐릭터 (서버 재시작 없이 바뀌도록 파일 대신 data URI 로 넣는다). 결정 대기가 있으면 주황 점
 let faviconAlert = null;
-function setFavicon(alert) {
-  if (alert === faviconAlert) return;
+function setFavicon(alert, force) {
+  if (alert === faviconAlert && !force) return;
   faviconAlert = alert;
   $('#favicon').href = 'data:image/svg+xml,' + encodeURIComponent(faviconSVG(alert));
 }
@@ -838,7 +800,7 @@ function renderDock() {
     const w = state.workers.find((x) => x.id === id);
     if (!w) continue;
     let c = dockEls.get(id);
-    if (!c) { c = el(`<button class="dchip"><span class="led"></span><span class="avatar">${clawdSVG()}</span><span class="dname"></span><span class="dst"></span></button>`); dockEls.set(id, c); }
+    if (!c) { c = el(`<button class="dchip"><span class="led"></span><span class="avatar">${clawdSVG('head')}</span><span class="dname"></span><span class="dst"></span></button>`); dockEls.set(id, c); }
     const st = viewStatus(w);
     c.className = `dchip s-${st}${w.id === selected ? ' sel' : ''}${isUnseenDone(w) ? ' unseen' : ''}${c.classList.contains('dropping') ? ' dropping' : ''}`;
     c.dataset.id = id;
@@ -1015,7 +977,7 @@ function renderDetail() {
   if (wasHidden) requestAnimationFrame(() => { fitTerm(); placeMeters(); });
   else if ($('#detail-name').textContent !== w.name) requestAnimationFrame(placeMeters); // 다른 워커로 바꾸면 이름 폭이 달라진다
   const av = $('#detail-avatar');
-  if (!av.firstChild) av.innerHTML = clawdSVG();
+  if (!av.firstChild) av.innerHTML = clawdSVG('head');
   av.className = `detail-avatar s-${viewStatus(w)}`;
   av.style.setProperty('--avatar', avatarColor(w.name) || 'var(--accent)');
   $('#term-wrap').style.setProperty('--avatar', avatarColor(w.name) || 'var(--accent)'); // 터미널 테두리 = 워커 색
@@ -2226,7 +2188,7 @@ function renderLangPop() {
 function setLangPop(open) {
   langPop.hidden = !open;
   langBtn.setAttribute('aria-expanded', String(open));
-  if (open) { if (!updPop.hidden) setUpdPop(false); renderLangPop(); langPop.querySelector('.lang-item.on')?.focus(); }
+  if (open) { if (!updPop.hidden) setUpdPop(false); setCharPop(false); renderLangPop(); langPop.querySelector('.lang-item.on')?.focus(); }
 }
 langBtn.addEventListener('click', () => setLangPop(langPop.hidden));
 langPop.addEventListener('click', (e) => {
@@ -2246,6 +2208,268 @@ document.addEventListener('keydown', (e) => {
     items[(i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length]?.focus();
   }
 });
+// ---------- 캐릭터 (헤더 👕) ----------
+// 누르면 캐릭터 목록(머리 미리보기 + 이름)이 열린다. 고르면 화면의 캐릭터를 모두 새 캐릭터로 다시 그리고 브라우저에 기억(am.char).
+// 맨 아래 '+ 캐릭터 추가' 로 그림을 올려 새 캐릭터를 만들고, 올린 캐릭터는 ✎ 로 고치고 ✕ 로 지운다(기본 클로드는 그대로)
+const charBtn = $('#btn-char'), charPop = $('#char-pop');
+function renderCharPop() {
+  charPop.innerHTML = CHARS.map((c) => {
+    const on = c.id === charId;
+    return `<div class="char-row"><button class="lang-item char-item${on ? ' on' : ''}" role="menuitemradio" aria-checked="${on}" data-id="${c.id}">
+      <span class="lang-check" aria-hidden="true">${on ? '✓' : ''}</span><span class="char-prev">${c.worker('head')}</span><span class="char-nm">${esc(c.custom ? c.name : _t(c.name))}</span></button>${c.custom
+      ? `<button class="char-act" data-edit="${c.id}" title="${_t('고치기')}" aria-label="${_t('고치기')}">✎</button><button class="char-act del" data-del="${c.id}" title="${_t('지우기')}" aria-label="${_t('지우기')}">✕</button>` : ''}</div>`;
+  }).join('') + `<button class="lang-item char-add" data-add>${_t('+ 캐릭터 추가')}</button>`;
+}
+function setCharPop(open) {
+  charPop.hidden = !open;
+  charBtn.setAttribute('aria-expanded', String(open));
+  if (open) { setLangPop(false); if (!updPop.hidden) setUpdPop(false); renderCharPop(); charPop.querySelector('.char-item.on')?.focus(); }
+}
+// 화면에 이미 그려진 캐릭터(svg.clawd)를 그 자리의 종류(data-v · 매니저)대로 지금 캐릭터로 바꿔 끼운다 — 목록 미리보기는 그대로
+function repaintChars() {
+  markChar();
+  for (const s of document.querySelectorAll('svg.clawd')) {
+    if (!s.closest('.char-pop, .char-edit')) s.outerHTML = s.classList.contains('mgr') ? managerSVG(mgrStage) : clawdSVG(s.dataset.v);
+  }
+  setFavicon(faviconAlert, true);
+  mgrUpdate();
+  requestAnimationFrame(drawTraces); // 매니저 키가 달라지면 회로 선 출발점도 달라진다
+}
+function setChar(id) {
+  charId = CHARS.some((c) => c.id === id) ? id : 'clawd';
+  try { charId === 'clawd' ? localStorage.removeItem(CHAR_KEY) : localStorage.setItem(CHAR_KEY, charId); } catch {}
+  repaintChars();
+}
+// 서버 목록 받기 — 다른 브라우저에서 고치거나 지운 것도 반영. 지금 캐릭터가 없어졌으면 클로드로
+async function loadChars() {
+  let list;
+  try { list = (await (await fetch('/api/characters')).json()).characters; } catch { return; }
+  if (!Array.isArray(list)) return;
+  let cached = null; try { cached = localStorage.getItem(CHARS_KEY); } catch {}
+  if (cached === JSON.stringify(list)) return;
+  setCharList(list);
+  setChar(charId);
+  if (!charPop.hidden) renderCharPop();
+}
+loadChars();
+charBtn.addEventListener('click', () => setCharPop(charPop.hidden));
+charPop.addEventListener('click', async (e) => {
+  if (e.target.closest('[data-add]')) { setCharPop(false); openCharEditor(null); return; }
+  const ed = e.target.closest('[data-edit]')?.dataset.edit;
+  if (ed) { setCharPop(false); openCharEditor(ed); return; }
+  const del = e.target.closest('[data-del]')?.dataset.del;
+  if (del) {
+    const c = CHARS.find((x) => x.id === del);
+    setCharPop(false);
+    if (!c || !(await ask({ title: _t('캐릭터를 지울까요?'), body: _t("'{name}' 캐릭터와 올린 그림을 모두 지워요.", { name: c.name }), ok: _t('지우기'), danger: true }))) return;
+    const r = await fetch(`/api/characters/${del}`, { method: 'DELETE' }).catch(() => null);
+    if (!r?.ok) { toast(_t('지우지 못했어요')); return; }
+    await loadChars();
+    return;
+  }
+  const b = e.target.closest('[data-id]');
+  if (!b || b.dataset.id === charId) return; // 이미 그 캐릭터 — 반응하지 않음
+  setCharPop(false);
+  setChar(b.dataset.id);
+  charBtn.focus();
+});
+document.addEventListener('click', (e) => { if (!charPop.hidden && !e.target.closest('.char-wrap')) setCharPop(false); });
+document.addEventListener('keydown', (e) => {
+  if (charPop.hidden) return;
+  if (e.key === 'Escape') { setCharPop(false); charBtn.focus(); }
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    const items = [...charPop.querySelectorAll('.char-item, .char-add')], i = items.indexOf(document.activeElement);
+    items[(i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length]?.focus();
+  }
+});
+document.addEventListener('langchange', () => { if (!charPop.hidden) renderCharPop(); });
+
+// ---------- 올린 그림 다듬기 (브라우저에서) ----------
+// 1) 배경: 네 귀퉁이가 같은 불투명 색이면 가장자리에서 이어진 그 색을 투명으로(흰 배경 그림 등)
+// 2) 여백: 보이는 픽셀만 남게 딱 맞게 자른다
+// 3) 도트: 도트를 몇 배로 키운 그림이면 칸 경계(옆 줄과 색이 달라지는 곳)를 찾아 칸마다 한 픽셀로 되돌린다.
+//    작은 그림(128px 이하)도 도트로 보고 픽셀 그대로 키운다. 그 밖의 그림은 긴 변 320px 까지 부드럽게 줄인다
+const CHAR_MAX_FILE = 20 * 1024 * 1024;
+async function processCharImage(file) {
+  if (!/^image\//.test(file.type)) throw new Error(_t('그림 파일만 올릴 수 있어요'));
+  if (file.size > CHAR_MAX_FILE) throw new Error(_t('20MB 를 넘는 그림은 올릴 수 없어요'));
+  let bmp;
+  try { bmp = await createImageBitmap(file); } catch { throw new Error(_t('그림을 읽지 못했어요')); }
+  if (bmp.width > 4096 || bmp.height > 4096) throw new Error(_t('4096px 를 넘는 그림은 올릴 수 없어요'));
+  const W = bmp.width, H = bmp.height;
+  const cv = new OffscreenCanvas(W, H), cx = cv.getContext('2d', { willReadFrequently: true });
+  cx.drawImage(bmp, 0, 0);
+  const id = cx.getImageData(0, 0, W, H), d = id.data, px = new Uint32Array(d.buffer);
+  clearBackground(d, W, H);
+  // 보이는 영역
+  let x0 = W, y0 = H, x1 = -1, y1 = -1;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (d[(y * W + x) * 4 + 3] > 16) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  }
+  if (x1 < 0) throw new Error(_t('그림에 보이는 부분이 없어요'));
+  const cw = x1 - x0 + 1, chh = y1 - y0 + 1;
+  // 안 보이는 픽셀은 색이 제각각일 수 있어 하나로 맞춘 뒤 칸 경계를 찾는다
+  const at = (x, y) => { const v = px[y * W + x]; return d[(y * W + x) * 4 + 3] ? v : 0; };
+  const bx = [x0], by = [y0];
+  for (let x = x0 + 1; x <= x1; x++) for (let y = y0; y <= y1; y++) if (at(x, y) !== at(x - 1, y)) { bx.push(x); break; }
+  for (let y = y0 + 1; y <= y1; y++) for (let x = x0; x <= x1; x++) if (at(x, y) !== at(x, y - 1)) { by.push(y); break; }
+  bx.push(x1 + 1); by.push(y1 + 1);
+  const nw = bx.length - 1, nh = by.length - 1;
+  const grid = nw <= cw * 0.7 && nh <= chh * 0.7 && nw <= 1024 && nh <= 1024;
+  let out, pixel;
+  if (grid) {
+    out = new OffscreenCanvas(nw, nh);
+    const o = out.getContext('2d'), od = o.createImageData(nw, nh), op = new Uint32Array(od.data.buffer);
+    for (let j = 0; j < nh; j++) for (let i = 0; i < nw; i++) op[j * nw + i] = at(bx[i], by[j]);
+    o.putImageData(od, 0, 0);
+    pixel = true;
+  } else {
+    cx.putImageData(id, 0, 0);
+    pixel = Math.max(cw, chh) <= 128;
+    const k = pixel ? 1 : Math.min(1, 320 / Math.max(cw, chh));
+    out = new OffscreenCanvas(Math.max(1, Math.round(cw * k)), Math.max(1, Math.round(chh * k)));
+    const o = out.getContext('2d');
+    o.imageSmoothingQuality = 'high';
+    o.drawImage(cv, x0, y0, cw, chh, 0, 0, out.width, out.height);
+  }
+  return { data: await canvasDataURL(out), w: out.width, h: out.height, pixel, canvas: out };
+}
+function clearBackground(d, W, H) {
+  const idx = [0, W - 1, (H - 1) * W, H * W - 1];
+  if (idx.some((i) => d[i * 4 + 3] < 255)) return; // 이미 투명 배경
+  const [r, g, b] = [d[0], d[1], d[2]], near = (i, t) => Math.abs(d[i * 4] - r) <= t && Math.abs(d[i * 4 + 1] - g) <= t && Math.abs(d[i * 4 + 2] - b) <= t;
+  if (!idx.every((i) => near(i, 10))) return; // 귀퉁이 색이 제각각 — 배경을 알 수 없으니 그대로
+  const seen = new Uint8Array(W * H), stack = [];
+  for (let x = 0; x < W; x++) stack.push(x, (H - 1) * W + x);
+  for (let y = 0; y < H; y++) stack.push(y * W, y * W + W - 1);
+  while (stack.length) {
+    const i = stack.pop();
+    if (seen[i] || !near(i, 30)) continue;
+    seen[i] = 1; d[i * 4 + 3] = 0;
+    const x = i % W;
+    if (x > 0) stack.push(i - 1);
+    if (x < W - 1) stack.push(i + 1);
+    if (i >= W) stack.push(i - W);
+    if (i < (H - 1) * W) stack.push(i + W);
+  }
+}
+async function canvasDataURL(cv) {
+  const blob = await cv.convertToBlob({ type: 'image/png' });
+  return new Promise((res) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); });
+}
+// 탭 아이콘: 작은 자리와 같은 기준(세로로 길면 위쪽 정사각형)으로 잘라 64×64 가운데 아래쪽에
+async function charIcon(src, pixel) {
+  const w = src.width, h = src.height > src.width * 1.15 ? src.width : src.height;
+  const k = 64 / Math.max(w, h), cv = new OffscreenCanvas(64, 64), c = cv.getContext('2d');
+  c.imageSmoothingEnabled = !pixel;
+  c.drawImage(src, 0, 0, w, h, Math.round((64 - w * k) / 2), Math.round(64 - h * k), Math.round(w * k), Math.round(h * k));
+  return canvasDataURL(cv);
+}
+
+// ---------- 캐릭터 추가·고치기 창 ----------
+// 칸 6개: 기본(워커 + 매니저 시작 모습, 꼭 필요) · 1~5단계(매니저가 성장하면 바뀌는 모습, 비우면 바로 앞 단계 그림).
+// 칸을 누르거나 그림을 끌어다 놓으면 다듬은 결과가 바로 보인다. 저장해야 서버에 올라간다
+const charModal = $('#char-modal'), charFile = $('#char-file');
+let ce = null; // { id, slots: { n: { src, w, h, pixel, data?, canvas? } }, cleared: Set, pick }
+function charStageLabel(n) { return n === 0 ? _t('기본') : _t('{n}단계', { n }); }
+function renderCharEditor() {
+  const html = [0, 1, 2, 3, 4, 5].map((n) => {
+    let s = ce.slots[n], inherited = false;
+    if (!s) for (let k = n - 1; k >= 0 && !s; k--) if (ce.slots[k]) { s = ce.slots[k]; inherited = true; }
+    const img = s ? `<img src="${s.src}" alt=""${s.pixel ? ' class="px"' : ''}>` : '';
+    return `<div class="cs-slot${ce.slots[n] ? ' set' : ''}${inherited ? ' inh' : ''}" data-n="${n}" role="button" tabindex="0" title="${_t('눌러서 그림 고르기 · 끌어다 놓기')}">
+      <div class="cs-prev">${img}${!ce.slots[n] ? `<span class="cs-plus">+</span>` : ''}</div>
+      <div class="cs-label">${charStageLabel(n)}${n === 0 ? ' <b>*</b>' : ''}</div>
+      ${ce.slots[n] && n > 0 ? `<button class="cs-clear" data-clear="${n}" title="${_t('비우기')}" aria-label="${_t('비우기')}">✕</button>` : ''}</div>`;
+  }).join('');
+  $('#char-stages').innerHTML = html;
+}
+function openCharEditor(id) {
+  const c = id && CHARS.find((x) => x.id === id);
+  let meta = null; try { meta = c && JSON.parse(localStorage.getItem(CHARS_KEY) || '[]').find((m) => m.id === id); } catch {}
+  ce = { id: meta ? id : null, slots: {}, cleared: new Set(), icon: null };
+  if (meta) for (const [n, s] of Object.entries(meta.stages)) ce.slots[n] = { src: `/characters/${s.file}`, w: s.w, h: s.h, pixel: s.pixel };
+  $('#char-edit-title').textContent = meta ? _t('캐릭터 고치기') : _t('캐릭터 추가');
+  $('#char-name').value = meta?.name || '';
+  $('#char-err').hidden = true;
+  renderCharEditor();
+  charModal.hidden = false;
+  requestAnimationFrame(() => $('#char-name').focus());
+}
+function closeCharEditor() { charModal.hidden = true; ce = null; }
+async function setCharSlot(n, file) {
+  const err = $('#char-err');
+  err.hidden = true;
+  try {
+    const r = await processCharImage(file);
+    if (!ce) return;
+    ce.slots[n] = { src: r.data, data: r.data, w: r.w, h: r.h, pixel: r.pixel, canvas: r.canvas };
+    ce.cleared.delete(n);
+    if (n === 0) ce.icon = await charIcon(r.canvas, r.pixel);
+    if (!$('#char-name').value.trim()) $('#char-name').value = file.name.replace(/\.[^.]+$/, '').slice(0, 30);
+    renderCharEditor();
+  } catch (e) { err.textContent = e.message; err.hidden = false; }
+}
+$('#char-stages').addEventListener('click', (e) => {
+  const clr = e.target.closest('[data-clear]')?.dataset.clear;
+  if (clr) { delete ce.slots[clr]; ce.cleared.add(Number(clr)); renderCharEditor(); return; }
+  const slot = e.target.closest('.cs-slot');
+  if (!slot) return;
+  ce.pick = Number(slot.dataset.n);
+  charFile.value = '';
+  charFile.click();
+});
+$('#char-stages').addEventListener('keydown', (e) => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.classList.contains('cs-slot')) { e.preventDefault(); e.target.click(); }
+});
+charFile.addEventListener('change', () => { if (charFile.files[0] && ce) setCharSlot(ce.pick, charFile.files[0]); });
+$('#char-stages').addEventListener('dragover', (e) => {
+  const slot = e.target.closest('.cs-slot');
+  if (!slot || !e.dataTransfer.types.includes('Files')) return;
+  e.preventDefault(); e.stopPropagation();
+  for (const s of charModal.querySelectorAll('.cs-slot.dropping')) if (s !== slot) s.classList.remove('dropping');
+  slot.classList.add('dropping');
+});
+$('#char-stages').addEventListener('dragleave', (e) => e.target.closest('.cs-slot')?.classList.remove('dropping'));
+$('#char-stages').addEventListener('drop', (e) => {
+  const slot = e.target.closest('.cs-slot'), f = e.dataTransfer.files[0];
+  if (!slot) return;
+  e.preventDefault(); e.stopPropagation();
+  slot.classList.remove('dropping');
+  if (f) setCharSlot(Number(slot.dataset.n), f);
+});
+async function saveCharEditor() {
+  const err = $('#char-err'), name = $('#char-name').value.trim();
+  const fail = (m) => { err.textContent = m; err.hidden = false; };
+  if (!ce.slots[0]) return fail(_t('기본 그림을 넣어 주세요'));
+  if (!name) { $('#char-name').focus(); return fail(_t('이름을 적어 주세요')); }
+  const stages = {};
+  for (const [n, s] of Object.entries(ce.slots)) if (s.data) stages[n] = { data: s.data, pixel: s.pixel };
+  for (const n of ce.cleared) if (!ce.slots[n]) stages[n] = null;
+  const body = { name, stages };
+  if (ce.icon) body.icon = ce.icon;
+  const btn = $('[data-ce="save"]', charModal);
+  btn.disabled = true;
+  try {
+    const r = await fetch(ce.id ? `/api/characters/${ce.id}` : '/api/characters', { method: ce.id ? 'PUT' : 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.char) return fail(_t('저장하지 못했어요'));
+    const id = j.char.id;
+    closeCharEditor();
+    await loadChars();
+    setChar(id); // 새로 만들었거나 고친 캐릭터로 바로 바꿔 보여 준다
+  } catch { fail(_t('저장하지 못했어요')); } finally { btn.disabled = false; }
+}
+charModal.addEventListener('click', (e) => {
+  const a = e.target.closest('[data-ce]')?.dataset.ce;
+  if (a === 'save') saveCharEditor();
+  else if (a === 'cancel' || e.target === charModal) closeCharEditor();
+});
+// 캡처 단계에서 처리하고 막는다 — Esc 가 터미널(=Claude 중단)로 새지 않게
+charModal.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeCharEditor(); charBtn.focus(); }
+}, true);
 // 언어가 바뀌면: 한 번 만들고 내용만 갱신하는 카드·칩은 새 언어로 다시 만들고, 종류가 같으면 다시 안 그리는 안내도 다시 그린다
 document.addEventListener('langchange', () => {
   for (const n of nodeEls.values()) n.remove();
@@ -2308,7 +2532,7 @@ function renderUpd() {
 function setUpdPop(open) {
   updPop.hidden = !open;
   updBtn.setAttribute('aria-expanded', String(open));
-  if (open) { setLangPop(false); fetch('/api/updates/check', { method: 'POST' }).catch(() => {}); }
+  if (open) { setLangPop(false); setCharPop(false); fetch('/api/updates/check', { method: 'POST' }).catch(() => {}); }
   renderUpd();
 }
 updBtn.addEventListener('click', () => setUpdPop(updPop.hidden));
