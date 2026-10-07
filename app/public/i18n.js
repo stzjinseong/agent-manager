@@ -422,8 +422,6 @@ const EN = {
   '닫기': 'Close',
   '원래 크기로': 'Back to normal size',
   '✕ 닫기': '✕ Close',
-  '터미널로 돌아가기': 'Back to the terminal',
-  '✕ 터미널': '✕ Terminal',
   '왼쪽으로 끌어 넓히기(터미널 위를 덮음) · 오른쪽 끝까지 끌면 접기 · 더블클릭: 기본 폭': 'Drag left to widen (covers the terminal) · drag far right to collapse · double-click: default width',
   '옆 패널 펼치기': 'Expand side panel',
   '업무 지시': 'Tasks',

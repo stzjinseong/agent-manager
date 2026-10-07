@@ -1257,22 +1257,22 @@ body.resizing-term { cursor: row-resize; user-select: none; }
 .d-del { color: var(--d-del); }
 .btn-diff b { font-weight: 600; margin-left: 2px; color: var(--accent-hi); }
 .btn-diff.none { opacity: .55; }
-.btn-diff.on { background: var(--surface-3); border-color: var(--line-2); color: var(--text); }
+/* diff 를 보고 있을 때: 강조색으로 켜진 버튼 — 다시 누르면 터미널로 */
+.btn-diff.on { background: color-mix(in srgb, var(--accent) 18%, var(--surface-3)); border-color: color-mix(in srgb, var(--accent) 65%, transparent); color: var(--accent-hi); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent), 0 0 12px color-mix(in srgb, var(--accent) 30%, transparent); }
+.btn-diff.on:hover { background: color-mix(in srgb, var(--accent) 26%, var(--surface-3)); }
+.btn-diff.on b { color: var(--accent-hi); }
 .diff-view {
   position: absolute; inset: 0; z-index: 5; display: grid; grid-template-columns: minmax(200px, 290px) 1fr;
   background: var(--term-bg); color: var(--text); font-size: 12.5px; border-radius: 6px; overflow: hidden;
 }
 .diff-files { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line-2); }
-.diff-files-head { display: flex; align-items: center; gap: 6px; padding: 4px 4px 6px 8px; color: var(--text-2); border-bottom: 1px solid var(--line); }
+.diff-files-head { display: flex; align-items: center; gap: 6px; padding: 8px 8px 9px; color: var(--text-2); border-bottom: 1px solid var(--line); }
 .diff-files-head #diff-sum { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.diff-files-head .btn { padding: 3px 8px; font-size: 12px; }
 #diff-files { list-style: none; margin: 0; padding: 4px; overflow: auto; flex: 1; }
 /* 요청(오름차순) → 펼치면 그 요청에서 고친 파일 */
 #diff-files .dr { margin-bottom: 2px; }
-.dr-head { display: flex; gap: 2px; align-items: flex-start; padding: 6px 6px 6px 2px; border-radius: 6px; cursor: pointer; user-select: none; }
+.dr-head { display: flex; gap: 2px; align-items: flex-start; padding: 6px; border-radius: 6px; cursor: pointer; user-select: none; }
 .dr-head:hover { background: var(--surface-2); }
-.dr-head .chev { flex: none; width: 16px; text-align: center; color: var(--dim); font-size: 12px; line-height: 18px; transition: transform .15s; }
-.dr:not(.open) .dr-head .chev { transform: rotate(-90deg); }
 .dr-main { display: grid; gap: 2px; min-width: 0; flex: 1; }
 .dr-top { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; }
 .dr-top b { color: var(--accent-hi); font-weight: 600; }
@@ -1280,7 +1280,7 @@ body.resizing-term { cursor: row-resize; user-select: none; }
 .dr-stat { margin-left: auto; color: var(--dim); font: 11px var(--mono); }
 .dr-text { color: var(--text-2); font-size: 12px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-all; }
 .dr.cur > .dr-head .dr-text { color: var(--text); }
-.dr-files { list-style: none; margin: 2px 0 6px 16px; padding: 0 0 0 6px; border-left: 1px solid var(--line-2); }
+.dr-files { list-style: none; margin: 2px 0 6px 6px; padding: 0 0 0 6px; border-left: 1px solid var(--line-2); }
 .dr-files li.df { display: grid; padding: 5px 8px; border-radius: 6px; cursor: pointer; line-height: 1.35; }
 .dr-files li.df:hover { background: var(--surface-2); }
 .dr-files li.df.sel { background: var(--surface-3); }

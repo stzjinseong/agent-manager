@@ -3278,7 +3278,6 @@ function renderDiff() {
     const text = reqText(g.prompt) || _t('(지난 요청 — 글이 남아 있지 않음)');
     return `<li class="dr${open ? ' open' : ''}${cur ? ' cur' : ''}">
       <div class="dr-head" data-turn="${g.key}" role="button" tabindex="0" aria-expanded="${open}" title="${esc(text)}">
-        <span class="chev">▾</span>
         <span class="dr-main"><span class="dr-top"><b>${g.turn != null ? `#${g.turn}` : '#?'}</b><time>${fmtClock(g.start).slice(0, -3)}</time>
           <span class="dr-stat">${_t('파일 {n}', { n: g.files.length })} · <span class="d-add">+${g.add}</span> <span class="d-del">−${g.del}</span></span></span>
         <span class="dr-text">${esc(text)}</span></span>
@@ -3343,7 +3342,6 @@ $('#diff-files').addEventListener('keydown', (e) => {
   if (head && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggleDiffReq(head.dataset.turn); }
 });
 for (const b of document.querySelectorAll('.btn-diff')) b.onclick = () => setDiffOpen(!diffOpen);
-$('#btn-diff-close').onclick = () => setDiffOpen(false);
 $('#btn-full').onclick = () => setTermFull(!$('#term-wrap').classList.contains('full'));
 $('#btn-full-exit').onclick = () => setTermFull(false);
 $('#btn-remove').onclick = async () => {
