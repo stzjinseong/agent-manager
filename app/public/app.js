@@ -2082,7 +2082,7 @@ const managerEl = () => (floorMin() ? $('.brand-mark') : $('.core-dot'));
 function flyToWorker(id, fromEl, kind) {
   const w = state.workers.find((x) => x.id === id), target = workerAvatar(id);
   if (!w || !target || !fromEl) return;
-  const color = avatarColor(w.name) || 'var(--accent)';
+  const color = charId === 'clawd-white' ? 'var(--char-white)' : avatarColor(w.name) || 'var(--accent)';
   flyNote(fromEl, target, color, `fly-note ${kind}`, () => {
     const nd = (floorMin() ? dockEls : nodeEls).get(id);
     if (!nd?.isConnected) return;

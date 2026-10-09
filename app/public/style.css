@@ -7,6 +7,7 @@
   --ink: 255 255 255; /* 면 위의 반투명 선·격자·테두리 색(RGB) — 다크는 흰색, 라이트는 먹색 */
   --shade: 1; /* 그림자 진하기 배율 — 라이트에선 옅게 */
   --av-l: 0.76; /* 워커 캐릭터 색 밝기(OKLCH L) */
+  --char-white: #f3f1ec; /* 흰 클로드의 워커 색(카드 선택 테두리·터미널 테두리 등) */
   --btn-hover: #2b303d;
   --sel-a: #222633; --sel-b: #181b22; /* 선택한 워커 카드 */
   --tip-bg: #0a0b0e;
@@ -1056,6 +1057,8 @@ body.resizing-term { cursor: row-resize; user-select: none; }
     0 0 14px color-mix(in srgb, var(--avatar, var(--accent)) 22%, transparent), 0 8px 24px rgb(0 0 0 / calc(.35 * var(--shade)));
 }
 .node.sel::after { background: var(--avatar, var(--accent)); }
+/* 흰 클로드: 워커 색(--avatar, app.js 가 요소마다 인라인으로 단다)을 모두 흰색으로 — 선택 카드·터미널 테두리·칩 등이 캐릭터와 같은 색 */
+html[data-char="clawd-white"] :is(.node, .dchip, .detail-avatar, .term-wrap) { --avatar: var(--char-white) !important; }
 .term-wrap.full .term-bar { border-bottom: 2px solid color-mix(in srgb, var(--avatar, var(--accent)) 75%, transparent); margin-bottom: 6px; }
 
 /* ---------- 지시·메모 추가 연출: 워커 색 쪽지가 카드로 날아간다 (app.js flyToWorker) ---------- */
@@ -1225,6 +1228,7 @@ body.resizing-term { cursor: row-resize; user-select: none; }
   --ink: 20 22 28;
   --shade: .4;
   --av-l: 0.62;
+  --char-white: #b7b3ab; /* 밝은 바탕에서 흰 테두리는 안 보여 옅은 회색으로 */
   --btn-hover: #e6e4de;
   --sel-a: #ffffff; --sel-b: #f3f1ec;
   --tip-bg: #ffffff;
