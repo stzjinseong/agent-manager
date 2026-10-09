@@ -258,6 +258,9 @@ main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24p
 .avatar svg { width: 100%; height: 100%; display: block; overflow: visible; }
 /* 워커 캐릭터 색: 역할별 --avatar (서버가 고른 OKLCH 색상각). 없으면 Claude 코랄 */
 .clawd .body { fill: var(--avatar, var(--accent)); }
+/* 흰 클로드: 워커 색 대신 흰 몸 · 캐릭터 목록의 클로드 미리보기: 무지개색 몸(characters.js 의 그라데이션) */
+.clawd.white .body { fill: #f3f1ec; }
+.clawd.rainbow .body { fill: url(#clawd-rainbow); }
 .clawd .eye { fill: #1a0f0a; transform-box: fill-box; transform-origin: center; animation: blink 4.5s infinite; }
 @keyframes blink { 0%, 94%, 100% { transform: scaleY(1); } 96% { transform: scaleY(.15); } }
 .clawd .legs-b { opacity: 0; }
@@ -484,6 +487,10 @@ body.term-full .side-grip { left: -6px; }
 #log li.k-req.gone { opacity: .5; cursor: default; border-left-style: dashed; }
 #log li.k-queued { color: var(--text-2); border-left: 2px dashed color-mix(in srgb, var(--accent) 70%, transparent); background: color-mix(in srgb, var(--accent) 5%, transparent); border-radius: 0 6px 6px 0; margin: 3px 0; padding: 5px 8px 5px 10px; white-space: pre-wrap; }
 #log li.k-queued::before { display: none; }
+/* 대기열에서 지운 지시: 대기열 줄 모양을 흐리게 + 글에 취소선 */
+#log li.k-unqueued { color: var(--dim); border-left: 2px dashed var(--line-2); border-radius: 0 6px 6px 0; margin: 3px 0; padding: 5px 8px 5px 10px; white-space: pre-wrap; text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--dim) 60%, transparent); }
+#log li.k-unqueued::before { display: none; }
+#log li.k-unqueued :is(time, .tag) { text-decoration: none; display: inline-block; }
 #log li.k-bgnote::before { background: var(--waiting); }
 #log .tag { display: inline-block; font-size: 10.5px; font-weight: 600; padding: 0 6px; margin-right: 6px; border-radius: 4px; line-height: 17px; vertical-align: 1px; }
 #log .k-req .tag { background: var(--accent); color: #1a0f0a; }
@@ -493,6 +500,7 @@ body.term-full .side-grip { left: -6px; }
 #log li.k-pastnote { display: flex; align-items: center; gap: 8px; margin: 6px 0 2px; color: var(--dim); font-size: 11.5px; }
 #log li.k-pastnote::before { display: none; }
 #log li.k-pastnote::after { content: ""; flex: 1; height: 1px; background: var(--line-2); }
+#log .k-unqueued .tag { border: 1px solid var(--line-2); color: var(--dim); }
 #log .k-queued .tag { border: 1px solid color-mix(in srgb, var(--accent) 60%, transparent); color: var(--accent); }
 #log .k-bgnote .tag { color: var(--waiting); padding: 0; }
 #log li.k-decision::before { background: var(--decision); }
@@ -1250,6 +1258,8 @@ body.resizing-term { cursor: row-resize; user-select: none; }
 /* 흰 몸 캐릭터(브랜드·매니저·질문 창)는 밝은 바탕에 묻히니 어두운 빛 */
 /* 다크의 흰 빛 번짐 대신 주변에 은은한 어두운 빛 — 외곽선 없이 밝은 바탕에서 몸이 떠 보이게.
    바깥 요소는 작업 중 빛 번짐 애니메이션이 filter 를 덮어쓰므로 안쪽 그림(.clawd)에 건다 */
+/* 흰 클로드는 라이트 모드의 밝은 카드·칩 위에서 몸이 묻히므로 얇은 그림자 테두리를 둔다 (아래 로고·매니저 자리 규칙이 우선) */
+:root[data-theme="light"] .clawd.white { filter: drop-shadow(0 0 .6px rgb(20 22 28 / .7)) drop-shadow(0 1px 2px rgb(20 22 28 / .25)); }
 :root[data-theme="light"] :is(.brand-mark, .core-mark, .ask-mark) .clawd { filter: drop-shadow(0 0 4px rgb(20 22 28 / .35)) drop-shadow(0 0 14px rgb(20 22 28 / .2)); }
 /* 다크용 흰 빛 번짐(.core-mark 의 core-glow 애니메이션 등)은 밝은 바탕에선 어두운 빛을 덮어 지운다 → 라이트에선 끈다
    (!important 라야 애니메이션 값보다 앞선다. 위아래로 떠다니는 움직임은 그대로) */
@@ -1350,6 +1360,8 @@ body.resizing-term { cursor: row-resize; user-select: none; }
   color: var(--text); font: inherit; font-size: 12.5px; cursor: pointer; transition: border-color .15s, background .15s;
 }
 .dchip.dropping { outline-offset: 1px; }
+.dchip.dragging { opacity: .35; border-style: dashed; }
+.dchip.dragging * { pointer-events: none; }
 .dchip:hover { border-color: rgb(var(--ink) / .2); }
 .dchip.sel { border-color: color-mix(in srgb, var(--c) 60%, transparent); background: linear-gradient(180deg, var(--sel-a), var(--sel-b)); }
 .dchip.s-working { --c: var(--working); } .dchip.s-decision { --c: var(--decision); } .dchip.s-waiting { --c: var(--waiting); }

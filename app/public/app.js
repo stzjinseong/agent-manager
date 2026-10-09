@@ -811,8 +811,10 @@ function renderFloor() {
 }
 
 // ---------- 최소화한 회로 기판 (헤더 아래 한 줄) ----------
-// 칩은 회로 기판과 같은 항목·순서(대기실 슬롯은 빼고). id 별로 한 번 만들고 내용만 갱신 — 캐릭터 애니메이션이 리셋되지 않게
+// 칩은 회로 기판과 같은 항목·순서(대기실 슬롯은 빼고). id 별로 한 번 만들고 내용만 갱신 — 캐릭터 애니메이션이 리셋되지 않게.
+// 칩도 끌어서 순서를 바꾼다 — 놓으면 회로 기판과 같은 순서(state.order)로 저장된다
 const dockEls = new Map();
+let dockDrag = null; // 끌고 있는 칩 (아래 '최소화한 칩 끌어서 순서 바꾸기')
 function renderDock() {
   // 최소화 중엔 헤더 로고가 매니저 역할 — 작업 중이면 걷고, 결정 대기면 주황 빛, 경험치 구슬도 여기로 (따로 두면 같은 캐릭터가 둘)
   const min = !$('#dock').hidden, mgr = $('.brand-mark'), core = $('.core-dot');
@@ -822,23 +824,28 @@ function renderDock() {
   if (min) mgr.title = core.title; else mgr.removeAttribute('title');
   if (!min) return;
   const list = $('#dock-list');
-  const ids = [...nodeEls.values()].filter((n) => n.isConnected && n.dataset.id).map((n) => n.dataset.id);
+  // 순서는 화면의 카드 순서 그대로 — nodeEls(Map)는 카드를 처음 만든 순서라 끌어 옮긴 순서와 다르다
+  const ids = [...$('#nodes').querySelectorAll('.node')].filter((n) => n.dataset.id && nodeEls.get(n.dataset.id) === n).map((n) => n.dataset.id);
   for (const [id, c] of dockEls) if (!ids.includes(id)) { c.remove(); dockEls.delete(id); }
   let prev = null;
   for (const id of ids) {
     const w = state.workers.find((x) => x.id === id);
     if (!w) continue;
     let c = dockEls.get(id);
-    if (!c) { c = el(`<button class="dchip"><span class="led"></span><span class="avatar">${clawdSVG('head')}</span><span class="dname"></span><span class="dst"></span></button>`); dockEls.set(id, c); }
+    if (!c) { c = el(`<button class="dchip" draggable="true"><span class="led"></span><span class="avatar">${clawdSVG('head')}</span><span class="dname"></span><span class="dst"></span></button>`); dockEls.set(id, c); }
     const st = viewStatus(w);
-    c.className = `dchip s-${st}${w.id === selected ? ' sel' : ''}${isUnseenDone(w) ? ' unseen' : ''}${c.classList.contains('dropping') ? ' dropping' : ''}`;
+    c.className = `dchip s-${st}${w.id === selected ? ' sel' : ''}${isUnseenDone(w) ? ' unseen' : ''}${c.classList.contains('dropping') ? ' dropping' : ''}${c === dockDrag ? ' dragging' : ''}`;
     c.dataset.id = id;
+    c.dataset.name = w.name;
     c.style.setProperty('--avatar', avatarColor(w.name) || 'var(--accent)');
     $('.dname', c).textContent = w.name;
     $('.dst', c).textContent = statusLabel(st);
     c.title = _t(w.id === selected ? '{name} · {status} — 다시 누르면 닫기' : '{name} · {status} — 클릭해서 열기', { name: w.name, status: statusLabel(st) });
-    const want = prev ? prev.nextSibling : list.firstChild;
-    if (want !== c) list.insertBefore(c, want);
+    // 끄는 중엔 사용자가 옮긴 자리를 존중
+    if (!dockDrag) {
+      const want = prev ? prev.nextSibling : list.firstChild;
+      if (want !== c) list.insertBefore(c, want);
+    }
     prev = c;
   }
   let empty = $('.dock-empty', list);
@@ -1032,7 +1039,7 @@ function renderDetail() {
   // 위로 올려 지난 기록을 보는 중이면 그 자리를 지킨다
   const logEl = $('#log');
   const html = timelineCache.map((r, i) =>
-    `<li class="k-${r.kind}${r.past ? ' past' : ''}" data-i="${i}"${r.kind === 'req' ? ` title="${_t('클릭: 터미널에서 이 요청 위치로 이동')}"` : ''}><time>${fmt(r.t)}</time>${r.tag ? `<span class="tag">${r.tag}</span>` : ''}${esc(r.text)}${r.shot ? shotImg(r.shot, 'tl-shot') : ''}${r.doc ? docCard(r.doc) : ''}${r.kind === 'req' || r.kind === 'queued' ? attachChips(r.text, 'md') : ''}</li>`).join('');
+    `<li class="k-${r.kind}${r.past ? ' past' : ''}" data-i="${i}"${r.kind === 'req' ? ` title="${_t('클릭: 터미널에서 이 요청 위치로 이동')}"` : ''}><time>${fmt(r.t)}</time>${r.tag ? `<span class="tag">${r.tag}</span>` : ''}${esc(r.text)}${r.shot ? shotImg(r.shot, 'tl-shot') : ''}${r.doc ? docCard(r.doc) : ''}${r.kind === 'req' || r.kind === 'queued' || r.kind === 'unqueued' ? attachChips(r.text, 'md') : ''}</li>`).join('');
   if (logEl._html !== html || logEl.dataset.w !== w.id) { // 브라우저가 innerHTML 을 정규화하므로 보낸 글로 비교
     const stick = logEl.dataset.w !== w.id || logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 40;
     logEl.dataset.w = w.id;
@@ -1054,12 +1061,13 @@ function renderDetail() {
 //  · 대시보드 지시는 'assign' 과 곧이어 오는 'working: 같은 글' 두 줄로 찍힌다 → 한 줄('요청')
 //  · 터미널에서 직접 친 요청은 'working: …' 만 찍힌다 → '요청'
 //  · 감시·백그라운드 완료 알림으로 생긴 턴('working: <task-notification>…')은 요청이 아니다 → '알림'
-//  · 'queue' 는 대기열에 들어간 지시 → '대기열'
+//  · 'queue' 는 대기열에 들어간 지시 → '대기열' · 'unqueue' 는 대기열에서 지운 지시 → '대기열에서 제거'
 function timelineRows(log, shots = [], docs = [], past = []) {
   const rows = [];
   for (const l of log) {
     if (l.kind === 'assign') { rows.push({ t: l.t, kind: 'req', tag: _t('요청'), text: l.text }); continue; }
     if (l.kind === 'queue') { rows.push({ t: l.t, kind: 'queued', tag: _t('대기열'), text: l.text }); continue; }
+    if (l.kind === 'unqueue') { rows.push({ t: l.t, kind: 'unqueued', tag: _t('대기열에서 제거'), text: l.text }); continue; }
     // 예전 버전이 지난 요청을 타임라인 기록(w.log)에 직접 넣은 것 — 지금은 w.past 로 따로 온다(아래)
     if (l.kind === 'past') { rows.push({ t: l.t, kind: 'req', past: true, tag: _t('지난 요청'), text: l.text }); continue; }
     if (l.kind === 'pastnote') { rows.push({ t: l.t, kind: 'pastnote', text: _t('지난 세션 요청 {n}개 — 대화 기록에서 불러옴', { n: l.text }) }); continue; }
@@ -2202,7 +2210,41 @@ async function memoDrop(e) {
   else toast(_t("'{name}' 의 나중에 할 작업으로 옮겼습니다", { name: to }));
 }
 const dockList = $('#dock-list');
-dockList.addEventListener('dragover', (e) => { if (memoDrag) memoDragOver(e); });
+// 최소화한 칩 끌어서 순서 바꾸기 — 회로 기판 카드 드래그와 같은 방식(끄는 동안 DOM 자리를 바꿔 미리 보여 주고, 놓으면 저장)
+dockList.addEventListener('dragstart', (e) => {
+  const c = e.target.closest?.('.dchip');
+  if (!c) return;
+  dockDrag = c;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', c.dataset.name || '');
+  requestAnimationFrame(() => c.classList.add('dragging'));
+});
+dockList.addEventListener('dragover', (e) => {
+  if (memoDrag) return memoDragOver(e);
+  if (!dockDrag) return;
+  e.preventDefault();
+  const over = e.target.closest('.dchip');
+  if (!over || over === dockDrag) return;
+  const r = over.getBoundingClientRect();
+  const ref = e.clientX > r.left + r.width / 2 ? over.nextSibling : over;
+  if (ref !== dockDrag && dockDrag.nextSibling !== ref) dockList.insertBefore(dockDrag, ref);
+});
+dockList.addEventListener('dragend', () => {
+  if (!dockDrag) return;
+  dockDrag.classList.remove('dragging');
+  dockDrag = null;
+  // 칩에는 대기실 슬롯이 없다 — 회로 기판 순서에서 칩에 있는 이름 자리만 칩 순서대로 채우고, 슬롯 자리는 그대로 둔다
+  const chips = [...new Set([...dockList.querySelectorAll('.dchip')].map((c) => c.dataset.name).filter(Boolean))];
+  const inDock = new Set(chips);
+  const floor = [...new Set([...nodesEl.querySelectorAll('.node')].map((n) => n.dataset.name).filter(Boolean))];
+  let k = 0;
+  const order = floor.map((name) => (inDock.has(name) ? chips[k++] : name));
+  for (; k < chips.length; k++) if (!order.includes(chips[k])) order.push(chips[k]);
+  state.order = order; // 서버 응답 전 깜빡임 방지
+  renderFloor(); // 펼쳤을 때도 같은 순서로
+  renderDock();
+  api('/api/order', { order });
+});
 dockList.addEventListener('drop', (e) => { if (memoDrag) { e.preventDefault(); memoDrop(e); } });
 dockList.addEventListener('dragleave', (e) => {
   const c = e.target.closest?.('.dchip');
@@ -2348,13 +2390,13 @@ themeModal.addEventListener('keydown', (e) => {
 }, true);
 // ---------- 캐릭터 ----------
 // 누르면 캐릭터 목록(머리 미리보기 + 이름)이 열린다. 고르면 화면의 캐릭터를 모두 새 캐릭터로 다시 그리고 브라우저에 기억(am.char).
-// 맨 아래 '+ 캐릭터 추가' 로 그림을 올려 새 캐릭터를 만들고, 올린 캐릭터는 ✎ 로 고치고 ✕ 로 지운다(기본 클로드는 그대로)
+// 맨 아래 '+ 캐릭터 추가' 로 그림을 올려 새 캐릭터를 만들고, 올린 캐릭터는 ✎ 로 고치고 ✕ 로 지운다(기본 클로드·흰 클로드는 그대로)
 const charBtn = $('#btn-char'), charPop = $('#char-pop');
 function renderCharPop() {
   charPop.innerHTML = CHARS.map((c) => {
     const on = c.id === charId;
     return `<div class="char-row"><button class="lang-item char-item${on ? ' on' : ''}" role="menuitemradio" aria-checked="${on}" data-id="${c.id}">
-      <span class="lang-check" aria-hidden="true">${on ? '✓' : ''}</span><span class="char-prev">${c.worker('logo')}</span><span class="char-nm">${esc(c.custom ? c.name : _t(c.name))}</span></button>${c.custom
+      <span class="lang-check" aria-hidden="true">${on ? '✓' : ''}</span><span class="char-prev">${c.preview ? c.preview() : c.worker('logo')}</span><span class="char-nm">${esc(c.custom ? c.name : _t(c.name))}</span></button>${c.custom
       ? `<button class="char-act" data-edit="${c.id}" title="${_t('고치기')}" aria-label="${_t('고치기')}">✎</button><button class="char-act del" data-del="${c.id}" title="${_t('지우기')}" aria-label="${_t('지우기')}">✕</button>` : ''}</div>`;
   }).join('') + `<button class="lang-item char-add" data-add>${_t('+ 캐릭터 추가')}</button>`;
   charPop.insertAdjacentHTML('afterbegin', `<div class="pop-h">${_t('캐릭터')}</div>`);

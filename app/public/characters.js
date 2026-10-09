@@ -1,6 +1,6 @@
 // ---------- 캐릭터 ----------
 // 워커·매니저·헤더 로고·탭 아이콘에 그리는 캐릭터. 헤더의 👕 버튼으로 고르고 브라우저에 기억한다(am.char).
-// 기본 클로드 하나에, 사용자가 올린 그림으로 만든 캐릭터(서버 data/characters)가 더해진다.
+// 기본 클로드·흰 클로드에, 사용자가 올린 그림으로 만든 캐릭터(서버 data/characters)가 더해진다.
 // 캐릭터마다 SVG 문자열을 돌려주는 함수 셋 — 화면 쪽 CSS·애니메이션이 기대하는 약속:
 //  · 루트 <svg class="clawd" data-v="…"> — data-v 는 'full'(카드·매니저) | 'head'(칩·헤더·상세처럼 작은 자리) · 캐릭터를 바꾸면 이걸 보고 다시 그린다
 //  · .body = 워커 색(--avatar)으로 칠할 부분 · .eye = 깜빡임·눈 감기(scaleY) · .legs-a/.legs-b = 걷기 두 프레임 — 없어도 된다
@@ -10,18 +10,25 @@
 // ---------- 클로드 (Claude Code 시작 화면의 픽셀 마스코트) ----------
 // 터미널 반블록 비율을 따라 픽셀 하나 = 가로 1 × 세로 2
 const clawdRect = (x, y, w, h, cls = 'body') => `<rect class="${cls}" x="${x}" y="${y}" width="${w}" height="${h}"/>`;
-const CLAWD = {
-  id: 'clawd',
-  name: '클로드',
-  worker(v = 'full') {
-    const R = clawdRect;
-    return `<svg class="clawd" data-v="${v}" viewBox="0 0 18 10" shape-rendering="crispEdges">
+// 워커 그림 — cls 는 루트에 더할 클래스(흰 클로드는 'white': 워커 색 대신 흰 몸), defs 는 그림 앞에 넣을 정의(캐릭터 목록의 무지개 그라데이션)
+const clawdWorker = (v, cls = '', defs = '') => {
+  const R = clawdRect;
+  return `<svg class="clawd${cls ? ` ${cls}` : ''}" data-v="${v}" viewBox="0 0 18 10" shape-rendering="crispEdges">${defs}
     ${R(3, 0, 12, 4)}${R(1, 4, 16, 2)}${R(3, 6, 12, 2)}
     <g class="legs-a">${R(4, 8, 1, 2)}${R(6, 8, 1, 2)}${R(11, 8, 1, 2)}${R(13, 8, 1, 2)}</g>
     <g class="legs-b">${R(5, 8, 1, 2)}${R(7, 8, 1, 2)}${R(10, 8, 1, 2)}${R(12, 8, 1, 2)}</g>
     ${R(5, 2, 1, 2, 'eye')}${R(12, 2, 1, 2, 'eye')}
   </svg>`;
-  },
+};
+// 캐릭터 목록의 클로드 미리보기 — 워커마다 색이 바뀌는 캐릭터라는 뜻으로 무지개색 몸(.rainbow, style.css)
+const RAINBOW = ['#ff5f6d', '#ffa53b', '#ffe14d', '#5fd38a', '#4aa8ff', '#9b6bff'];
+const rainbowDefs = `<defs><linearGradient id="clawd-rainbow" gradientUnits="userSpaceOnUse" x1="3" y1="1" x2="15" y2="9">${
+  RAINBOW.map((c, i) => `<stop offset="${(i / (RAINBOW.length - 1)).toFixed(2)}" stop-color="${c}"/>`).join('')}</linearGradient></defs>`;
+const CLAWD = {
+  id: 'clawd',
+  name: '클로드',
+  worker: (v = 'full') => clawdWorker(v),
+  preview: () => clawdWorker('logo', 'rainbow', rainbowDefs),
   // 매니저 — 같은 마스코트에 성장 단계별 액세서리 레이어를 겹친다 (왕 테마)
   //  1 볼터치(+눈 깜빡임) · 2 헤드셋 · 3 망토 · 4 왕관(헤드셋 대신) + 금빛 스파크 · 5 후광 + 별가루
   // 바깥 g(.mgr-lean)는 시선 기울기, 안쪽 g(.mgr-act)는 끄덕임·인사 같은 반응 동작용 — 서로 transform 이 겹치지 않게 나눈다
@@ -52,6 +59,16 @@ const CLAWD = {
     const dot = alert ? '<circle cx="18.5" cy="3.5" r="3.5" fill="#f4b34a" stroke="#14161c" stroke-width="1"/>' : '';
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22" shape-rendering="crispEdges">${bg}<g transform="translate(2 6)">${g}</g>${dot}</svg>`;
   },
+};
+
+// ---------- 흰 클로드 ----------
+// 같은 마스코트를 워커 색 없이 모두 흰 몸으로(.white, style.css). 매니저·탭 아이콘은 원래 흰 캐릭터라 클로드 것을 그대로 쓴다
+const CLAWD_WHITE = {
+  ...CLAWD,
+  id: 'clawd-white',
+  name: '흰 클로드',
+  worker: (v = 'full') => clawdWorker(v, 'white'),
+  preview: undefined,
 };
 
 // ---------- 올린 그림 캐릭터 ----------
@@ -95,9 +112,9 @@ function imageChar(meta) {
 
 // 목록은 서버가 원본이고, 첫 화면부터 그 캐릭터로 그리도록 브라우저에도 기억해 둔다(am.chars). app.js 가 서버 목록을 받으면 갱신
 const CHAR_KEY = 'am.char', CHARS_KEY = 'am.chars';
-let CHARS = [CLAWD];
+let CHARS = [CLAWD, CLAWD_WHITE];
 function setCharList(metas) {
-  CHARS = [CLAWD, ...metas.filter((m) => m?.id && m.stages?.[0]).map(imageChar)];
+  CHARS = [CLAWD, CLAWD_WHITE, ...metas.filter((m) => m?.id && m.stages?.[0]).map(imageChar)];
   try { localStorage.setItem(CHARS_KEY, JSON.stringify(metas)); } catch {}
 }
 try { setCharList(JSON.parse(localStorage.getItem(CHARS_KEY) || '[]')); } catch {}

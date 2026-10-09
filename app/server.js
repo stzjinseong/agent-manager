@@ -1615,7 +1615,7 @@ const server = http.createServer(async (req, res) => {
         (config.memos[w.name] ||= []).push({ id: `m${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`, text: q, createdAt: Date.now() });
         pushLog(w, 'status', `대기열 → 나중에 할 작업: ${q}`);
         saveConfig(); // emitState 포함
-      } else emitState();
+      } else { pushLog(w, 'unqueue', q); emitState(); } // 그냥 지운 지시도 무엇을 뺐는지 타임라인에 남긴다
     }
     if (m[2] === 'resume') { w.queueHeld = false; emitState(); dispatchQueued(w); }
     if (m[2] === 'rename') {
