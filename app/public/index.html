@@ -147,7 +147,6 @@
       </div>
     </div>
     <div class="nodes" id="nodes"></div>
-    <div class="trash" id="trash" aria-hidden="true"><div class="bin"><span class="ic">🗑</span><span class="tx" data-i18n>여기에 놓으면 제거</span></div></div>
     <!-- 워커 비교: 카드 아래에 붙은 접이식 표 (접힘 상태는 브라우저에 기억) -->
     <div class="compare" id="compare" hidden>
       <div class="chart-head cmp-toggle" id="compare-toggle" role="button" tabindex="0" aria-expanded="true" title="클릭해서 접기/펼치기" data-i18n-attr="title">
@@ -162,6 +161,8 @@
   </section>
 
   <!-- 아무 워커도 열지 않았을 때 아래 빈 자리 안내 (app.js renderHint) -->
+  <!-- 카드·최소화 칩을 끌 때 화면 아래에 뜨는 휴지통 — 최소화하면 회로 기판(#floor)이 숨으므로 그 밖에 둔다 -->
+  <div class="trash" id="trash" aria-hidden="true"><div class="bin"><span class="ic">🗑</span><span class="tx" data-i18n>여기에 놓으면 제거</span></div></div>
   <section class="hint" id="hint" hidden></section>
 
   <section id="detail" class="panel detail" hidden>

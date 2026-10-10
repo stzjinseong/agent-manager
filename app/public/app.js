@@ -1860,11 +1860,11 @@ nodesEl.addEventListener('dragend', () => {
 // ---------- 휴지통: 칩을 끌기 시작하면 아래에 뜨고, 놓으면 제거 ----------
 // 워커 칩은 상세의 '제거'와 같고(실행 중이면 세션 종료), 대기실 칩은 저장된 역할 삭제와 같다. 둘 다 확인을 받는다
 const trashEl = $('#trash');
-trashEl.addEventListener('dragover', (e) => { if (!dragEl) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; trashEl.classList.add('over'); });
+trashEl.addEventListener('dragover', (e) => { if (!dragEl && !dockDrag) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; trashEl.classList.add('over'); });
 trashEl.addEventListener('dragleave', (e) => { if (!trashEl.contains(e.relatedTarget)) trashEl.classList.remove('over'); });
 trashEl.addEventListener('drop', async (e) => {
   e.preventDefault();
-  const n = dragEl;
+  const n = dragEl || dockDrag; // 카드 또는 최소화 칩
   if (!n) return;
   if (n.classList.contains('socket')) {
     // 대기실 카드 한 장이 같은 이름의 종료된 워커 기록들을 대신 보여 주고 있었다 → 역할과 함께 그 기록도 지운다(서버). 미리 알려 준다
@@ -2309,7 +2309,7 @@ dockList.addEventListener('dragstart', (e) => {
   dockDrag = c;
   e.dataTransfer.effectAllowed = 'move';
   e.dataTransfer.setData('text/plain', c.dataset.name || '');
-  requestAnimationFrame(() => c.classList.add('dragging'));
+  requestAnimationFrame(() => { c.classList.add('dragging'); trashEl.classList.add('show'); document.body.classList.add('card-drag'); }); // 카드 끌기와 같은 휴지통·어둡게
 });
 dockList.addEventListener('dragover', (e) => {
   if (memoDrag) return memoDragOver(e);
@@ -2322,6 +2322,8 @@ dockList.addEventListener('dragover', (e) => {
   if (ref !== slot && slot.nextSibling !== ref) dockList.insertBefore(slot, ref);
 });
 dockList.addEventListener('dragend', () => {
+  trashEl.classList.remove('show', 'over');
+  document.body.classList.remove('card-drag');
   if (!dockDrag) return;
   dockDrag.classList.remove('dragging');
   dockDrag = null;
