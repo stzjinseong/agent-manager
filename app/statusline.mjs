@@ -17,11 +17,13 @@ process.stdin.on('data', (c) => (input += c));
 process.stdin.on('end', async () => {
   let data = {};
   try { data = JSON.parse(input); } catch {}
-  if (worker && data.rate_limits) {
+  // 모델도 같이 보낸다 — /model 로 바꾸면 훅은 오지 않지만 상태줄은 다시 그려지므로, 화면의 모델명을 바로 바꿀 수 있다
+  const model = data.model?.id;
+  if (worker && (data.rate_limits || model)) {
     try {
       await fetch(`http://127.0.0.1:${port}/statusline?w=${worker}`, {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ rate_limits: data.rate_limits, session_id: data.session_id }),
+        body: JSON.stringify({ rate_limits: data.rate_limits, session_id: data.session_id, model }),
         signal: AbortSignal.timeout(500),
       });
     } catch {}

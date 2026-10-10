@@ -95,6 +95,8 @@ let usage = (() => { try { return JSON.parse(fs.readFileSync(USAGE_PATH, 'utf8')
 // 받은 값은 항목(5시간·주간)마다 받은 시각(at)·보낸 워커(from)와 함께 둔다. 새로 받은 값에 한 항목이 빠져 있으면
 // (실측: 10/04 받은 값에 five_hour 가 없었다) 이전 값이 아직 초기화 전이면 그대로 둔다 — 빠졌다고 지우면 막대가 '—' 로 바뀌었다
 function onStatusLine(body, from) {
+  const w = workers.get(from);
+  if (w && typeof body?.model === 'string' && body.model) setModel(w, body.model);
   const rl = body?.rate_limits;
   if (!rl || typeof rl !== 'object') return;
   const now = Date.now();
@@ -114,6 +116,17 @@ function onStatusLine(body, from) {
   emitState();
 }
 let lastUsageEmit = 0;
+
+// 워커의 모델명(상세 화면 머리줄) — /model 로 바꿔도 훅이 오지 않으므로 세 곳에서 받는다:
+// SessionStart 훅 · 상태줄(statusline.mjs, /model 직후 다시 그려질 때) · 트랜스크립트의 응답 기록(상태줄이 없는 예전 워커도 다음 응답부터).
+// at 은 그 값이 언제 것인지 — 이어 붙인 세션의 트랜스크립트에 남은 지난 모델이 방금 받은 모델을 덮지 않게 더 새로운 것만 받는다
+function setModel(w, model, at = Date.now()) {
+  if (!model || at < (w.modelAt || 0)) return;
+  w.modelAt = at;
+  if (w.model === model) return;
+  w.model = model;
+  emitState();
+}
 
 // 사용량을 보낼 수 있는 워커: 상태줄(statusline.mjs)을 넣어 띄운 살아 있는 워커. 이 기능 이전에 띄운 워커는 설정에 없어 못 보낸다
 // 설정 파일은 띄울 때 한 번 쓰고 바뀌지 않으므로 pid 별로 한 번만 읽는다(같은 id 로 다시 띄우면 pid 가 다르다)
@@ -716,7 +729,7 @@ function onHook(w, ev, res) {
 
   switch (name) {
     case 'SessionStart':
-      w.model = ev.model || w.model;
+      setModel(w, ev.model);
       if (ev.source === 'clear') {
         w.todos = [];
         // 새 세션이니 타임라인(로그·캡처·결과물)도 비운다
@@ -838,7 +851,7 @@ function scheduleProfile(w) {
   if (!w.tx || w.tx.timer) return;
   w.tx.timer = setTimeout(() => {
     w.tx.timer = null;
-    if (readProfile(w.tx)) { drainShots(w); checkInterrupted(w); emitState(); }
+    if (readProfile(w.tx)) { setModel(w, w.tx.model, w.tx.modelAt); drainShots(w); checkInterrupted(w); emitState(); }
     if (w.seedAt) seedHistory(w);
   }, 300);
 }

@@ -29,7 +29,7 @@ export function createProfile(file) {
     // 백그라운드 작업 (Monitor 감시 · run_in_background 명령). 턴이 끝나도 계속 돈다 → '백그라운드 대기' 판정용
     bgTasks: new Map(), // task id → { kind: 'monitor'|'shell', desc, startedAt, expiresAt, done }
     bgCalls: new Map(), // 백그라운드로 시작한 tool_use id → { kind, desc } (결과에서 task id 를 읽기 전까지)
-    turns: [], tools: {}, model: null, compactions: 0, context: 0, unpriced: false,
+    turns: [], tools: {}, model: null, modelAt: 0, compactions: 0, context: 0, unpriced: false,
     // 시간 측정: 직전 이벤트 시각, 진행 중인 도구 구간, 도구 호출별 시작
     lastTs: 0, seg: null, toolStart: new Map(), toolTime: {},
     // 도구 결과에 담긴 이미지(Read 로 연 그림, MCP 스크린샷 등). 서버가 읽을 때마다 꺼내 파일로 저장하고 비운다
@@ -291,7 +291,7 @@ function apply(p, e, line) {
   p.lastStop = m.stop_reason || null; // 'end_turn' 이면 응답이 정상으로 끝난 것 (스트리밍 중간 줄은 null)
   p.lastText = (m.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('\n') || p.lastText;
   target.end = ts;
-  if (m.model && m.model !== '<synthetic>') { p.model = m.model; target.model = m.model; }
+  if (m.model && m.model !== '<synthetic>') { p.model = m.model; p.modelAt = ts; target.model = m.model; }
   p.context = usage.input + usage.cacheWrite + usage.cacheRead;
   target.context = p.context;
   for (const b of m.content || []) {
