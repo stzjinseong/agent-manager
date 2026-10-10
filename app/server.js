@@ -438,8 +438,8 @@ async function assignTask(w, text) {
     const cli = await cliDraft(w);
     if (isIdle(w) && cli.state !== 'empty') return { rejected: cli.state };
   }
-  // 질문·⏸ 로 멈췄거나 자동 투입을 끈 대기열은 그대로 두고, 쉬는 워커에 새로 보낸 지시는 바로 넣는다 — 질문에 대한 답일 수 있다
-  const waitsForUser = w.queueHeld === 'question' || w.queueHeld === 'manual' || manualQueue(w);
+  // 질문으로 멈췄거나 자동 투입을 끈 대기열은 그대로 두고, 쉬는 워커에 새로 보낸 지시는 바로 넣는다 — 질문에 대한 답일 수 있다
+  const waitsForUser = w.queueHeld === 'question' || manualQueue(w);
   if (isIdle(w) && w.queue.length && !waitsForUser) {
     // 쉬는 중인데 대기열이 남아 있으면(중단됨·투입 실패로 보류·투입 대기 중) 새 지시를 뒤에 붙이고 맨 앞부터 이어서 투입
     cancelDispatch(w);
@@ -461,10 +461,10 @@ async function assignTask(w, text) {
 // 대기열은 사람이 안 보는 사이 넘어가기 쉽다 — 응답이 '어느 쪽으로 할까요?'처럼 묻고 끝났는데 다음 지시가 곧바로 들어가
 // 그 질문을 못 보고 지나쳤다. 그래서
 //   1) 마지막 응답이 질문으로 끝나면 대기열을 멈춘다(queueHeld='question') — CLI 에서 답하면(UserPromptSubmit) 풀리고 그 턴 뒤에 잇는다
-//   2) 그 밖에도 바로 넣지 않고 DISPATCH_GRACE_MS 동안 기다린다(w.dispatchAt — 화면에 남은 초와 ⏸)
+//   2) 그 밖에도 바로 넣지 않고 DISPATCH_GRACE_MS 동안 기다린다(w.dispatchAt — 화면에 남은 초). 그사이 자동 투입을 끄면 보내지 않는다
 //   3) 역할마다 자동 투입을 끌 수 있다(config.manualQueue) — 그때는 ▶ 를 눌러야 한 건씩 나간다
-// queueHeld: false | 'failed'(투입 실패 — 중복 위험) | 'question'(응답이 질문) | 'manual'(⏸). 예전 버전이 저장한 true 는 'failed' 로 본다
-const DISPATCH_GRACE_MS = 8000;
+// queueHeld: false | 'failed'(투입 실패 — 중복 위험) | 'question'(응답이 질문). 예전 버전이 저장한 true 는 'failed' 로 본다
+const DISPATCH_GRACE_MS = 5000;
 const dispatchTimers = new Map(); // 워커 id → setTimeout (draftTimers 와 같은 이유로 워커 밖에 둔다)
 const manualQueue = (w) => Boolean(config.manualQueue?.[w.name]);
 function afterTurn(w, lastText) {
@@ -1080,6 +1080,7 @@ function onHostHello({ ptys }) {
     delete w.txPath;
     delete w.shellPending; // 예전 버전이 워커 객체에 두어 {} 로 저장된 것
     if (w.queueHeld === true) w.queueHeld = 'failed'; // 이유를 두기 전 버전
+    if (w.queueHeld === 'manual') w.queueHeld = false; // 없앤 ⏸ 멈춤
     const resumeDispatch = Boolean(w.dispatchAt); // 투입 대기 중에 재시작했으면 대기를 다시 건다
     w.dispatchAt = 0;
     if (!p || p.exited) w.status = 'exited';
@@ -1689,7 +1690,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   let m;
-  if (req.method === 'POST' && (m = p.match(/^\/api\/workers\/(W\d+)\/(task|kill|remove|interrupt|unqueue|tomemo|resume|hold|autoqueue|rename|diffclear)$/))) {
+  if (req.method === 'POST' && (m = p.match(/^\/api\/workers\/(W\d+)\/(task|kill|remove|interrupt|unqueue|tomemo|resume|autoqueue|rename|diffclear)$/))) {
     const w = workers.get(m[1]);
     if (!w) return json(res, 404, { error: 'no worker' });
     const body = await readBody(req);
@@ -1721,9 +1722,7 @@ const server = http.createServer(async (req, res) => {
       saveConfig(); // emitState 포함
     }
     if (m[2] === 'resume') { cancelDispatch(w); w.queueHeld = false; emitState(); dispatchQueued(w, true); }
-    // ⏸ 대기열 멈춤 — 투입 대기(남은 초) 중이든 작업 중이든, ▶ 재개 전까지 보내지 않는다
-    if (m[2] === 'hold' && w.queue.length && !w.queueHeld) { cancelDispatch(w); w.queueHeld = 'manual'; pushLog(w, 'status', '대기열 일시정지'); emitState(); }
-    // 역할별 자동 투입 켜기/끄기. 켜는 순간 쉬고 있고 대기열이 있으면 투입 대기를 시작한다
+    // 역할별 자동 투입 켜기/끄기. 끄면 투입 대기(남은 초) 중이던 것도 보내지 않는다. 켜는 순간 쉬고 있고 대기열이 있으면 투입 대기를 시작한다
     if (m[2] === 'autoqueue') {
       if (body.on) delete config.manualQueue[w.name]; else config.manualQueue[w.name] = true;
       pushLog(w, 'status', body.on ? '대기열 자동 투입 켬' : '대기열 자동 투입 끔 — ▶ 를 눌러야 한 건씩 투입');

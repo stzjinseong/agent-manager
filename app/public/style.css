@@ -446,7 +446,6 @@ body.term-full .side-grip { left: -6px; }
 .queue .qh.held button { font: inherit; font-size: 12px; padding: 1px 8px; border-radius: 6px; border: 1px solid currentColor; background: none; color: inherit; cursor: pointer; }
 .queue .qh.held.calm { color: var(--dim); }
 .queue .qh.held.soon { color: var(--accent); }
-.queue .qh.held.calm button, .queue .qh.held.soon button { margin-left: auto; }
 .queue .qh .cd { font: 600 12px var(--mono); }
 .meta .q.held { color: var(--dim); }
 .meta .q.ask { color: var(--decision); font-weight: 600; animation: led 1.6s ease-in-out infinite; }
