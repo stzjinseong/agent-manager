@@ -731,14 +731,11 @@ function updateNode(node, w) {
     (w.queue.length ? `<span class="q" title="${_t('대기 중인 지시')}">📥 ${w.queue.length}</span>` : '') +
     (w.profile?.turnCount ? `<span title="${_t('추정 비용 (API 환산)')}">$ ${fmtUsd(w.profile.total.cost).slice(1)}</span>` : '');
   // 이번(또는 마지막) 턴에 나온 최근 캡처를 무대 왼쪽 아래에 작게. 주소가 같으면 다시 그리지 않는다(깜빡임 방지)
-  const shot = (w.shots || []).at(-1);
-  const showShot = shot && (!w.turnStartedAt || shot.t >= w.turnStartedAt - 5000) ? shot : null;
+  const { shot: showShot, doc: showDoc } = recentMedia(w);
   let thumb = $('.card-shot', node);
   if (showShot && thumb?.dataset.shot !== showShot.url) { thumb?.remove(); thumb = el(shotImg(showShot, 'card-shot')); $('.stage', node).append(thumb); }
   if (!showShot && thumb) thumb.remove();
   // 같은 규칙으로 최근 결과물 문서(html·md·pdf·svg)를 무대 오른쪽 아래에 작은 타일로. 누르면 새 탭
-  const doc = (w.docs || []).at(-1);
-  const showDoc = doc && (!w.turnStartedAt || doc.t >= w.turnStartedAt - 5000) ? doc : null;
   let tile = $('.card-doc', node);
   const docKey = showDoc && `${showDoc.url}@${showDoc.t}`;
   if (showDoc && tile?.dataset.key !== docKey) { tile?.remove(); tile = el(docTile(showDoc)); tile.dataset.key = docKey; $('.stage', node).append(tile); }
@@ -830,13 +827,23 @@ function renderDock() {
   const list = $('#dock-list');
   // 순서는 화면의 카드 순서 그대로 — nodeEls(Map)는 카드를 처음 만든 순서라 끌어 옮긴 순서와 다르다
   const ids = [...$('#nodes').querySelectorAll('.node')].filter((n) => n.dataset.id && nodeEls.get(n.dataset.id) === n).map((n) => n.dataset.id);
-  for (const [id, c] of dockEls) if (!ids.includes(id)) { c.remove(); dockEls.delete(id); }
+  for (const [id, c] of dockEls) if (!ids.includes(id)) { c.parentElement.remove(); dockEls.delete(id); }
   let prev = null;
   for (const id of ids) {
     const w = state.workers.find((x) => x.id === id);
     if (!w) continue;
     let c = dockEls.get(id);
-    if (!c) { c = el(`<button class="dchip" draggable="true"><span class="led"></span><span class="avatar">${clawdSVG('head')}</span><span class="dname"></span><span class="dst"></span></button>`); dockEls.set(id, c); }
+    // 칩(버튼) 아래에 그 워커의 최근 캡처·문서 썸네일 — 버튼 안에는 링크를 둘 수 없어 칩과 썸네일을 한 칸(.dslot)으로 묶는다
+    if (!c) {
+      const slot = el(`<div class="dslot"><button class="dchip" draggable="true"><span class="led"></span><span class="avatar">${clawdSVG('head')}</span><span class="dname"></span><span class="dst"></span></button><div class="dthumbs"></div></div>`);
+      c = slot.firstChild; dockEls.set(id, c);
+    }
+    const media = recentMedia(w), thumbs = c.nextElementSibling;
+    const mkey = `${media.shot?.url || ''}|${media.doc ? `${media.doc.url}@${media.doc.t}` : ''}`;
+    if (thumbs.dataset.key !== mkey) {
+      thumbs.dataset.key = mkey;
+      thumbs.innerHTML = (media.shot ? shotImg(media.shot, 'dock-shot') : '') + (media.doc ? docTile(media.doc, 'dock-doc') : '');
+    }
     const st = viewStatus(w);
     c.className = `dchip s-${st}${w.id === selected ? ' sel' : ''}${isUnseenDone(w) ? ' unseen' : ''}${c.classList.contains('dropping') ? ' dropping' : ''}${c === dockDrag ? ' dragging' : ''}`;
     c.dataset.id = id;
@@ -846,11 +853,12 @@ function renderDock() {
     $('.dst', c).textContent = statusLabel(st);
     c.title = _t(w.id === selected ? '{name} · {status} — 다시 누르면 닫기' : '{name} · {status} — 클릭해서 열기', { name: w.name, status: statusLabel(st) });
     // 끄는 중엔 사용자가 옮긴 자리를 존중
+    const slot = c.parentElement;
     if (!dockDrag) {
       const want = prev ? prev.nextSibling : list.firstChild;
-      if (want !== c) list.insertBefore(c, want);
+      if (want !== slot) list.insertBefore(slot, want);
     }
-    prev = c;
+    prev = slot;
   }
   let empty = $('.dock-empty', list);
   if (!dockEls.size && !empty) list.append(el(`<span class="dock-empty">${_t('워커 없음')}</span>`));
@@ -1102,12 +1110,17 @@ function timelineRows(log, shots = [], docs = [], past = []) {
   if (shots?.length || docs?.length || past?.length) rows.sort((a, b) => a.t - b.t); // 안정 정렬이라 같은 시각의 로그 순서는 그대로
   return rows;
 }
+// 카드·최소화 칩에 띄울 최근 캡처·결과물 문서 — 이번(또는 마지막) 턴에 나온 것만
+function recentMedia(w) {
+  const fresh = (x) => (x && (!w.turnStartedAt || x.t >= w.turnStartedAt - 5000) ? x : null);
+  return { shot: fresh((w.shots || []).at(-1)), doc: fresh((w.docs || []).at(-1)) };
+}
 // 결과물 문서 카드. 미리보기(iframe)는 넣지 않는다 — 타임라인은 줄이 늘 때마다 통째로 다시 그려서 계속 다시 로드된다
 const DOC_ICON = { html: '🌐', htm: '🌐', md: '📝', markdown: '📝', pdf: '📕', svg: '🖼️' };
 // 워커 카드용 작은 타일 (아이콘 + 확장자). 끌면 링크가 아니라 카드가 끌리게 draggable=false
-function docTile(d) {
+function docTile(d, cls = 'card-doc') {
   const ext = d.name.split('.').pop().toLowerCase();
-  return `<a class="card-doc" href="${esc(d.url)}" target="_blank" rel="noopener" draggable="false" title="${esc(d.title ? `${d.title}\n` : '')}${esc(d.name)}&#10;${_t('클릭: 새 탭에서 열기')}">` +
+  return `<a class="${cls}" href="${esc(d.url)}" target="_blank" rel="noopener" draggable="false" title="${esc(d.title ? `${d.title}\n` : '')}${esc(d.name)}&#10;${_t('클릭: 새 탭에서 열기')}">` +
     `<span class="ic">${DOC_ICON[ext] || '📄'}</span><span class="ext">${esc(ext.toUpperCase())}</span></a>`;
 }
 function docCard(d) {
@@ -2225,7 +2238,7 @@ const dockList = $('#dock-list');
 // 최소화한 칩 끌어서 순서 바꾸기 — 회로 기판 카드 드래그와 같은 방식(끄는 동안 DOM 자리를 바꿔 미리 보여 주고, 놓으면 저장)
 dockList.addEventListener('dragstart', (e) => {
   const c = e.target.closest?.('.dchip');
-  if (!c) return;
+  if (!c) { e.preventDefault(); return; } // 썸네일 이미지·링크는 끌지 않는다
   dockDrag = c;
   e.dataTransfer.effectAllowed = 'move';
   e.dataTransfer.setData('text/plain', c.dataset.name || '');
@@ -2235,11 +2248,11 @@ dockList.addEventListener('dragover', (e) => {
   if (memoDrag) return memoDragOver(e);
   if (!dockDrag) return;
   e.preventDefault();
-  const over = e.target.closest('.dchip');
-  if (!over || over === dockDrag) return;
+  const over = e.target.closest('.dslot'), slot = dockDrag.parentElement;
+  if (!over || over === slot) return;
   const r = over.getBoundingClientRect();
   const ref = e.clientX > r.left + r.width / 2 ? over.nextSibling : over;
-  if (ref !== dockDrag && dockDrag.nextSibling !== ref) dockList.insertBefore(dockDrag, ref);
+  if (ref !== slot && slot.nextSibling !== ref) dockList.insertBefore(slot, ref);
 });
 dockList.addEventListener('dragend', () => {
   if (!dockDrag) return;
