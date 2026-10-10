@@ -444,6 +444,14 @@ body.term-full .side-grip { left: -6px; }
 .queue .qh { font-size: 12px; color: var(--dim); position: sticky; top: 0; z-index: 1; background: var(--surface); padding-bottom: 2px; }
 .queue .qh.held { color: var(--decision); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .queue .qh.held button { font: inherit; font-size: 12px; padding: 1px 8px; border-radius: 6px; border: 1px solid currentColor; background: none; color: inherit; cursor: pointer; }
+.queue .qh.held.calm { color: var(--dim); }
+.queue .qh.held.soon { color: var(--accent); }
+.queue .qh.held.calm button, .queue .qh.held.soon button { margin-left: auto; }
+.queue .qh .cd { font: 600 12px var(--mono); }
+.meta .q.held { color: var(--dim); }
+.meta .q.ask { color: var(--decision); font-weight: 600; animation: led 1.6s ease-in-out infinite; }
+.auto-q { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--dim); cursor: pointer; user-select: none; margin-top: -6px; align-self: flex-start; }
+.auto-q input { width: auto; margin: 0; padding: 0; accent-color: var(--accent); }
 .queue .qi { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
 .queue .qi .n { color: var(--accent); font: 600 11px/1.6 var(--mono); }
 .queue .qi .tx { flex: 1; min-width: 0; white-space: pre-wrap; word-break: break-all; }
@@ -946,6 +954,10 @@ body.term-full::before {
 .memo textarea { font-size: 13px; }
 /* 업무 지시·나중에 할 작업 입력칸은 쓴 줄 수만큼 자동으로 늘어난다(autoGrow) — 손잡이로 크기 조절은 없앰 */
 .task-form textarea, .memo-form textarea { resize: none; overflow-y: hidden; flex-shrink: 0; }
+/* 업무 지시가 바로 들어가지 못하고 대기열로 갔을 때(CLI 에 쓰던 글 등) 입력 칸을 좌우로 흔든다 */
+.shake { animation: shake .42s cubic-bezier(.36,.07,.19,.97); border-color: var(--decision) !important; }
+@keyframes shake { 15%, 85% { transform: translateX(-2px); } 30%, 70% { transform: translateX(4px); } 45% { transform: translateX(-6px); } 60% { transform: translateX(6px); } }
+@media (prefers-reduced-motion: reduce) { .shake { animation: none; } }
 .memos { list-style: none; margin: 0; padding: 2px 4px 6px 8px; /* 마우스 오버 손잡이·그림자가 스크롤 영역에 잘리지 않게 */ display: flex; flex-direction: column; gap: 5px; max-height: 220px; overflow: auto; }
 .memos li { background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; font-size: 12.5px; display: flex; flex-direction: column; gap: 5px; }
 .memos li.busy { opacity: .5; pointer-events: none; }

@@ -728,7 +728,9 @@ function updateNode(node, w) {
   $('.meta', node).innerHTML =
     `<span title="${_t(running ? '이번 턴 경과' : '마지막 갱신')}">⏱ <em data-since="${running ? w.turnStartedAt : w.updatedAt}"></em></span>` +
     `<span title="${_t('도구 사용 횟수')}">⚙ ${w.toolCount}</span>` +
-    (w.queue.length ? `<span class="q" title="${_t('대기 중인 지시')}">📥 ${w.queue.length}</span>` : '') +
+    (w.queue.length ? (w.queueHeld === 'question'
+      ? `<span class="q ask" title="${_t('응답이 질문으로 끝나 대기열을 멈췄습니다')}">❓📥 ${w.queue.length}</span>`
+      : `<span class="q${w.queueHeld ? ' held' : ''}" title="${_t(w.queueHeld ? '대기열 멈춤' : w.dispatchAt ? '곧 다음 지시 투입' : '대기 중인 지시')}">${w.queueHeld ? '⏸' : w.dispatchAt ? '⏳' : ''}📥 ${w.queue.length}</span>`) : '') +
     (w.profile?.turnCount ? `<span title="${_t('추정 비용 (API 환산)')}">$ ${fmtUsd(w.profile.total.cost).slice(1)}</span>` : '');
   // 이번(또는 마지막) 턴에 나온 최근 캡처를 무대 왼쪽 아래에 작게. 주소가 같으면 다시 그리지 않는다(깜빡임 방지)
   const { shot: showShot, doc: showDoc } = recentMedia(w);
@@ -1017,6 +1019,23 @@ function renderHint() {
 $('#hint').addEventListener('click', (e) => { if (e.target.closest('[data-hint="new"]')) $('#btn-new').click(); });
 
 // ---------- 상세 ----------
+// 대기열 머리줄 — 멈춘 이유(server.js afterTurn: 'failed' 투입 실패 · 'question' 응답이 질문 · 'manual' ⏸)·투입 대기 남은 초·자동 투입 꺼짐
+const QH_RESUME = (label = '▶ 재개') => ` <button data-resume title="${_t('맨 위부터 다시 투입')}">${_t(label)}</button>`;
+const QH_HOLD = () => ` <button data-hold title="${_t('턴이 끝나도 보내지 않고 멈춤 — ▶ 재개로 이어 감')}">${_t('⏸ 멈춤')}</button>`;
+function queueHead(w) {
+  const n = w.queue.length, idle = !['working', 'decision'].includes(w.status);
+  if (w.queueHeld === 'question') return `<div class="qh held ask" title="${_t('마지막 응답이 질문으로 끝나 대기열을 멈췄습니다 — CLI 에서 답하면 그 턴이 끝난 뒤 이어서 투입')}">${_t('❓ 응답이 질문으로 끝남 · 대기 {n}건 · 답하면 이어서', { n })}${QH_RESUME()}</div>`;
+  if (w.queueHeld === 'manual') return `<div class="qh held" title="${_t('⏸ 로 멈춘 대기열 — ▶ 재개로 이어 갑니다')}">${_t('⏸ 대기열 멈춤 · {n}건', { n })}${QH_RESUME()}</div>`;
+  if (w.queueHeld) return `<div class="qh held" title="${_t('지시가 CLI 에 들어가지 않아 보류 중 — 중복 투입을 막으려고 자동으로 다시 보내지 않습니다')}">${_t('⚠ 보류된 지시 {n}건 · 터미널 확인 후', { n })}${QH_RESUME()}</div>`;
+  if (w.dispatchAt) return `<div class="qh held soon">${_t('{s}초 뒤 1번 투입 · 대기 {n}건', { n, s: `<span class="cd" data-at="${w.dispatchAt}"></span>` })}${QH_HOLD()}</div>`;
+  if (state.manualQueue?.[w.name]) return `<div class="qh held" title="${_t('자동 투입이 꺼져 있어 ▶ 를 눌러야 한 건씩 투입됩니다')}">${_t('자동 투입 꺼짐 · 대기 {n}건', { n })}${idle ? QH_RESUME('▶ 1번 보내기') : ''}</div>`;
+  return `<div class="qh held calm" title="${_t('현재 턴이 끝나면 위에서부터 투입')}">${_t('대기 중인 지시 {n}건', { n })}${QH_HOLD()}</div>`;
+}
+// 투입 대기 남은 초 — 상태가 안 바뀌어도 매초 줄어들게(새로 그린 직후에도 비지 않게 renderDetail 끝에서도 부른다)
+function tickQueueCountdown() {
+  for (const c of document.querySelectorAll('#queue .cd')) c.textContent = Math.max(0, Math.ceil((Number(c.dataset.at) + clockSkew - Date.now()) / 1000));
+}
+setInterval(tickQueueCountdown, 250);
 function renderDetail() {
   const w = state.workers.find((x) => x.id === selected);
   const wasHidden = $('#detail').hidden;
@@ -1036,15 +1055,13 @@ function renderDetail() {
   const meta = $('#detail-meta');
   if (meta._html !== metaHtml) meta.innerHTML = meta._html = metaHtml;
   renderMemos(w);
+  $('#auto-queue').checked = !state.manualQueue?.[w.name];
   const queueEl = $('#queue');
-  const queueHtml = w.queue.length
-    ? (w.queueHeld
-      ? `<div class="qh held" title="${_t('지시가 CLI 에 들어가지 않아 보류 중 — 중복 투입을 막으려고 자동으로 다시 보내지 않습니다')}">${_t('⚠ 보류된 지시 {n}건 · 터미널 확인 후', { n: w.queue.length })} <button data-resume title="${_t('맨 위부터 다시 투입')}">${_t('▶ 재개')}</button></div>`
-      : `<div class="qh" title="${_t('현재 턴이 끝나면 위에서부터 투입')}">${_t('대기 중인 지시 {n}건', { n: w.queue.length })}</div>`) +
+  const queueHtml = w.queue.length ? queueHead(w) +
       w.queue.map((q, i) => `<div class="qi"><span class="n">${i + 1}</span><span class="tx"><span class="qt">${esc(q)}</span>${attachChips(q, 'sm')}</span><button data-tomemo="${i}" title="${_t('나중에 할 작업으로 되돌리기')}">↩</button><button data-unqueue="${i}" title="${_t('큐에서 빼기')}">✕</button></div>`).join('')
     : '';
   // 상태가 올 때마다 통째로 바꾸면 썸네일이 다시 로드되고 누르는 중인 타일이 사라진다 → 바뀐 때만
-  if (queueEl._html !== queueHtml) queueEl.innerHTML = queueEl._html = queueHtml;
+  if (queueEl._html !== queueHtml) { queueEl.innerHTML = queueEl._html = queueHtml; tickQueueCountdown(); }
   const fmt = (t) => new Date(t + clockSkew).toLocaleTimeString(uiLocale(), { hour12: false });
   timelineCache = timelineRows(w.log, w.shots, w.docs, w.past);
   // CLI 처럼 아래로 갈수록 최신. 맨 아래를 보고 있었거나 워커를 바꿨으면 새 줄을 따라 내려가고,
@@ -2006,13 +2023,24 @@ taskForm.onsubmit = async (e) => {
   e.preventDefault();
   const text = taskForm.text.value.trim();
   if (!text || !selected) return;
+  const to = selected;
   taskForm.text.value = '';
   autoGrow(taskForm.text);
   taskForm.text.focus();
-  flyToWorker(selected, taskForm.text, 'task');
-  const r = await api(`/api/workers/${selected}/task`, { text });
-  // CLI 입력창에 쓰던 글이 있으면 서버가 합치지 않고 대기열에 둔다(server.js assignTask)
-  if (r?.held) toast(_t('CLI 입력창에 쓰던 글이 있어 업무 지시를 대기열에 두었습니다 — 그 글을 보내거나 지우면 이어서 투입됩니다'), 4500);
+  const r = await api(`/api/workers/${to}/task`, { text });
+  // 쉬는 워커의 CLI 입력창에 쓰던 글이 있거나 입력창이 아닌 화면(선택창·! 셸 모드)이면 서버가 보내지 않는다(대기열에도 안 넣음 — server.js assignTask).
+  // 흔들림 = 전송 실패: 글을 입력 칸에 되돌리고(그사이 새로 쓴 글이 있으면 뒤에 붙인다) 알린다
+  if (r?.rejected) {
+    const ta = taskForm.text;
+    ta.value = ta.value.trim() ? `${text}\n${ta.value}` : text;
+    autoGrow(ta);
+    toast(r.rejected === 'blocked'
+      ? _t('전송 실패 — CLI 가 입력 대기 화면이 아닙니다(선택창, ! 셸 모드 등). 입력창으로 돌아온 뒤 다시 보내세요')
+      : _t('전송 실패 — CLI 입력창에 쓰던 글이 있습니다. 그 글을 보내거나 지운 뒤 다시 보내세요'), 4500);
+    shake(ta);
+    return;
+  }
+  if (!r?.error) flyToWorker(to, taskForm.text, 'task');
 };
 function shake(node) {
   node.classList.remove('shake');
@@ -2187,9 +2215,9 @@ $('#memos').addEventListener('click', async (e) => {
   if (act === 'edit') return editMemo(li, w);
   if (act === 'remove' && !(await ask({ title: _t('이 작업을 지울까요?'), body: li.querySelector('.mt')?.textContent.slice(0, 120) || '', ok: _t('지우기'), danger: true }))) return;
   li.classList.add('busy');
-  if (act === 'send') flyToWorker(w.id, li, 'task');
   const r = await api('/api/memos', { role: w.name, op: act, id: li.dataset.id, workerId: w.id });
-  if (r.error) { li.classList.remove('busy'); toast(r.error, 3000); } // 성공은 날아가는 쪽지로 알린다
+  if (r.error) { li.classList.remove('busy'); toast(r.error, 3000); if (act === 'send') shake(li); return; } // 보내기 실패는 흔들림으로
+  if (act === 'send') flyToWorker(w.id, li, 'task'); // 성공은 날아가는 쪽지로 알린다
 });
 
 // ---------- 메모 → 다른 워커 카드로 끌어 옮기기 ----------
@@ -2278,6 +2306,7 @@ dockList.addEventListener('dragleave', (e) => {
 
 $('#queue').addEventListener('click', (e) => {
   if (e.target.closest('[data-resume]') && selected) { api(`/api/workers/${selected}/resume`, {}); return; }
+  if (e.target.closest('[data-hold]') && selected) { api(`/api/workers/${selected}/hold`, {}); return; }
   // ✕ 빼기 · ↩ 나중에 할 작업으로 — 번호와 함께 글도 보내, 그사이 CLI 로 나간 지시면 서버가 거절한다(두 번 실행 방지)
   const b = e.target.closest('[data-unqueue], [data-tomemo]');
   const w = b && selected && state.workers.find((x) => x.id === selected);
@@ -2288,6 +2317,9 @@ $('#queue').addEventListener('click', (e) => {
     .then((r) => { if (r.status === 409) toast(_t('이미 CLI 로 보낸 지시라 옮기지 못했어요')); else if (op === 'tomemo' && r.ok) toast(_t('나중에 할 작업으로 옮겼어요')); })
     .catch(() => { b.disabled = false; });
 });
+
+// 역할별 대기열 자동 투입 켜기/끄기 (server.js config.manualQueue)
+$('#auto-queue').addEventListener('change', (e) => { if (selected) api(`/api/workers/${selected}/autoqueue`, { on: e.target.checked }); });
 
 // ---------- 다크/라이트 테마 ----------
 // 고른 테마는 브라우저에 기억한다(첫 그리기 전 적용은 index.html 머리의 짧은 스크립트). 터미널은 두 테마 모두 어둡다

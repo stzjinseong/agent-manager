@@ -149,8 +149,8 @@ function usageReporters() {
 function loadConfig() {
   try {
     const c = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
-    return { profiles: c.profiles || [], recentCwds: c.recentCwds || [], order: c.order || [], memos: c.memos || {}, colors: c.colors || {}, sessions: c.sessions || {}, diffCleared: c.diffCleared || {} };
-  } catch { return { profiles: [], recentCwds: [], order: [], memos: {}, colors: {}, sessions: {}, diffCleared: {} }; }
+    return { profiles: c.profiles || [], recentCwds: c.recentCwds || [], order: c.order || [], memos: c.memos || {}, colors: c.colors || {}, sessions: c.sessions || {}, diffCleared: c.diffCleared || {}, manualQueue: c.manualQueue || {} };
+  } catch { return { profiles: [], recentCwds: [], order: [], memos: {}, colors: {}, sessions: {}, diffCleared: {}, manualQueue: {} }; }
 }
 
 function saveConfig() {
@@ -215,6 +215,7 @@ function renameRole(from, to, worker) {
   if (config.colors?.[from] != null && config.colors[to] == null) { config.colors[to] = config.colors[from]; delete config.colors[from]; }
   if (config.sessions?.[from]) { config.sessions[to] = config.sessions[from]; delete config.sessions[from]; }
   if (config.memos?.[from]) { config.memos[to] = [...(config.memos[to] || []), ...config.memos[from]]; delete config.memos[from]; }
+  if (config.manualQueue?.[from]) { config.manualQueue[to] = true; delete config.manualQueue[from]; }
   saveConfig(); // emitState 포함
   return { ok: true };
 }
@@ -308,7 +309,7 @@ function checkInterrupted(w) {
     w.doneAt = Date.now(); // 화면의 '확인 안 한 완료' 표시 기준
     payout(w);
     setStatus(w, 'done', '턴 완료 (기록으로 확인)');
-    if (w.queue.length) setTimeout(() => dispatchQueued(w), 400);
+    afterTurn(w, tx.lastText);
     return;
   }
   const at = w.tx?.interruptedAt;
@@ -425,35 +426,96 @@ function setStatus(w, status, note) {
   emitState();
 }
 
-// 업무 지시: 입력 대기 상태면 즉시, 아니면 큐에 쌓았다가 Stop 시점에 투입.
-// CLI 입력창에 사람이 쓰던 글이 있으면 그 뒤에 붙어 한 요청으로 나가 버리므로, 그때도 큐에 넣고 입력창이 빌 때까지 기다린다.
-// 입력창이 아닌 화면(/resume·/model 선택창, ! 셸 모드 등)이면 지시가 검색칸·셸 명령으로 들어가 버리므로 그때도 기다린다
+// 업무 지시: 입력 대기 상태면 즉시, 작업 중이면 큐에 쌓았다가 Stop 시점에 투입.
+// 쉬는 워커의 CLI 입력창에 사람이 쓰던 글이 있거나(그 뒤에 붙어 한 요청으로 나가 버린다) 입력창이 아닌 화면이면
+// (/resume·/model 선택창, ! 셸 모드 등 — 지시가 검색칸·셸 명령으로 들어간다) 보내지 않는다. 대기열에도 넣지 않고 실패로 돌려주면
+// 화면이 글을 입력 칸에 되돌리고 흔든다({ rejected: 'draft' | 'blocked' })
 const isIdle = (w) => w.status === 'idle' || w.status === 'done' || w.status === 'interrupted';
 async function assignTask(w, text) {
   text = String(text || '').trim();
   if (!text) return {};
-  if (isIdle(w) && w.queue.length) {
-    // 쉬는 중인데 대기열이 남아 있으면(중단됨·투입 실패로 보류) 새 지시를 뒤에 붙이고 맨 앞부터 이어서 투입
+  if (isIdle(w)) {
+    const cli = await cliDraft(w);
+    if (isIdle(w) && cli.state !== 'empty') return { rejected: cli.state };
+  }
+  // 질문·⏸ 로 멈췄거나 자동 투입을 끈 대기열은 그대로 두고, 쉬는 워커에 새로 보낸 지시는 바로 넣는다 — 질문에 대한 답일 수 있다
+  const waitsForUser = w.queueHeld === 'question' || w.queueHeld === 'manual' || manualQueue(w);
+  if (isIdle(w) && w.queue.length && !waitsForUser) {
+    // 쉬는 중인데 대기열이 남아 있으면(중단됨·투입 실패로 보류·투입 대기 중) 새 지시를 뒤에 붙이고 맨 앞부터 이어서 투입
+    cancelDispatch(w);
     w.queueHeld = false;
     w.queue.push(text); pushLog(w, 'queue', text); emitState();
     dispatchQueued(w);
     return {};
   }
   if (isIdle(w)) {
-    w.queueHeld = false;
-    const cli = await cliDraft(w);
-    if (isIdle(w) && !w.queue.length && cli.state === 'empty') { sendPrompt(w, text); return {}; }
-    if (isIdle(w) && cli.state !== 'empty') { w.queue.push(text); pushLog(w, 'queue', text); holdForDraft(w, cli.state); emitState(); return { held: true }; }
+    if (!waitsForUser || w.queueHeld === 'question') w.queueHeld = false;
+    cancelDispatch(w);
+    sendPrompt(w, text);
+    return {};
   }
   w.queue.push(text); pushLog(w, 'queue', text); emitState();
   return {};
 }
+// ---------- 턴이 끝난 뒤 대기열 잇기 ----------
+// 대기열은 사람이 안 보는 사이 넘어가기 쉽다 — 응답이 '어느 쪽으로 할까요?'처럼 묻고 끝났는데 다음 지시가 곧바로 들어가
+// 그 질문을 못 보고 지나쳤다. 그래서
+//   1) 마지막 응답이 질문으로 끝나면 대기열을 멈춘다(queueHeld='question') — CLI 에서 답하면(UserPromptSubmit) 풀리고 그 턴 뒤에 잇는다
+//   2) 그 밖에도 바로 넣지 않고 DISPATCH_GRACE_MS 동안 기다린다(w.dispatchAt — 화면에 남은 초와 ⏸)
+//   3) 역할마다 자동 투입을 끌 수 있다(config.manualQueue) — 그때는 ▶ 를 눌러야 한 건씩 나간다
+// queueHeld: false | 'failed'(투입 실패 — 중복 위험) | 'question'(응답이 질문) | 'manual'(⏸). 예전 버전이 저장한 true 는 'failed' 로 본다
+const DISPATCH_GRACE_MS = 8000;
+const dispatchTimers = new Map(); // 워커 id → setTimeout (draftTimers 와 같은 이유로 워커 밖에 둔다)
+const manualQueue = (w) => Boolean(config.manualQueue?.[w.name]);
+function afterTurn(w, lastText) {
+  if (!w.queue.length || w.queueHeld) return;
+  if (endsWithQuestion(lastText)) {
+    w.queueHeld = 'question';
+    pushLog(w, 'notice', '응답이 질문으로 끝나 대기열을 멈췄습니다 — CLI 에서 답하면 그 턴이 끝난 뒤 이어서 투입 · 바로 보내려면 ▶ 재개');
+    emitState();
+    return;
+  }
+  scheduleDispatch(w);
+}
+function scheduleDispatch(w) {
+  cancelDispatch(w);
+  if (!w.queue.length || w.queueHeld || manualQueue(w)) return;
+  w.dispatchAt = Date.now() + DISPATCH_GRACE_MS;
+  dispatchTimers.set(w.id, setTimeout(() => {
+    dispatchTimers.delete(w.id);
+    w.dispatchAt = 0;
+    emitState();
+    dispatchQueued(w);
+  }, DISPATCH_GRACE_MS));
+  emitState();
+}
+function cancelDispatch(w) {
+  clearTimeout(dispatchTimers.get(w.id));
+  dispatchTimers.delete(w.id);
+  if (w.dispatchAt) { w.dispatchAt = 0; emitState(); }
+}
+// 응답 끝이 사람에게 묻는 말인가 — 넉넉하게 잡는다(잘못 멈추면 ▶ 한 번이지만, 놓치면 질문을 지나친다).
+// 코드 블록은 빼고 마지막 몇 줄만 본다: 물음표로 끝남 · 묻는 어미/문구 · 질문 줄 뒤에 붙은 선택지 목록(1. 2. / A) B))
+const ASK_KO = /(까요|시겠어요|시겠습니까|실래요|원하시는|원하시나요|어떤 (것|걸|쪽|방식|방법|안)|어느 (것|걸|쪽)|(선택|골라|알려|말씀|정해|결정)(해)? ?주(세요|시면)|주시면 (진행|구현|적용|작업|반영))/;
+const ASK_EN = /\b(would you like|do you want|should i|shall i|which (one|option|approach|way)|let me know|please (choose|confirm|pick|decide)|do you prefer|would you prefer)\b/i;
+const OPTION_LINE = /^(\d+[.)]|[A-Za-z][.)]|[①-⑨]|[-*•]\s*\*\*)/;
+function endsWithQuestion(text) {
+  const lines = String(text || '').replace(/```[\s\S]*?```/g, '').split('\n').map((l) => l.trim()).filter(Boolean);
+  if (!lines.length) return false;
+  if (/[?？]$/.test(lines.at(-1).replace(/[*_`)\]\s]+$/, ''))) return true;
+  const tail = lines.slice(-3).join(' ');
+  if (ASK_KO.test(tail) || ASK_EN.test(tail)) return true;
+  let k = lines.length - 1;
+  while (k >= 0 && OPTION_LINE.test(lines[k])) k--;
+  return lines.length - 1 - k >= 2 && k >= 0 && (/[?？:：]$/.test(lines[k]) || ASK_KO.test(lines[k]) || ASK_EN.test(lines[k]));
+}
 // 큐 맨 앞 지시를 투입 — 턴이 끝났을 때. 입력창에 쓰던 글이 있거나 입력창이 아닌 화면이면 기다린다.
 // 투입 실패로 보류된 대기열(queueHeld)은 새 지시나 ▶ 재개가 있을 때까지 자동으로 보내지 않는다(실제로는 들어갔을 수도 있어 중복 위험)
-async function dispatchQueued(w) {
-  if (!w.queue.length || !isIdle(w) || w.queueHeld) return;
+// force: ▶ 재개 — 자동 투입을 끈 역할도 한 건 보낸다
+async function dispatchQueued(w, force = false) {
+  if (!w.queue.length || !isIdle(w) || w.queueHeld || (!force && manualQueue(w))) return;
   const cli = await cliDraft(w);
-  if (cli.state !== 'empty') { holdForDraft(w, cli.state); emitState(); return; }
+  if (cli.state !== 'empty') { holdForDraft(w, cli.state); emitState(); return cli.state; } // 'draft' | 'blocked' — 기다리는 이유
   if (!w.queue.length || !isIdle(w) || w.queueHeld) return;
   sendPrompt(w, w.queue.shift());
 }
@@ -600,7 +662,7 @@ async function confirmPrompt(w, at) {
     return;
   }
   w.queue.unshift(sent.text);
-  w.queueHeld = true;
+  w.queueHeld = 'failed';
   pushLog(w, 'notice', `업무 지시가 CLI 에 들어가지 않은 것 같습니다${cli.state === 'blocked' ? '(입력 대기 화면이 아님)' : ''} — 대기열 맨 앞에 보류했습니다. 터미널을 확인하고 ▶ 재개하거나 새 지시를 보내세요`);
   setStatus(w, 'idle', '업무 지시 투입 실패');
 }
@@ -753,6 +815,8 @@ function onHook(w, ev, res) {
       w.turnStartedAt = Date.now();
       w.notice = null;
       w.sentPrompt = null; // 투입 확인
+      cancelDispatch(w); // 투입 대기 중에 사람이 CLI 로 먼저 보냈다
+      if (w.queueHeld === 'question') w.queueHeld = false; // 질문에 답했다 — 이 턴이 끝나면 대기열을 잇는다
       progress.open(w);
       setStatus(w, 'working', w.lastPrompt);
       break;
@@ -816,7 +880,7 @@ function onHook(w, ev, res) {
       payout(w);
       setTimeout(() => judgeCache(w), 1500); // 마지막 응답이 트랜스크립트에 다 쓰일 시간을 준다
       setStatus(w, 'done', '턴 완료');
-      if (w.queue.length) setTimeout(() => dispatchQueued(w), 400);
+      afterTurn(w, ev.last_assistant_message ?? w.lastMessage);
       break;
     case 'SubagentStop':
       if (ev.agent_id && w.tx) w.tx.doneAgents.add(ev.agent_id);
@@ -923,6 +987,7 @@ function publicState() {
     profiles: config.profiles,
     order: config.order,
     memos: config.memos,
+    manualQueue: config.manualQueue, // 대기열 자동 투입을 끈 역할 (이름 → true)
     colors: config.colors,
     // 대기실 카드: 이어 갈 수 있는 마지막 세션의 시각 (역할 이름 → at)
     resumable: Object.fromEntries(config.profiles.map((p) => [p.name, resumableSession(p.name, p.cwd, p.args)?.at]).filter(([, at]) => at != null)),
@@ -1013,6 +1078,9 @@ function onHostHello({ ptys }) {
     const w = { ...rec, term: hostTerm(rec.id), tx: rec.txPath ? openProfile(rec.txPath) : null };
     delete w.txPath;
     delete w.shellPending; // 예전 버전이 워커 객체에 두어 {} 로 저장된 것
+    if (w.queueHeld === true) w.queueHeld = 'failed'; // 이유를 두기 전 버전
+    const resumeDispatch = Boolean(w.dispatchAt); // 투입 대기 중에 재시작했으면 대기를 다시 건다
+    w.dispatchAt = 0;
     if (!p || p.exited) w.status = 'exited';
     else { w.pid = p.pid; pushLog(w, 'status', '관제 서버 재시작 — 워커 다시 연결'); }
     // 완료 시각 기록(doneAt) 이전에 끝난 워커도 '확인 안 한 완료'로 보이게 마지막 갱신 시각으로 채운다
@@ -1021,6 +1089,7 @@ function onHostHello({ ptys }) {
     ensureRoleColor(w.name);
     workers.set(w.id, w);
     if (w.tx) scheduleProfile(w);
+    if (resumeDispatch && w.status !== 'exited') scheduleDispatch(w);
   }
   for (const id of [...workers.keys(), ...alive.keys()]) seq = Math.max(seq, Number(String(id).replace(/\D/g, '')) || 0);
   const before = JSON.stringify(config.sessions);
@@ -1475,7 +1544,9 @@ const server = http.createServer(async (req, res) => {
       const m = list.find((x) => x.id === id), w = workers.get(workerId);
       if (!m || !w) return json(res, 404, { error: '메모나 워커가 없습니다' });
       if (w.status === 'exited') return json(res, 409, { error: '종료된 워커에는 지시할 수 없습니다' });
-      assignTask(w, m.text);
+      const r = await assignTask(w, m.text);
+      // CLI 에 쓰던 글이 있는 등 보내지 못했으면 메모를 그대로 둔다
+      if (r.rejected) return json(res, 409, { error: r.rejected === 'blocked' ? 'CLI 가 입력 대기 화면이 아니어서 보내지 못했습니다' : 'CLI 입력창에 쓰던 글이 있어 보내지 못했습니다' });
       config.memos[role] = list.filter((x) => x.id !== id);
     }
     // 다른 역할로 옮기기: 워커 카드(대기실 슬롯 포함)에 끌어다 놓으면 그 역할 목록 끝으로 간다
@@ -1611,7 +1682,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   let m;
-  if (req.method === 'POST' && (m = p.match(/^\/api\/workers\/(W\d+)\/(task|kill|remove|interrupt|unqueue|tomemo|resume|rename|diffclear)$/))) {
+  if (req.method === 'POST' && (m = p.match(/^\/api\/workers\/(W\d+)\/(task|kill|remove|interrupt|unqueue|tomemo|resume|hold|autoqueue|rename|diffclear)$/))) {
     const w = workers.get(m[1]);
     if (!w) return json(res, 404, { error: 'no worker' });
     const body = await readBody(req);
@@ -1642,7 +1713,16 @@ const server = http.createServer(async (req, res) => {
       pushLog(w, 'status', 'diff 목록 비움');
       saveConfig(); // emitState 포함
     }
-    if (m[2] === 'resume') { w.queueHeld = false; emitState(); dispatchQueued(w); }
+    if (m[2] === 'resume') { cancelDispatch(w); w.queueHeld = false; emitState(); dispatchQueued(w, true); }
+    // ⏸ 대기열 멈춤 — 투입 대기(남은 초) 중이든 작업 중이든, ▶ 재개 전까지 보내지 않는다
+    if (m[2] === 'hold' && w.queue.length && !w.queueHeld) { cancelDispatch(w); w.queueHeld = 'manual'; pushLog(w, 'status', '대기열 일시정지'); emitState(); }
+    // 역할별 자동 투입 켜기/끄기. 켜는 순간 쉬고 있고 대기열이 있으면 투입 대기를 시작한다
+    if (m[2] === 'autoqueue') {
+      if (body.on) delete config.manualQueue[w.name]; else config.manualQueue[w.name] = true;
+      pushLog(w, 'status', body.on ? '대기열 자동 투입 켬' : '대기열 자동 투입 끔 — ▶ 를 눌러야 한 건씩 투입');
+      if (body.on) { if (isIdle(w)) scheduleDispatch(w); } else cancelDispatch(w);
+      saveConfig(); // emitState 포함
+    }
     if (m[2] === 'rename') {
       const r = renameRole(w.name, body.name, w);
       if (r.error) return json(res, 409, r);
