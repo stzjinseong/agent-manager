@@ -1020,6 +1020,9 @@ $('#hint').addEventListener('click', (e) => { if (e.target.closest('[data-hint="
 
 // ---------- 상세 ----------
 // 대기열 머리줄 — 멈춘 이유(server.js afterTurn: 'failed' 투입 실패 · 'question' 응답이 질문)·투입 대기 남은 초·자동 투입 꺼짐
+// 대기열 ↩ 되돌리기·✕ 빼기 아이콘 — 메모 카드의 수정·보내기와 같은 버튼 모양(.memo-ic)
+const UNDO_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>';
+const X_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
 const QH_RESUME = (label = '▶ 재개') => ` <button data-resume title="${_t('맨 위부터 다시 투입')}">${_t(label)}</button>`;
 function queueHead(w) {
   const n = w.queue.length, idle = !['working', 'decision'].includes(w.status);
@@ -1057,7 +1060,7 @@ function renderDetail() {
   $('#auto-queue').checked = !state.manualQueue?.[w.name];
   const queueEl = $('#queue');
   const queueHtml = w.queue.length ? queueHead(w) +
-      w.queue.map((q, i) => `<div class="qi"><span class="n">${i + 1}</span><span class="tx"><span class="qt">${esc(q)}</span>${attachChips(q, 'sm')}</span><button data-tomemo="${i}" title="${_t('나중에 할 작업으로 되돌리기')}">↩</button><button data-unqueue="${i}" title="${_t('큐에서 빼기')}">✕</button></div>`).join('')
+      w.queue.map((q, i) => `<div class="qi"><span class="n">${i + 1}</span><span class="tx"><span class="qt">${esc(q)}</span>${attachChips(q, 'sm')}</span><button class="btn mini ghost memo-ic" data-tomemo="${i}" title="${_t('나중에 할 작업으로 되돌리기')}" aria-label="${_t('나중에 할 작업으로 되돌리기')}">${UNDO_SVG}</button><button class="btn mini ghost memo-ic" data-unqueue="${i}" title="${_t('큐에서 빼기')}" aria-label="${_t('큐에서 빼기')}">${X_SVG}</button></div>`).join('')
     : '';
   // 상태가 올 때마다 통째로 바꾸면 썸네일이 다시 로드되고 누르는 중인 타일이 사라진다 → 바뀐 때만
   if (queueEl._html !== queueHtml) { queueEl.innerHTML = queueEl._html = queueHtml; tickQueueCountdown(); }
@@ -2069,7 +2072,7 @@ function renderMemos(w) {
   const fmt = (t) => new Date(t + clockSkew).toLocaleString(uiLocale(), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
   $('#memos').innerHTML = list.length
     ? `<li class="mh">${_t('{n}건', { n: list.length })}</li>` + list.map((m) => `<li data-id="${m.id}" draggable="true" title="${_t('워커 카드에 끌어다 놓으면 그 워커의 나중에 할 작업으로 옮겨집니다')}"><span class="mt">${esc(m.text)}</span>${attachChips(m.text, 'sm')}
-        <span class="ma"><time>${fmt(m.createdAt)}</time><button class="btn mini ghost memo-ic" data-memo="edit" title="${_t('내용 수정')}" aria-label="${_t('내용 수정')}">${MEMO_EDIT_SVG}</button><button class="btn mini ghost memo-ic" data-memo="send" title="${_t('업무 지시로 보내기 (작업 중이면 대기열)')}" aria-label="${_t('업무 지시로 보내기')}">${MEMO_SEND_SVG}</button><button class="btn mini ghost" data-memo="remove" title="${_t('삭제')}">✕</button></span></li>`).join('')
+        <span class="ma"><time>${fmt(m.createdAt)}</time><button class="btn mini ghost memo-ic" data-memo="edit" title="${_t('내용 수정')}" aria-label="${_t('내용 수정')}">${MEMO_EDIT_SVG}</button><button class="btn mini ghost memo-ic" data-memo="send" title="${_t('업무 지시로 보내기 (작업 중이면 대기열)')}" aria-label="${_t('업무 지시로 보내기')}">${MEMO_SEND_SVG}</button><button class="btn mini ghost memo-ic" data-memo="remove" title="${_t('삭제')}" aria-label="${_t('삭제')}">${X_SVG}</button></span></li>`).join('')
     : ''; // 비어 있으면 아무것도 두지 않는다 — 업무 지시처럼 입력칸에서 섹션이 끝나 타임라인과의 간격이 같다
 }
 // 수정: 본문 자리에 입력칸을 띄운다. 키 세트의 전송 키로 저장 · Esc 취소 — 추가 칸과 같은 키
