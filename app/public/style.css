@@ -1290,6 +1290,9 @@ html[data-char="clawd-white"] :is(.node, .dchip, .detail-avatar, .term-wrap) { -
 .diff-files { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line-2); }
 .diff-files-head { display: flex; align-items: center; gap: 6px; padding: 8px 8px 9px; color: var(--text-2); border-bottom: 1px solid var(--line); }
 .diff-files-head #diff-sum { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.diff-clear { flex: none; display: grid; place-items: center; width: 24px; height: 24px; margin: -3px 0; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--dim); cursor: pointer; }
+.diff-clear:hover { background: var(--surface-3); color: #e0655a; }
+.diff-clear svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 #diff-files { list-style: none; margin: 0; padding: 4px; overflow: auto; flex: 1; }
 /* 요청(오름차순) → 펼치면 그 요청에서 고친 파일 */
 #diff-files .dr { margin-bottom: 2px; }

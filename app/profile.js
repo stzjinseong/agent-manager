@@ -41,6 +41,7 @@ export function createProfile(file) {
     toolErrors: 0, toolErrBy: {}, // 도구 결과 is_error
     compactLog: [], // compact_boundary.compactMetadata
     edits: [], editSeen: new Set(), // Edit/Write 로 고친 파일 이력 (diff 보기) — editOf. editSeen: 같은 결과가 두 번 기록돼도 한 번만
+    diffClearedAt: 0, // diff 목록 비우기(🗑) 시각 — 그때까지의 수정은 다시 읽어도 담지 않는다(clearEdits)
     shellEdits: [], // 셸 명령으로 바뀐 파일 (서버가 git 비교로 채운다 — 트랜스크립트엔 없음)
   };
 }
@@ -79,6 +80,7 @@ export function trimHunks(hunks) {
   return { add, del, cut, hunks };
 }
 function pushEdit(p, ed) {
+  if (ed.ts <= p.diffClearedAt) return null;
   p.edits.push(ed);
   // 긴 트랜스크립트를 읽는 동안에도 메모리가 불지 않게 가끔 — 이때는 Edit/Write 만(셸 수정은 아직 안 읽은 턴에 속할 수 있어 다 읽은 뒤에)
   if (p.edits.length % 50 === 0) pruneEdits(p, false);
@@ -393,7 +395,7 @@ export function runningSubagents(p) {
 export function readProfile(p) {
   let r = readLines(p, p.path, (e, line) => apply(p, e, line));
   // 트랜스크립트가 줄었으면 처음부터 다시 읽는다 — 셸 수정은 트랜스크립트에 없는 서버 기록이라 그대로 둔다(비우면 다음 정리 때 디스크 파일까지 지워졌다)
-  if (r === 'reset') { const shell = p.shellEdits; Object.assign(p, createProfile(p.path)); p.shellEdits = shell; r = readLines(p, p.path, (e, line) => apply(p, e, line)); }
+  if (r === 'reset') { const { shellEdits: shell, diffClearedAt } = p; Object.assign(p, createProfile(p.path)); Object.assign(p, { shellEdits: shell, diffClearedAt }); r = readLines(p, p.path, (e, line) => apply(p, e, line)); }
   const s = readSubagents(p);
   return Boolean(r || s);
 }
@@ -404,9 +406,16 @@ function turnAt(p, ts) {
   for (let i = p.turns.length - 1; i >= 0; i--) if (p.turns[i].start <= ts) return p.turns[i];
   return null;
 }
+// diff 목록 비우기 — 지금까지의 수정(Edit/Write·셸)을 버리고, 트랜스크립트를 다시 읽어도(서버 재시작) 그 시각 전 것은 담지 않는다
+export function clearEdits(p, at = Date.now()) {
+  p.diffClearedAt = at;
+  p.edits = [];
+  p.shellEdits = [];
+  p.pruneKey = null;
+}
 // Edit/Write(메인·서브에이전트) + 셸 명령 수정을 시간순으로. 셸 수정의 턴은 그 Bash 호출의 턴(서브에이전트 Bash 면 그 시각의 턴)
 function allEdits(p) {
-  const shell = p.shellEdits.map((ed) => ({ ...ed, turn: (p.toolTurn.get(ed.toolUseId) || turnAt(p, ed.ts))?.n ?? null }));
+  const shell = p.shellEdits.filter((ed) => ed.ts > p.diffClearedAt).map((ed) => ({ ...ed, turn: (p.toolTurn.get(ed.toolUseId) || turnAt(p, ed.ts))?.n ?? null }));
   return shell.length ? [...p.edits, ...shell].sort((a, b) => a.ts - b.ts) : p.edits;
 }
 

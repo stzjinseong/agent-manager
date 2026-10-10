@@ -3434,6 +3434,16 @@ async function loadDiff() {
   diffKey = key;
   renderDiff();
 }
+// 🗑 diff 목록 비우기 — 이 세션의 지금까지 수정을 목록에서 뺀다(파일은 그대로). 이후 수정부터 다시 쌓인다
+$('#diff-clear').addEventListener('click', async () => {
+  const w = state.workers.find((x) => x.id === selected);
+  if (!w) return;
+  if (!(await ask({ title: _t('diff 목록을 비울까요?'), body: _t('지금까지의 요청·파일 변경 기록을 목록에서 지웁니다. 실제 파일은 바뀌지 않고, 앞으로의 수정부터 다시 쌓입니다.'), ok: _t('비우기'), danger: true }))) return;
+  const r = await api(`/api/workers/${w.id}/diffclear`, {});
+  if (r?.error) return;
+  diffSel = null; diffExpanded = new Set(); diffFollow = true;
+  loadDiff();
+});
 function setDiffOpen(on) {
   diffOpen = on;
   $('#diff-view').hidden = !on;
@@ -3479,6 +3489,7 @@ function renderDiff() {
   if (!latest) diffSel = null;
   const allFiles = diffData?.files || [];
   const add = allFiles.reduce((a, f) => a + f.add, 0), del = allFiles.reduce((a, f) => a + f.del, 0);
+  $('#diff-clear').hidden = !allFiles.length;
   $('#diff-sum').innerHTML = allFiles.length
     ? `${_t('요청 <b>{n}</b>', { n: groups.length })} · ${_t('파일 <b>{n}</b>', { n: allFiles.length })} <span class="d-add">+${add}</span> <span class="d-del">−${del}</span>` : _t('고친 파일 없음');
   const list = $('#diff-files');

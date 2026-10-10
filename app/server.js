@@ -11,7 +11,7 @@ import { execSync, execFile, spawn as spawnProcess } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import WebSocket, { WebSocketServer } from 'ws';
 import { createRequire } from 'node:module';
-import { createProfile, readProfile, profileSummary, runningSubagents, editLog, trimHunks, pruneEdits } from './profile.js';
+import { createProfile, readProfile, profileSummary, runningSubagents, editLog, trimHunks, pruneEdits, clearEdits } from './profile.js';
 import { snapshot, changedSince } from './shelldiff.js';
 import { createProgress, isCommit } from './progress.js';
 import { L } from './cli-lang.js';
@@ -149,8 +149,8 @@ function usageReporters() {
 function loadConfig() {
   try {
     const c = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
-    return { profiles: c.profiles || [], recentCwds: c.recentCwds || [], order: c.order || [], memos: c.memos || {}, colors: c.colors || {}, sessions: c.sessions || {} };
-  } catch { return { profiles: [], recentCwds: [], order: [], memos: {}, colors: {}, sessions: {} }; }
+    return { profiles: c.profiles || [], recentCwds: c.recentCwds || [], order: c.order || [], memos: c.memos || {}, colors: c.colors || {}, sessions: c.sessions || {}, diffCleared: c.diffCleared || {} };
+  } catch { return { profiles: [], recentCwds: [], order: [], memos: {}, colors: {}, sessions: {}, diffCleared: {} }; }
 }
 
 function saveConfig() {
@@ -624,6 +624,7 @@ const shellFile = (txPath) => path.join(SHELL_DIR, `${path.basename(txPath, '.js
 const shellLines = new Map(); // 파일 경로 → 디스크에 쌓인 줄 수
 function openProfile(txPath) {
   const p = createProfile(txPath);
+  p.diffClearedAt = config.diffCleared[path.basename(txPath, '.jsonl')] || 0; // diff 목록을 비운 세션이면 그 뒤 수정만
   try {
     const lines = fs.readFileSync(shellFile(txPath), 'utf8').split('\n').filter(Boolean);
     shellLines.set(shellFile(txPath), lines.length);
@@ -1610,7 +1611,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   let m;
-  if (req.method === 'POST' && (m = p.match(/^\/api\/workers\/(W\d+)\/(task|kill|remove|interrupt|unqueue|tomemo|resume|rename)$/))) {
+  if (req.method === 'POST' && (m = p.match(/^\/api\/workers\/(W\d+)\/(task|kill|remove|interrupt|unqueue|tomemo|resume|rename|diffclear)$/))) {
     const w = workers.get(m[1]);
     if (!w) return json(res, 404, { error: 'no worker' });
     const body = await readBody(req);
@@ -1629,6 +1630,17 @@ const server = http.createServer(async (req, res) => {
         pushLog(w, 'status', `대기열 → 나중에 할 작업: ${q}`);
         saveConfig(); // emitState 포함
       } else { pushLog(w, 'unqueue', q); emitState(); } // 그냥 지운 지시도 무엇을 뺐는지 타임라인에 남긴다
+    }
+    // diff 목록 비우기(🗑) — 이 세션의 지금까지 수정을 목록에서 뺀다. 시각은 세션(트랜스크립트)별로 config 에 남겨 재시작해도 비운 채로.
+    // 셸 수정 기록 파일도 지운다(서버가 쌓는 기록이라 트랜스크립트처럼 다시 읽을 원본이 따로 없다). 오래된 세션 기록은 최근 200개만
+    if (m[2] === 'diffclear' && w.tx) {
+      const at = Date.now(), key = path.basename(w.tx.path, '.jsonl');
+      clearEdits(w.tx, at);
+      fs.rmSync(shellFile(w.tx.path), { force: true }); shellLines.delete(shellFile(w.tx.path));
+      delete config.diffCleared[key];
+      config.diffCleared = Object.fromEntries([...Object.entries(config.diffCleared), [key, at]].slice(-200));
+      pushLog(w, 'status', 'diff 목록 비움');
+      saveConfig(); // emitState 포함
     }
     if (m[2] === 'resume') { w.queueHeld = false; emitState(); dispatchQueued(w); }
     if (m[2] === 'rename') {
