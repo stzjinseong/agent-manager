@@ -2242,8 +2242,33 @@ $('#memos').addEventListener('dragstart', (e) => {
 });
 $('#memos').addEventListener('dragend', () => {
   memoDrag?.li.classList.remove('dragging');
+  // 목록 안에서 자리를 옮겨 놓고 목록 밖(놓을 수 없는 곳)에서 끝났으면 원래 순서로 되돌린다
+  if (memoDrag?.moved && !memoDrag.saved) { memoSig = ''; const w = state.workers.find((x) => x.id === selected); if (w) renderMemos(w); }
   memoDrag = null;
   clearMemoDrop();
+});
+// 같은 목록 안에서 끌면 순서 바꾸기 — 끄는 동안 자리를 바꿔 미리 보여 주고(칩 순서 바꾸기와 같은 방식), 목록 안에 놓으면 저장
+$('#memos').addEventListener('dragover', (e) => {
+  if (!memoDrag) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  const over = e.target.closest?.('li[data-id]');
+  if (!over || over === memoDrag.li) return;
+  const r = over.getBoundingClientRect();
+  const before = e.clientY < r.top + r.height / 2;
+  if (before ? over.previousElementSibling !== memoDrag.li : over.nextElementSibling !== memoDrag.li) {
+    over.parentNode.insertBefore(memoDrag.li, before ? over : over.nextElementSibling);
+    memoDrag.moved = true;
+  }
+});
+$('#memos').addEventListener('drop', (e) => {
+  const d = memoDrag;
+  if (!d) return;
+  e.preventDefault();
+  if (!d.moved) return;
+  d.saved = true;
+  const ids = [...$('#memos').querySelectorAll('li[data-id]')].map((li) => li.dataset.id);
+  api('/api/memos', { role: d.role, op: 'reorder', ids });
 });
 function memoDragOver(e) {
   const n = memoTarget(e);

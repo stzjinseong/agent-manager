@@ -1530,7 +1530,8 @@ const server = http.createServer(async (req, res) => {
   // 기판 칩 순서 — 역할 이름 기준이라 서버를 다시 켜도, 대기실 슬롯↔워커 전환에도 자리가 유지된다
   // 메모: 역할별로 적어 두는 할 일 목록. 자동 실행되지 않고, ▶ 지시를 누른 항목만 업무 지시(즉시 또는 대기열)로 넘어간다
   if (req.method === 'POST' && p === '/api/memos') {
-    const { role, op, text, id, workerId, to } = await readBody(req);
+    const body = await readBody(req);
+    const { role, op, text, id, workerId, to } = body;
     if (!role) return json(res, 400, { error: 'role 필요' });
     const list = (config.memos[role] ||= []);
     if (op === 'add' && String(text || '').trim()) list.push({ id: `m${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`, text: String(text).trim(), createdAt: Date.now() });
@@ -1556,6 +1557,11 @@ const server = http.createServer(async (req, res) => {
       if (!m || !to || to === role) return json(res, 404, { error: '옮길 작업이 없습니다' });
       config.memos[role] = list.filter((x) => x.id !== id);
       (config.memos[to] ||= []).push(m);
+    }
+    // 같은 목록 안에서 순서 바꾸기(끌어 놓기) — 화면이 본 순서(ids). 그사이 생긴 항목은 뒤에 그대로 둔다
+    if (op === 'reorder' && Array.isArray(body.ids)) {
+      const rank = new Map(body.ids.map((x, i) => [String(x), i]));
+      config.memos[role] = [...list].sort((a, b) => (rank.get(a.id) ?? Infinity) - (rank.get(b.id) ?? Infinity));
     }
     if (!config.memos[role]?.length) delete config.memos[role];
     saveConfig();
