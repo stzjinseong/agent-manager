@@ -1491,7 +1491,10 @@ html.char-img .down-mark svg { width: auto; height: var(--ch-logo, 66px); }
 /* ---------- 언어 (헤더 🌐) ---------- */
 /* 한국어가 아닌 언어로 처음 열 때, 번역이 끝날 때까지 잠깐 가린다 (index.html 머리 스크립트 · app.js 가 푼다) */
 html.i18n-pending body { visibility: hidden; }
-.lang-wrap { position: relative; display: flex; }
+.lang-wrap, .keys-wrap { position: relative; display: flex; }
+.keys-pop { min-width: 210px; }
+.keys-desc { display: flex; flex-direction: column; gap: 3px; }
+.keys-desc kbd { font: 11.5px var(--mono); padding: 0 5px; border-radius: 4px; border: 1px solid var(--line-2); background: var(--surface-3); color: var(--text); }
 .btn.lang-btn { padding: 4px 8px; color: var(--text-2); display: grid; place-items: center; }
 .btn.lang-btn:hover, .btn.lang-btn[aria-expanded="true"] { color: var(--text); background: var(--surface-3); }
 /* Chrome 이 아닐 때 경고 아이콘(🌐 오른쪽) — 주황 */

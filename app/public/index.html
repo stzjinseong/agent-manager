@@ -56,6 +56,13 @@
       </button>
       <div class="lang-pop char-pop" id="char-pop" role="menu" hidden></div>
     </div>
+    <!-- 전송·개행 키 세트: 키보드 아이콘을 누르면 두 세트 중 하나를 고른다. 지금 세트는 ✓ -->
+    <div class="keys-wrap">
+      <button id="btn-keys" class="btn ghost lang-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="keys-pop" title="전송·개행 키" aria-label="전송·개행 키" data-i18n-attr="title,aria-label">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h.01M10 10h.01M13 10h.01M16 10h.01M8 14h8"/></svg>
+      </button>
+      <div class="lang-pop keys-pop" id="keys-pop" role="menu" hidden></div>
+    </div>
     <!-- 언어: 지구본을 누르면 작은 목록이 열리고, 지금 언어는 ✓ 로 표시만 하고 눌러도 반응하지 않는다 -->
     <div class="lang-wrap">
       <button id="btn-lang" class="btn ghost lang-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="lang-pop" title="언어" aria-label="언어" data-i18n-attr="title,aria-label">
@@ -191,7 +198,7 @@
         <div class="side-sec" id="sec-task">
           <h3 class="side-h sec-toggle" role="button" tabindex="0" aria-expanded="true" title="클릭해서 접기/펼치기" data-i18n-attr="title"><span class="chev">▾</span><span data-i18n>업무 지시</span> <small data-i18n>바로 투입 · 작업 중이면 대기열에 쌓임</small><span class="sec-count"></span></h3>
           <form id="task-form" class="task-form">
-            <textarea name="text" rows="3" placeholder="전송 : Alt(⌘)+Enter&#10;개행 : Enter&#10;*CLI에서도 동일하게 작동" data-i18n-attr="placeholder"></textarea>
+            <textarea name="text" rows="3"></textarea>
           </form>
           <div class="queue" id="queue"></div>
         </div>
@@ -199,7 +206,7 @@
         <div class="memo side-sec" id="sec-memo">
           <h3 class="sec-toggle" role="button" tabindex="0" aria-expanded="true" title="클릭해서 접기/펼치기" data-i18n-attr="title"><span class="chev">▾</span><span data-i18n>나중에 할 작업</span> <small data-i18n>자동 실행 안 됨 · ▶ 지시를 눌러야 투입</small><span class="sec-count"></span></h3>
           <form id="memo-form" class="memo-form">
-            <textarea name="text" rows="3" placeholder="추가 : Alt(⌘)+Enter&#10;개행 : Enter&#10;*CLI에서도 동일하게 작동" data-i18n-attr="placeholder"></textarea>
+            <textarea name="text" rows="3"></textarea>
           </form>
           <ol class="memos" id="memos"></ol>
         </div>

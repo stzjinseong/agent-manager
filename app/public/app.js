@@ -272,14 +272,17 @@ async function copySelection() {
 }
 term.attachCustomKeyEventHandler((e) => {
   if (e.type !== 'keydown') return true;
-  // Enter 는 줄바꿈, Alt(⌥)·Cmd+Enter 는 제출 — 업무 지시 입력창과 같은 규칙.
+  // Enter 는 헤더 ⌨ 의 키 세트대로(enterAction) — 업무 지시 입력창과 같은 규칙. 세트 1: Enter 줄바꿈 · Alt(⌥)·Cmd+Enter 제출,
+  // 세트 2: Enter 제출 · Shift/Ctrl+Enter 줄바꿈 · Cmd(Alt)+Enter 는 아무 일도 안 함.
   // 줄바꿈은 \n(Ctrl+J)으로 보낸다. 입력창에선 줄바꿈이고 메뉴(권한 확인·선택지)에선 아무 일도 안 해서,
   // 메뉴 확정도 Alt+Enter(\r)로 통일된다. ESC CR 도 줄바꿈이지만 ESC 가 섞여 메뉴에선 위험하다
   // (실측: \n·ESC CR → 입력창 줄바꿈, /model 메뉴 그대로 / \r → 제출·메뉴 확정). 한글 조합 중 Enter 는 조합 확정이라 건드리지 않는다.
   // 직접 보내지 않고 xterm 이 처리하게 둔 뒤 onData 에서 바꾼다 — 이 처리기는 xterm 의 조합 마무리보다 먼저 돌아서,
   // 여기서 바로 보내면 조합 중이던 글자보다 줄바꿈이 먼저 가 글자가 다음 줄로 내려갔다
   if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229) {
-    enterAs = e.altKey || e.metaKey ? '\r' : '\n';
+    const act = enterAction(e);
+    if (!act) return false;
+    enterAs = act === 'send' ? '\r' : '\n';
     return true;
   }
   // 한글 조합 중 보조키(⌘ 등)만 누른 것은 xterm 에 넘기지 않는다. xterm 은 Shift·Ctrl·Alt 만 보조키로 알고 ⌘(Meta)는 몰라서
@@ -347,7 +350,8 @@ function ask({ title, body = '', ok = _t('확인'), danger = false, input = null
     // 캡처 단계에서 처리하고 막는다 — Esc 가 터미널(=Claude 중단)이나 다른 단축키로 새지 않게
     const onKey = (e) => {
       if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done(false); }
-      else if (e.key === 'Enter' && !e.isComposing && (input === null || e.altKey || e.metaKey)) { e.preventDefault(); e.stopPropagation(); done(true); }
+      // 입력 칸이 있으면 그 칸의 Enter 처리(onEnterKey, 키 세트대로)가 확인 버튼을 누른다
+      else if (e.key === 'Enter' && !e.isComposing && input === null) { e.preventDefault(); e.stopPropagation(); done(true); }
     };
     back.addEventListener('click', onClick);
     back.addEventListener('keydown', onKey, true);
@@ -1997,14 +2001,15 @@ taskForm.onsubmit = async (e) => {
   // CLI 입력창에 쓰던 글이 있으면 서버가 합치지 않고 대기열에 둔다(server.js assignTask)
   if (r?.held) toast(_t('CLI 입력창에 쓰던 글이 있어 업무 지시를 대기열에 두었습니다 — 그 글을 보내거나 지우면 이어서 투입됩니다'), 4500);
 };
-// 입력 칸 공통 키: Enter = 줄바꿈(기본 동작), Alt+Enter / 맥 ⌘+Enter = 제출(폼 submit).
-// 업무 지시·메모가 같은 함수를 써서 키 동작이 어긋나지 않게 한다. 한글 조합 중 입력은 무시해야 마지막 글자가 잘리지 않는다
-function submitOnModEnter(form) {
-  form.text.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && (e.altKey || e.metaKey) && !e.isComposing) { e.preventDefault(); form.requestSubmit(); }
-  });
+function shake(node) {
+  node.classList.remove('shake');
+  void node.offsetWidth; // 연달아 막혀도 매번 다시 흔들리게
+  node.classList.add('shake');
+  node.addEventListener('animationend', () => node.classList.remove('shake'), { once: true });
 }
-submitOnModEnter(taskForm);
+// 입력 칸 공통 키(키 세트는 아래 '전송·개행 키 세트'): 업무 지시·메모가 같은 함수를 써서 키 동작이 어긋나지 않게 한다
+const submitOnEnter = (form) => onEnterKey(form.text, () => form.requestSubmit());
+submitOnEnter(taskForm);
 // ---------- 메모 (역할별, 자동 실행 안 됨) ----------
 let memoSig = '';
 function renderMemos(w) {
@@ -2019,7 +2024,7 @@ function renderMemos(w) {
         <span class="ma"><time>${fmt(m.createdAt)}</time><button class="btn mini ghost" data-memo="edit" title="${_t('내용 수정')}">${_t('수정')}</button><button class="btn mini primary" data-memo="send" title="${_t('업무 지시로 보내기 (작업 중이면 대기열)')}" aria-label="${_t('업무 지시로 보내기')}">▶</button><button class="btn mini ghost" data-memo="remove" title="${_t('삭제')}">✕</button></span></li>`).join('')
     : ''; // 비어 있으면 아무것도 두지 않는다 — 업무 지시처럼 입력칸에서 섹션이 끝나 타임라인과의 간격이 같다
 }
-// 수정: 본문 자리에 입력칸을 띄운다. Alt(⌘)+Enter 저장 · Esc 취소 — 추가 칸과 같은 키
+// 수정: 본문 자리에 입력칸을 띄운다. 키 세트의 전송 키로 저장 · Esc 취소 — 추가 칸과 같은 키
 function editMemo(li, w) {
   if (li.classList.contains('editing')) return;
   const id = li.dataset.id, old = (state.memos?.[w.name] || []).find((m) => m.id === id)?.text ?? $('.mt', li).textContent;
@@ -2048,8 +2053,8 @@ function editMemo(li, w) {
     if (m) m.text = text; // 서버 상태가 오기 전에 바로 보이게
     done();
   };
+  onEnterKey(ta, save);
   ta.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && (e.altKey || e.metaKey) && !e.isComposing) { e.preventDefault(); save(); }
     if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done(); }
   });
   bar.addEventListener('click', (e) => {
@@ -2060,7 +2065,7 @@ function editMemo(li, w) {
   });
 }
 const memoForm = $('#memo-form');
-submitOnModEnter(memoForm); // 업무 지시 칸과 같은 키: Enter 줄바꿈, Alt/⌘+Enter 추가
+submitOnEnter(memoForm); // 업무 지시 칸과 같은 키
 memoForm.onsubmit = (e) => {
   e.preventDefault();
   const text = memoForm.text.value.trim();
@@ -2269,6 +2274,84 @@ $('#queue').addEventListener('click', (e) => {
 // 좌우 스위치: 왼쪽 다크(🌙) · 오른쪽 라이트(☀), 기본 다크. 손잡이가 물방울처럼 — 움찔했다가 길게 늘어나 미끄러지고,
 // 뒤에 남은 작은 방울이 끈적하게 이어져 따라오다 합쳐지며, 도착하면 납작해졌다 출렁이며 멈춘다(style.css, index.html 의 gooey 필터).
 // 움직이는 동안 다시 누르면(클릭·Enter·Space) 무시한다 — 중간에 방향이 뒤집히며 상태와 위치가 어긋나지 않게
+// ---------- 전송·개행 키 세트 (헤더 ⌨) ----------
+// 1: Alt(⌘)+Enter 전송 · Enter 개행 (기본)   2: Enter 전송 · Shift/Ctrl+Enter 개행 · ⌘(Alt)+Enter 는 아무 일도 안 함
+// 업무 지시·메모·메모 고치기·입력 확인 창·CLI 터미널이 모두 이 규칙을 따른다. 브라우저에 기억(am.keys)
+const KEYS_KEY = 'am.keys';
+let keySet = '1';
+try { if (localStorage.getItem(KEYS_KEY) === '2') keySet = '2'; } catch {}
+// Enter 가 할 일: 'send' | 'newline' | null(아무 일도 안 함)
+function enterAction(e) {
+  if (keySet === '2') return e.metaKey || e.altKey ? null : e.shiftKey || e.ctrlKey ? 'newline' : 'send';
+  return e.altKey || e.metaKey ? 'send' : 'newline';
+}
+// 입력 칸의 Enter. 한글 조합 중 Enter 는 입력기가 글자를 확정하는 키라 그 keydown 은 막지 않는다(막으면 확정이 깨진다).
+// 맥 Chrome 은 조합 확정 keydown(229) 뒤에 Enter keydown 을 한 번 더 보내고, Safari 는 확정과 함께 줄바꿈까지 넣는다 →
+// 전송은 잠깐(40ms) 미뤄 한 번만 하고, 그사이 확정된 마지막 글자까지 담는다(끝에 붙은 줄바꿈은 보내는 쪽이 trim 으로 버린다)
+function onEnterKey(ta, send) {
+  let timer = null;
+  ta.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    const composing = e.isComposing || e.keyCode === 229, act = enterAction(e);
+    if (act === 'send') {
+      if (!composing) e.preventDefault();
+      timer ??= setTimeout(() => { timer = null; send(); }, 40);
+      return;
+    }
+    if (composing) return;
+    if (!act) { e.preventDefault(); return; }
+    // 그냥·Shift+Enter 는 칸이 알아서 줄을 바꾼다. Ctrl·Alt·⌘+Enter 는 안 바꿔서 직접 넣는다(execCommand 라 ⌘Z 로 되돌릴 수 있다)
+    if (e.ctrlKey || e.altKey || e.metaKey) { e.preventDefault(); document.execCommand('insertText', false, '\n'); }
+  });
+}
+onEnterKey($('#ask-input'), () => $('#ask-modal [data-ask="ok"]').click());
+const KEY_SETS = [
+  { id: '1', send: 'Alt(⌘)+Enter', newline: 'Enter' },
+  { id: '2', send: 'Enter', newline: 'Shift/Ctrl+Enter' },
+];
+// 입력 칸 안내 문구도 키 세트대로
+function applyKeyHints() {
+  const k = KEY_SETS.find((x) => x.id === keySet);
+  const hint = (verb) => `${_t(verb)} : ${k.send}\n${_t('개행')} : ${k.newline}\n${_t('*CLI에서도 동일하게 작동')}`;
+  taskForm.text.placeholder = hint('전송');
+  $('#memo-form').text.placeholder = hint('추가');
+}
+applyKeyHints();
+document.addEventListener('langchange', applyKeyHints);
+const keysBtn = $('#btn-keys'), keysPop = $('#keys-pop');
+function renderKeysPop() {
+  keysPop.innerHTML = `<div class="pop-h">${_t('전송·개행 키')}</div>` + KEY_SETS.map((k) => {
+    const on = k.id === keySet;
+    return `<button class="lang-item keys-item${on ? ' on' : ''}" role="menuitemradio" aria-checked="${on}" data-keys="${k.id}">
+      <span class="lang-check" aria-hidden="true">${on ? '✓' : ''}</span><span class="keys-desc"><span>${_t('전송')} <kbd>${k.send}</kbd></span><span>${_t('개행')} <kbd>${k.newline}</kbd></span></span></button>`;
+  }).join('');
+}
+function setKeysPop(open) {
+  keysPop.hidden = !open;
+  keysBtn.setAttribute('aria-expanded', String(open));
+  if (open) { setLangPop(false); setCharPop(false); setPowerPop(false); if (!updPop.hidden) setUpdPop(false); renderKeysPop(); keysPop.querySelector('.keys-item.on')?.focus(); }
+}
+keysBtn.addEventListener('click', () => setKeysPop(keysPop.hidden));
+keysPop.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-keys]');
+  if (!b || b.dataset.keys === keySet) return;
+  keySet = b.dataset.keys;
+  try { keySet === '1' ? localStorage.removeItem(KEYS_KEY) : localStorage.setItem(KEYS_KEY, keySet); } catch {}
+  applyKeyHints();
+  setKeysPop(false);
+  keysBtn.focus();
+});
+document.addEventListener('click', (e) => { if (!keysPop.hidden && !e.target.closest('.keys-wrap')) setKeysPop(false); });
+document.addEventListener('keydown', (e) => {
+  if (keysPop.hidden) return;
+  if (e.key === 'Escape') { setKeysPop(false); keysBtn.focus(); }
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    const items = [...keysPop.querySelectorAll('.keys-item')], i = items.indexOf(document.activeElement);
+    items[(i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length]?.focus();
+  }
+});
+
 // ---------- 언어 (헤더 🌐) ----------
 // 누르면 작은 목록이 열린다. 지금 언어는 ✓ 로 표시만 하고 눌러도 아무 일도 없다(setLang 이 같은 언어면 무시)
 const langBtn = $('#btn-lang'), langPop = $('#lang-pop');
