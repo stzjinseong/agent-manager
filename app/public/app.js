@@ -2012,6 +2012,12 @@ const submitOnEnter = (form) => onEnterKey(form.text, () => form.requestSubmit()
 submitOnEnter(taskForm);
 // ---------- 메모 (역할별, 자동 실행 안 됨) ----------
 let memoSig = '';
+// 메모 카드의 수정(연필)·업무 지시로 보내기(종이비행기) 아이콘 — 같은 모양의 버튼(.memo-ic)
+const MEMO_EDIT_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"/></svg>';
+const MEMO_SEND_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3 10 14M21 3l-7 18-4-7-7-4 18-7z"/></svg>';
+// 수정 중: 저장(체크)·취소(엑스) — 같은 모양의 아이콘 버튼
+const MEMO_SAVE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 10 17.5 19 7"/></svg>';
+const MEMO_CANCEL_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
 function renderMemos(w) {
   const list = state.memos?.[w.name] || [];
   const sig = `${w.id}|${w.name}|${list.map((m) => `${m.id}:${m.text}`).join('|')}`; // 글도 넣어야 수정이 반영된다
@@ -2021,7 +2027,7 @@ function renderMemos(w) {
   const fmt = (t) => new Date(t + clockSkew).toLocaleString(uiLocale(), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
   $('#memos').innerHTML = list.length
     ? `<li class="mh">${_t('{n}건', { n: list.length })}</li>` + list.map((m) => `<li data-id="${m.id}" draggable="true" title="${_t('워커 카드에 끌어다 놓으면 그 워커의 나중에 할 작업으로 옮겨집니다')}"><span class="mt">${esc(m.text)}</span>${attachChips(m.text, 'sm')}
-        <span class="ma"><time>${fmt(m.createdAt)}</time><button class="btn mini ghost" data-memo="edit" title="${_t('내용 수정')}">${_t('수정')}</button><button class="btn mini primary" data-memo="send" title="${_t('업무 지시로 보내기 (작업 중이면 대기열)')}" aria-label="${_t('업무 지시로 보내기')}">▶</button><button class="btn mini ghost" data-memo="remove" title="${_t('삭제')}">✕</button></span></li>`).join('')
+        <span class="ma"><time>${fmt(m.createdAt)}</time><button class="btn mini ghost memo-ic" data-memo="edit" title="${_t('내용 수정')}" aria-label="${_t('내용 수정')}">${MEMO_EDIT_SVG}</button><button class="btn mini ghost memo-ic" data-memo="send" title="${_t('업무 지시로 보내기 (작업 중이면 대기열)')}" aria-label="${_t('업무 지시로 보내기')}">${MEMO_SEND_SVG}</button><button class="btn mini ghost" data-memo="remove" title="${_t('삭제')}">✕</button></span></li>`).join('')
     : ''; // 비어 있으면 아무것도 두지 않는다 — 업무 지시처럼 입력칸에서 섹션이 끝나 타임라인과의 간격이 같다
 }
 // 수정: 본문 자리에 입력칸을 띄운다. 키 세트의 전송 키로 저장 · Esc 취소 — 추가 칸과 같은 키
@@ -2032,7 +2038,8 @@ function editMemo(li, w) {
   li.draggable = false; // 입력칸에서 글자를 끌어 선택할 수 있게
   const ta = el('<textarea class="memo-edit" rows="3"></textarea>');
   ta.value = old;
-  const bar = el(`<span class="ma"><span class="hint">${_t('Alt(⌘)+Enter 저장 · Esc 취소')}</span><button class="btn mini primary" data-edit="save">${_t('저장')}</button><button class="btn mini ghost" data-edit="cancel">${_t('취소')}</button></span>`);
+  // 안내 글은 .me-hint — 전역 .hint(빈 화면 안내, 위아래 큰 여백)와 이름이 겹치면 수정 칸 아래가 텅 빈다
+  const bar = el(`<span class="ma"><span class="me-hint">${_t(keySet === '2' ? 'Enter 저장 · Esc 취소' : 'Alt(⌘)+Enter 저장 · Esc 취소')}</span><button class="btn mini ghost memo-ic" data-edit="save" title="${_t('저장')}" aria-label="${_t('저장')}">${MEMO_SAVE_SVG}</button><button class="btn mini ghost memo-ic" data-edit="cancel" title="${_t('취소')}" aria-label="${_t('취소')}">${MEMO_CANCEL_SVG}</button></span>`);
   const keep = [...li.children];
   keep.forEach((c) => (c.hidden = true));
   li.append(ta, bar);

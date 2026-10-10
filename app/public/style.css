@@ -960,11 +960,12 @@ body.term-full::before {
 .memos li[draggable="true"]:hover::before { opacity: 1; }
 .memos li[draggable="true"]:active { cursor: grabbing; }
 .memos li.editing { border-color: var(--accent); }
-/* 수정 버튼: 흰 배경 (지시=코랄, 삭제=투명 사이에서 구분되게) */
-.memos .btn[data-memo="edit"] { background: #f3f1ec; border-color: #f3f1ec; color: #14161c; font-weight: 600; }
-.memos .btn[data-memo="edit"]:hover { background: #fff; border-color: #fff; }
+/* 수정·업무 지시로 보내기 아이콘 버튼: 다크는 흰 배경에 검은 아이콘, 라이트는 검은 배경에 흰 아이콘 (삭제=투명과 구분되게) */
+.memos .btn.memo-ic { display: inline-grid; place-items: center; padding: 3px 7px; background: #f3f1ec; border-color: #f3f1ec; color: #14161c; }
+.memos .btn.memo-ic:hover { background: #fff; border-color: #fff; }
+.memos .memo-ic svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .memos .memo-edit { width: 100%; resize: vertical; min-height: 60px; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
-.memos .ma .hint { flex: 1; color: var(--dim); font-size: 11px; }
+.memos .ma .me-hint { flex: 1; color: var(--dim); font-size: 11px; }
 .memos li.dragging { opacity: .35; border-style: dashed; }
 .memos .mt { white-space: pre-wrap; word-break: break-all; color: var(--text); display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
 .memos .ma { display: flex; align-items: center; gap: 6px; }
@@ -1269,8 +1270,8 @@ html[data-char="clawd-white"] :is(.node, .dchip, .detail-avatar, .term-wrap) { -
    (!important 라야 애니메이션 값보다 앞선다. 위아래로 떠다니는 움직임은 그대로) */
 :root[data-theme="light"] :is(.brand-mark, .core-mark) { filter: none !important; }
 /* 나중에 할 작업 '수정' 버튼: 다크에선 흰 버튼 — 라이트에선 흰 면에 묻히니 먹색 */
-:root[data-theme="light"] .memos .btn[data-memo="edit"] { background: #2a2d36; border-color: #2a2d36; color: #fff; }
-:root[data-theme="light"] .memos .btn[data-memo="edit"]:hover { background: #14161c; border-color: #14161c; }
+:root[data-theme="light"] .memos .btn.memo-ic { background: #2a2d36; border-color: #2a2d36; color: #fff; }
+:root[data-theme="light"] .memos .btn.memo-ic:hover { background: #14161c; border-color: #14161c; }
 
 /* ---------- diff 보기: 워커가 고친 파일의 변경 (터미널 자리에 덮어 보여 줌, app.js setDiffOpen) ---------- */
 :root { --d-add: #52d19b; --d-del: #ff8a80; --d-add-bg: rgb(82 209 155 / .12); --d-del-bg: rgb(255 120 110 / .12); }
