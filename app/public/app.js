@@ -2851,7 +2851,7 @@ charModal.addEventListener('keydown', (e) => {
 document.addEventListener('langchange', () => {
   for (const n of nodeEls.values()) n.remove();
   nodeEls.clear();
-  for (const c of dockEls.values()) c.remove();
+  for (const c of dockEls.values()) c.parentElement.remove(); // 칩만 지우면 그 칸(.dslot)의 썸네일이 줄 끝에 남았다
   dockEls.clear();
   $('.empty', $('#nodes'))?.remove();
   $('.dock-empty', $('#dock-list'))?.remove();
