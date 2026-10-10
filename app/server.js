@@ -503,20 +503,27 @@ function cancelDispatch(w) {
   dispatchTimers.delete(w.id);
   if (w.dispatchAt) { w.dispatchAt = 0; emitState(); }
 }
-// 응답 끝이 사람에게 묻는 말인가 — 넉넉하게 잡는다(잘못 멈추면 ▶ 한 번이지만, 놓치면 질문을 지나친다).
-// 코드 블록은 빼고 마지막 몇 줄만 본다: 물음표로 끝남 · 묻는 어미/문구 · 질문 줄 뒤에 붙은 선택지 목록(1. 2. / A) B))
-const ASK_KO = /(까요|시겠어요|시겠습니까|실래요|원하시는|원하시나요|어떤 (것|걸|쪽|방식|방법|안)|어느 (것|걸|쪽)|(선택|골라|알려|말씀|정해|결정)(해)? ?주(세요|시면)|주시면 (진행|구현|적용|작업|반영))/;
-const ASK_EN = /\b(would you like|do you want|should i|shall i|which (one|option|approach|way)|let me know|please (choose|confirm|pick|decide)|do you prefer|would you prefer)\b/i;
+// 응답 끝이 진행에 꼭 필요한 선택을 묻는 말인가. 코드 블록은 빼고 마지막 몇 줄만 본다.
+// 멈추는 것: 고르라는 말(어느 쪽·어떤 방식·정해 주시면·선택해 주세요 / which one·please choose) · 선택지 목록(1. 2. / A) B))과
+// 그 앞의 질문·선택 안내 줄 · 물음표나 묻는 어미로 끝나는 마지막 줄(진행할까요?)
+// 멈추지 않는 것: '원하시면 말씀해 주세요'처럼 조건을 단 권유(필요하면·궁금하시면·if you'd like·feel free) — 답하지 않아도 진행에 지장이 없다
+const CHOICE_KO = /(어느|어떤) ?(것|걸|쪽|방식|방법|안|버전|순서)|중(에서|에)? ?(어느|어떤|무엇|뭘|하나)|(정해|골라|선택해|결정해) ?주(세요|시면|십시오)|(할지|갈지|둘지|쓸지|넣을지)[^.?!]{0,20}(정해|알려|말씀)/;
+const CHOICE_EN = /\b(which (one|option|approach|way|of)|please (choose|pick|decide|select)|would you prefer|do you prefer|or should i)\b/i;
+const OFFER = /(원하시|필요하시|궁금하시|싶으시|있으시|원하|필요하|있으)(면|다면)|하시려면|\bif you('d| would)? (like|want|prefer|need)|\bfeel free\b|\blet me know if\b/i;
+const ASK_END = /([?？]|까요|습니까|나요|실래요|시겠어요)$/;
 const OPTION_LINE = /^(\d+[.)]|[A-Za-z][.)]|[①-⑨]|[-*•]\s*\*\*)/;
+const OPTION_HEAD = /[?？]$|방법|방식|선택|옵션|후보|중 |option|approach|choose/i;
 function endsWithQuestion(text) {
   const lines = String(text || '').replace(/```[\s\S]*?```/g, '').split('\n').map((l) => l.trim()).filter(Boolean);
   if (!lines.length) return false;
-  if (/[?？]$/.test(lines.at(-1).replace(/[*_`)\]\s]+$/, ''))) return true;
-  const tail = lines.slice(-3).join(' ');
-  if (ASK_KO.test(tail) || ASK_EN.test(tail)) return true;
+  // 끝에 선택지 목록이 2개 넘게 붙어 있고, 그 앞 줄이 질문이거나 고를 거리를 소개하면(두 가지 방법이 있습니다:)
   let k = lines.length - 1;
   while (k >= 0 && OPTION_LINE.test(lines[k])) k--;
-  return lines.length - 1 - k >= 2 && k >= 0 && (/[?？:：]$/.test(lines[k]) || ASK_KO.test(lines[k]) || ASK_EN.test(lines[k]));
+  if (lines.length - 1 - k >= 2 && k >= 0 && (OPTION_HEAD.test(lines[k]) || CHOICE_KO.test(lines[k]) || CHOICE_EN.test(lines[k]))) return true;
+  const tail = lines.slice(-2).join(' ');
+  if (CHOICE_KO.test(tail) || CHOICE_EN.test(tail)) return true;
+  if (OFFER.test(tail)) return false;
+  return ASK_END.test(lines.at(-1).replace(/[*_`)\].\s]+$/, ''));
 }
 // 큐 맨 앞 지시를 투입 — 턴이 끝났을 때. 입력창에 쓰던 글이 있거나 입력창이 아닌 화면이면 기다린다.
 // 투입 실패로 보류된 대기열(queueHeld)은 새 지시나 ▶ 재개가 있을 때까지 자동으로 보내지 않는다(실제로는 들어갔을 수도 있어 중복 위험)
