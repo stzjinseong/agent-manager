@@ -694,13 +694,23 @@ function markSeen(id) {
   seenDone[seenKey(w)] = w.doneAt;
   try { localStorage.setItem(SEEN_KEY, JSON.stringify(seenDone)); } catch {}
 }
+// 보고 있는(선택한) 워커가 끝나도 바로 확인 처리하지 않는다 — 끝난 걸 놓치지 않게 빛이 돌고, 그 워커에 손을 대면(아래 ackSeen) 확인
 function isSeenDone(w) {
   if (!w.doneAt) return false;
-  // 지금 그 워커를 보고 있으면 바로 확인 처리
-  if (w.id === selected && !$('#detail').hidden && document.visibilityState === 'visible') markSeen(w.id);
   return (seenDone[seenKey(w)] || 0) >= w.doneAt;
 }
 const isUnseenDone = (w) => viewStatus(w) === 'done' && !!w.doneAt;
+// 선택한 워커의 상세 화면(터미널·업무 지시·메모 등)이나 그 카드·칩을 누르거나 그 안에서 키를 치면 완료 확인
+function ackSeen(e) {
+  if (!selected || $('#detail').hidden) return;
+  if (!e.target.closest?.(`#detail, .node[data-id="${selected}"], .dchip[data-id="${selected}"]`)) return;
+  const w = state.workers.find((x) => x.id === selected);
+  if (!w || !isUnseenDone(w)) return;
+  markSeen(w.id);
+  render();
+}
+document.addEventListener('pointerdown', ackSeen, true);
+document.addEventListener('keydown', ackSeen, true);
 
 // 역할별 캐릭터 색 — 밝기(L 0.76)·채도(C 0.15)를 고정한 OKLCH 라 어떤 색상각이어도 어둡지 않다
 // 밝기는 테마 변수(--av-l: 다크 0.76, 라이트 0.62) — 밝은 바탕에선 조금 어둡게

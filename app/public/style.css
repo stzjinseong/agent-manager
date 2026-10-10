@@ -933,22 +933,24 @@ body.term-full::before {
 @property --unseen-ang { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
 .node.unseen, .dchip.unseen {
   --halo: #fff;
-  --halo-dim: color-mix(in srgb, var(--halo) 16%, transparent);
+  /* 바탕 테두리는 거의 안 보이게 두고(흐린 흰색을 깔면 전체가 그냥 흰 테두리로 보였다), 꼬리가 길고 머리가 또렷한 빛 두 줄기만 돈다 */
+  --halo-dim: color-mix(in srgb, var(--halo) 6%, transparent);
+  --halo-tail: color-mix(in srgb, var(--halo) 35%, transparent);
   /* 선택한 카드(.sel — 뒤쪽 규칙이 테두리·바탕을 바꾼다)가 끝나도 돌게 !important */
   border: 2px solid transparent !important;
   background:
     var(--unseen-bg) padding-box,
-    conic-gradient(from var(--unseen-ang), var(--halo-dim) 0turn, var(--halo-dim) .25turn, var(--halo) .42turn .46turn, var(--halo-dim) .5turn,
-      var(--halo-dim) .75turn, var(--halo) .92turn .96turn, var(--halo-dim) 1turn) border-box !important;
-  animation: unseen-spin 1.6s linear infinite, unseen-glow 1.6s ease-in-out infinite;
+    conic-gradient(from var(--unseen-ang), var(--halo-dim) 0turn, var(--halo-dim) .3turn, var(--halo-tail) .42turn, var(--halo) .48turn .5turn, var(--halo-dim) .51turn,
+      var(--halo-dim) .8turn, var(--halo-tail) .92turn, var(--halo) .98turn 1turn) border-box !important;
+  animation: unseen-spin 1.4s linear infinite, unseen-glow 1.4s ease-in-out infinite;
 }
 .node.unseen { --unseen-bg: linear-gradient(180deg, color-mix(in srgb, var(--halo) 7%, var(--surface-2)), var(--surface)); padding: 13px 13px 11px; }
 .dchip.unseen { --unseen-bg: linear-gradient(var(--surface), var(--surface)); padding: 3px 9px 3px 7px; }
 :root[data-theme="light"] :is(.node, .dchip).unseen { --halo: var(--accent); }
 @keyframes unseen-spin { to { --unseen-ang: 1turn; } }
 @keyframes unseen-glow {
-  0%, 100% { box-shadow: 0 0 14px 1px color-mix(in srgb, var(--halo) 18%, transparent); }
-  50% { box-shadow: 0 0 26px 5px color-mix(in srgb, var(--halo) 38%, transparent); }
+  0%, 100% { box-shadow: 0 0 10px 0 color-mix(in srgb, var(--halo) 8%, transparent); }
+  50% { box-shadow: 0 0 22px 3px color-mix(in srgb, var(--halo) 26%, transparent); }
 }
 @media (prefers-reduced-motion: reduce) { :is(.node, .dchip).unseen { animation: none; } }
 
