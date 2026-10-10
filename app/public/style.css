@@ -206,6 +206,8 @@ main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24p
 }
 .trash .ic { font-size: 22px; line-height: 1; }
 .trash.show .bin { opacity: 1; transform: none; pointer-events: auto; }
+/* 카드를 끄는 동안 놓을 수 있는 곳(워커 카드·휴지통)만 밝게 — 헤더·매니저·회로선·오른쪽 패널·비교 표 등은 어둡게 */
+body.card-drag > :is(.topbar, section:not(.floor)), body.card-drag .floor > :not(#nodes, #trash) { opacity: .25; transition: opacity .2s; }
 .trash.over .bin { border-style: solid; border-color: #e0655a; background: color-mix(in srgb, #e0655a 30%, var(--surface-3)); color: var(--text); transform: scale(1.08); }
 .nodes { position: relative; display: grid; grid-template-columns: repeat(auto-fill, minmax(236px, 1fr)); gap: 34px 22px; }
 .empty { grid-column: 1 / -1; text-align: center; color: var(--dim); padding: 18px 0 6px; }

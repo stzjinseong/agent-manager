@@ -1808,7 +1808,8 @@ nodesEl.addEventListener('dragstart', (e) => {
   dragEl = n;
   e.dataTransfer.effectAllowed = 'move';
   e.dataTransfer.setData('text/plain', n.dataset.name || '');
-  requestAnimationFrame(() => { n.classList.add('dragging'); trashEl.classList.add('show'); }); // 드래그 이미지가 찍힌 뒤 흐리게
+  // 드래그 이미지가 찍힌 뒤 흐리게 · 카드와 휴지통 말고는 어둡게(body.card-drag)
+  requestAnimationFrame(() => { n.classList.add('dragging'); trashEl.classList.add('show'); document.body.classList.add('card-drag'); });
 });
 nodesEl.addEventListener('dragover', (e) => {
   if (memoDrag) return memoDragOver(e);
@@ -1833,6 +1834,7 @@ nodesEl.addEventListener('dragleave', (e) => {
 });
 nodesEl.addEventListener('dragend', () => {
   trashEl.classList.remove('show', 'over');
+  document.body.classList.remove('card-drag');
   if (!dragEl) return;
   dragEl.classList.remove('dragging');
   dragEl = null;
