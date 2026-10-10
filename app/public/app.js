@@ -1024,6 +1024,7 @@ const QH_RESUME = (label = '▶ 재개') => ` <button data-resume title="${_t('�
 function queueHead(w) {
   const n = w.queue.length, idle = !['working', 'decision'].includes(w.status);
   if (w.queueHeld === 'question') return `<div class="qh held ask" title="${_t('마지막 응답이 질문으로 끝나 대기열을 멈췄습니다 — CLI 에서 답하면 그 턴이 끝난 뒤 이어서 투입')}">${_t('❓ 응답이 질문으로 끝남 · 대기 {n}건 · 답하면 이어서', { n })}${QH_RESUME()}</div>`;
+  if (w.queueHeld === 'carried') return `<div class="qh held" title="${_t('같은 역할의 지난 워커에 남아 있던 지시 — 새 세션에 바로 보내지 않고 기다립니다')}">${_t('↪ 지난 워커에서 넘어온 지시 {n}건', { n })}${QH_RESUME()}</div>`;
   if (w.queueHeld) return `<div class="qh held" title="${_t('지시가 CLI 에 들어가지 않아 보류 중 — 중복 투입을 막으려고 자동으로 다시 보내지 않습니다')}">${_t('⚠ 보류된 지시 {n}건 · 터미널 확인 후', { n })}${QH_RESUME()}</div>`;
   if (w.dispatchAt) return `<div class="qh held soon" title="${_t('보내지 않으려면 위의 자동 투입 체크를 해제하세요')}">${_t('{s}초 뒤 1번 투입 · 대기 {n}건', { n, s: `<span class="cd" data-at="${w.dispatchAt}"></span>` })}</div>`;
   if (state.manualQueue?.[w.name]) return `<div class="qh held" title="${_t('자동 투입이 꺼져 있어 ▶ 를 눌러야 한 건씩 투입됩니다')}">${_t('자동 투입 꺼짐 · 대기 {n}건', { n })}${idle ? QH_RESUME('▶ 1번 보내기') : ''}</div>`;

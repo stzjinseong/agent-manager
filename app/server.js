@@ -409,6 +409,15 @@ function spawnWorker({ name, cwd, args = '', permissionMode = 'default', resume 
   };
   workers.set(id, w);
   pushLog(w, 'spawn', `claude 실행 · ${permissionMode}${extra.length ? ` · ${extra.join(' ')}` : ''}`);
+  // 같은 역할의 종료된 워커에 남은 대기열을 이어받는다(대기실 카드 ▶ 투입·서버 재시작 뒤 다시 띄울 때 사라지지 않게).
+  // 새 세션에 바로 보내지는 않는다 — 'carried' 로 멈춰 두고 사람이 ▶ 재개
+  for (const old of workers.values()) {
+    if (old === w || old.name !== w.name || old.status !== 'exited' || !old.queue?.length) continue;
+    w.queue.push(...old.queue);
+    pushLog(old, 'status', `남은 대기열 ${old.queue.length}건을 ${id} 로 넘김`);
+    old.queue = [];
+  }
+  if (w.queue.length) { w.queueHeld = 'carried'; pushLog(w, 'notice', `지난 워커의 대기열 ${w.queue.length}건을 이어받았습니다 — 확인 후 ▶ 재개`); }
   ensureRoleColor(w.name);
   rememberCwd(cwd);
   return w;
@@ -439,7 +448,7 @@ async function assignTask(w, text) {
     if (isIdle(w) && cli.state !== 'empty') return { rejected: cli.state };
   }
   // 질문으로 멈췄거나 자동 투입을 끈 대기열은 그대로 두고, 쉬는 워커에 새로 보낸 지시는 바로 넣는다 — 질문에 대한 답일 수 있다
-  const waitsForUser = w.queueHeld === 'question' || manualQueue(w);
+  const waitsForUser = w.queueHeld === 'question' || w.queueHeld === 'carried' || manualQueue(w);
   if (isIdle(w) && w.queue.length && !waitsForUser) {
     // 쉬는 중인데 대기열이 남아 있으면(중단됨·투입 실패로 보류·투입 대기 중) 새 지시를 뒤에 붙이고 맨 앞부터 이어서 투입
     cancelDispatch(w);
@@ -463,7 +472,7 @@ async function assignTask(w, text) {
 //   1) 마지막 응답이 질문으로 끝나면 대기열을 멈춘다(queueHeld='question') — CLI 에서 답하면(UserPromptSubmit) 풀리고 그 턴 뒤에 잇는다
 //   2) 그 밖에도 바로 넣지 않고 DISPATCH_GRACE_MS 동안 기다린다(w.dispatchAt — 화면에 남은 초). 그사이 자동 투입을 끄면 보내지 않는다
 //   3) 역할마다 자동 투입을 끌 수 있다(config.manualQueue) — 그때는 ▶ 를 눌러야 한 건씩 나간다
-// queueHeld: false | 'failed'(투입 실패 — 중복 위험) | 'question'(응답이 질문). 예전 버전이 저장한 true 는 'failed' 로 본다
+// queueHeld: false | 'failed'(투입 실패 — 중복 위험) | 'question'(응답이 질문) | 'carried'(지난 워커에서 이어받음). 예전 버전이 저장한 true 는 'failed' 로 본다
 const DISPATCH_GRACE_MS = 5000;
 const dispatchTimers = new Map(); // 워커 id → setTimeout (draftTimers 와 같은 이유로 워커 밖에 둔다)
 const manualQueue = (w) => Boolean(config.manualQueue?.[w.name]);
@@ -1377,6 +1386,12 @@ function loadSavedWorkers() {
 // 워커 기록을 목록에서 지운다(PTY 호스트에도 잊게 하고, 받아 둔 스크린샷도 지움). 대화 기록(transcript)은 그대로
 function forgetWorker(w) {
   noteWorkerSession(w);
+  // 대기열은 워커에 붙어 있어 기록을 지우면 같이 사라졌다 — 남은 지시는 그 역할의 '나중에 할 작업'으로 옮긴다
+  if (w.queue?.length) {
+    (config.memos[w.name] ||= []).push(...w.queue.map((text, i) => ({ id: `m${Date.now().toString(36)}${i}${Math.random().toString(36).slice(2, 5)}`, text, createdAt: Date.now() })));
+    w.queue = [];
+    saveConfig(); // emitState 포함
+  }
   hostSend({ op: 'forget', id: w.id });
   workers.delete(w.id);
   fs.rmSync(path.join(SHOT_DIR, w.id), { recursive: true, force: true });
