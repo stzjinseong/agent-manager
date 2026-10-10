@@ -632,8 +632,9 @@ setInterval(async () => {
 const PROMPT_CONFIRM_MS = 8000;
 const confirmTimers = new Map(); // 워커 id → setTimeout (draftTimers 와 같은 이유로 워커 밖에 둔다)
 function sendPrompt(w, text) {
-  // bracketed paste 로 넣어야 여러 줄 지시가 줄마다 전송되지 않는다
-  w.term.write(`\x1b[200~${text}\x1b[201~`);
+  // bracketed paste 로 넣어야 여러 줄 지시가 줄마다 전송되지 않는다.
+  // 끝이 \ 이면 Claude Code 가 뒤따르는 Enter 를 줄바꿈으로 바꿔 전송되지 않고 입력창에 남았다 — 공백을 하나 붙여 막는다
+  w.term.write(`\x1b[200~${text}${/\\$/.test(text) ? ' ' : ''}\x1b[201~`);
   setTimeout(() => w.term.write('\r'), 120);
   // UserPromptSubmit 훅이 오기 전에 다음 지시가 들어오면 바로 투입돼 버리므로 선제적으로 작업 중 처리
   w.status = 'working';
