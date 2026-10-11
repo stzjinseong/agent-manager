@@ -284,7 +284,9 @@ function hookSettings() {
   const slash = (p) => p.replace(/\\/g, '/');
   const command = `"${slash(process.execPath)}" "${slash(path.join(APP_DIR, 'hook.mjs'))}"`;
   const h = (timeout = 10) => [{ type: 'command', command, timeout }];
-  const events = ['SessionStart', 'UserPromptSubmit', 'Notification', 'Stop', 'SessionEnd', 'SubagentStop'];
+  // StopFailure: API 오류(사용량 한도·과부하 등)로 턴이 끝나면 Stop 대신 온다 — 안 받으면 '작업 중'에 남아 대기열이 멈췄다.
+  // 설정은 띄울 때 읽고 바뀌어도 다시 읽지 않아(실측 v2.1.296), 훅을 늘리면 이미 떠 있는 워커는 다시 띄워야 받는다
+  const events = ['SessionStart', 'UserPromptSubmit', 'Notification', 'Stop', 'StopFailure', 'SessionEnd', 'SubagentStop'];
   const hooks = Object.fromEntries(events.map((e) => [e, [{ hooks: h() }]]));
   hooks.PreToolUse = [{ matcher: '*', hooks: h() }];
   hooks.PostToolUse = [{ matcher: '*', hooks: h() }];
@@ -318,7 +320,9 @@ function checkInterrupted(w) {
   // Stop 훅을 놓친 경우(서버가 꺼져 있던 사이 턴이 끝남 등) 트랜스크립트로 바로잡는다:
   // 마지막 기록이 정상 종료된 응답이고 5초 넘게 새 기록이 없으면 완료
   const tx = w.tx;
-  if (w.status === 'working' && tx?.lastKind === 'assistant' && tx.lastStop === 'end_turn' && Date.now() - tx.lastTs > 5000 && !tx.seg) {
+  // 마지막 기록이 이번 턴(turnStartedAt) 뒤여야 한다 — 아니면 지시를 막 보낸 참에 지난 턴의 끝을 보고 '완료'로 판정해
+  // 대기열 다음 지시를 곧바로 끼워 넣었다(실측: 서버 재시작 직후 '좋아' 투입 → 바로 '턴 완료 (기록으로 확인)' → '감사' 투입)
+  if (w.status === 'working' && tx?.lastKind === 'assistant' && tx.lastStop === 'end_turn' && tx.lastTs > (w.turnStartedAt || 0) && Date.now() - tx.lastTs > 5000 && !tx.seg) {
     if (tx.lastText) w.lastMessage = tx.lastText.slice(0, 2000);
     w.currentTool = null;
     w.doneAt = Date.now(); // 화면의 '확인 안 한 완료' 표시 기준
@@ -555,6 +559,7 @@ function hostSnapshot(id, ms = 1500) {
 }
 // 입력창 아래에는 상태 줄 몇 줄(권한 모드, statusLine)만 온다. 그보다 위에 있는 가로선 쌍은 지난 화면의 흔적으로 본다
 const BELOW_BOX_MAX = 8;
+const STATUS_SCAN = 15; // 입력창 위로 진행 줄을 찾는 줄 수
 async function cliDraft(w) {
   const snap = await hostSnapshot(w.id);
   if (!snap?.data || !snap.cols) return { state: 'empty', text: '' };
@@ -584,12 +589,14 @@ async function cliDraft(w) {
         }
       }
       text = text.trim();
-      // 턴이 돌고 있다는 표시: 입력창 아래 상태줄의 'esc to interrupt', 또는 입력창 바로 위 진행 줄("· Nebulizing…").
-      // 끝나면 둘 다 사라지고 "✻ Baked for 6s · done …" 이 남는다(실측 v2.1.288)
+      // 턴이 돌고 있다는 표시: 입력창 아래 상태줄의 'esc to interrupt'(옛 버전), 또는 입력창 위 진행 줄("✢ Garnishing… (1m 16s · ↓ 6k tokens)").
+      // 끝나면 둘 다 사라지고 "✻ Baked for 6s · done …" 이 남는다(실측 v2.1.288·v2.1.296). 진행 줄과 입력창 사이에 할 일 목록 등이
+      // 끼면 바로 위 두 줄 안에 없어서, 턴 도중에 '작업 표시 없음'으로 잘못 보고 입력 대기로 바꿔 다음 지시를 끼워 넣었다 →
+      // 위로 STATUS_SCAN 줄까지 본다. 도구 출력(⎿)·응답(⏺)·접힌 줄(… +N lines)은 진행 줄이 아니다
       const line = (i) => (i >= 0 && i < rows.length ? rows[i].translateToString(true) : '');
       let busy = false;
       for (let i = bottom + 1; i <= last; i++) if (/esc to interrupt/i.test(line(i))) busy = true;
-      for (let i = top - 1; i >= Math.max(0, top - 2); i--) if (/^\s*\S\s+\S.*…/.test(line(i))) busy = true;
+      for (let i = top - 1; i >= Math.max(0, top - STATUS_SCAN); i--) if (/^\s*[^\s⎿⏺…│|]\s+[^\s…].*…/.test(line(i))) busy = true;
       return { state: text ? 'draft' : 'empty', text, busy };
     }
     return { state: 'blocked', text: '' };
@@ -629,6 +636,7 @@ setInterval(async () => {
 
 // 투입 확인: 보낸 뒤 이 시간 안에 UserPromptSubmit 훅도, 트랜스크립트 새 기록도 없으면 들어가지 않은 것으로 본다
 const PROMPT_CONFIRM_MS = 8000;
+const RETRYABLE_STOP = new Set(['overloaded', 'server_error', 'unknown', 'max_output_tokens']); // StopFailure 뒤 대기열을 이어도 되는 오류
 const retryText = new Map(); // 워커 id → 마지막으로 투입에 실패해 다시 보낸 지시 (confirmPrompt)
 const confirmTimers = new Map(); // 워커 id → setTimeout (draftTimers 와 같은 이유로 워커 밖에 둔다)
 function sendPrompt(w, text) {
@@ -888,6 +896,20 @@ function onHook(w, ev, res) {
       else if (['permission_prompt', 'elicitation_dialog', 'agent_needs_input'].includes(ev.notification_type)) setStatus(w, 'decision', w.notice);
       else { pushLog(w, 'notice', w.notice); emitState(); }
       break;
+    case 'StopFailure': {
+      // API 오류로 턴이 끝났다(Claude Code 가 재시도한 뒤에도 실패). 작업 결과가 아니라 점수는 없고, 상태는 입력 대기로.
+      // 대기열은 다시 될 만한 오류(과부하·서버 오류 등)면 잇고, 다음 지시도 똑같이 실패할 오류(사용량 한도·인증·결제·모델 없음 등)면
+      // 잇지 않는다 — 이으면 지시마다 곧바로 실패하며 대기열이 통째로 소진된다. 다음 턴이 끝나거나 새 지시를 보내면 이어진다
+      const err = String(ev.error || 'unknown');
+      w.lastMessage = ev.last_assistant_message || w.lastMessage;
+      w.currentTool = null;
+      progress.drop(w);
+      setStatus(w, 'idle', `API 오류로 턴이 끝남 (${err})`);
+      if (RETRYABLE_STOP.has(err)) afterTurn(w);
+      else if (w.queue.length) pushLog(w, 'notice', `API 오류(${err})라 대기열을 바로 잇지 않았습니다 — 해결된 뒤 지시를 보내면 이어서 투입`);
+      emitState();
+      break;
+    }
     case 'Stop':
       w.lastMessage = ev.last_assistant_message ?? w.lastMessage;
       w.currentTool = null;
@@ -931,7 +953,10 @@ function scheduleProfile(w) {
   if (!w.tx || w.tx.timer) return;
   w.tx.timer = setTimeout(() => {
     w.tx.timer = null;
-    if (readProfile(w.tx)) { setModel(w, w.tx.model, w.tx.modelAt); drainShots(w); checkInterrupted(w); emitState(); }
+    if (readProfile(w.tx)) { setModel(w, w.tx.model, w.tx.modelAt); drainShots(w); emitState(); }
+    // 기록이 그대로여도 본다 — Stop 훅을 놓친 턴(서버 재시작 중에 끝남 등)은 끝난 뒤 기록이 더 늘지 않아,
+    // 바뀔 때만 보면 '기록으로 완료 확인'(5초 조용)이 영영 돌지 않고 '작업 중'에 남아 대기열이 멈췄다
+    checkInterrupted(w);
     if (w.seedAt) seedHistory(w);
   }, 300);
 }

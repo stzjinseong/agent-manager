@@ -548,6 +548,8 @@ const SERVER_EN = [
   [/CLI 가 입력 대기 화면이 아니어서\(\/resume 같은 선택창, ! 셸 모드 등\) 업무 지시를 대기열에 두었습니다 — 입력창으로 돌아오면 이어서 투입/, "The CLI isn't at its input screen (a picker like /resume, ! shell mode, etc.), so the task was queued — it goes in once the input is back"],
   [/CLI 입력창에 쓰던 글이 있어 업무 지시를 대기열에 두었습니다 — 그 글을 보내거나 지우면 이어서 투입(됩니다)?/, 'There was unsent text in the CLI input, so the task was queued — send or clear that text and it will go in next'],
   [/응답이 질문으로 끝나 대기열을 멈췄습니다 — CLI 에서 답하면 그 턴이 끝난 뒤 이어서 투입 · 바로 보내려면 ▶ 재개/, 'The reply ended with a question, so the queue is paused — answer in the CLI and it continues after that turn · ▶ Resume to send now'], // 없앤 기능 — 지난 타임라인 기록용
+  [/API 오류로 턴이 끝남 \(([\w-]+)\)/, (m, e) => `Turn ended by an API error (${e})`],
+  [/API 오류\(([\w-]+)\)라 대기열을 바로 잇지 않았습니다 — 해결된 뒤 지시를 보내면 이어서 투입/, (m, e) => `API error (${e}), so the queue wasn't continued — send a task once it's resolved and the queue follows`],
   [/대기열 자동 투입 끔 — ▶ 를 눌러야 한 건씩 투입/, 'Queue auto-send off — press ▶ to send one at a time'],
   [/지난 워커의 대기열 (\d+)건을 이어받았습니다 — 세션이 뜨면 이어서 투입/, (m, n) => `Carried over ${n} queued task(s) from the previous worker — they go in once the session is up`],
   [/지난 워커의 대기열 (\d+)건을 이어받았습니다 — 확인 후 ▶ 재개/, (m, n) => `Carried over ${n} queued task(s) from the previous worker — check them, then ▶ Resume`],
