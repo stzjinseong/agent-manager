@@ -10,7 +10,6 @@ let LANG = document.documentElement.lang === 'en' ? 'en' : 'ko';
 const EN = {
   // 헤더
   '클로드 키우기': 'Clawdgotchi',
-  '+ 워커': '+ Worker',
   '서버 종료': 'Shut down server',
   '라이트 모드로': 'Switch to light mode',
   '다크 모드로': 'Switch to dark mode',
@@ -143,7 +142,10 @@ const EN = {
   ' · 대기 지시 {n}건은 보류 (지시를 새로 보내면 재개)': (v) => ` · ${v.n} queued task${v.n > 1 ? 's' : ''} on hold (send a new task to resume)`,
   '부팅 중… (처음 여는 폴더면 터미널에서 신뢰 여부를 선택하세요)': 'Starting… (if this folder is new, choose whether to trust it in the terminal)',
   '프로세스 종료됨': 'Process exited',
-  '아직 워커가 없습니다. 오른쪽 위 <b>+ 워커</b>로 첫 Claude 를 투입하세요.': 'No workers yet. Use <b>+ Worker</b> at the top right to launch your first Claude.',
+  '아직 워커가 없습니다. <b>+ 워커 추가</b>로 첫 Claude 를 투입하세요.': 'No workers yet. Use <b>+ Add worker</b> to launch your first Claude.',
+  '워커 추가': 'Add worker',
+  '+ 워커 추가': '+ Add worker',
+  '역할 이름과 작업 폴더를 정해 투입': 'Pick a role name and folder, then launch',
   // 최소화
   '▴ 최소화': '▴ Minimize',
   '매니저·워커 카드를 헤더 아래 한 줄로 최소화': 'Collapse the manager and worker cards into one row under the header',
@@ -158,7 +160,7 @@ const EN = {
   '워커를 생성해보세요!': 'Create a worker!',
   '워커를 클릭해보세요!': 'Click a worker!',
   '대기실 카드의 <b>▶ 투입</b>이나 ': '<b>▶ Launch</b> a standby card or use ',
-  '<b>+ 워커</b>로 첫 Claude 를 투입하면 여기서 터미널·업무 지시·타임라인을 볼 수 있어요.': '<b>+ Worker</b> to launch your first Claude — its terminal, tasks and timeline will show up here.',
+  '<b>+ 워커 추가</b>로 첫 Claude 를 투입하면 여기서 터미널·업무 지시·타임라인을 볼 수 있어요.': '<b>+ Add worker</b> to launch your first Claude — its terminal, tasks and timeline will show up here.',
   '위의 워커 칩을 누르면 여기에 그 워커의 터미널·업무 지시·타임라인이 열려요.': 'Click a worker chip above to open its terminal, tasks and timeline here.',
   '위의 워커 카드를 누르면 여기에 그 워커의 터미널·업무 지시·타임라인이 열려요.': 'Click a worker card above to open its terminal, tasks and timeline here.',
   // 시간

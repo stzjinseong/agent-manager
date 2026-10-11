@@ -862,8 +862,15 @@ function renderFloor() {
     prev = n;
   }
   let empty = $('.empty', nodes);
-  if (!items.length && !empty) nodes.append(el(`<div class="empty">${_t('아직 워커가 없습니다. 오른쪽 위 <b>+ 워커</b>로 첫 Claude 를 투입하세요.')}</div>`));
+  if (!items.length && !empty) nodes.append(empty = el(`<div class="empty">${_t('아직 워커가 없습니다. <b>+ 워커 추가</b>로 첫 Claude 를 투입하세요.')}</div>`));
   if (items.length && empty) empty.remove();
+  // 맨 끝(마지막 워커 다음 자리)에 '워커 추가' 카드 — .node 가 아니라 순서·회로선·끌기에 끼지 않는다
+  let add = $('.node-add', nodes);
+  if (!add) add = el(`<button type="button" class="node-add" data-new><span class="na-plus" aria-hidden="true">+</span><b></b><small></small></button>`);
+  $('b', add).textContent = _t('워커 추가');
+  $('small', add).textContent = _t('역할 이름과 작업 폴더를 정해 투입');
+  add.classList.toggle('on', !$('#new-panel').hidden);
+  if (nodes.lastElementChild !== add) nodes.append(add);
   tick();
   requestAnimationFrame(drawTraces);
 }
@@ -923,6 +930,12 @@ function renderDock() {
   let empty = $('.dock-empty', list);
   if (!dockEls.size && !empty) list.append(el(`<span class="dock-empty">${_t('워커 없음')}</span>`));
   if (dockEls.size && empty) empty.remove();
+  // 칩 줄 끝에도 워커 추가(회로 기판의 '워커 추가' 카드와 같은 동작)
+  let add = $('.dadd', list);
+  if (!add) add = el(`<button type="button" class="dadd" data-new aria-haspopup="dialog">+</button>`);
+  add.title = add.ariaLabel = _t('워커 추가');
+  add.classList.toggle('on', !$('#new-panel').hidden);
+  if (list.lastElementChild !== add) list.append(add);
 }
 // 대기실 슬롯 칩: 흐린 점선 칩에 ▶ 투입 버튼. 버튼을 안에 두려고 칩을 <div> 로 만든다
 function renderDockSocket(list, key, prev) {
@@ -1099,13 +1112,13 @@ function renderHint() {
   box.innerHTML = kind === 'create'
     ? `<div class="hint-art create"><span class="hint-slot"><span class="avatar">${clawdSVG()}</span></span><span class="hint-plus">+</span></div>
        <h2>${_t('워커를 생성해보세요!')}</h2>
-       <p>${state.profiles.length ? _t('대기실 카드의 <b>▶ 투입</b>이나 ') : ''}${_t('<b>+ 워커</b>로 첫 Claude 를 투입하면 여기서 터미널·업무 지시·타임라인을 볼 수 있어요.')}</p>
-       <button class="btn primary" data-hint="new">${_t('+ 워커')}</button>`
+       <p>${state.profiles.length ? _t('대기실 카드의 <b>▶ 투입</b>이나 ') : ''}${_t('<b>+ 워커 추가</b>로 첫 Claude 를 투입하면 여기서 터미널·업무 지시·타임라인을 볼 수 있어요.')}</p>
+       <button class="btn primary" data-hint="new">${_t('+ 워커 추가')}</button>`
     : `<div class="hint-art click"><span class="avatar">${clawdSVG()}</span><span class="hint-ring"></span>${CURSOR_SVG}</div>
        <h2>${_t('워커를 클릭해보세요!')}</h2>
        <p>${_t(min ? '위의 워커 칩을 누르면 여기에 그 워커의 터미널·업무 지시·타임라인이 열려요.' : '위의 워커 카드를 누르면 여기에 그 워커의 터미널·업무 지시·타임라인이 열려요.')}</p>`;
 }
-$('#hint').addEventListener('click', (e) => { if (e.target.closest('[data-hint="new"]')) $('#btn-new').click(); });
+$('#hint').addEventListener('click', (e) => { if (e.target.closest('[data-hint="new"]')) toggleNewPanel(); });
 
 // ---------- 상세 ----------
 // 대기열 머리줄 — 멈춘 이유(server.js: 'failed' 투입 실패 · 'carried' 지난 워커에서 이어받음)·투입 대기 남은 초·자동 투입 꺼짐
@@ -2049,14 +2062,18 @@ $('#inbox').addEventListener('click', async (e) => {
 });
 
 const newForm = $('#new-form');
-$('#btn-new').onclick = () => {
-  $('#new-panel').hidden = !$('#new-panel').hidden;
-  if (!$('#new-panel').hidden) {
-    if (!newForm.cwd.value && state.recentCwds[0]) newForm.cwd.value = state.recentCwds[0];
-    newForm.name.focus();
-  }
-};
-$('#btn-cancel').onclick = () => { $('#new-panel').hidden = true; };
+// 워커 추가 창 — 회로 기판 끝의 '워커 추가' 카드·최소화 칩 줄 끝의 + 칩·안내의 버튼이 연다(예전엔 헤더의 + 워커)
+function toggleNewPanel(open = $('#new-panel').hidden) {
+  const panel = $('#new-panel');
+  panel.hidden = !open;
+  for (const b of document.querySelectorAll('[data-new]')) b.classList.toggle('on', open);
+  if (!open) return;
+  if (!newForm.cwd.value && state.recentCwds[0]) newForm.cwd.value = state.recentCwds[0];
+  panel.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); // 창은 회로 기판 위에 열린다 — 아래쪽 카드를 눌렀으면 보이게
+  newForm.name.focus({ preventScroll: true });
+}
+document.addEventListener('click', (e) => { if (e.target.closest?.('[data-new]')) toggleNewPanel(); });
+$('#btn-cancel').onclick = () => toggleNewPanel(false);
 $('#btn-pick').onclick = async (e) => {
   const btn = e.currentTarget;
   btn.disabled = true; btn.textContent = '…';
@@ -2071,7 +2088,7 @@ newForm.onsubmit = async (e) => {
   const body = { name: f.name.value, cwd: f.cwd.value, args: f.args.value, permissionMode: f.permissionMode.value, save: f.save.checked };
   const { id } = await api('/api/workers', body);
   f.name.value = ''; f.args.value = '';
-  $('#new-panel').hidden = true;
+  toggleNewPanel(false);
   select(id);
 };
 

@@ -37,7 +37,7 @@ Open `claude` in the cloned folder and run the command below — it checks every
 
 ### 1. Launch a worker
 
-Click **+ Worker** at the top right, pick a role name and a working folder, then **Launch**.
+Click the **Add worker** card at the end of the worker cards (or the **+** at the end of the chip row when minimized), pick a role name and a working folder, then **Launch**.
 With **Save role** on, the card stays in **Standby** after the worker closes, so you can bring it back with **▶ Launch**.
 
 ![Launch a worker](docs/screenshots/en/new-worker.png)
