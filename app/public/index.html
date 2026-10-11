@@ -107,7 +107,9 @@
       <label class="f-name"><span data-i18n>역할 이름</span><input name="name" placeholder="예: 클라 구현" required autocomplete="off" data-i18n-attr="placeholder"></label>
       <label class="f-cwd"><span data-i18n>작업 폴더</span>
         <div class="with-btn">
-          <input name="cwd" list="recent-cwds" placeholder="최근 경로에서 고르거나 📁 로 선택" autocomplete="off" data-i18n-attr="placeholder">
+          <input name="cwd" placeholder="최근 경로에서 고르거나 📁 로 선택" autocomplete="off" data-i18n-attr="placeholder">
+          <button type="button" id="btn-recent" class="btn" aria-haspopup="listbox" aria-expanded="false" title="최근 작업 폴더" aria-label="최근 작업 폴더" data-i18n-attr="title,aria-label">▾</button>
+          <div class="recent-pop" id="recent-pop" role="listbox" hidden></div>
           <button type="button" id="btn-pick" class="btn" title="폴더 선택 창 열기" data-i18n-attr="title">📁</button>
         </div>
       </label>
@@ -126,7 +128,6 @@
         <button class="btn primary" data-i18n>띄우기</button>
       </div>
     </form>
-    <datalist id="recent-cwds"></datalist>
   </section>
 
   <div class="stale-bar" id="stale-bar" hidden>

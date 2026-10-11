@@ -159,9 +159,24 @@ function saveConfig() {
   emitState();
 }
 
+const RECENT_CWDS = 10;
 function rememberCwd(cwd) {
-  config.recentCwds = [cwd, ...config.recentCwds.filter((c) => c.toLowerCase() !== cwd.toLowerCase())].slice(0, 12);
+  config.recentCwds = [cwd, ...config.recentCwds.filter((c) => c.toLowerCase() !== cwd.toLowerCase())].slice(0, RECENT_CWDS);
   saveConfig();
+}
+// 워커 추가 창의 작업 폴더 목록 — 띄운 순서(recentCwds) 뒤에 지난 워커·역할 세션·저장된 역할의 폴더를 최근 쓴 순으로 채운다.
+// recentCwds 는 이 기능이 생긴 뒤 띄운 것만 쌓여 있어 예전에 쓰던 폴더가 빠졌다
+function recentCwdList() {
+  const seen = new Set(), out = [];
+  const add = (c) => { const k = String(c || '').toLowerCase(); if (c && !seen.has(k) && out.length < RECENT_CWDS) { seen.add(k); out.push(c); } };
+  for (const c of config.recentCwds) add(c);
+  const past = [
+    ...[...workers.values()].map((w) => ({ cwd: w.cwd, at: w.updatedAt || w.startedAt || 0 })),
+    ...Object.values(config.sessions || {}).map((x) => ({ cwd: x.cwd, at: x.at || 0 })),
+  ].sort((a, b) => b.at - a.at);
+  for (const x of past) add(x.cwd);
+  for (const p of config.profiles) add(p.cwd);
+  return out;
 }
 
 // 역할(이름)마다 마지막 Claude 세션 — 대기실 카드의 ▶ 투입이 이 세션을 이어서(--resume) 띄운다.
@@ -992,7 +1007,7 @@ function publicState() {
     // 대기실 카드: 이어 갈 수 있는 마지막 세션의 시각 (역할 이름 → at)
     resumable: Object.fromEntries(config.profiles.map((p) => [p.name, resumableSession(p.name, p.cwd, p.args)?.at]).filter(([, at]) => at != null)),
     serverStale: serverStale(),
-    recentCwds: config.recentCwds,
+    recentCwds: recentCwdList(),
     progress: progress.public(),
     shotKeep: SHOT_KEEP, // 화면 안내 문구용 (워커당 캡처 보관 장수)
     usage, // 계정 사용량 { fiveHour: { pct, resetsAt, at, from }, sevenDay, at, from }

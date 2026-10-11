@@ -600,7 +600,6 @@ function render() {
   renderDetail();
   renderHint();
   mgrUpdate();
-  $('#recent-cwds').innerHTML = state.recentCwds.map((c) => `<option value="${esc(c)}">`).join('');
 }
 
 function pendingCount() {
@@ -2122,6 +2121,38 @@ function toggleNewPanel(open = $('#new-panel').hidden) {
 }
 document.addEventListener('click', (e) => { if (e.target.closest?.('[data-new]')) toggleNewPanel(); });
 $('#btn-cancel').onclick = () => toggleNewPanel(false);
+// 최근 작업 폴더 목록(최근 10개 — server.js recentCwdList). 브라우저 자동완성(datalist)은 입력칸에 채워 둔 경로와 맞는 것만
+// 보여 줘서 사실상 하나만 떴고 Safari 는 잘 띄우지도 않았다 → ▾ 로 여는 목록. 입력칸에서 ↓ 로도 연다
+const recentPop = $('#recent-pop'), recentBtn = $('#btn-recent');
+function setRecentPop(open) {
+  if (open) {
+    const cur = newForm.cwd.value.trim().toLowerCase();
+    recentPop.innerHTML = state.recentCwds.length
+      ? state.recentCwds.map((c) => {
+        const name = c.split(/[\\/]/).filter(Boolean).pop() || c;
+        return `<button type="button" class="recent-item${c.toLowerCase() === cur ? ' on' : ''}" role="option" data-cwd="${esc(c)}" title="${esc(c)}"><b>${esc(name)}</b><small>${esc(ltrPath(c))}</small></button>`;
+      }).join('')
+      : `<div class="recent-empty">${_t('아직 띄운 작업 폴더가 없습니다')}</div>`;
+  }
+  recentPop.hidden = !open;
+  recentBtn.setAttribute('aria-expanded', String(open));
+  if (open) (recentPop.querySelector('.on') || recentPop.querySelector('.recent-item'))?.focus();
+}
+recentBtn.onclick = () => setRecentPop(recentPop.hidden);
+recentPop.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-cwd]');
+  if (!b) return;
+  newForm.cwd.value = b.dataset.cwd;
+  setRecentPop(false);
+  newForm.cwd.focus();
+});
+recentPop.addEventListener('keydown', (e) => {
+  const items = [...recentPop.querySelectorAll('.recent-item')], i = items.indexOf(document.activeElement);
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); items[(i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length]?.focus(); }
+  else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setRecentPop(false); newForm.cwd.focus(); }
+});
+newForm.cwd.addEventListener('keydown', (e) => { if (e.key === 'ArrowDown' && recentPop.hidden) { e.preventDefault(); setRecentPop(true); } });
+document.addEventListener('pointerdown', (e) => { if (!recentPop.hidden && !e.target.closest('#recent-pop, #btn-recent')) setRecentPop(false); });
 $('#btn-pick').onclick = async (e) => {
   const btn = e.currentTarget;
   btn.disabled = true; btn.textContent = '…';

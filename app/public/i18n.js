@@ -203,6 +203,8 @@ const EN = {
   '▶ 1번 보내기': '▶ Send #1',
   '맨 위 지시를 지금 투입': 'Send the top task now',
   '클릭해 재생': 'Click to play',
+  '최근 작업 폴더': 'Recent folders',
+  '아직 띄운 작업 폴더가 없습니다': 'No folders used yet',
   '이 브라우저가 재생할 수 없는 형식입니다.': 'This browser can\'t play this format.',
   '내려받기': 'Download',
   '곧 다음 지시 투입': 'Sending the next task shortly',
