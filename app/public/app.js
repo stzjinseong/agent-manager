@@ -731,7 +731,7 @@ function bubbleOf(w) {
     }
     case 'done': case 'checked': return esc(w.lastMessage || _t('완료'));
     case 'idle': return w.lastMessage ? esc(w.lastMessage) : _t('지시를 기다리는 중');
-    case 'interrupted': return `${_t('⏸ 중단됨 — 처리 중인 작업 없음')}${w.queue.length ? _t(' · 대기 지시 {n}건은 보류 (지시를 새로 보내면 재개)', { n: w.queue.length }) : ''}`;
+    case 'interrupted': return _t('⏸ 중단됨 — 처리 중인 작업 없음');
     case 'starting': return _t('부팅 중… (처음 여는 폴더면 터미널에서 신뢰 여부를 선택하세요)');
     case 'exited': return _t('프로세스 종료됨');
   }
@@ -797,7 +797,7 @@ function updateNode(node, w) {
   $('.meta', node).innerHTML =
     `<span title="${_t(running ? '이번 턴 경과' : '마지막 갱신')}">⏱ <em data-since="${running ? w.turnStartedAt : w.updatedAt}"></em></span>` +
     `<span title="${_t('도구 사용 횟수')}">⚙ ${w.toolCount}</span>` +
-    (w.queue.length ? `<span class="q${w.queueHeld ? ' held' : ''}" title="${_t(w.queueHeld ? '대기열 멈춤' : w.dispatchAt ? '곧 다음 지시 투입' : '대기 중인 지시')}">${w.queueHeld ? '⏸' : w.dispatchAt ? '⏳' : ''}📥 ${w.queue.length}</span>` : '') +
+    (w.queue.length ? `<span class="q" title="${_t(w.dispatchAt ? '곧 다음 지시 투입' : '대기 중인 지시')}">${w.dispatchAt ? '⏳' : ''}📥 ${w.queue.length}</span>` : '') +
     (w.profile?.turnCount ? `<span title="${_t('추정 비용 (API 환산)')}">$ ${fmtUsd(w.profile.total.cost).slice(1)}</span>` : '');
   // 이번(또는 마지막) 턴에 나온 최근 캡처를 무대 왼쪽 아래에 작게. 주소가 같으면 다시 그리지 않는다(깜빡임 방지)
   const { shot: showShot, doc: showDoc } = recentMedia(w);
@@ -1144,17 +1144,15 @@ function renderHint() {
 $('#hint').addEventListener('click', (e) => { if (e.target.closest('[data-hint="new"]')) toggleNewPanel(); });
 
 // ---------- 상세 ----------
-// 대기열 머리줄 — 멈춘 이유(server.js: 'failed' 투입 실패 · 'carried' 지난 워커에서 이어받음)·투입 대기 남은 초·자동 투입 꺼짐
+// 대기열 머리줄 — 투입 대기 남은 초·자동 투입 꺼짐
 // 대기열 ↩ 되돌리기·✕ 빼기 아이콘 — 메모 카드의 수정·보내기와 같은 버튼 모양(.memo-ic)
 const UNDO_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>';
 const X_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
-const QH_RESUME = (label = '▶ 재개') => ` <button data-resume title="${_t('맨 위부터 다시 투입')}">${_t(label)}</button>`;
+const QH_SEND = () => ` <button data-resume title="${_t('맨 위 지시를 지금 투입')}">${_t('▶ 1번 보내기')}</button>`;
 function queueHead(w) {
   const n = w.queue.length, idle = !['working', 'decision'].includes(w.status);
-  if (w.queueHeld === 'carried') return `<div class="qh held" title="${_t('같은 역할의 지난 워커에 남아 있던 지시 — 새 세션에 바로 보내지 않고 기다립니다')}">${_t('↪ 지난 워커에서 넘어온 지시 {n}건', { n })}${QH_RESUME()}</div>`;
-  if (w.queueHeld) return `<div class="qh held" title="${_t('지시가 CLI 에 들어가지 않아 보류 중 — 중복 투입을 막으려고 자동으로 다시 보내지 않습니다')}">${_t('⚠ 보류된 지시 {n}건 · 터미널 확인 후', { n })}${QH_RESUME()}</div>`;
   if (w.dispatchAt) return `<div class="qh held soon" title="${_t('보내지 않으려면 위의 자동 투입 체크를 해제하세요')}">${_t('{s}초 뒤 1번 투입 · 대기 {n}건', { n, s: `<span class="cd" data-at="${w.dispatchAt}"></span>` })}</div>`;
-  if (state.manualQueue?.[w.name]) return `<div class="qh held" title="${_t('자동 투입이 꺼져 있어 ▶ 를 눌러야 한 건씩 투입됩니다')}">${_t('자동 투입 꺼짐 · 대기 {n}건', { n })}${idle ? QH_RESUME('▶ 1번 보내기') : ''}</div>`;
+  if (state.manualQueue?.[w.name]) return `<div class="qh held" title="${_t('자동 투입이 꺼져 있어 ▶ 를 눌러야 한 건씩 투입됩니다')}">${_t('자동 투입 꺼짐 · 대기 {n}건', { n })}${idle ? QH_SEND() : ''}</div>`;
   return `<div class="qh held calm" title="${_t('현재 턴이 끝나면 위에서부터 투입')}">${_t('대기 중인 지시 {n}건', { n })}</div>`;
 }
 // 투입 대기 남은 초 — 상태가 안 바뀌어도 매초 줄어들게(새로 그린 직후에도 비지 않게 renderDetail 끝에서도 부른다)

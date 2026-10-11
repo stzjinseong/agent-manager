@@ -297,7 +297,7 @@ function workerTheme() {
 }
 
 // 사용자가 중단(Esc)하면 Stop 훅이 오지 않아 '작업 중'으로 남는다. 트랜스크립트의 중단 기록이
-// 이번 턴 시작 이후면 '중단됨'으로 바꾼다. 큐에 쌓인 지시는 자동 투입하지 않는다(사용자가 멈춘 것이므로).
+// 이번 턴 시작 이후면 '중단됨'으로 바꾸고, 정상 완료처럼 대기열을 잇는다(예전엔 멈춰 두었는데 끝날 턴이 없어 하염없이 기다렸다).
 function checkInterrupted(w) {
   if (w.status !== 'working' && w.status !== 'decision') return;
   // Stop 훅을 놓친 경우(서버가 꺼져 있던 사이 턴이 끝남 등) 트랜스크립트로 바로잡는다:
@@ -318,6 +318,7 @@ function checkInterrupted(w) {
   for (const [did, d] of decisions) if (d.workerId === w.id) resolveDecision(did, null);
   progress.drop(w); // 중단된 작업은 점수 없음
   setStatus(w, 'interrupted', '사용자 중단');
+  afterTurn(w);
 }
 
 // 서버 코드가 켜진 뒤 바뀌었는지 — 화면은 새로고침마다 새 코드를 받지만 서버는 재시작해야 바뀐다.
@@ -410,14 +411,14 @@ function spawnWorker({ name, cwd, args = '', permissionMode = 'default', resume 
   workers.set(id, w);
   pushLog(w, 'spawn', `claude 실행 · ${permissionMode}${extra.length ? ` · ${extra.join(' ')}` : ''}`);
   // 같은 역할의 종료된 워커에 남은 대기열을 이어받는다(대기실 카드 ▶ 투입·서버 재시작 뒤 다시 띄울 때 사라지지 않게).
-  // 새 세션에 바로 보내지는 않는다 — 'carried' 로 멈춰 두고 사람이 ▶ 재개
+  // 세션이 뜨면(SessionStart) 이어서 투입한다
   for (const old of workers.values()) {
     if (old === w || old.name !== w.name || old.status !== 'exited' || !old.queue?.length) continue;
     w.queue.push(...old.queue);
     pushLog(old, 'status', `남은 대기열 ${old.queue.length}건을 ${id} 로 넘김`);
     old.queue = [];
   }
-  if (w.queue.length) { w.queueHeld = 'carried'; pushLog(w, 'notice', `지난 워커의 대기열 ${w.queue.length}건을 이어받았습니다 — 확인 후 ▶ 재개`); }
+  if (w.queue.length) pushLog(w, 'notice', `지난 워커의 대기열 ${w.queue.length}건을 이어받았습니다 — 세션이 뜨면 이어서 투입`);
   ensureRoleColor(w.name);
   rememberCwd(cwd);
   return w;
@@ -447,18 +448,15 @@ async function assignTask(w, text) {
     const cli = await cliDraft(w);
     if (isIdle(w) && cli.state !== 'empty') return { rejected: cli.state };
   }
-  // 지난 워커에서 넘어왔거나 자동 투입을 끈 대기열은 그대로 두고, 쉬는 워커에 새로 보낸 지시는 바로 넣는다
-  const waitsForUser = w.queueHeld === 'carried' || manualQueue(w);
-  if (isIdle(w) && w.queue.length && !waitsForUser) {
-    // 쉬는 중인데 대기열이 남아 있으면(중단됨·투입 실패로 보류·투입 대기 중) 새 지시를 뒤에 붙이고 맨 앞부터 이어서 투입
+  // 자동 투입을 끈 대기열은 그대로 두고, 쉬는 워커에 새로 보낸 지시는 바로 넣는다
+  if (isIdle(w) && w.queue.length && !manualQueue(w)) {
+    // 쉬는 중인데 대기열이 남아 있으면(투입 대기 중 등) 새 지시를 뒤에 붙이고 맨 앞부터 이어서 투입
     cancelDispatch(w);
-    w.queueHeld = false;
     w.queue.push(text); pushLog(w, 'queue', text); emitState();
     dispatchQueued(w);
     return {};
   }
   if (isIdle(w)) {
-    if (!waitsForUser) w.queueHeld = false;
     cancelDispatch(w);
     sendPrompt(w, text);
     return {};
@@ -470,18 +468,18 @@ async function assignTask(w, text) {
 // 대기열은 사람이 안 보는 사이 넘어가기 쉽다. 그래서
 //   1) 바로 넣지 않고 DISPATCH_GRACE_MS 동안 기다린다(w.dispatchAt — 화면에 남은 초). 그사이 자동 투입을 끄면 보내지 않는다
 //   2) 역할마다 자동 투입을 끌 수 있다(config.manualQueue) — 그때는 ▶ 를 눌러야 한 건씩 나간다
-// (예전엔 응답이 질문으로 끝나면 대기열을 멈췄으나(queueHeld='question') 질문 판정이 너무 자주 걸려 대기열이 자꾸 서서 뺐다)
-// queueHeld: false | 'failed'(투입 실패 — 중복 위험) | 'carried'(지난 워커에서 이어받음). 예전 버전이 저장한 true 는 'failed' 로 본다
+// 그 밖에는 멈추지 않는다 — 예전엔 응답이 질문으로 끝날 때·투입 실패·지난 워커에서 넘어온 대기열을 멈춰 두고(queueHeld)
+// ▶ 재개를 기다렸는데, 멈추는 일이 잦아 모두 뺐다. 턴이 끝나면(중단 포함) 늘 이어서 투입한다
 const DISPATCH_GRACE_MS = 3000;
 const dispatchTimers = new Map(); // 워커 id → setTimeout (draftTimers 와 같은 이유로 워커 밖에 둔다)
 const manualQueue = (w) => Boolean(config.manualQueue?.[w.name]);
 function afterTurn(w) {
-  if (!w.queue.length || w.queueHeld) return;
+  if (!w.queue.length) return;
   scheduleDispatch(w);
 }
 function scheduleDispatch(w) {
   cancelDispatch(w);
-  if (!w.queue.length || w.queueHeld || manualQueue(w)) return;
+  if (!w.queue.length || manualQueue(w)) return;
   w.dispatchAt = Date.now() + DISPATCH_GRACE_MS;
   dispatchTimers.set(w.id, setTimeout(() => {
     dispatchTimers.delete(w.id);
@@ -497,13 +495,12 @@ function cancelDispatch(w) {
   if (w.dispatchAt) { w.dispatchAt = 0; emitState(); }
 }
 // 큐 맨 앞 지시를 투입 — 턴이 끝났을 때. 입력창에 쓰던 글이 있거나 입력창이 아닌 화면이면 기다린다.
-// 투입 실패로 보류된 대기열(queueHeld)은 새 지시나 ▶ 재개가 있을 때까지 자동으로 보내지 않는다(실제로는 들어갔을 수도 있어 중복 위험)
-// force: ▶ 재개 — 자동 투입을 끈 역할도 한 건 보낸다
+// force: ▶ 1번 보내기 — 자동 투입을 끈 역할도 한 건 보낸다
 async function dispatchQueued(w, force = false) {
-  if (!w.queue.length || !isIdle(w) || w.queueHeld || (!force && manualQueue(w))) return;
+  if (!w.queue.length || !isIdle(w) || (!force && manualQueue(w))) return;
   const cli = await cliDraft(w);
   if (cli.state !== 'empty') { holdForDraft(w, cli.state); emitState(); return cli.state; } // 'draft' | 'blocked' — 기다리는 이유
-  if (!w.queue.length || !isIdle(w) || w.queueHeld) return;
+  if (!w.queue.length || !isIdle(w)) return;
   sendPrompt(w, w.queue.shift());
 }
 // 입력창이 빌 때까지 1.5초마다 다시 본다. 사람이 그 글을 보내 턴이 시작되면 그만 — 그 턴이 끝날 때(Stop) 큐가 이어진다.
@@ -518,13 +515,13 @@ function holdForDraft(w, state) {
   let busy = false; // 화면 읽기가 주기보다 오래 걸려도 두 번 투입하지 않게
   draftTimers.set(w.id, setInterval(async () => {
     if (busy) return;
-    if (!workers.has(w.id) || !w.queue.length || !isIdle(w) || w.queueHeld) { stop(); return; }
+    if (!workers.has(w.id) || !w.queue.length || !isIdle(w)) { stop(); return; }
     busy = true;
     const cli = await cliDraft(w);
     busy = false;
     if (cli.state !== 'empty' || !draftTimers.has(w.id)) return;
     stop();
-    if (w.queue.length && isIdle(w) && !w.queueHeld) sendPrompt(w, w.queue.shift());
+    if (w.queue.length && isIdle(w)) sendPrompt(w, w.queue.shift());
   }, 1500));
 }
 // 호스트 원본 화면에서 Claude 입력창(❯ 줄, 위아래 가로선 사이)을 찾아 상태를 본다.
@@ -617,6 +614,7 @@ setInterval(async () => {
 
 // 투입 확인: 보낸 뒤 이 시간 안에 UserPromptSubmit 훅도, 트랜스크립트 새 기록도 없으면 들어가지 않은 것으로 본다
 const PROMPT_CONFIRM_MS = 8000;
+const retryText = new Map(); // 워커 id → 마지막으로 투입에 실패해 다시 보낸 지시 (confirmPrompt)
 const confirmTimers = new Map(); // 워커 id → setTimeout (draftTimers 와 같은 이유로 워커 밖에 둔다)
 function sendPrompt(w, text) {
   // bracketed paste 로 넣어야 여러 줄 지시가 줄마다 전송되지 않는다.
@@ -632,8 +630,8 @@ function sendPrompt(w, text) {
   clearTimeout(confirmTimers.get(w.id));
   confirmTimers.set(w.id, setTimeout(() => confirmPrompt(w, w.turnStartedAt), PROMPT_CONFIRM_MS));
 }
-// 들어가지 않았으면(훅이 안 옴) '작업 중'에 영영 갇히고 뒤 대기열도 멈춘다 → 상태를 되돌리고 알린다.
-// 다시 보내지는 않는다 — 훅만 놓치고 실제로는 들어갔을 수도 있어서. 지시는 대기열 맨 앞에 보류해 두고 사람이 재개한다
+// 들어가지 않았으면(훅이 안 옴) '작업 중'에 영영 갇히고 뒤 대기열도 멈춘다 → 상태를 되돌리고 대기열 맨 앞에 되돌려 이어서 투입한다.
+// 훅만 놓치고 실제로 들어갔다면 두 번 갈 수 있지만, 트랜스크립트가 움직였으면 들어간 것으로 보므로(아래) 드물다
 async function confirmPrompt(w, at) {
   confirmTimers.delete(w.id);
   const sent = w.sentPrompt;
@@ -650,9 +648,13 @@ async function confirmPrompt(w, at) {
     return;
   }
   w.queue.unshift(sent.text);
-  w.queueHeld = 'failed';
-  pushLog(w, 'notice', `업무 지시가 CLI 에 들어가지 않은 것 같습니다${cli.state === 'blocked' ? '(입력 대기 화면이 아님)' : ''} — 대기열 맨 앞에 보류했습니다. 터미널을 확인하고 ▶ 재개하거나 새 지시를 보내세요`);
+  // 같은 지시가 연달아 안 들어가면 더 다시 보내지 않는다(계속 실패하는 화면에 같은 글을 거듭 넣지 않게) — 맨 앞에 둔 채
+  // 다음 턴이 끝날 때나 새 지시를 보낼 때 이어진다
+  const again = retryText.get(w.id) === sent.text;
+  retryText.set(w.id, sent.text);
+  pushLog(w, 'notice', `업무 지시가 CLI 에 들어가지 않은 것 같습니다${cli.state === 'blocked' ? '(입력 대기 화면이 아님)' : ''} — ${again ? '대기열 맨 앞에 두었습니다. 터미널을 확인하세요' : '대기열 맨 앞에 되돌려 다시 투입합니다'}`);
   setStatus(w, 'idle', '업무 지시 투입 실패');
+  if (!again) afterTurn(w);
 }
 
 function summarizeTool(name, input = {}) {
@@ -803,6 +805,7 @@ function onHook(w, ev, res) {
       // 지난 세션을 이어 붙였으면(▶ 투입의 --resume · 터미널의 /resume) 트랜스크립트를 다 읽은 뒤 지난 요청을 타임라인에 채운다
       if (ev.source === 'resume') w.seedAt = Date.now();
       setStatus(w, 'idle', `세션 시작 (${ev.source || 'startup'})`);
+      afterTurn(w); // 지난 워커에서 넘어온 대기열 등 — 세션이 뜨면 이어서
       break;
     case 'UserPromptSubmit':
       w.lastPrompt = ev.prompt ?? ev.prompt_text ?? w.lastPrompt;
@@ -812,6 +815,7 @@ function onHook(w, ev, res) {
       w.turnStartedAt = Date.now();
       w.notice = null;
       w.sentPrompt = null; // 투입 확인
+      retryText.delete(w.id);
       cancelDispatch(w); // 투입 대기 중에 사람이 CLI 로 먼저 보냈다
       progress.open(w);
       setStatus(w, 'working', w.lastPrompt);
@@ -1075,11 +1079,9 @@ function onHostHello({ ptys }) {
     const w = { ...rec, term: hostTerm(rec.id), tx: rec.txPath ? openProfile(rec.txPath) : null };
     delete w.txPath;
     delete w.shellPending; // 예전 버전이 워커 객체에 두어 {} 로 저장된 것
-    if (w.queueHeld === true) w.queueHeld = 'failed'; // 이유를 두기 전 버전
-    if (w.queueHeld === 'manual') w.queueHeld = false; // 없앤 ⏸ 멈춤
-    const wasQuestion = w.queueHeld === 'question'; // 없앤 '응답이 질문이라 멈춤' — 풀고 이어서 투입
-    if (wasQuestion) w.queueHeld = false;
-    const resumeDispatch = Boolean(w.dispatchAt) || wasQuestion; // 투입 대기 중에 재시작했으면 대기를 다시 건다
+    const wasHeld = Boolean(w.queueHeld); // 없앤 대기열 멈춤(질문·투입 실패·넘어온 대기열·⏸) — 풀고 이어서 투입
+    delete w.queueHeld;
+    const resumeDispatch = Boolean(w.dispatchAt) || wasHeld; // 투입 대기 중에 재시작했으면 대기를 다시 건다
     w.dispatchAt = 0;
     if (!p || p.exited) w.status = 'exited';
     else { w.pid = p.pid; pushLog(w, 'status', '관제 서버 재시작 — 워커 다시 연결'); }
@@ -1725,7 +1727,7 @@ const server = http.createServer(async (req, res) => {
       pushLog(w, 'status', 'diff 목록 비움');
       saveConfig(); // emitState 포함
     }
-    if (m[2] === 'resume') { cancelDispatch(w); w.queueHeld = false; emitState(); dispatchQueued(w, true); }
+    if (m[2] === 'resume') { cancelDispatch(w); dispatchQueued(w, true); } // ▶ 1번 보내기(자동 투입을 끈 역할)
     // 역할별 자동 투입 켜기/끄기. 끄면 투입 대기(남은 초) 중이던 것도 보내지 않는다. 켜는 순간 쉬고 있고 대기열이 있으면 투입 대기를 시작한다
     if (m[2] === 'autoqueue') {
       if (body.on) delete config.manualQueue[w.name]; else config.manualQueue[w.name] = true;
