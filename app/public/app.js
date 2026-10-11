@@ -947,7 +947,16 @@ function renderDock() {
   add.title = add.ariaLabel = _t('워커 추가');
   add.classList.toggle('on', !$('#new-panel').hidden);
   if (list.lastElementChild !== add) list.append(add);
+  dockFade();
 }
+// 칩 줄 양 끝 흐림: 화면 밖으로 넘친 칩이 있는 쪽만 흐리게 — 스크롤바를 숨겨서(style.css) 옆으로 밀 수 있는지 알 길이 없었다
+function dockFade() {
+  const d = $('#dock-list');
+  d.classList.toggle('fade-l', d.scrollLeft > 2);
+  d.classList.toggle('fade-r', d.scrollLeft + d.clientWidth < d.scrollWidth - 2);
+}
+$('#dock-list').addEventListener('scroll', dockFade, { passive: true });
+addEventListener('resize', dockFade);
 // 대기실 슬롯 칩: 흐린 점선 칩에 ▶ 투입 버튼. 버튼을 안에 두려고 칩을 <div> 로 만든다
 function renderDockSocket(list, key, prev) {
   const p = state.profiles.find((x) => `P:${x.name}` === key);
