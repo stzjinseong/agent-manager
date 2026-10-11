@@ -964,9 +964,9 @@ body.term-full::before {
 .task-form textarea, .memo-form textarea { resize: none; overflow-y: hidden; flex-shrink: 0; }
 /* 업무 지시가 바로 들어가지 못하고 대기열로 갔을 때(CLI 에 쓰던 글 등) 입력 칸을 좌우로 흔든다 */
 .shake { animation: shake .42s cubic-bezier(.36,.07,.19,.97); border-color: var(--decision) !important; }
-@keyframes shake { 15%, 85% { transform: translateX(-2px); } 30%, 70% { transform: translateX(4px); } 45% { transform: translateX(-6px); } 60% { transform: translateX(6px); } }
+@keyframes shake { 15%, 85% { transform: translateX(-1px); } 30%, 70% { transform: translateX(2px); } 45% { transform: translateX(-3px); } 60% { transform: translateX(3px); } }
 @media (prefers-reduced-motion: reduce) { .shake { animation: none; } }
-.memos { list-style: none; margin: 0; padding: 2px 4px 6px 8px; /* 마우스 오버 손잡이·그림자가 스크롤 영역에 잘리지 않게 */ display: flex; flex-direction: column; gap: 5px; max-height: 220px; overflow: auto; }
+.memos { list-style: none; margin: 0; padding: 2px 4px 6px 8px; /* 마우스 오버 손잡이·그림자가 스크롤 영역에 잘리지 않게 */ display: flex; flex-direction: column; gap: 5px; max-height: 220px; overflow: hidden auto; }
 .memos li { background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; font-size: 12.5px; display: flex; flex-direction: column; gap: 5px; }
 .memos li.busy { opacity: .5; pointer-events: none; }
 .memos li[draggable="true"] { cursor: grab; }
@@ -1022,7 +1022,7 @@ body.resizing-term { cursor: row-resize; user-select: none; }
    그래도 모자라면 영역 자체가 스크롤된다. 타임라인은 최소 높이(--log-min)를 지킨다 */
 /* --sec-min = 제목+입력칸 높이(app.js 가 잰다). 그 아래로는 줄지 않게 해, 자리가 모자랄 때 입력칸이 아니라 목록이 줄어든다
    (그냥 두면 영역들이 크기 비율대로 같이 줄어, 나중에 할 작업을 펼치면 업무 지시 입력칸 아래가 잘렸다) */
-.side > .side-sec:not(.timeline) { flex: 0 1 auto; min-height: var(--sec-min, 0px); overflow: auto; }
+.side > .side-sec:not(.timeline) { flex: 0 1 auto; min-height: var(--sec-min, 0px); overflow: hidden auto; padding-inline: 4px; margin-inline: -4px; } /* 가로는 숨김: 전송 실패 흔들림(.shake)이 폭을 넘어 가로 스크롤바가 뜨지 않게. 좌우 4px 여백(바깥으로 밀어 자리는 그대로)은 흔들리는 입력칸이 잘리지 않을 자리 */
 .side > .side-sec > :is(h3, form) { flex-shrink: 0; }
 .side > .side-sec > :is(.queue, .memos) { flex: 0 1 auto; min-height: 0; }
 .timeline { --log-min: 120px; min-height: min(var(--log-min), 100%); }
@@ -1560,6 +1560,11 @@ html.i18n-pending body { visibility: hidden; }
 .lang-item.on { cursor: default; font-weight: 600; color: var(--accent-hi); }
 .lang-item.on:hover { background: none; }
 .lang-check { width: 12px; flex: none; text-align: center; }
+/* 전송·개행 키 항목: 서버 종료 창 버튼(.power-act)처럼 테두리·바탕으로 창 배경과 구분 */
+.keys-pop { gap: 4px; }
+.lang-item.keys-item { border: 1px solid var(--line-2); border-radius: 9px; background: var(--surface-2); transition: background .15s, border-color .15s; }
+.lang-item.keys-item:hover, .lang-item.keys-item:focus-visible { background: var(--surface-3); border-color: rgb(var(--ink) / .2); }
+.lang-item.keys-item.on, .lang-item.keys-item.on:hover { background: var(--surface-2); border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
 
 /* ---------- 업데이트 확인 (헤더, 🌐 오른쪽) ---------- */
 .upd-wrap { position: relative; display: flex; }

@@ -2071,24 +2071,27 @@ taskForm.onsubmit = async (e) => {
   e.preventDefault();
   const text = taskForm.text.value.trim();
   if (!text || !selected) return;
-  const to = selected;
-  taskForm.text.value = '';
-  autoGrow(taskForm.text);
-  taskForm.text.focus();
+  const to = selected, ta = taskForm.text;
+  // 서버가 CLI 입력창을 읽어 보는 동안(server.js cliDraft) 글을 비워 두면 플레이스홀더가 비쳤다가 실패 시 글이 되돌아온다 —
+  // 답이 올 때까지 글을 그대로 두고 잠가 두었다가, 보냈으면 비운다
+  if (ta.readOnly) return;
+  ta.readOnly = true;
   const r = await api(`/api/workers/${to}/task`, { text });
+  ta.readOnly = false;
   // 쉬는 워커의 CLI 입력창에 쓰던 글이 있거나 입력창이 아닌 화면(선택창·! 셸 모드)이면 서버가 보내지 않는다(대기열에도 안 넣음 — server.js assignTask).
-  // 흔들림 = 전송 실패: 글을 입력 칸에 되돌리고(그사이 새로 쓴 글이 있으면 뒤에 붙인다) 알린다
+  // 흔들림 = 전송 실패: 글은 입력 칸에 남겨 두고 알린다
   if (r?.rejected) {
-    const ta = taskForm.text;
-    ta.value = ta.value.trim() ? `${text}\n${ta.value}` : text;
-    autoGrow(ta);
     toast(r.rejected === 'blocked'
       ? _t('전송 실패 — CLI 가 입력 대기 화면이 아닙니다(선택창, ! 셸 모드 등). 입력창으로 돌아온 뒤 다시 보내세요')
       : _t('전송 실패 — CLI 입력창에 쓰던 글이 있습니다. 그 글을 보내거나 지운 뒤 다시 보내세요'), 4500);
     shake(ta);
     return;
   }
-  if (!r?.error) flyToWorker(to, taskForm.text, 'task');
+  if (r?.error) return;
+  ta.value = '';
+  autoGrow(ta);
+  ta.focus();
+  flyToWorker(to, ta, 'task');
 };
 function shake(node) {
   node.classList.remove('shake');
