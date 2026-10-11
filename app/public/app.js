@@ -455,6 +455,8 @@ function fitTerm(now = false) {
   if (!selected || $('#detail').hidden) return;
   if (TOUCH) return fitTermTouch();
   try {
+    const box = $('#term');
+    box.style.width = '';
     // 고정 칸 수가 들어가는 가장 큰 글자 크기. 예전엔 큰 글자부터 하나씩 바꿔 가며 쟀는데, 글자 크기를 바꿀 때마다
     // 터미널 전체를 다시 그려(실측 1회 ~175ms, CPU 4배 느림) 최대 6번이면 워커 선택·크게 보기가 1초 넘게 멈췄다.
     // 칸 너비는 글자 크기에 비례하므로 지금 크기로 한 번 재서 맞는 크기를 계산해 한 번만 바꾸고, 넘치면 한 단계만 더 줄인다
@@ -464,9 +466,16 @@ function fitTerm(now = false) {
     const want = Math.max(FONT_MIN, Math.min(FONT_MAX, Math.floor((cur * dims.cols) / TERM_COLS)));
     if (want !== cur) { term.options.fontSize = want; dims = fit.proposeDimensions(); }
     if (dims && dims.cols < TERM_COLS && want > FONT_MIN) { term.options.fontSize = want - 1; dims = fit.proposeDimensions(); }
+    // 최소 글자로도 안 들어갈 만큼 좁아도 칸 수는 줄이지 않는다 — 터미널을 넓히고 옆으로 밀어 본다(터치 기기와 같은 방식).
+    // 칸 수가 바뀌면 Claude 는 보이는 화면만 새 폭으로 다시 그리고 스크롤백은 그대로라, 그 경계에 걸린 표가 두 폭으로
+    // 섞여 세로선이 어긋났다(실측 — 되돌려도 남는다). 칸 폭 반올림 때문에 한두 번 더 잰다
+    for (let i = 0; i < 4 && dims && dims.cols < TERM_COLS; i++) {
+      box.style.width = `${Math.ceil(box.clientWidth * (TERM_COLS + 1) / dims.cols)}px`;
+      dims = fit.proposeDimensions();
+    }
     if (!dims) return;
-    // 아주 좁아 최소 글자로도 안 들어가면 그때만 칸 수를 줄인다
-    const cols = Math.min(TERM_COLS, dims.cols), rows = dims.rows;
+    $('#term-wrap').classList.toggle('zoomed', box.style.width !== '');
+    const cols = TERM_COLS, rows = dims.rows;
     if (term.cols !== cols || term.rows !== rows) term.resize(cols, rows);
     syncPtySize(now);
   } catch {}

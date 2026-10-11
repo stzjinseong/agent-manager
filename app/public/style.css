@@ -422,6 +422,9 @@ body.card-drag .node-add { opacity: .25; transition: opacity .2s; }
 /* 옆 패널 넓히기: 격자 칸(360px)은 그대로 두고 패널만 왼쪽으로 늘려 터미널 위를 덮는다 — 터미널 크기가 안 바뀌니
    워커 터미널(pty) 크기도 그대로다(줄 수가 바뀌면 입력창이 두 벌 남는 문제를 피함). --side-extra = 늘린 폭.
    덮는 동안은 불투명 배경 + 왼쪽 그림자, 왼쪽 안쪽 여백만큼 더 당겨 내용 위치가 튀지 않게 */
+/* 너무 좁아 110칸이 안 들어가면(app.js fitTerm — 칸 수는 줄이지 않는다) 터미널을 넓히고 옆으로 밀어 본다. diff 보기는 밀리지 않게 */
+.term-wrap.zoomed .term-stage { overflow-x: auto; overflow-y: hidden; }
+.term-wrap.zoomed.diffing .term-stage { overflow: hidden; }
 .side.cover {
   margin-left: calc(-1 * var(--side-extra, 0px) - 14px); padding-left: 14px; z-index: 6;
   background: var(--surface); box-shadow: -14px 0 24px -12px rgb(0 0 0 / calc(.7 * var(--shade))); border-left: 1px solid var(--line-2);
