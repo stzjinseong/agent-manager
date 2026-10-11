@@ -472,7 +472,7 @@ async function assignTask(w, text) {
 //   2) 역할마다 자동 투입을 끌 수 있다(config.manualQueue) — 그때는 ▶ 를 눌러야 한 건씩 나간다
 // (예전엔 응답이 질문으로 끝나면 대기열을 멈췄으나(queueHeld='question') 질문 판정이 너무 자주 걸려 대기열이 자꾸 서서 뺐다)
 // queueHeld: false | 'failed'(투입 실패 — 중복 위험) | 'carried'(지난 워커에서 이어받음). 예전 버전이 저장한 true 는 'failed' 로 본다
-const DISPATCH_GRACE_MS = 5000;
+const DISPATCH_GRACE_MS = 3000;
 const dispatchTimers = new Map(); // 워커 id → setTimeout (draftTimers 와 같은 이유로 워커 밖에 둔다)
 const manualQueue = (w) => Boolean(config.manualQueue?.[w.name]);
 function afterTurn(w) {

@@ -209,7 +209,7 @@ const EN = {
   '대기열 멈춤': 'Queue paused',
   '곧 다음 지시 투입': 'Sending the next task shortly',
   '턴이 끝나면 대기열 자동 투입': 'Auto-send the queue when a turn ends',
-  '끄면 턴이 끝나도 대기열을 보내지 않습니다 — ▶ 를 눌러 한 건씩 투입. 켜 두면 보내기 전 5초 기다립니다': 'When off, the queue isn\'t sent when a turn ends — press ▶ to send one at a time. When on, it waits 5 seconds before sending',
+  '끄면 턴이 끝나도 대기열을 보내지 않습니다 — ▶ 를 눌러 한 건씩 투입. 켜 두면 보내기 전 3초 기다립니다': 'When off, the queue isn\'t sent when a turn ends — press ▶ to send one at a time. When on, it waits 3 seconds before sending',
   '클릭: 터미널에서 이 요청 위치로 이동': 'Click: jump to this request in the terminal',
   '대기 {n}': '{n} queued',
   '{n}건': '{n}',
