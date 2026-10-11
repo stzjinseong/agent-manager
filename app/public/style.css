@@ -450,7 +450,6 @@ body.term-full .side-grip { left: -6px; }
 .queue .qh.held.soon { color: var(--accent); }
 .queue .qh .cd { font: 600 12px var(--mono); }
 .meta .q.held { color: var(--dim); }
-.meta .q.ask { color: var(--decision); font-weight: 600; animation: led 1.6s ease-in-out infinite; }
 .auto-q { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--dim); cursor: pointer; user-select: none; margin-top: -6px; align-self: flex-start; }
 .auto-q input { width: auto; margin: 0; padding: 0; accent-color: var(--accent); }
 .queue .qi { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }

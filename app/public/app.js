@@ -743,9 +743,7 @@ function updateNode(node, w) {
   $('.meta', node).innerHTML =
     `<span title="${_t(running ? '이번 턴 경과' : '마지막 갱신')}">⏱ <em data-since="${running ? w.turnStartedAt : w.updatedAt}"></em></span>` +
     `<span title="${_t('도구 사용 횟수')}">⚙ ${w.toolCount}</span>` +
-    (w.queue.length ? (w.queueHeld === 'question'
-      ? `<span class="q ask" title="${_t('응답이 질문으로 끝나 대기열을 멈췄습니다')}">❓📥 ${w.queue.length}</span>`
-      : `<span class="q${w.queueHeld ? ' held' : ''}" title="${_t(w.queueHeld ? '대기열 멈춤' : w.dispatchAt ? '곧 다음 지시 투입' : '대기 중인 지시')}">${w.queueHeld ? '⏸' : w.dispatchAt ? '⏳' : ''}📥 ${w.queue.length}</span>`) : '') +
+    (w.queue.length ? `<span class="q${w.queueHeld ? ' held' : ''}" title="${_t(w.queueHeld ? '대기열 멈춤' : w.dispatchAt ? '곧 다음 지시 투입' : '대기 중인 지시')}">${w.queueHeld ? '⏸' : w.dispatchAt ? '⏳' : ''}📥 ${w.queue.length}</span>` : '') +
     (w.profile?.turnCount ? `<span title="${_t('추정 비용 (API 환산)')}">$ ${fmtUsd(w.profile.total.cost).slice(1)}</span>` : '');
   // 이번(또는 마지막) 턴에 나온 최근 캡처를 무대 왼쪽 아래에 작게. 주소가 같으면 다시 그리지 않는다(깜빡임 방지)
   const { shot: showShot, doc: showDoc } = recentMedia(w);
@@ -1068,14 +1066,13 @@ function renderHint() {
 $('#hint').addEventListener('click', (e) => { if (e.target.closest('[data-hint="new"]')) $('#btn-new').click(); });
 
 // ---------- 상세 ----------
-// 대기열 머리줄 — 멈춘 이유(server.js afterTurn: 'failed' 투입 실패 · 'question' 응답이 질문)·투입 대기 남은 초·자동 투입 꺼짐
+// 대기열 머리줄 — 멈춘 이유(server.js: 'failed' 투입 실패 · 'carried' 지난 워커에서 이어받음)·투입 대기 남은 초·자동 투입 꺼짐
 // 대기열 ↩ 되돌리기·✕ 빼기 아이콘 — 메모 카드의 수정·보내기와 같은 버튼 모양(.memo-ic)
 const UNDO_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>';
 const X_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
 const QH_RESUME = (label = '▶ 재개') => ` <button data-resume title="${_t('맨 위부터 다시 투입')}">${_t(label)}</button>`;
 function queueHead(w) {
   const n = w.queue.length, idle = !['working', 'decision'].includes(w.status);
-  if (w.queueHeld === 'question') return `<div class="qh held ask" title="${_t('마지막 응답이 질문으로 끝나 대기열을 멈췄습니다 — CLI 에서 답하면 그 턴이 끝난 뒤 이어서 투입')}">${_t('❓ 응답이 질문으로 끝남 · 대기 {n}건 · 답하면 이어서', { n })}${QH_RESUME()}</div>`;
   if (w.queueHeld === 'carried') return `<div class="qh held" title="${_t('같은 역할의 지난 워커에 남아 있던 지시 — 새 세션에 바로 보내지 않고 기다립니다')}">${_t('↪ 지난 워커에서 넘어온 지시 {n}건', { n })}${QH_RESUME()}</div>`;
   if (w.queueHeld) return `<div class="qh held" title="${_t('지시가 CLI 에 들어가지 않아 보류 중 — 중복 투입을 막으려고 자동으로 다시 보내지 않습니다')}">${_t('⚠ 보류된 지시 {n}건 · 터미널 확인 후', { n })}${QH_RESUME()}</div>`;
   if (w.dispatchAt) return `<div class="qh held soon" title="${_t('보내지 않으려면 위의 자동 투입 체크를 해제하세요')}">${_t('{s}초 뒤 1번 투입 · 대기 {n}건', { n, s: `<span class="cd" data-at="${w.dispatchAt}"></span>` })}</div>`;

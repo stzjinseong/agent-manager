@@ -309,7 +309,7 @@ function checkInterrupted(w) {
     w.doneAt = Date.now(); // 화면의 '확인 안 한 완료' 표시 기준
     payout(w);
     setStatus(w, 'done', '턴 완료 (기록으로 확인)');
-    afterTurn(w, tx.lastText);
+    afterTurn(w);
     return;
   }
   const at = w.tx?.interruptedAt;
@@ -447,8 +447,8 @@ async function assignTask(w, text) {
     const cli = await cliDraft(w);
     if (isIdle(w) && cli.state !== 'empty') return { rejected: cli.state };
   }
-  // 질문으로 멈췄거나 자동 투입을 끈 대기열은 그대로 두고, 쉬는 워커에 새로 보낸 지시는 바로 넣는다 — 질문에 대한 답일 수 있다
-  const waitsForUser = w.queueHeld === 'question' || w.queueHeld === 'carried' || manualQueue(w);
+  // 지난 워커에서 넘어왔거나 자동 투입을 끈 대기열은 그대로 두고, 쉬는 워커에 새로 보낸 지시는 바로 넣는다
+  const waitsForUser = w.queueHeld === 'carried' || manualQueue(w);
   if (isIdle(w) && w.queue.length && !waitsForUser) {
     // 쉬는 중인데 대기열이 남아 있으면(중단됨·투입 실패로 보류·투입 대기 중) 새 지시를 뒤에 붙이고 맨 앞부터 이어서 투입
     cancelDispatch(w);
@@ -458,7 +458,7 @@ async function assignTask(w, text) {
     return {};
   }
   if (isIdle(w)) {
-    if (!waitsForUser || w.queueHeld === 'question') w.queueHeld = false;
+    if (!waitsForUser) w.queueHeld = false;
     cancelDispatch(w);
     sendPrompt(w, text);
     return {};
@@ -467,23 +467,16 @@ async function assignTask(w, text) {
   return {};
 }
 // ---------- 턴이 끝난 뒤 대기열 잇기 ----------
-// 대기열은 사람이 안 보는 사이 넘어가기 쉽다 — 응답이 '어느 쪽으로 할까요?'처럼 묻고 끝났는데 다음 지시가 곧바로 들어가
-// 그 질문을 못 보고 지나쳤다. 그래서
-//   1) 마지막 응답이 질문으로 끝나면 대기열을 멈춘다(queueHeld='question') — CLI 에서 답하면(UserPromptSubmit) 풀리고 그 턴 뒤에 잇는다
-//   2) 그 밖에도 바로 넣지 않고 DISPATCH_GRACE_MS 동안 기다린다(w.dispatchAt — 화면에 남은 초). 그사이 자동 투입을 끄면 보내지 않는다
-//   3) 역할마다 자동 투입을 끌 수 있다(config.manualQueue) — 그때는 ▶ 를 눌러야 한 건씩 나간다
-// queueHeld: false | 'failed'(투입 실패 — 중복 위험) | 'question'(응답이 질문) | 'carried'(지난 워커에서 이어받음). 예전 버전이 저장한 true 는 'failed' 로 본다
+// 대기열은 사람이 안 보는 사이 넘어가기 쉽다. 그래서
+//   1) 바로 넣지 않고 DISPATCH_GRACE_MS 동안 기다린다(w.dispatchAt — 화면에 남은 초). 그사이 자동 투입을 끄면 보내지 않는다
+//   2) 역할마다 자동 투입을 끌 수 있다(config.manualQueue) — 그때는 ▶ 를 눌러야 한 건씩 나간다
+// (예전엔 응답이 질문으로 끝나면 대기열을 멈췄으나(queueHeld='question') 질문 판정이 너무 자주 걸려 대기열이 자꾸 서서 뺐다)
+// queueHeld: false | 'failed'(투입 실패 — 중복 위험) | 'carried'(지난 워커에서 이어받음). 예전 버전이 저장한 true 는 'failed' 로 본다
 const DISPATCH_GRACE_MS = 5000;
 const dispatchTimers = new Map(); // 워커 id → setTimeout (draftTimers 와 같은 이유로 워커 밖에 둔다)
 const manualQueue = (w) => Boolean(config.manualQueue?.[w.name]);
-function afterTurn(w, lastText) {
+function afterTurn(w) {
   if (!w.queue.length || w.queueHeld) return;
-  if (endsWithQuestion(lastText)) {
-    w.queueHeld = 'question';
-    pushLog(w, 'notice', '응답이 질문으로 끝나 대기열을 멈췄습니다 — CLI 에서 답하면 그 턴이 끝난 뒤 이어서 투입 · 바로 보내려면 ▶ 재개');
-    emitState();
-    return;
-  }
   scheduleDispatch(w);
 }
 function scheduleDispatch(w) {
@@ -502,28 +495,6 @@ function cancelDispatch(w) {
   clearTimeout(dispatchTimers.get(w.id));
   dispatchTimers.delete(w.id);
   if (w.dispatchAt) { w.dispatchAt = 0; emitState(); }
-}
-// 응답 끝이 진행에 꼭 필요한 선택을 묻는 말인가. 코드 블록은 빼고 마지막 몇 줄만 본다.
-// 멈추는 것: 고르라는 말(어느 쪽·어떤 방식·정해 주시면·선택해 주세요 / which one·please choose) · 선택지 목록(1. 2. / A) B))과
-// 그 앞의 질문·선택 안내 줄 · 물음표나 묻는 어미로 끝나는 마지막 줄(진행할까요?)
-// 멈추지 않는 것: '원하시면 말씀해 주세요'처럼 조건을 단 권유(필요하면·궁금하시면·if you'd like·feel free) — 답하지 않아도 진행에 지장이 없다
-const CHOICE_KO = /(어느|어떤) ?(것|걸|쪽|방식|방법|안|버전|순서)|중(에서|에)? ?(어느|어떤|무엇|뭘|하나)|(정해|골라|선택해|결정해) ?주(세요|시면|십시오)|(할지|갈지|둘지|쓸지|넣을지)[^.?!]{0,20}(정해|알려|말씀)/;
-const CHOICE_EN = /\b(which (one|option|approach|way|of)|please (choose|pick|decide|select)|would you prefer|do you prefer|or should i)\b/i;
-const OFFER = /(원하시|필요하시|궁금하시|싶으시|있으시|원하|필요하|있으)(면|다면)|하시려면|\bif you('d| would)? (like|want|prefer|need)|\bfeel free\b|\blet me know if\b/i;
-const ASK_END = /([?？]|까요|습니까|나요|실래요|시겠어요)$/;
-const OPTION_LINE = /^(\d+[.)]|[A-Za-z][.)]|[①-⑨]|[-*•]\s*\*\*)/;
-const OPTION_HEAD = /[?？]$|방법|방식|선택|옵션|후보|중 |option|approach|choose/i;
-function endsWithQuestion(text) {
-  const lines = String(text || '').replace(/```[\s\S]*?```/g, '').split('\n').map((l) => l.trim()).filter(Boolean);
-  if (!lines.length) return false;
-  // 끝에 선택지 목록이 2개 넘게 붙어 있고, 그 앞 줄이 질문이거나 고를 거리를 소개하면(두 가지 방법이 있습니다:)
-  let k = lines.length - 1;
-  while (k >= 0 && OPTION_LINE.test(lines[k])) k--;
-  if (lines.length - 1 - k >= 2 && k >= 0 && (OPTION_HEAD.test(lines[k]) || CHOICE_KO.test(lines[k]) || CHOICE_EN.test(lines[k]))) return true;
-  const tail = lines.slice(-2).join(' ');
-  if (CHOICE_KO.test(tail) || CHOICE_EN.test(tail)) return true;
-  if (OFFER.test(tail)) return false;
-  return ASK_END.test(lines.at(-1).replace(/[*_`)\].\s]+$/, ''));
 }
 // 큐 맨 앞 지시를 투입 — 턴이 끝났을 때. 입력창에 쓰던 글이 있거나 입력창이 아닌 화면이면 기다린다.
 // 투입 실패로 보류된 대기열(queueHeld)은 새 지시나 ▶ 재개가 있을 때까지 자동으로 보내지 않는다(실제로는 들어갔을 수도 있어 중복 위험)
@@ -842,7 +813,6 @@ function onHook(w, ev, res) {
       w.notice = null;
       w.sentPrompt = null; // 투입 확인
       cancelDispatch(w); // 투입 대기 중에 사람이 CLI 로 먼저 보냈다
-      if (w.queueHeld === 'question') w.queueHeld = false; // 질문에 답했다 — 이 턴이 끝나면 대기열을 잇는다
       progress.open(w);
       setStatus(w, 'working', w.lastPrompt);
       break;
@@ -906,7 +876,7 @@ function onHook(w, ev, res) {
       payout(w);
       setTimeout(() => judgeCache(w), 1500); // 마지막 응답이 트랜스크립트에 다 쓰일 시간을 준다
       setStatus(w, 'done', '턴 완료');
-      afterTurn(w, ev.last_assistant_message ?? w.lastMessage);
+      afterTurn(w);
       break;
     case 'SubagentStop':
       if (ev.agent_id && w.tx) w.tx.doneAgents.add(ev.agent_id);
@@ -1106,7 +1076,9 @@ function onHostHello({ ptys }) {
     delete w.shellPending; // 예전 버전이 워커 객체에 두어 {} 로 저장된 것
     if (w.queueHeld === true) w.queueHeld = 'failed'; // 이유를 두기 전 버전
     if (w.queueHeld === 'manual') w.queueHeld = false; // 없앤 ⏸ 멈춤
-    const resumeDispatch = Boolean(w.dispatchAt); // 투입 대기 중에 재시작했으면 대기를 다시 건다
+    const wasQuestion = w.queueHeld === 'question'; // 없앤 '응답이 질문이라 멈춤' — 풀고 이어서 투입
+    if (wasQuestion) w.queueHeld = false;
+    const resumeDispatch = Boolean(w.dispatchAt) || wasQuestion; // 투입 대기 중에 재시작했으면 대기를 다시 건다
     w.dispatchAt = 0;
     if (!p || p.exited) w.status = 'exited';
     else { w.pid = p.pid; pushLog(w, 'status', '관제 서버 재시작 — 워커 다시 연결'); }
