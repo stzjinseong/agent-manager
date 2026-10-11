@@ -1303,6 +1303,22 @@ function readJsonLimited(req, limit) {
 // 워커가 Write/Edit 로 쓴 문서(html·md·pdf·svg)를 타임라인에 카드로 보여 주고, 누르면 새 탭으로 연다.
 // 열어 주는 것은 워커가 직접 쓴 바로 그 파일뿐이다 — w.docs 에 기록된 경로를 문서 id 로만 찾는다.
 // Bash 로 만든 파일은 알 수 없다
+const VIDEO_TYPES = { mp4: 'video/mp4', m4v: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm', ogv: 'video/ogg' };
+// 파일을 구간 요청(Range: bytes=a-b)대로 보낸다 — <video> 가 앞뒤로 옮겨 보거나, Safari 가 재생을 시작하려면 필요하다
+function sendRange(req, res, full, type) {
+  const size = fs.statSync(full).size;
+  const head = { 'content-type': type, 'accept-ranges': 'bytes', 'cache-control': 'max-age=86400', 'x-content-type-options': 'nosniff' };
+  const m = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
+  if (!m || (!m[1] && !m[2])) {
+    res.writeHead(200, { ...head, 'content-length': size });
+    return fs.createReadStream(full).pipe(res);
+  }
+  let start = m[1] ? Number(m[1]) : Math.max(0, size - Number(m[2])); // bytes=-N 은 끝에서 N 바이트
+  let end = m[1] && m[2] ? Math.min(Number(m[2]), size - 1) : size - 1;
+  if (start >= size || start > end) { res.writeHead(416, { ...head, 'content-range': `bytes */${size}` }); return res.end(); }
+  res.writeHead(206, { ...head, 'content-length': end - start + 1, 'content-range': `bytes ${start}-${end}/${size}` });
+  return fs.createReadStream(full, { start, end }).pipe(res);
+}
 const DOC_TYPES = { html: 'text/html', htm: 'text/html', md: 'text/plain', markdown: 'text/plain', svg: 'image/svg+xml', pdf: 'application/pdf' };
 const DOC_KEEP = 50;
 const CLAUDE_HOME = path.join(os.homedir(), '.claude');
@@ -1445,6 +1461,9 @@ const server = http.createServer(async (req, res) => {
     if (path.dirname(full) !== UPLOAD_DIR || !fs.existsSync(full)) return json(res, 404, {});
     const ext = docExt(name);
     const img = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp' }[ext];
+    // 동영상은 화면의 뷰어(<video>)로 본다 — 예전엔 형식을 몰라 내려받기로 갔다. 탐색·Safari 재생에는 구간 요청(Range)이 필요하다
+    const video = VIDEO_TYPES[ext];
+    if (video) return sendRange(req, res, full, video);
     const textLike = /^(txt|log|csv|tsv|json|jsonl|ya?ml|toml|ini|xml|js|mjs|cjs|ts|tsx|jsx|py|rb|go|rs|java|kt|c|h|cpp|cs|sh|ps1|bat|sql|css|scss|diff|patch)$/.test(ext);
     const type = img || DOC_TYPES[ext] || (textLike ? 'text/plain' : null);
     // 이미지가 아닌 것: html·svg 의 스크립트가 관제 화면과 같은 출처로 돌지 않게 샌드박스(결과물 문서와 같은 방식, pdf 는 뷰어 때문에 제외).

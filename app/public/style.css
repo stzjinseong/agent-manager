@@ -673,6 +673,16 @@ body.term-full .side-grip { left: -6px; }
 .att { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; white-space: normal; }
 .att .att-img { display: block; border-radius: 6px; border: 1px solid rgb(var(--ink) / .7); cursor: zoom-in; background: var(--bg); object-fit: cover; }
 .att .att-img:hover, .att .att-file:hover { border-color: rgb(var(--ink)); }
+/* 첨부 동영상: 첫 장면 썸네일 + 가운데 ▶. 누르면 동영상 뷰어(app.js openVideo) */
+.att .att-vid { position: relative; display: block; overflow: hidden; border-radius: 6px; border: 1px solid rgb(var(--ink) / .7); background: #000; cursor: pointer; }
+.att .att-vid:hover { border-color: rgb(var(--ink)); }
+.att .att-vid video { display: block; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.att .att-vid .play { position: absolute; left: 50%; top: 50%; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%; background: rgb(0 0 0 / .55); border: 1px solid rgb(255 255 255 / .7); }
+.att .att-vid .play::after { content: ""; position: absolute; left: 10px; top: 7px; border-style: solid; border-width: 6px 0 6px 9px; border-color: transparent transparent transparent #fff; }
+.att-md .att-vid { width: 140px; height: 90px; }
+.att-sm .att-vid { width: 40px; height: 40px; border-radius: 5px; }
+.att-sm .att-vid .play { width: 18px; height: 18px; margin: -9px 0 0 -9px; }
+.att-sm .att-vid .play::after { left: 6.5px; top: 4.5px; border-width: 4px 0 4px 6px; }
 .att .att-file { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; border: 1px solid rgb(var(--ink) / .45); border-radius: 6px; background: var(--surface-3); color: var(--text); text-decoration: none; cursor: pointer; }
 .att .att-file .ic { flex: none; line-height: 1; }
 .att .att-file .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); color: var(--text-2); }
@@ -689,7 +699,7 @@ body.term-full .side-grip { left: -6px; }
 .att-live .att { margin-top: 0; }
 .shot-view { position: fixed; inset: 0; z-index: 500; display: grid; place-items: center; background: rgba(0, 0, 0, .78); cursor: zoom-out; padding: 24px; }
 .shot-view figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 100%; max-height: 100%; }
-.shot-view img { max-width: min(92vw, 1600px); max-height: calc(100vh - 90px); object-fit: contain; border-radius: 8px; box-shadow: 0 10px 40px rgba(0, 0, 0, .6); background: #0c0d11; }
+.shot-view :is(img, video) { max-width: min(92vw, 1600px); max-height: calc(100vh - 90px); object-fit: contain; border-radius: 8px; box-shadow: 0 10px 40px rgba(0, 0, 0, .6); background: #0c0d11; }
 .shot-view figcaption { color: var(--text-2); font: 12px var(--mono); word-break: break-all; text-align: center; display: flex; flex-direction: column; gap: 3px; cursor: text; }
 .shot-view figcaption .meta { color: var(--dim); font-size: 11px; }
 .shot-view figcaption .note { color: var(--dim); font: 11px var(--sans, inherit); }

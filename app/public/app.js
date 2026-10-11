@@ -1281,6 +1281,7 @@ function docCard(d) {
 // size: 'md' = 타임라인, 'sm' = 입력칸 아래·대기열·나중에 할 작업(칸이 좁아 더 작게)
 const UPLOAD_PATH_RE = /[\\/]uploads[\\/](\d{14}-[a-z0-9]{1,8}(?:\.[a-z0-9]+|-[\p{L}\p{N}._-]*[\p{L}\p{N}_-]))/giu;
 const IMG_EXT = /^(png|jpe?g|gif|webp|bmp)$/i;
+const VIDEO_EXT = /^(mp4|m4v|mov|webm|ogv)$/i; // 서버 VIDEO_TYPES 와 같게 — 누르면 동영상 뷰어(openVideo)
 // 타임라인 글은 서버가 300자로 자른다(pushLog) — 잘린 끝에 걸친 경로는 이름이 잘려 있어 빼야 깨진 타일이 안 생긴다
 const LOG_CLIP = 290;
 function uploadsIn(text, clipped = false) {
@@ -1290,7 +1291,7 @@ function uploadsIn(text, clipped = false) {
   return names.map((name) => {
     const label = name.replace(/^\d{14}-[a-z0-9]{1,8}-/i, '');
     const ext = name.includes('.') ? name.split('.').pop().toLowerCase() : '';
-    return { name, label, ext, url: `/uploads/${encodeURIComponent(name)}`, image: IMG_EXT.test(ext) };
+    return { name, label, ext, url: `/uploads/${encodeURIComponent(name)}`, image: IMG_EXT.test(ext), video: VIDEO_EXT.test(ext) };
   });
 }
 function attachChips(text, size = 'sm') {
@@ -1298,7 +1299,10 @@ function attachChips(text, size = 'sm') {
   if (!list.length) return '';
   return `<span class="att att-${size}">${list.map((f) => f.image
     ? shotImg({ url: f.url }, 'att-img').replace('<img ', '<img onerror="this.remove()" ')
-    : `<a class="att-file" href="${esc(f.url)}" target="_blank" rel="noopener" draggable="false" title="${esc(f.label)}&#10;${_t('클릭: 새 탭에서 열기')}"><span class="ic">${DOC_ICON[f.ext] || '📄'}</span><span class="nm">${esc(f.label)}</span></a>`).join('')}</span>`;
+    : f.video
+      // 첫 장면(#t=0.1)을 썸네일로 — 못 읽는 형식(브라우저가 재생 못 하는 코덱)이어도 ▶ 표시와 이름은 남는다
+      ? `<span class="att-vid" data-video="${esc(f.url)}" title="${esc(f.label)}&#10;${_t('클릭해 재생')}"><video src="${esc(f.url)}#t=0.1" preload="metadata" muted playsinline></video><span class="play" aria-hidden="true"></span></span>`
+      : `<a class="att-file" href="${esc(f.url)}" target="_blank" rel="noopener" draggable="false" title="${esc(f.label)}&#10;${_t('클릭: 새 탭에서 열기')}"><span class="ic">${DOC_ICON[f.ext] || '📄'}</span><span class="nm">${esc(f.label)}</span></a>`).join('')}</span>`;
 }
 // 첨부 파일 타일을 눌러도 요청 줄 이동(타임라인)·카드 선택으로 번지지 않게 — 새 탭 열기(기본 동작)는 그대로
 document.addEventListener('click', (e) => { if (e.target.closest?.('.att-file')) e.stopPropagation(); }, true);
@@ -1348,6 +1352,29 @@ function openShot(url) {
   document.body.append(box);
   show();
 }
+// 첨부 동영상 보기 — 캡처 크게 보기(.shot-view)와 같은 틀에 <video>. 바깥·Esc 로 닫는다
+function openVideo(url) {
+  const box = el(`<div class="shot-view" title="${_t('바깥을 누르거나 Esc 로 닫기')}">
+    <figure><video controls autoplay playsinline></video><figcaption><div class="cap"></div><div class="note"></div></figcaption></figure></div>`);
+  const v = $('video', box);
+  v.src = url;
+  $('.cap', box).textContent = `${_t('사람이 첨부')} · data/uploads/${decodeURIComponent(url.slice('/uploads/'.length))}`;
+  $('.note', box).textContent = _t('첨부 원본을 그대로 보여 줍니다 (7일 지나면 정리됨).');
+  v.addEventListener('error', () => {
+    $('.note', box).innerHTML = `${esc(_t('이 브라우저가 재생할 수 없는 형식입니다.'))} <a href="${esc(url)}" download>${esc(_t('내려받기'))}</a>`;
+  });
+  const close = () => { v.pause(); box.remove(); document.removeEventListener('keydown', onKey, true); };
+  const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+  box.addEventListener('click', (e) => { if (!e.target.closest('figure')) close(); });
+  document.addEventListener('keydown', onKey, true);
+  document.body.append(box);
+}
+document.addEventListener('click', (e) => {
+  const t = e.target.closest?.('[data-video]');
+  if (!t) return;
+  e.stopPropagation(); // 카드 선택·타임라인 요청 이동으로 번지지 않게
+  openVideo(t.dataset.video);
+}, true);
 // 타임라인 썸네일은 늦게 로드되며 높이가 늘어난다 → 맨 아래를 보던 중이면 바닥을 유지
 $('#log').addEventListener('load', (e) => {
   const logEl = e.currentTarget;
