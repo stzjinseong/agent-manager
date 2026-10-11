@@ -112,6 +112,11 @@ function mgrOnState(prev, next) {
 }
 function mgrOnFx(msg) {
   if (msg.kind === 'xp') flyXpToManager(msg.id, msg.xp, msg.reason, msg.detail);
+  // CLI 에 직접 친 요청 — 업무 지시처럼 쪽지가 날아간다. 출발점은 그 워커의 터미널 커서 자리(xterm 입력 칸이 커서를 따라간다)
+  if (msg.kind === 'cli-send' && msg.id === selected && !$('#detail').hidden) {
+    const from = $('#term-wrap .xterm-helper-textarea') || $('#term-wrap');
+    flyToWorker(msg.id, from, 'task');
+  }
   if (msg.kind === 'commit' && mgrStage >= 1) {
     const t = document.createElement('span');
     t.className = 'mgr-twinkle'; t.textContent = '✦';

@@ -829,6 +829,9 @@ function onHook(w, ev, res) {
       break;
     case 'UserPromptSubmit':
       w.lastPrompt = ev.prompt ?? ev.prompt_text ?? w.lastPrompt;
+      // 대시보드가 넣은 지시(sentPrompt)가 아니면 사람이 CLI 에 직접 친 요청 — 화면이 터미널에서 카드로 쪽지를 날린다.
+      // 백그라운드 완료 알림(<task-notification> 등 '<' 로 시작)으로 생긴 턴은 사람이 보낸 게 아니라 뺀다
+      if (!w.sentPrompt && !String(w.lastPrompt || '').trimStart().startsWith('<')) broadcast({ type: 'fx', kind: 'cli-send', id: w.id });
       w.turnStartedAt = Date.now();
       w.notice = null;
       w.sentPrompt = null; // 투입 확인
