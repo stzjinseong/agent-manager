@@ -824,7 +824,7 @@ function renderFloor() {
 }
 
 // ---------- 최소화한 회로 기판 (헤더 아래 한 줄) ----------
-// 칩은 회로 기판과 같은 항목·순서(대기실 슬롯은 빼고). id 별로 한 번 만들고 내용만 갱신 — 캐릭터 애니메이션이 리셋되지 않게.
+// 칩은 회로 기판과 같은 항목·순서(대기실 슬롯도 — 흐린 점선 칩에 ▶ 투입). id 별로 한 번 만들고 내용만 갱신 — 캐릭터 애니메이션이 리셋되지 않게.
 // 칩도 끌어서 순서를 바꾼다 — 놓으면 회로 기판과 같은 순서(state.order)로 저장된다
 const dockEls = new Map();
 let dockDrag = null; // 끌고 있는 칩 (아래 '최소화한 칩 끌어서 순서 바꾸기')
@@ -837,11 +837,14 @@ function renderDock() {
   if (min) mgr.title = core.title; else mgr.removeAttribute('title');
   if (!min) return;
   const list = $('#dock-list');
-  // 순서는 화면의 카드 순서 그대로 — nodeEls(Map)는 카드를 처음 만든 순서라 끌어 옮긴 순서와 다르다
-  const ids = [...$('#nodes').querySelectorAll('.node')].filter((n) => n.dataset.id && nodeEls.get(n.dataset.id) === n).map((n) => n.dataset.id);
-  for (const [id, c] of dockEls) if (!ids.includes(id)) { c.parentElement.remove(); dockEls.delete(id); }
+  // 순서는 화면의 카드 순서 그대로 — nodeEls(Map)는 카드를 처음 만든 순서라 끌어 옮긴 순서와 다르다.
+  // 키: 워커는 id, 대기실 슬롯은 'P:역할 이름'(nodeEls 와 같은 키)
+  const keys = [...$('#nodes').querySelectorAll('.node')].map((n) => (n.classList.contains('socket') ? `P:${n.dataset.profile}` : n.dataset.id))
+    .filter((k) => k && nodeEls.get(k));
+  for (const [id, c] of dockEls) if (!keys.includes(id)) { c.parentElement.remove(); dockEls.delete(id); }
   let prev = null;
-  for (const id of ids) {
+  for (const id of keys) {
+    if (id.startsWith('P:')) { prev = renderDockSocket(list, id, prev); continue; }
     const w = state.workers.find((x) => x.id === id);
     if (!w) continue;
     let c = dockEls.get(id);
@@ -876,9 +879,40 @@ function renderDock() {
   if (!dockEls.size && !empty) list.append(el(`<span class="dock-empty">${_t('워커 없음')}</span>`));
   if (dockEls.size && empty) empty.remove();
 }
+// 대기실 슬롯 칩: 흐린 점선 칩에 ▶ 투입 버튼. 버튼을 안에 두려고 칩을 <div> 로 만든다
+function renderDockSocket(list, key, prev) {
+  const p = state.profiles.find((x) => `P:${x.name}` === key);
+  let c = dockEls.get(key);
+  if (!p) return prev;
+  if (!c) {
+    const slot = el(`<div class="dslot"><div class="dchip socket" draggable="true"><span class="avatar">${clawdSVG('head')}</span><span class="dname"></span><span class="dst">${_t('대기실')}</span><button class="btn primary dlaunch" data-act="launch">${_t('▶ 투입')}</button></div></div>`);
+    c = slot.firstChild; dockEls.set(key, c);
+  }
+  c.dataset.name = c.dataset.profile = p.name;
+  c.classList.toggle('dragging', c === dockDrag);
+  $('.dname', c).textContent = p.name;
+  const at = state.resumable?.[p.name];
+  $('.dlaunch', c).title = at ? _t('마지막 세션({t})을 이어서 시작 · Shift+클릭: 새 세션으로', { t: fmtAgo(at) }) : _t('새 세션으로 시작');
+  const slot = c.parentElement;
+  if (!dockDrag) {
+    const want = prev ? prev.nextSibling : list.firstChild;
+    if (want !== slot) list.insertBefore(slot, want);
+  }
+  return slot;
+}
+// 칩 ▶ 투입 — 회로 기판의 대기실 카드와 같다(마지막 세션 이어서, Shift+클릭이면 새 세션)
+async function launchProfile(name, fresh) {
+  const p = state.profiles.find((x) => x.name === name);
+  if (!p) return;
+  const r = await api('/api/workers', { ...p, resume: !fresh });
+  if (!r.id) return;
+  select(r.id);
+  if (r.resumed) toast(_t('지난 세션을 이어서 시작했어요 — 새로 시작하려면 Shift+클릭'), 3500);
+}
 $('#dock-list').addEventListener('click', (e) => {
   const c = e.target.closest('.dchip');
   if (!c) return;
+  if (c.classList.contains('socket')) { if (e.target.closest('[data-act="launch"]')) launchProfile(c.dataset.profile, e.shiftKey); return; }
   if (c.dataset.id === selected && !$('#detail').hidden) closeDetail(); // 열린 워커의 칩을 다시 누르면 닫기
   else select(c.dataset.id);
 });
@@ -1931,12 +1965,7 @@ $('#nodes').addEventListener('click', async (e) => {
   if (node.classList.contains('socket')) {
     const p = state.profiles.find((x) => x.name === node.dataset.profile);
     if (!p) return;
-    if (act === 'launch') {
-      const r = await api('/api/workers', { ...p, resume: !e.shiftKey });
-      if (!r.id) return;
-      select(r.id);
-      if (r.resumed) toast(_t('지난 세션을 이어서 시작했어요 — 새로 시작하려면 Shift+클릭'), 3500);
-    }
+    if (act === 'launch') launchProfile(p.name, e.shiftKey);
     if (act === 'forget' && await ask({ title: _t('저장된 역할 삭제'), body: _t('"{name}" 역할을 목록에서 지울까요?', { name: p.name }), ok: _t('삭제'), danger: true })) api('/api/profiles/delete', { name: p.name });
     return;
   }
