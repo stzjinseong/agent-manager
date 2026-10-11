@@ -219,8 +219,12 @@ body.card-drag > :is(.topbar, section:not(.floor)), body.card-drag .floor > :not
 }
 .node-add .na-plus {
   display: grid; place-items: center; width: 38px; height: 38px; margin-bottom: 2px; border-radius: 50%;
-  border: 1px solid rgb(var(--ink) / .2); font-size: 22px; font-weight: 300; line-height: 1; transition: inherit;
+  border: 1px solid rgb(var(--ink) / .2); transition: inherit;
 }
+/* + 아이콘(app.js PLUS_SVG): 선 끝이 둥근 SVG 라 글꼴과 상관없이 동그라미 정가운데 */
+:is(.node-add .na-plus, .dadd) svg { display: block; fill: none; stroke: currentColor; stroke-linecap: round; }
+.node-add .na-plus svg { width: 18px; height: 18px; stroke-width: 1.8; }
+.dadd svg { width: 14px; height: 14px; stroke-width: 2; }
 .node-add b { font-size: 13.5px; font-weight: 600; color: var(--text); }
 .node-add small { font-size: 11.5px; color: var(--dim); }
 .node-add:hover, .node-add:focus-visible, .node-add.on {
@@ -418,13 +422,13 @@ body.card-drag .node-add { opacity: .25; transition: opacity .2s; }
 /* 터미널 스크롤바 막대: 각진 사각형 대신 가장자리에서 조금 떨어진 둥근 막대(색은 app.js 터미널 테마) */
 #term .xterm-scrollable-element > .scrollbar > .slider { box-sizing: border-box; border: 3px solid transparent; background-clip: padding-box; border-radius: 999px; }
 .term-stage { position: relative; height: 100%; }
+/* 너무 좁아 110칸이 안 들어가면(app.js fitTerm — 칸 수는 줄이지 않는다) 터미널을 넓히고 옆으로 밀어 본다. diff 보기는 밀리지 않게 */
+.term-wrap.zoomed .term-stage { overflow-x: auto; overflow-y: hidden; }
+.term-wrap.zoomed.diffing .term-stage { overflow: hidden; }
 .side { display: flex; flex-direction: column; gap: 12px; min-width: 0; height: var(--term-h, 580px); position: relative; }
 /* 옆 패널 넓히기: 격자 칸(360px)은 그대로 두고 패널만 왼쪽으로 늘려 터미널 위를 덮는다 — 터미널 크기가 안 바뀌니
    워커 터미널(pty) 크기도 그대로다(줄 수가 바뀌면 입력창이 두 벌 남는 문제를 피함). --side-extra = 늘린 폭.
    덮는 동안은 불투명 배경 + 왼쪽 그림자, 왼쪽 안쪽 여백만큼 더 당겨 내용 위치가 튀지 않게 */
-/* 너무 좁아 110칸이 안 들어가면(app.js fitTerm — 칸 수는 줄이지 않는다) 터미널을 넓히고 옆으로 밀어 본다. diff 보기는 밀리지 않게 */
-.term-wrap.zoomed .term-stage { overflow-x: auto; overflow-y: hidden; }
-.term-wrap.zoomed.diffing .term-stage { overflow: hidden; }
 .side.cover {
   margin-left: calc(-1 * var(--side-extra, 0px) - 14px); padding-left: 14px; z-index: 6;
   background: var(--surface); box-shadow: -14px 0 24px -12px rgb(0 0 0 / calc(.7 * var(--shade))); border-left: 1px solid var(--line-2);
@@ -1424,8 +1428,8 @@ html[data-char="clawd-white"] :is(.node, .dchip, .detail-avatar, .term-wrap) { -
 .dock-empty { color: var(--dim); font-size: 12.5px; align-self: center; }
 /* 칩 줄 끝 워커 추가 — 칩 높이의 동그란 점선 버튼 */
 .dadd {
-  flex: none; width: 30px; height: 30px; border-radius: 50%; border: 1px dashed rgb(var(--ink) / .25); background: transparent;
-  color: var(--text-2); font-family: inherit; font-size: 18px; font-weight: 300; line-height: 1; cursor: pointer; transition: border-color .15s, background .15s, color .15s;
+  flex: none; align-self: center; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border-radius: 50%; border: 1px dashed rgb(var(--ink) / .25); background: transparent;
+  color: var(--text-2); cursor: pointer; transition: border-color .15s, background .15s, color .15s;
 }
 .dadd:hover, .dadd:focus-visible, .dadd.on { border-style: solid; border-color: var(--accent); background: var(--accent); color: #fff; outline: none; }
 body.card-drag .dadd { opacity: .25; }

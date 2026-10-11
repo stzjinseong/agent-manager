@@ -830,6 +830,8 @@ function setBranch(elx, b) {
   elx.title = branchTitle(b);
 }
 
+// 워커 추가 + 아이콘 — 글자 '+' 는 글꼴마다 기준선이 달라 동그라미 가운데에 맞지 않았다
+const PLUS_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
 function renderFloor() {
   const nodes = $('#nodes');
   const liveNames = new Set(state.workers.filter((w) => w.status !== 'exited').map((w) => w.name));
@@ -875,7 +877,7 @@ function renderFloor() {
   if (items.length && empty) empty.remove();
   // 맨 끝(마지막 워커 다음 자리)에 '워커 추가' 카드 — .node 가 아니라 순서·회로선·끌기에 끼지 않는다
   let add = $('.node-add', nodes);
-  if (!add) add = el(`<button type="button" class="node-add" data-new><span class="na-plus" aria-hidden="true">+</span><b></b><small></small></button>`);
+  if (!add) add = el(`<button type="button" class="node-add" data-new><span class="na-plus" aria-hidden="true">${PLUS_SVG}</span><b></b><small></small></button>`);
   $('b', add).textContent = _t('워커 추가');
   $('small', add).textContent = _t('역할 이름과 작업 폴더를 정해 투입');
   add.classList.toggle('on', !$('#new-panel').hidden);
@@ -941,7 +943,7 @@ function renderDock() {
   if (dockEls.size && empty) empty.remove();
   // 칩 줄 끝에도 워커 추가(회로 기판의 '워커 추가' 카드와 같은 동작)
   let add = $('.dadd', list);
-  if (!add) add = el(`<button type="button" class="dadd" data-new aria-haspopup="dialog">+</button>`);
+  if (!add) add = el(`<button type="button" class="dadd" data-new aria-haspopup="dialog">${PLUS_SVG}</button>`);
   add.title = add.ariaLabel = _t('워커 추가');
   add.classList.toggle('on', !$('#new-panel').hidden);
   if (list.lastElementChild !== add) list.append(add);
