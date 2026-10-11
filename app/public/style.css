@@ -1670,3 +1670,108 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 .tg-h { margin-bottom: 6px; font-size: 13px; font-weight: 700; color: var(--text); }
 .tg-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .theme-guide .tg-foot { margin: 12px 0 10px; color: var(--dim); font-size: 12px; }
+
+/* ---------- 모바일: 터치 기기(html.touch — app.js TOUCH)와 휴대폰 폭(640px 이하) ----------
+   손가락으로 다루는 화면: 끌어 놓기 대신 카드 ⋯ · 길게 누르기 메뉴(.sheet), 입력칸 전송 버튼(.form-send), 터미널 키 줄(.term-keys) */
+.node-more, .form-send, .term-keys { display: none; }
+.touch .node-more {
+  display: grid; place-items: center; flex: none; width: 32px; height: 28px; margin: -4px -6px -4px -2px; padding: 0;
+  border: 0; border-radius: 8px; background: none; color: var(--text-2); font-size: 18px; line-height: 1; cursor: pointer;
+}
+.touch .node-more:active { background: var(--surface-3); }
+/* 손가락 아래에서 글자 선택·iOS 길게 누르기 미리보기가 뜨지 않게(길게 누르기 = 메뉴) */
+.touch :is(.node, .dchip, .memos li[data-id]) { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.touch .memos li[data-id] .mt { -webkit-user-select: none; user-select: none; }
+/* 마우스가 없으면 :hover 가 손을 뗀 뒤에도 남는다 — 들뜨는 효과는 끄고, 올려야 보이던 버튼·끌기 손잡이는 늘 보이거나 숨긴다 */
+.touch .node:hover:not(.sel) { transform: none; border-color: var(--line-2); }
+.touch .memos li[draggable="true"]::before { display: none; }
+.touch .memos li[draggable="true"]:hover { transform: none; box-shadow: none; border-color: var(--line); }
+.touch :is(.char-act, .cs-clear) { opacity: 1; }
+/* iOS 는 16px 보다 작은 입력칸에 포커스하면 화면을 확대한다 */
+.touch :is(input, textarea, select) { font-size: 16px; }
+.touch #btn-pick { display: none; } /* 폴더 선택 창은 서버 PC 화면에 뜬다 */
+.touch .keys-wrap { display: none; } /* 전송·개행 키 세트: 터치 기기 입력칸은 Enter 줄바꿈 · ↑ 버튼 전송으로 고정이라 고를 것이 없다 */
+/* 누르기 쉬운 크기(44px 안팎) */
+.touch .detail-head .btn, .touch .decision .acts .btn, .touch .socket-acts .btn { min-height: 38px; padding: 8px 14px; }
+.touch .memo-ic { min-width: 34px; min-height: 32px; }
+.touch .queue .qi button { min-width: 34px; min-height: 32px; }
+.touch .sec-toggle { padding: 6px 0; }
+
+/* 입력칸 전송(↑)·추가(+) 버튼: 칸 오른쪽 아래 안에 둥근 버튼 — 그 자리만큼 글이 비켜 간다 */
+.touch :is(.task-form, .memo-form) { position: relative; }
+.touch :is(.task-form, .memo-form) textarea { padding-right: 52px; }
+.touch .form-send {
+  display: grid; place-items: center; position: absolute; right: 7px; bottom: 7px; width: 38px; height: 38px; padding: 0;
+  border: 0; border-radius: 50%; background: var(--accent); color: #1a0f0a; cursor: pointer;
+}
+.touch .memo-form .form-send { background: var(--surface-3); color: var(--text); border: 1px solid var(--line-2); }
+.form-send svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.touch .form-send:active { transform: scale(.94); }
+.touch .task-form textarea[readonly] + .form-send { opacity: .5; }
+
+/* 터미널 키 줄: 터미널 아래 한 줄(넘치면 옆으로 밀어 봄). 터미널은 남은 높이를 쓴다.
+   높이는 화면 높이에 맞춘다 — 가로로 눕힌 휴대폰(높이 400px 안팎)에서 고정 높이(460~580px)면 화면을 넘었다 */
+.touch .term-wrap { display: flex; flex-direction: column; height: var(--term-h, min(64vh, 580px)); height: var(--term-h, min(64dvh, 580px)); }
+.touch .term-wrap.full { height: auto; } /* 크게 보기는 화면 전체(inset: 0) */
+.touch .term-stage { flex: 1; min-height: 0; height: auto; overflow-x: auto; overflow-y: hidden; }
+.touch #term { min-width: 100%; }
+.touch .term-keys {
+  display: flex; flex: none; gap: 5px; margin-top: 7px; overflow-x: auto; scrollbar-width: none; -webkit-user-select: none; user-select: none;
+}
+.term-keys::-webkit-scrollbar { display: none; }
+.term-keys button {
+  flex: none; min-width: 40px; height: 36px; padding: 0 9px; border-radius: 8px; border: 1px solid rgb(var(--ink) / .14);
+  background: rgb(var(--ink) / .06); color: var(--text); font: 600 13px/1 var(--mono); cursor: pointer; touch-action: manipulation;
+}
+:root[data-theme="light"] .term-keys button { background: #fff; }
+.term-keys button:active { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+.term-keys button.on { border-color: var(--accent); color: var(--accent); }
+.term-keys .tk-gap { flex: 1; min-width: 6px; }
+.term-wrap.zoomed [data-key="zoom"] { border-color: var(--accent); }
+
+/* 아래에서 올라오는 메뉴 (app.js sheet) */
+.sheet-back {
+  position: fixed; inset: 0; z-index: 210; background: rgba(0, 0, 0, .5); display: flex; align-items: flex-end; justify-content: center;
+  animation: ask-fade .15s ease-out;
+}
+.sheet {
+  width: min(520px, 100%); max-height: 80vh; overflow-y: auto; padding: 8px 10px calc(10px + env(safe-area-inset-bottom));
+  border-radius: 16px 16px 0 0; display: flex; flex-direction: column; gap: 2px; animation: sheet-up .2s cubic-bezier(.2, .8, .2, 1);
+}
+@keyframes sheet-up { from { transform: translateY(40px); opacity: .4; } }
+.sheet-h { padding: 8px 10px 10px; font-size: 13px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+.sheet-list { display: flex; flex-direction: column; gap: 2px; }
+.sheet-item {
+  display: block; width: 100%; min-height: 48px; padding: 12px 14px; border: 0; border-radius: 10px; background: none;
+  color: var(--text); font: inherit; font-size: 15.5px; text-align: left; cursor: pointer;
+}
+.sheet-item:active, .sheet-item:hover { background: var(--surface-3); }
+.sheet-item:disabled { color: var(--faint); background: none; }
+.sheet-item.danger { color: #e0655a; }
+.sheet-cancel { margin-top: 6px; text-align: center; background: var(--surface-2); font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { .sheet-back, .sheet { animation: none; } }
+
+/* 열린 상세 화면으로 내려갈 때(app.js select) 헤더·칩 줄에 가리지 않게 */
+.detail { scroll-margin-top: calc(var(--topbar-h, 59px) + 8px); }
+
+/* 휴대폰 폭: 상세 머리줄은 [캐릭터 · 이름] / [버튼들] / [미터] 세 줄 — 한 줄에 다 넣으면 이름이 한 글자씩 세로로 접혔다 */
+@media (max-width: 640px) {
+  /* 헤더 상태 칩은 자리가 모자라 글자가 세로로 접혔다 — 결정 대기(눌러야 할 것)만 남긴다 */
+  .stat:not(.hot) { display: none; }
+  .stat.hot { padding: 4px 9px; gap: 5px; white-space: nowrap; }
+  .detail { padding: 12px 10px 14px; }
+  .detail-head { flex-wrap: wrap; gap: 8px 10px; }
+  .detail-title { flex: 1 1 calc(100% - 60px); }
+  .detail-head .btn { flex: 1 1 0; min-width: 0; padding-left: 6px; padding-right: 6px; }
+  .detail-head .meters { position: static; order: 9; flex: 1 1 100%; height: auto; flex-wrap: wrap; gap: 6px 14px; }
+  .term-wrap { height: var(--term-h, min(62vh, 520px)); padding: 6px; }
+  .dock { padding-left: 12px; padding-right: 12px; }
+  .floor { padding: 18px 12px 22px; }
+  .nodes { grid-template-columns: minmax(0, 1fr); gap: 26px; }
+  /* 카드가 한 줄에 하나라 세로로 길다 — 무대를 낮춰 한 화면에 더 많이 */
+  .stage { height: 70px; padding-bottom: 8px; }
+  .toast { bottom: calc(16px + env(safe-area-inset-bottom)); max-width: calc(100% - 24px); }
+}
+/* diff 는 터미널 자리를 덮는다 — 확대 보기의 가로 스크롤·키 줄은 그동안 쉰다 */
+.touch .term-wrap.diffing .term-stage { overflow: hidden; }
+.touch .term-wrap.diffing .term-keys { display: none; }

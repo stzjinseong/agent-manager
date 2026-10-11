@@ -1030,6 +1030,7 @@ function hostTerm(id) {
       if (size === `${cols}x${rows}` || host?.readyState !== 1) return;
       size = `${cols}x${rows}`;
       hostSend({ op: 'resize', id, cols, rows });
+      broadcast({ type: 'ptysize', id, cols, rows }); // 크기를 바꾸지 않는 화면(휴대폰)이 이 폭에 맞춰 그리게
     },
     kill: () => hostSend({ op: 'kill', id }),
   };
@@ -1104,7 +1105,7 @@ function onHostMessage(msg) {
     const ws = snapWaiters.get(msg.req);
     snapWaiters.delete(msg.req);
     if (typeof ws === 'function') return ws(msg); // 서버가 직접 요청한 것(cliDraft)
-    if (ws?.readyState === 1) ws.send(JSON.stringify({ type: 'scrollback', id: msg.id, data: msg.data }));
+    if (ws?.readyState === 1) ws.send(JSON.stringify({ type: 'scrollback', id: msg.id, data: msg.data, cols: msg.cols, rows: msg.rows }));
     return;
   }
   if (!w) return;

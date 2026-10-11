@@ -19,6 +19,12 @@ let gotState = false; // 서버 상태를 한 번이라도 받았는지 — 그 
 let clockSkew = 0;
 let selected = null;
 let ws;
+// 터치 기기(휴대폰·태블릿): 마우스 없이 손가락으로만 다루는 화면 — 끌기 대신 길게 누르기 메뉴, 전송 버튼, 터미널 보조 키 등(아래 '모바일').
+// 마우스도 있는 기기(터치 노트북·트랙패드 iPad)는 hover 가 있어 데스크톱 방식 그대로
+const TOUCH = matchMedia('(hover: none) and (pointer: coarse)').matches;
+document.documentElement.classList.toggle('touch', TOUCH);
+// 휴대폰 폭: 상세 머리줄이 두 줄(이름 · 버튼)이 되고 미터는 그 아래 한 줄(style.css) — 미터 자리를 재지 않는다(placeMeters)
+const NARROW = matchMedia('(max-width: 640px)');
 
 // ---------- 캐릭터 — 그림은 characters.js 의 컨셉이 그린다(clawdSVG · managerSVG · faviconSVG) ----------
 // data-clawd 값이 'head' 면 머리만(작은 자리) · 'logo' / 'logo-full' 은 앱의 얼굴 자리(올린 캐릭터면 워커 그림 대신 매니저 기본 그림)
@@ -413,6 +419,7 @@ new ResizeObserver(() => { clearTimeout(fitTimer); fitTimer = setTimeout(fitTerm
 let termAnim = null, revealTimer = 0; // 크게 보기 전환 애니메이션(setTermFull)
 function placeMeters() {
   const head = $('.detail-head'), wrap = $('#term-wrap'), name = $('#detail-name'), box = $('#meters');
+  if (NARROW.matches) { box.classList.remove('y1', 'y2', 'y3'); return; }
   if (!head || wrap.classList.contains('full') || $('#detail').hidden) return;
   // 크게 보기에서 돌아오는 동안엔 터미널 상자가 transform 으로 줄어드는 중이라 getBoundingClientRect 가 움직이는 값을 준다 —
   // 그 값으로 맞추면 미터가 오른쪽으로 튀었다가 끝나고 돌아왔다. 애니메이션이 끝나면(setTermFull 의 done) 다시 맞춘다
@@ -446,6 +453,7 @@ const TERM_COLS = 110;
 const FONT_MIN = 11, FONT_MAX = 16;
 function fitTerm(now = false) {
   if (!selected || $('#detail').hidden) return;
+  if (TOUCH) return fitTermTouch();
   try {
     // 고정 칸 수가 들어가는 가장 큰 글자 크기. 예전엔 큰 글자부터 하나씩 바꿔 가며 쟀는데, 글자 크기를 바꿀 때마다
     // 터미널 전체를 다시 그려(실측 1회 ~175ms, CPU 4배 느림) 최대 6번이면 워커 선택·크게 보기가 1초 넘게 멈췄다.
@@ -463,6 +471,33 @@ function fitTerm(now = false) {
     syncPtySize(now);
   } catch {}
 }
+// 터치 기기: 워커 터미널(pty) 크기는 건드리지 않는다. 휴대폰 폭(40여 칸)으로 바꾸면 Claude 가 그 폭으로 다시 그려
+// PC 로 돌아와도 이미 찍힌 출력이 좁게 접힌 채 남는다 — 그래서 PC 와 같은 110칸으로 받고 화면 쪽에서 맞춘다.
+// 확대(기본): 읽기 좋은 크기로 그리고 터미널을 옆으로 밀어 본다 · 맞춤: 110칸이 화면 폭에 다 들어가는 글자 크기(전체 모양 보기). term-keys 🔍 로 전환
+const TOUCH_ZOOM_KEY = 'am.termZoom', TOUCH_FONT = { fit: 4, zoom: 11 };
+let termZoom = true;
+let ptyCols = TERM_COLS; // 워커 터미널(pty)의 지금 칸 수 — 서버가 기록(scrollback)과 크기 변경(ptysize)에 실어 보낸다. 옛 서버면 PC 기본값
+try { termZoom = localStorage.getItem(TOUCH_ZOOM_KEY) !== '0'; } catch {}
+function fitTermTouch() {
+  try {
+    const box = $('#term');
+    box.style.width = '';
+    let dims = fit.proposeDimensions();
+    if (!dims) return;
+    const cur = term.options.fontSize;
+    // 맞춤은 0.5px 단위 — 정수로만 줄이면 휴대폰 폭에선 한 단계 차이로 오른쪽이 크게 빈다
+    const want = termZoom ? TOUCH_FONT.zoom : Math.max(TOUCH_FONT.fit, Math.min(FONT_MAX, Math.floor((cur * dims.cols * 2) / ptyCols) / 2));
+    if (want !== cur) { term.options.fontSize = want; dims = fit.proposeDimensions(); }
+    // 칸이 모자라면 상자를 그만큼 넓힌다(밖은 .term-stage 가 가로 스크롤). 칸 폭 반올림 때문에 한두 번 더 잰다
+    for (let i = 0; i < 4 && dims && dims.cols < ptyCols; i++) {
+      box.style.width = `${Math.ceil(box.clientWidth * (ptyCols + 1) / dims.cols)}px`;
+      dims = fit.proposeDimensions();
+    }
+    if (!dims) return;
+    if (term.cols !== ptyCols || term.rows !== dims.rows) term.resize(ptyCols, dims.rows);
+    $('#term-wrap').classList.toggle('zoomed', box.style.width !== '');
+  } catch {}
+}
 
 // 화면 크기는 바로 맞추되, 워커 터미널(pty) 크기는 아껴서 바꾼다. 줄 수가 늘 때마다 ConPTY 와 Claude 가
 // 화면을 다시 그리면서 이미 스크롤백에 올라간 줄을 한 번 더 써서 입력창이 두 벌 남는다
@@ -471,6 +506,7 @@ function fitTerm(now = false) {
 let ptyTimer;
 function syncPtySize(now = false) {
   clearTimeout(ptyTimer);
+  if (TOUCH) return; // 터치 기기는 pty 크기를 바꾸지 않는다(fitTermTouch)
   const go = () => {
     if (!selected || $('#detail').hidden) return;
     if (document.visibilityState !== 'visible' || !document.hasFocus()) return;
@@ -484,7 +520,7 @@ addEventListener('focus', () => syncPtySize(true));
 // ---------- 통신 ----------
 function send(msg) { if (ws?.readyState === 1) ws.send(JSON.stringify(msg)); }
 function connect() {
-  ws = new WebSocket(`ws://${location.host}/ws`);
+  ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`); // https 로 열었으면 wss 여야 브라우저가 막지 않는다
   ws.onopen = () => { if (selected) { syncPtySize(true); send({ type: 'attach', id: selected }); } };
   ws.onmessage = (e) => {
     const msg = JSON.parse(e.data);
@@ -499,7 +535,11 @@ function connect() {
     }
     else if (msg.type === 'fx') mgrOnFx(msg);
     else if (msg.type === 'pty' && msg.id === selected) term.write(msg.data);
-    else if (msg.type === 'scrollback' && msg.id === selected) { term.reset(); term.write(msg.data, () => restoreTermScroll(msg.id)); }
+    else if (msg.type === 'ptysize' && msg.id === selected && TOUCH) { ptyCols = msg.cols; fitTerm(); } // PC 에서 터미널 폭이 바뀌면 따라간다
+    else if (msg.type === 'scrollback' && msg.id === selected) {
+      if (TOUCH) { ptyCols = msg.cols || TERM_COLS; fitTerm(); } // 기록은 pty 폭으로 만들어졌다 — 그 폭으로 받아야 줄이 어긋나지 않는다
+      term.reset(); term.write(msg.data, () => restoreTermScroll(msg.id));
+    }
     else if (msg.type === 'clearScrollback' && msg.id === selected) term.write('\x1b[3J'); // /clear — 이전 대화 기록만 지움
   };
   ws.onopen = ((orig) => () => { if (serverDown) { location.reload(); return; } orig?.(); })(ws.onopen);
@@ -640,7 +680,7 @@ const ltrPath = (p) => (p ? `\u200E${p}` : '');
 function nodeTemplate() {
   return el(`
     <div class="node">
-      <div class="node-head"><span class="led"></span><span class="nid"></span><span class="nname" title="${_t('더블클릭해 이름 변경 · 칩을 끌어 순서 변경')}"></span><span class="pill"></span></div>
+      <div class="node-head"><span class="led"></span><span class="nid"></span><span class="nname" title="${_t('더블클릭해 이름 변경 · 칩을 끌어 순서 변경')}"></span><span class="pill"></span><button class="node-more" data-act="more" aria-label="${_t('메뉴')}">⋯</button></div>
       <div class="stage"><div class="avatar">${clawdSVG()}</div><div class="fx"><span></span><span></span><span></span><span class="mark"></span></div></div>
       <div class="bubble"></div>
       <div class="quest"><div class="quest-top"><span>${_t('할 일')}</span><b class="qn"></b></div><div class="qbar"><i></i></div></div>
@@ -657,7 +697,7 @@ function fmtAgo(t) {
 function socketTemplate() {
   return el(`
     <div class="node socket">
-      <div class="node-head"><span class="nid">SLOT</span><span class="nname" title="${_t('더블클릭해 이름 변경 · 칩을 끌어 순서 변경')}"></span><span class="pill">${_t('대기실')}</span></div>
+      <div class="node-head"><span class="nid">SLOT</span><span class="nname" title="${_t('더블클릭해 이름 변경 · 칩을 끌어 순서 변경')}"></span><span class="pill">${_t('대기실')}</span><button class="node-more" data-act="more" aria-label="${_t('메뉴')}">⋯</button></div>
       <div class="stage"><div class="avatar">${clawdSVG()}</div></div>
       <div class="path"></div>
       <div class="socket-acts"><button class="btn primary" data-act="launch">${_t('▶ 투입')}</button><button class="btn ghost" data-act="forget" title="${_t('저장된 역할 삭제')}">✕</button></div>
@@ -1731,7 +1771,9 @@ function select(id) {
   requestAnimationFrame(() => {
     fitTerm(true);
     send({ type: 'attach', id });
-    if (!document.querySelector('input.rename')) $('#task-form').text.focus();
+    // 터치 기기: 입력칸에 바로 포커스를 주면 화면 키보드가 터미널을 가린다 — 대신 열린 상세 화면으로 내려 준다(카드 아래에 있어 안 보인다)
+    if (TOUCH) $('#detail').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    else if (!document.querySelector('input.rename')) $('#task-form').text.focus();
   });
 }
 
@@ -1901,10 +1943,13 @@ nodesEl.addEventListener('dragend', () => {
 const trashEl = $('#trash');
 trashEl.addEventListener('dragover', (e) => { if (!dragEl && !dockDrag) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; trashEl.classList.add('over'); });
 trashEl.addEventListener('dragleave', (e) => { if (!trashEl.contains(e.relatedTarget)) trashEl.classList.remove('over'); });
-trashEl.addEventListener('drop', async (e) => {
+trashEl.addEventListener('drop', (e) => {
   e.preventDefault();
   const n = dragEl || dockDrag; // 카드 또는 최소화 칩
-  if (!n) return;
+  if (n) removeCard(n);
+});
+// 카드·칩 제거 — 휴지통에 놓거나 터치 기기의 카드 메뉴에서
+async function removeCard(n) {
   if (n.classList.contains('socket')) {
     // 대기실 카드 한 장이 같은 이름의 종료된 워커 기록들을 대신 보여 주고 있었다 → 역할과 함께 그 기록도 지운다(서버). 미리 알려 준다
     const name = n.dataset.profile;
@@ -1922,7 +1967,7 @@ trashEl.addEventListener('drop', async (e) => {
   if (!(await ask({ title: _t('"{name}" 워커를 제거할까요?', { name: w.name }), body: _t(running ? '목록에서 지웁니다. 실행 중인 Claude 세션도 종료됩니다.' : '목록에서 지웁니다.'), ok: _t('제거'), danger: true }))) return;
   await api(`/api/workers/${w.id}/remove`);
   if (selected === w.id) { selected = null; render(); }
-});
+}
 
 // ---------- 역할 이름 변경: 칩의 이름을 더블클릭 → Enter 저장 / Esc 취소 ----------
 nodesEl.addEventListener('dblclick', (e) => {
@@ -1967,6 +2012,7 @@ $('#nodes').addEventListener('click', async (e) => {
   const node = e.target.closest('.node');
   if (!node || e.target.closest('.card-doc')) return; // 문서 타일은 새 탭만 열고 카드는 선택하지 않음
   const act = e.target.closest('[data-act]')?.dataset.act;
+  if (act === 'more') { cardMenu(node); return; } // 터치 기기의 ⋯ (아래 '모바일')
   if (node.classList.contains('socket')) {
     const p = state.profiles.find((x) => x.name === node.dataset.profile);
     if (!p) return;
@@ -2258,18 +2304,21 @@ function flyNote(fromEl, toEl, color, cls, onArrive) {
   };
   requestAnimationFrame(frame);
 }
-$('#memos').addEventListener('click', async (e) => {
+$('#memos').addEventListener('click', (e) => {
   const act = e.target.closest('[data-memo]')?.dataset.memo;
   const li = e.target.closest('li[data-id]');
   const w = state.workers.find((x) => x.id === selected);
   if (!act || !li || !w) return;
+  memoAct(act, li, w);
+});
+async function memoAct(act, li, w) {
   if (act === 'edit') return editMemo(li, w);
   if (act === 'remove' && !(await ask({ title: _t('이 작업을 지울까요?'), body: li.querySelector('.mt')?.textContent.slice(0, 120) || '', ok: _t('지우기'), danger: true }))) return;
   li.classList.add('busy');
   const r = await api('/api/memos', { role: w.name, op: act, id: li.dataset.id, workerId: w.id });
   if (r.error) { li.classList.remove('busy'); toast(r.error, 3000); if (act === 'send') shake(li); return; } // 보내기 실패는 흔들림으로
   if (act === 'send') flyToWorker(w.id, li, 'task'); // 성공은 날아가는 쪽지로 알린다
-});
+}
 
 // ---------- 메모 → 다른 워커 카드로 끌어 옮기기 ----------
 // 카드 순서 변경 드래그(dragEl)와 섞이지 않게 따로 표시한다. dragover 중엔 dataTransfer 를 읽을 수 없어 변수로 들고 다닌다
@@ -2427,7 +2476,8 @@ function onEnterKey(ta, send) {
   let timer = null;
   ta.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter') return;
-    const composing = e.isComposing || e.keyCode === 229, act = enterAction(e);
+    // 터치 기기의 입력칸: Enter 는 늘 줄바꿈(화면 키보드엔 보조키가 없어 전송은 칸의 ↑ 버튼). 외장 키보드의 Alt·⌘+Enter 는 전송
+    const composing = e.isComposing || e.keyCode === 229, act = TOUCH ? (e.altKey || e.metaKey ? 'send' : 'newline') : enterAction(e);
     if (act === 'send') {
       if (!composing) e.preventDefault();
       timer ??= setTimeout(() => { timer = null; send(); }, 40);
@@ -2448,8 +2498,9 @@ const KEY_SETS = [
 function applyKeyHints() {
   const k = KEY_SETS.find((x) => x.id === keySet);
   const hint = (verb) => `${_t(verb)} : ${k.send}\n${_t('개행')} : ${k.newline}\n${_t('*CLI에서도 동일하게 작동')}`;
-  taskForm.text.placeholder = hint('전송');
-  $('#memo-form').text.placeholder = hint('추가');
+  // 터치 기기는 화면 키보드에 Alt·⌘ 가 없다 — 입력칸 오른쪽 아래 버튼으로 보낸다(Enter 는 줄바꿈)
+  taskForm.text.placeholder = TOUCH ? _t('지시를 적고 ↑ 를 누르면 보냅니다') : hint('전송');
+  $('#memo-form').text.placeholder = TOUCH ? _t('적고 + 를 누르면 추가됩니다') : hint('추가');
 }
 applyKeyHints();
 document.addEventListener('langchange', applyKeyHints);
@@ -3073,7 +3124,7 @@ function browserName() {
     try { await navigator.clipboard.writeText(location.href); toast(_t('주소를 복사했습니다 — Chrome 주소창에 붙여넣으세요')); }
     catch { toast(_t('주소: {url}', { url: location.href }), 6000); }
   };
-  if (name !== 'Chrome') {
+  if (name !== 'Chrome' && !TOUCH) { // 휴대폰에선 'Chrome 으로 열기'가 서버 PC 쪽에서 열려 의미가 없다
     btn.hidden = false;
     btn.dataset.mt = 'browser';
     hoverTips.browser = () => ({
@@ -3585,7 +3636,7 @@ function setDiffOpen(on) {
   $('#term-wrap').classList.toggle('diffing', on);
   const w = state.workers.find((x) => x.id === selected);
   if (w) renderDiffButton(w);
-  if (on) { term.blur(); diffKey = ''; loadDiff(); }
+  if (on) { term.blur(); diffKey = ''; $('.term-stage').scrollLeft = 0; loadDiff(); } // 터치 기기의 확대 보기는 옆으로 밀려 있을 수 있다
   else term.focus();
 }
 const fmtClock = (t) => new Date(t + clockSkew).toLocaleTimeString(uiLocale(), { hour12: false });
@@ -3719,3 +3770,209 @@ connect();
 
 // 다른 탭에 있다가 돌아오면, 열어 둔 워커의 완료를 확인 처리하도록 다시 그린다
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') render(); });
+
+// ---------- 모바일(터치 기기) ----------
+// 마우스로 하던 일(끌어 놓기 · 더블클릭 · 휴지통)을 손가락으로: 카드·칩·메모를 길게 누르거나 카드의 ⋯ 를 누르면
+// 화면 아래에서 메뉴가 올라온다. 터미널 아래엔 화면 키보드에 없는 키 줄(term-keys)
+const sheetEl = el(`<div class="sheet-back" hidden><div class="sheet panel" role="menu"><div class="sheet-h"></div><div class="sheet-list"></div><button type="button" class="sheet-item sheet-cancel"></button></div></div>`);
+document.body.append(sheetEl);
+let sheetDone = null;
+// 고른 항목의 key 를 돌려준다. 취소·바깥 누르기 → null
+function sheet(title, items) {
+  sheetDone?.(null);
+  const list = items.filter(Boolean);
+  $('.sheet-h', sheetEl).textContent = title;
+  $('.sheet-h', sheetEl).hidden = !title;
+  $('.sheet-list', sheetEl).innerHTML = list.map((it, i) =>
+    `<button type="button" class="sheet-item${it.danger ? ' danger' : ''}" role="menuitem" data-i="${i}"${it.disabled ? ' disabled' : ''}>${esc(it.label)}</button>`).join('');
+  $('.sheet-cancel', sheetEl).textContent = _t('취소');
+  sheetEl.hidden = false;
+  return new Promise((resolve) => {
+    sheetDone = (v) => { sheetDone = null; sheetEl.hidden = true; resolve(v); };
+    sheetEl.onclick = (e) => {
+      const b = e.target.closest('.sheet-item[data-i]');
+      if (b) sheetDone(list[b.dataset.i].key);
+      else if (e.target === sheetEl || e.target.closest('.sheet-cancel')) sheetDone(null);
+    };
+  });
+}
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && sheetDone) { e.preventDefault(); e.stopPropagation(); sheetDone(null); } }, true);
+
+// 카드(대기실 포함)·최소화 칩 메뉴 — 투입 · 중단 · 이름 바꾸기 · 앞뒤로 옮기기 · 제거
+const cardOrder = () => [...new Set([...nodesEl.querySelectorAll('.node')].map((n) => n.dataset.name).filter(Boolean))];
+function moveCard(name, dir) {
+  const order = cardOrder(), i = order.indexOf(name), j = i + dir;
+  if (i < 0 || j < 0 || j >= order.length) return;
+  [order[i], order[j]] = [order[j], order[i]];
+  state.order = order; // 서버 응답 전 깜빡임 방지 (끌어 놓기와 같다)
+  renderFloor(); renderDock();
+  api('/api/order', { order });
+}
+async function cardMenu(n) {
+  const socket = n.classList.contains('socket');
+  const w = !socket && state.workers.find((x) => x.id === n.dataset.id);
+  const name = socket ? n.dataset.profile : w?.name;
+  if (!name) return;
+  const order = cardOrder(), i = order.indexOf(name);
+  const at = socket && state.resumable?.[name];
+  const key = await sheet(socket ? _t('{name} · 대기실', { name }) : `${w.id} · ${name}`, [
+    socket && { key: 'launch', label: at ? _t('▶ 이어서 투입 (마지막 세션 {t})', { t: fmtAgo(at) }) : _t('▶ 투입') },
+    at && { key: 'fresh', label: _t('▶ 새 세션으로 투입') },
+    w && ['working', 'decision'].includes(w.status) && { key: 'stop', label: _t('⏸ 중단') },
+    { key: 'rename', label: _t('이름 바꾸기') },
+    { key: 'prev', label: _t('← 앞으로 옮기기'), disabled: i <= 0 },
+    { key: 'next', label: _t('뒤로 옮기기 →'), disabled: i < 0 || i >= order.length - 1 },
+    { key: 'remove', label: _t(socket ? '저장된 역할 삭제' : '제거'), danger: true },
+  ]);
+  if (key === 'launch' || key === 'fresh') launchProfile(name, key === 'fresh');
+  if (key === 'stop') api(`/api/workers/${w.id}/interrupt`);
+  if (key === 'prev' || key === 'next') moveCard(name, key === 'prev' ? -1 : 1);
+  if (key === 'remove') removeCard(n);
+  if (key === 'rename') {
+    const to = await ask({ title: _t('이름 바꾸기'), ok: _t('저장'), input: name });
+    if (!to || to === name) return;
+    const r = await api(socket ? '/api/profiles/rename' : `/api/workers/${w.id}/rename`, { from: name, name: to });
+    if (r.error) toast(r.error, 3500);
+  }
+}
+
+// 나중에 할 작업 메뉴 — 보내기 · 수정 · 위아래로 · 다른 워커로 옮기기 · 삭제
+async function memoMenu(li) {
+  const w = state.workers.find((x) => x.id === selected);
+  if (!w) return;
+  const lis = [...$('#memos').querySelectorAll('li[data-id]')], i = lis.indexOf(li);
+  const others = cardOrder().filter((n) => n !== w.name); // 끌어 놓기처럼 대기실 역할에도 옮길 수 있다
+  const key = await sheet($('.mt', li)?.textContent.slice(0, 80) || '', [
+    { key: 'send', label: _t('업무 지시로 보내기') },
+    { key: 'edit', label: _t('내용 수정') },
+    { key: 'up', label: _t('↑ 위로'), disabled: i <= 0 },
+    { key: 'down', label: _t('↓ 아래로'), disabled: i >= lis.length - 1 },
+    { key: 'move', label: _t('다른 워커로 옮기기…'), disabled: !others.length },
+    { key: 'remove', label: _t('삭제'), danger: true },
+  ]);
+  if (key === 'up' || key === 'down') {
+    const ids = lis.map((l) => l.dataset.id), j = i + (key === 'up' ? -1 : 1);
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    const list = state.memos?.[w.name];
+    if (list) list.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id)); // 서버 상태가 오기 전에 바로 보이게
+    memoSig = ''; renderMemos(w);
+    api('/api/memos', { role: w.name, op: 'reorder', ids });
+  } else if (key === 'move') {
+    const to = await sheet(_t('어느 워커로 옮길까요?'), others.map((n) => ({ key: n, label: n })));
+    if (!to) return;
+    li.classList.add('busy');
+    const r = await api('/api/memos', { role: w.name, op: 'move', id: li.dataset.id, to });
+    if (r.error) { li.classList.remove('busy'); toast(r.error, 3000); }
+    else toast(_t("'{name}' 의 나중에 할 작업으로 옮겼습니다", { name: to }));
+  } else if (key) memoAct(key, li, w);
+}
+
+// 터미널 키 줄 — 화면 키보드에 없는 키를 CLI 에 바로 보낸다. 누를 때 포커스를 옮기지 않아 열린 키보드가 닫히지 않는다
+const TERM_KEYS = { esc: '\x1b', ctrlc: '\x03', stab: '\x1b[Z', tab: '\t', up: '\x1b[A', down: '\x1b[B', left: '\x1b[D', right: '\x1b[C', enter: '\r' };
+const termKeys = $('#term-keys');
+let termTyping = false;
+// 터미널을 눌러 스크롤할 때마다 화면 키보드가 뜨지 않게 평소엔 inputmode=none — ⌨ 를 눌렀을 때만 키보드로 입력
+function setTermTyping(on) {
+  const ta = term.textarea;
+  termTyping = on;
+  $('[data-key="type"]', termKeys).classList.toggle('on', on);
+  if (!ta) return;
+  if (on) { ta.blur(); ta.inputMode = 'text'; term.focus(); }
+  else { ta.inputMode = 'none'; ta.blur(); }
+}
+termKeys.addEventListener('pointerdown', (e) => { if (e.target.closest('button')) e.preventDefault(); });
+termKeys.addEventListener('click', async (e) => {
+  const k = e.target.closest('[data-key]')?.dataset.key;
+  if (!k || !selected) return;
+  if (TERM_KEYS[k]) { send({ type: 'input', id: selected, data: TERM_KEYS[k] }); return; }
+  if (k === 'type') setTermTyping(!termTyping);
+  if (k === 'zoom') {
+    termZoom = !termZoom;
+    try { localStorage.setItem(TOUCH_ZOOM_KEY, termZoom ? '1' : '0'); } catch {}
+    $('.term-stage').scrollLeft = 0;
+    fitTerm();
+  }
+  if (k === 'paste') {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) term.paste(text); else toast(_t('클립보드가 비어 있습니다'));
+    } catch { toast(_t('클립보드를 읽지 못했습니다 — 브라우저가 허용하지 않았어요'), 3000); }
+  }
+});
+
+if (TOUCH) {
+  if (term.textarea) {
+    term.textarea.inputMode = 'none';
+    term.textarea.addEventListener('blur', () => { if (termTyping) setTermTyping(false); });
+  }
+  // 터미널 손가락 스크롤: xterm 6 은 터치로 스크롤되지 않는다(실측 — 스크롤 영역이 자체 스크롤바라 브라우저 기본 스크롤도 없음).
+  // 처음 8px 움직임으로 방향을 정해 세로면 기록을 줄 단위로 올리고 내리고(손을 떼면 관성), 가로면 확대 보기의 터미널을 옆으로 민다
+  const stage = $('.term-stage');
+  let pan = null, glide = 0;
+  const lineH = () => ($('#term .xterm-screen')?.clientHeight || 0) / term.rows || 16;
+  stage.addEventListener('touchstart', (e) => {
+    cancelAnimationFrame(glide);
+    const t = e.touches[0];
+    pan = e.touches.length === 1 && !diffOpen ? { x: t.clientX, y: t.clientY, left: stage.scrollLeft, axis: null, rest: 0, v: 0, at: e.timeStamp } : null;
+  }, { passive: true });
+  stage.addEventListener('touchmove', (e) => {
+    if (!pan) return;
+    const t = e.touches[0], dx = t.clientX - pan.x, dy = t.clientY - pan.y;
+    if (!pan.axis && Math.hypot(dx, dy) > 8) {
+      pan.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+      pan.y = t.clientY; // 세로는 방향이 정해진 자리부터 센다(처음 8px 만큼 튀지 않게)
+    }
+    if (!pan.axis) return;
+    e.preventDefault(); e.stopPropagation();
+    if (pan.axis === 'x') { stage.scrollLeft = pan.left - dx; return; }
+    const step = pan.y - t.clientY, dt = Math.max(1, e.timeStamp - pan.at);
+    pan.y = t.clientY; pan.at = e.timeStamp;
+    pan.v = step / dt; // px/ms — 손을 뗄 때 관성에 쓴다
+    pan.rest += step / lineH();
+    const n = Math.trunc(pan.rest);
+    if (n) { term.scrollLines(n); pan.rest -= n; }
+  }, { passive: false });
+  stage.addEventListener('touchend', () => {
+    if (pan?.axis === 'y' && Math.abs(pan.v) > 0.2) {
+      let v = pan.v, rest = 0, last = performance.now();
+      const step = (now) => {
+        const dt = now - last; last = now;
+        rest += (v * dt) / lineH();
+        const n = Math.trunc(rest);
+        if (n) { term.scrollLines(n); rest -= n; }
+        v *= Math.pow(0.995, dt); // 서서히 멈춘다
+        if (Math.abs(v) > 0.02) glide = requestAnimationFrame(step);
+      };
+      glide = requestAnimationFrame(step);
+    }
+    pan = null;
+  });
+  // 터치로 끌면 브라우저가 HTML 끌어 놓기를 시작한다(카드 순서·휴지통·메모 옮기기) — 길게 누르기 메뉴와 겹치지 않게 막는다
+  document.addEventListener('dragstart', (e) => { e.preventDefault(); e.stopPropagation(); }, true);
+  // 길게 누르기(0.5초, 손가락이 10px 넘게 움직이면 스크롤로 보고 취소) → 메뉴. 그 뒤 따라오는 클릭은 삼킨다(카드가 열리지 않게)
+  const LP = '.node, .dchip, #memos li[data-id]';
+  let lpTimer = 0, lpAt = null, lpFired = false;
+  const lpCancel = () => { clearTimeout(lpTimer); lpAt = null; };
+  document.addEventListener('pointerdown', (e) => {
+    lpFired = false;
+    if (e.pointerType !== 'touch') return;
+    const t = e.target.closest(LP), inner = e.target.closest('button, a, input, textarea, [data-shot]');
+    if (!t || (inner && inner !== t) || t.matches('.renaming, .editing')) return;
+    lpAt = { x: e.clientX, y: e.clientY };
+    clearTimeout(lpTimer);
+    lpTimer = setTimeout(() => {
+      lpAt = null; lpFired = true;
+      navigator.vibrate?.(12);
+      if (t.matches('#memos li')) memoMenu(t); else cardMenu(t);
+    }, 500);
+  }, true);
+  document.addEventListener('pointermove', (e) => { if (lpAt && Math.hypot(e.clientX - lpAt.x, e.clientY - lpAt.y) > 10) lpCancel(); }, true);
+  document.addEventListener('pointerup', lpCancel, true);
+  document.addEventListener('pointercancel', lpCancel, true);
+  document.addEventListener('click', (e) => { if (lpFired) { lpFired = false; e.preventDefault(); e.stopPropagation(); } }, true);
+  document.addEventListener('contextmenu', (e) => { if (e.target.closest(LP)) e.preventDefault(); }); // 안드로이드: 길게 누르면 뜨는 기본 메뉴
+  // 툴팁(ⓘ·미터·차트)은 눌렀을 때 뜬다(브라우저가 보내는 마우스 호환 이벤트). 스크롤하면 닫는다 — 떠 있는 채로 내용을 가리지 않게
+  addEventListener('scroll', () => { const tip = $('#tip'); if (!tip.hidden) { tip.hidden = true; mtPt = null; } }, { passive: true, capture: true });
+  // 헤더 로고를 누르면 맨 위(워커 카드)로 — 상세 화면을 보다가 다른 워커로 갈 때
+  $('.brand').addEventListener('click', () => scrollTo({ top: 0, behavior: 'smooth' }));
+}

@@ -192,6 +192,22 @@
             <div class="diff-main" id="diff-main"></div>
           </div>
         </div>
+        <!-- 터치 기기: 화면 키보드에 없는 키를 워커 CLI 에 바로 보낸다 · ⌨ 키보드 열기 · 🔍 맞춤/확대 (app.js '모바일') -->
+        <div class="term-keys" id="term-keys">
+          <button type="button" data-key="esc" title="중단·취소 (Esc)" data-i18n-attr="title">Esc</button>
+          <button type="button" data-key="ctrlc" title="Ctrl+C">^C</button>
+          <button type="button" data-key="stab" title="모드 전환 (Shift+Tab)" data-i18n-attr="title">⇧Tab</button>
+          <button type="button" data-key="tab" title="Tab">Tab</button>
+          <button type="button" data-key="up" aria-label="위" data-i18n-attr="aria-label">↑</button>
+          <button type="button" data-key="down" aria-label="아래" data-i18n-attr="aria-label">↓</button>
+          <button type="button" data-key="left" aria-label="왼쪽" data-i18n-attr="aria-label">←</button>
+          <button type="button" data-key="right" aria-label="오른쪽" data-i18n-attr="aria-label">→</button>
+          <button type="button" data-key="enter" title="확정 (Enter)" data-i18n-attr="title">⏎</button>
+          <span class="tk-gap"></span>
+          <button type="button" data-key="paste" title="붙여넣기" aria-label="붙여넣기" data-i18n-attr="title,aria-label">📋</button>
+          <button type="button" data-key="type" title="키보드로 직접 입력" aria-label="키보드로 직접 입력" data-i18n-attr="title,aria-label">⌨</button>
+          <button type="button" data-key="zoom" title="글자 크게 보기 / 화면에 맞추기" aria-label="글자 크게 보기 / 화면에 맞추기" data-i18n-attr="title,aria-label">🔍</button>
+        </div>
       </div>
       <aside class="side">
         <div class="side-grip" id="side-grip" title="왼쪽으로 끌어 넓히기(터미널 위를 덮음) · 오른쪽 끝까지 끌면 접기 · 더블클릭: 기본 폭" data-i18n-attr="title"><i></i></div>
@@ -200,6 +216,8 @@
           <h3 class="side-h sec-toggle" role="button" tabindex="0" aria-expanded="true" title="클릭해서 접기/펼치기" data-i18n-attr="title"><span class="chev">▾</span><span data-i18n>업무 지시</span> <small data-i18n>바로 투입 · 작업 중이면 대기열에 쌓임</small><span class="sec-count"></span></h3>
           <form id="task-form" class="task-form">
             <textarea name="text" rows="3"></textarea>
+            <!-- 터치 기기에서만 보이는 전송 버튼 — 화면 키보드엔 Alt·⌘ 가 없다 -->
+            <button type="submit" class="form-send" title="보내기" aria-label="보내기" data-i18n-attr="title,aria-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5.5 11.5 12 5l6.5 6.5"/></svg></button>
           </form>
           <label class="auto-q" title="끄면 턴이 끝나도 대기열을 보내지 않습니다 — ▶ 를 눌러 한 건씩 투입. 켜 두면 보내기 전 3초 기다립니다" data-i18n-attr="title"><input type="checkbox" id="auto-queue" checked> <span data-i18n>턴이 끝나면 대기열 자동 투입</span></label>
           <div class="queue" id="queue"></div>
@@ -209,6 +227,7 @@
           <h3 class="sec-toggle" role="button" tabindex="0" aria-expanded="true" title="클릭해서 접기/펼치기" data-i18n-attr="title"><span class="chev">▾</span><span data-i18n>나중에 할 작업</span> <small data-i18n>자동 실행 안 됨 · ▶ 지시를 눌러야 투입</small><span class="sec-count"></span></h3>
           <form id="memo-form" class="memo-form">
             <textarea name="text" rows="3"></textarea>
+            <button type="submit" class="form-send" title="추가" aria-label="추가" data-i18n-attr="title,aria-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
           </form>
           <ol class="memos" id="memos"></ol>
         </div>
