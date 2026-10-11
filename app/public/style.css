@@ -1379,11 +1379,16 @@ html[data-char="clawd-white"] :is(.node, .dchip, .detail-avatar, .term-wrap) { -
 :root .brand-mark.mgr-on.alert .clawd { filter: drop-shadow(0 0 5px color-mix(in srgb, var(--decision) 85%, transparent)) !important; }
 /* 가로 스크롤 영역은 위아래도 잘라 낸다 — 도착 효과(칩 빛 번짐·캐릭터 통 튀기)가 잘리지 않게 안쪽 여백을 넉넉히 두고,
    같은 만큼 음수 바깥 여백으로 줄 높이는 그대로 */
-.dock-list { flex: 1; min-width: 0; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: thin; padding: 9px 8px; margin: -7px -8px; }
+/* 썸네일은 줄 아래로 늘어뜨린다(줄 높이를 늘리지 않게) — 그 자리(아래 36px)까지 스크롤 영역에 넣어 잘리지 않게 하고, 같은 만큼
+   음수 바깥 여백으로 줄 높이는 그대로. 그 빈 자리가 아래 화면의 클릭을 가로채지 않게 목록은 클릭을 흘려보내고 칸만 받는다.
+   스크롤바는 그 빈 자리 아래에 떠 보여서 숨기고, 휠로 가로 스크롤한다(app.js) */
+.dock-list { flex: 1; min-width: 0; display: flex; align-items: flex-start; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 9px 8px 45px; margin: -7px -8px -43px; pointer-events: none; }
+.dock-list::-webkit-scrollbar { display: none; }
+.dock-list > * { pointer-events: auto; }
 .dock-empty { color: var(--dim); font-size: 12.5px; align-self: center; }
 /* 칩 + 그 아래 최근 캡처·문서 썸네일(있을 때만) */
-.dslot { flex: none; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
-.dthumbs { display: flex; gap: 4px; padding-left: 8px; }
+.dslot { flex: none; position: relative; }
+.dthumbs { position: absolute; top: calc(100% + 4px); left: 0; display: flex; gap: 4px; padding-left: 8px; }
 .dthumbs:empty { display: none; }
 .dock-shot, .dock-doc {
   width: 34px; height: 22px; border-radius: 4px; border: 1px solid rgb(var(--ink) / .3); background: var(--bg);

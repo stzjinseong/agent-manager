@@ -2336,6 +2336,12 @@ async function memoDrop(e) {
   else toast(_t("'{name}' 의 나중에 할 작업으로 옮겼습니다", { name: to }));
 }
 const dockList = $('#dock-list');
+// 칩 줄은 스크롤바를 숨겼다(style.css .dock-list) — 세로 휠을 가로 스크롤로
+dockList.addEventListener('wheel', (e) => {
+  if (Math.abs(e.deltaY) <= Math.abs(e.deltaX) || dockList.scrollWidth <= dockList.clientWidth) return;
+  e.preventDefault();
+  dockList.scrollLeft += e.deltaY;
+}, { passive: false });
 // 최소화한 칩 끌어서 순서 바꾸기 — 회로 기판 카드 드래그와 같은 방식(끄는 동안 DOM 자리를 바꿔 미리 보여 주고, 놓으면 저장)
 dockList.addEventListener('dragstart', (e) => {
   const c = e.target.closest?.('.dchip');
