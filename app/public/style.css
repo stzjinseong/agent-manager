@@ -1449,7 +1449,8 @@ body.card-drag .dadd { opacity: .25; }
   box-shadow: 0 1px 4px rgb(0 0 0 / calc(.4 * var(--shade))); transition: border-color .15s, transform .15s;
 }
 .dock-shot { object-fit: cover; cursor: zoom-in; }
-.dock-doc { display: flex; align-items: center; justify-content: center; gap: 2px; text-decoration: none; color: var(--text-2); }
+/* 문서 타일은 폭을 내용에 맞춘다(최소는 캡처와 같은 34px) — 34px 고정이면 HTML·JSONL 같은 확장자가 테두리 밖으로 나갔다 */
+.dock-doc { display: flex; align-items: center; justify-content: center; gap: 2px; width: auto; min-width: 34px; padding: 0 4px; white-space: nowrap; text-decoration: none; color: var(--text-2); }
 .dock-doc .ic { font-size: 11px; line-height: 1; }
 .dock-doc .ext { font: 600 7.5px/1 var(--mono); }
 .dock-shot:hover, .dock-doc:hover { border-color: rgb(var(--ink)); transform: scale(1.08); color: var(--text); }
