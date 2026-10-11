@@ -735,9 +735,15 @@ function cleanupShellEdits() {
 cleanupShellEdits();
 setInterval(cleanupShellEdits, 24 * 3600_000);
 const repoChecks = new Map(); // cwd → Promise<bool> (git 저장소인지 — diff 화면 안내용)
+// 성공만 기억한다 — 큰 저장소에서 첫 찍기가 시간 초과로 실패하면 그 폴더가 서버를 재시작할 때까지 'git 저장소가 아님'으로 남았다.
+// 실패하면 지워 두어 다음에 diff 를 열 때 다시 확인한다(그사이 git init 한 폴더도 잡힌다)
 function snapshotRepo(cwd) {
   if (!cwd) return Promise.resolve(false);
-  if (!repoChecks.has(cwd)) repoChecks.set(cwd, snapshot(cwd).then(Boolean));
+  if (!repoChecks.has(cwd)) {
+    const check = snapshot(cwd).then(Boolean);
+    repoChecks.set(cwd, check);
+    check.then((ok) => { if (!ok && repoChecks.get(cwd) === check) repoChecks.delete(cwd); });
+  }
   return repoChecks.get(cwd);
 }
 const withTimeout = (pr, ms) => Promise.race([pr, new Promise((r) => setTimeout(() => r(null), ms))]);

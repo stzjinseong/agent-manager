@@ -29,7 +29,7 @@ async function repoOf(cwd) {
     const prev = [...repos.values()].find((x) => x?.root === root);
     r = prev || { root, gitDir, idx: path.join(IDX_DIR, crypto.createHash('sha1').update(root).digest('hex').slice(0, 16)), queue: Promise.resolve(), last: null };
   }
-  repos.set(cwd, r);
+  if (r) repos.set(cwd, r); // 실패(저장소 아님·git 없음·시간 초과)는 기억하지 않는다 — 다음 명령 때 다시 확인(그사이 git init 한 폴더도 잡힌다)
   return r;
 }
 
