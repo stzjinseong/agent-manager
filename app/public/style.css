@@ -945,13 +945,27 @@ body.term-full::before {
 }
 .node.unseen { --unseen-bg: linear-gradient(180deg, color-mix(in srgb, var(--halo) 7%, var(--surface-2)), var(--surface)); padding: 13px 13px 11px; }
 .dchip.unseen { --unseen-bg: linear-gradient(var(--surface), var(--surface)); padding: 3px 9px 3px 7px; }
-:root[data-theme="light"] :is(.node, .dchip).unseen { --halo: var(--accent); }
+/* 선택해서 띄워 둔 워커는 카드 대신 터미널 테두리에 (app.js unseenOnCard). 터미널 테두리는 원래 2px 라 여백은 그대로.
+   크게 보기(.full)는 테두리가 없어 빼고, 뒤쪽 '터미널 테두리 = 워커 색' 규칙의 그림자를 이기게 선택자를 하나 더 붙인다 */
+.term-wrap.unseen:not(.full) {
+  --halo: #fff;
+  --halo-dim: color-mix(in srgb, var(--halo) 6%, transparent);
+  --halo-tail: color-mix(in srgb, var(--halo) 35%, transparent);
+  --unseen-bg: linear-gradient(var(--term-bg), var(--term-bg));
+  border: 2px solid transparent;
+  background:
+    var(--unseen-bg) padding-box,
+    conic-gradient(from var(--unseen-ang), var(--halo-dim) 0turn, var(--halo-dim) .3turn, var(--halo-tail) .42turn, var(--halo) .48turn .5turn, var(--halo-dim) .51turn,
+      var(--halo-dim) .8turn, var(--halo-tail) .92turn, var(--halo) .98turn 1turn) border-box;
+  animation: unseen-spin 1.4s linear infinite, unseen-glow 1.4s ease-in-out infinite;
+}
+:root[data-theme="light"] :is(.node, .dchip, .term-wrap).unseen { --halo: var(--accent); }
 @keyframes unseen-spin { to { --unseen-ang: 1turn; } }
 @keyframes unseen-glow {
   0%, 100% { box-shadow: 0 0 10px 0 color-mix(in srgb, var(--halo) 8%, transparent); }
   50% { box-shadow: 0 0 22px 3px color-mix(in srgb, var(--halo) 26%, transparent); }
 }
-@media (prefers-reduced-motion: reduce) { :is(.node, .dchip).unseen { animation: none; } }
+@media (prefers-reduced-motion: reduce) { :is(.node, .dchip, .term-wrap).unseen { animation: none; } }
 
 /* ---------- 메모 (자동 실행 안 됨) ---------- */
 .memo { display: flex; flex-direction: column; gap: 6px; }

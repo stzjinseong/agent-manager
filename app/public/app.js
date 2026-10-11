@@ -705,6 +705,8 @@ function isSeenDone(w) {
   return (seenDone[seenKey(w)] || 0) >= w.doneAt;
 }
 const isUnseenDone = (w) => viewStatus(w) === 'done' && !!w.doneAt;
+// 선택해서 터미널을 띄워 둔 워커는 카드·칩 대신 터미널 테두리에 빛이 돈다 — 보고 있는 화면에서 알아채게 (상세 화면은 선택한 워커가 있으면 늘 열려 있다)
+const unseenOnCard = (w) => isUnseenDone(w) && w.id !== selected;
 // 선택한 워커의 상세 화면(터미널·업무 지시·메모 등)이나 그 카드·칩을 누르거나 그 안에서 키를 치면 완료 확인
 function ackSeen(e) {
   if (!selected || $('#detail').hidden) return;
@@ -726,7 +728,7 @@ function updateNode(node, w) {
   // 이름 변경 중(renaming)·드래그 중(dragging) 표시는 사용자 동작이 붙인 것이라 상태 갱신이 지우면 안 된다 —
   // 지우면 바로 아래에서 이름 글자가 입력창을 덮어써, 다른 워커 활동으로 상태가 올 때마다 입력이 닫혔다
   const keep = ['renaming', 'dragging', 'dropping'].filter((c) => node.classList.contains(c)).map((c) => ` ${c}`).join('');
-  node.className = `node s-${viewStatus(w)}${w.id === selected ? ' sel' : ''}${isUnseenDone(w) ? ' unseen' : ''}${keep}`;
+  node.className = `node s-${viewStatus(w)}${w.id === selected ? ' sel' : ''}${unseenOnCard(w) ? ' unseen' : ''}${keep}`;
   node.title = w.id === selected ? _t('다시 누르면 닫기') : '';
   node.dataset.id = w.id;
   $('.nid', node).textContent = w.id;
@@ -863,7 +865,7 @@ function renderDock() {
       thumbs.innerHTML = (media.shot ? shotImg(media.shot, 'dock-shot') : '') + (media.doc ? docTile(media.doc, 'dock-doc') : '');
     }
     const st = viewStatus(w);
-    c.className = `dchip s-${st}${w.id === selected ? ' sel' : ''}${isUnseenDone(w) ? ' unseen' : ''}${c.classList.contains('dropping') ? ' dropping' : ''}${c === dockDrag ? ' dragging' : ''}`;
+    c.className = `dchip s-${st}${w.id === selected ? ' sel' : ''}${unseenOnCard(w) ? ' unseen' : ''}${c.classList.contains('dropping') ? ' dropping' : ''}${c === dockDrag ? ' dragging' : ''}`;
     c.dataset.id = id;
     c.dataset.name = w.name;
     c.style.setProperty('--avatar', avatarColor(w.name) || 'var(--accent)');
@@ -1088,6 +1090,7 @@ function renderDetail() {
   const w = state.workers.find((x) => x.id === selected);
   const wasHidden = $('#detail').hidden;
   $('#detail').hidden = !w;
+  $('#term-wrap').classList.toggle('unseen', Boolean(w && isUnseenDone(w))); // 확인 안 한 완료 빛 — 카드 대신 여기(unseenOnCard)
   if (!w) return;
   if (wasHidden) requestAnimationFrame(() => { fitTerm(); placeMeters(); });
   else if ($('#detail-name').textContent !== w.name) requestAnimationFrame(placeMeters); // 다른 워커로 바꾸면 이름 폭이 달라진다
