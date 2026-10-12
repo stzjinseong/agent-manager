@@ -210,15 +210,15 @@ main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24p
   50% { filter: drop-shadow(0 0 9px var(--decision)) drop-shadow(0 0 28px color-mix(in srgb, var(--decision) 55%, transparent)); }
 }
 
-/* 칩을 끄는 동안만 뜨는 휴지통. 화면 아래 가운데에 떠 있다(fixed) — 예전엔 칩 영역 끝에 붙어 마지막 줄 카드 아래쪽을
+/* 칩을 끄는 동안만 뜨는 휴지통. 화면 위 가운데에 떠 있다(fixed · 칩 줄과 가까워 아래보다 끌 거리가 짧다) — 예전엔 칩 영역 끝에 붙어 마지막 줄 카드 아래쪽을
    덮었는데, 반투명 배경이라 카드에 묻혀 뒤에 있는 것처럼 보여 놓기 어려웠다. 이제 모든 카드 위에, 불투명 배경·진한 그림자로 */
-.trash { position: fixed; left: 0; right: 0; bottom: 28px; height: 0; z-index: 60; display: flex; justify-content: center; pointer-events: none; }
+.trash { position: fixed; left: 0; right: 0; top: 28px; height: 0; z-index: 60; display: flex; justify-content: center; pointer-events: none; }
 .trash .bin {
-  position: absolute; bottom: 0; display: flex; align-items: center; gap: 10px; padding: 14px 30px;
+  position: absolute; top: 0; display: flex; align-items: center; gap: 10px; padding: 14px 30px;
   border: 2px dashed rgb(var(--ink) / .5); border-radius: 999px; background: var(--surface-3);
   box-shadow: 0 0 0 6px color-mix(in srgb, var(--bg) 70%, transparent), 0 14px 40px rgb(0 0 0 / calc(.6 * var(--shade))), 0 4px 12px rgb(0 0 0 / calc(.4 * var(--shade)));
   color: var(--text); font-size: 14px; font-weight: 600; white-space: nowrap;
-  opacity: 0; transform: translateY(16px) scale(.96); pointer-events: none;
+  opacity: 0; transform: translateY(-16px) scale(.96); pointer-events: none;
   transition: opacity .15s, transform .18s cubic-bezier(.2, .8, .2, 1), border-color .15s, background .15s, color .15s;
 }
 .trash .ic { font-size: 22px; line-height: 1; }

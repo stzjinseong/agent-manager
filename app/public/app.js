@@ -2044,7 +2044,7 @@ nodesEl.addEventListener('dragend', () => {
   requestAnimationFrame(drawTraces);
 });
 
-// ---------- 휴지통: 칩을 끌기 시작하면 아래에 뜨고, 놓으면 제거 ----------
+// ---------- 휴지통: 칩을 끌기 시작하면 위에 뜨고, 놓으면 제거 ----------
 // 워커 칩은 상세의 '제거'와 같고(실행 중이면 세션 종료), 대기실 칩은 저장된 역할 삭제와 같다. 둘 다 확인을 받는다
 const trashEl = $('#trash');
 trashEl.addEventListener('dragover', (e) => { if (!dragEl && !dockDrag) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; trashEl.classList.add('over'); });
