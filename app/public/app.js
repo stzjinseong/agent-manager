@@ -1121,7 +1121,7 @@ function roundedPath(pts, r) {
 
 new ResizeObserver(() => requestAnimationFrame(drawTraces)).observe($('#floor'));
 
-// 선택한 워커 카드 → 아래 상세 패널(아바타)로 워커 색 연결선 — 어느 카드의 터미널을 보고 있는지 한눈에.
+// 선택한 워커 카드 → 아래 상세 패널(CLI 가 든 카드) 위쪽 가운데로 워커 색 연결선 — 어느 카드의 터미널을 보고 있는지 한눈에.
 // 카드 영역(#floor)과 상세 패널은 따로 놓인 형제라 #traces 에 못 그리고, 페이지 좌표의 오버레이(body 아래 #sel-link)에 그린다.
 // 반투명 곡선으로 다른 UI 위를 그대로 가로지른다. 최소화 중엔 칩에서 출발. 크게 보기·카드 끄는 중엔 숨김
 const selLink = document.body.appendChild(Object.assign(document.createElementNS('http://www.w3.org/2000/svg', 'svg'), { id: 'sel-link' }));
@@ -1149,10 +1149,10 @@ function drawSelLink() {
   const d = `M${start[0]} ${start[1]} C${start[0]} ${start[1] + k} ${end[0]} ${end[1] - k} ${end[0]} ${end[1]}`;
   selLink.innerHTML = `<path class="base" d="${d}"/><path class="flow" d="${d}"/><circle cx="${start[0]}" cy="${start[1]}" r="3"/><circle cx="${end[0]}" cy="${end[1]}" r="3"/>`;
 }
-// 상세 패널 아바타 위쪽 가운데 (페이지 좌표). top 은 패널 위 가장자리(화면 좌표)
+// 상세 패널(CLI 가 든 카드) 위쪽 가장자리 가운데 (페이지 좌표). top 은 패널 위 가장자리(화면 좌표)
 function linkTarget() {
-  const dr = $('#detail').getBoundingClientRect(), ar = $('#detail-avatar').getBoundingClientRect();
-  return { x: Math.round((ar.width ? ar.left + ar.width / 2 : dr.left + 40) + scrollX), y: Math.round((ar.height ? ar.top - 3 : dr.top) + scrollY), top: dr.top };
+  const dr = $('#detail').getBoundingClientRect();
+  return { x: Math.round(dr.left + dr.width / 2 + scrollX), y: Math.round(dr.top + scrollY), top: dr.top };
 }
 function cardLinkPoints(card) {
   const t = linkTarget();
