@@ -206,7 +206,7 @@ function baseTermTheme(light) {
   if (!light) return { background: '#07080a', foreground: '#e6e4de', cursor: '#d97757', selectionBackground: '#d9775744',
     scrollbarSliderBackground: '#e6e4de40', scrollbarSliderHoverBackground: '#e6e4de66', scrollbarSliderActiveBackground: '#e6e4de85', extendedAnsi: extAnsi(TERM_256.dark) };
   return {
-    background: '#f4f3ef', foreground: '#1b1d23', cursor: '#c8623f', cursorAccent: '#f4f3ef', selectionBackground: '#c8623f33',
+    background: '#f8f4ec', foreground: '#2b231c', cursor: '#c8623f', cursorAccent: '#f8f4ec', selectionBackground: '#c8623f33',
     scrollbarSliderBackground: '#1b1d234d', scrollbarSliderHoverBackground: '#1b1d2373', scrollbarSliderActiveBackground: '#1b1d2394',
     black: '#1b1d23', red: '#c4342b', green: '#2f7d3a', yellow: '#946200', blue: '#2a5fc0', magenta: '#9b3aa8', cyan: '#1a7f8e', white: '#5c606b',
     brightBlack: '#6b6f7a', brightRed: '#d9473d', brightGreen: '#3a9147', brightYellow: '#a87000', brightBlue: '#3a72d6', brightMagenta: '#ae4cbb', brightCyan: '#22909f', brightWhite: '#3d4049',

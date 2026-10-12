@@ -1332,41 +1332,67 @@ html[data-char="clawd-white"] :is(.node, .dchip, .detail-avatar, .term-wrap) { -
    다크와 같은 역할의 값을 밝은 면 기준으로. 터미널도 밝아진다(바탕 = 업무 지시 입력칸 색, app.js termTheme) */
 :root[data-theme="light"] {
   color-scheme: light;
-  --term-bg: #f4f3ef;
-  --ink: 20 22 28;
+  --term-bg: #f8f4ec;
+  --ink: 58 42 28; /* 따뜻한 갈색 잉크 — 테두리·격자·그림자가 회색 대신 베이지로 */
   --shade: .4;
   --av-l: 0.62;
   --char-white: #b7b3ab; /* 밝은 바탕에서 흰 테두리는 안 보여 옅은 회색으로 */
-  --btn-hover: #e6e4de;
-  --sel-a: #ffffff; --sel-b: #f3f1ec;
-  --tip-bg: #ffffff;
-  --faint: #9a9da6;
-  --bg: #f4f3ef;
-  --floor: #ecebe6;
-  --surface: #ffffff;
-  --surface-2: #f6f5f1;
-  --surface-3: #ecebe5;
-  --line: rgb(20 22 28 / .08);
-  --line-2: rgb(20 22 28 / .14);
-  --text: #1b1d23;
-  --text-2: #4a4d57;
-  --dim: #767a86;
+  --btn-hover: #ebe2d3;
+  --sel-a: #fffdf8; --sel-b: #f5efe5;
+  --tip-bg: #fffdf8;
+  --faint: #a99b8c;
+  --bg: #f1ebe1;
+  --floor: #e9e1d4;
+  --surface: #fcf9f3;
+  --surface-2: #f8f3eb;
+  --surface-3: #eee6d9;
+  --line: rgb(90 62 36 / .11);
+  --line-2: rgb(90 62 36 / .19);
+  --text: #2b231c;
+  --text-2: #5c4f44;
+  --dim: #8a7c6e;
   --accent: #c8623f;
   --accent-hi: #d97757;
   --working: #d0683f;
   --decision: #c98500;
   --done: #1f9d6b;
   --checked: #5b8a75;
-  --idle: #7a8296;
+  --idle: #8a8478;
   --exited: #a3a7b1;
   --copper: #9a6e40;
   --waiting: #6f63d6;
   --interrupted: #6f7890;
   --gold: #b8892a;
-  /* 차트: dataviz 기준 팔레트 light 단계(같은 색상, 밝은 면용) — 흰 면 검증 통과, 3:1 미만 색은 범례·수치로 보완 */
-  --s-read: #2a78d6; --s-write: #1baf7a; --s-new: #eb6834; --s-out: #4a3aa7;
-  --t-model: #e87ba4; --t-tool: #eda100; --t-wait: #2a78d6; --t-other: #8a8d96;
+  /* 차트: 크림 바탕에 어울리는 흙빛 팔레트(참고: Claude Motion) — 초록·머스터드·코랄·보라 / 시간은 코랄·머스터드·하늘·베이지.
+     인접 색끼리 명도 차를 둬 겹친 막대도 구분되고, 3:1 미만 색(머스터드·하늘)은 범례·수치로 보완 */
+  --s-read: #2f7a54; --s-write: #d2a03c; --s-new: #d6643f; --s-out: #7d6fcb;
+  --t-model: #dc8466; --t-tool: #d2a03c; --t-wait: #7f9ed4; --t-other: #b3a594;
 }
+/* 라이트 · 세션 프로파일 — 참고 이미지(Claude Motion 대시보드)의 결: 크림 바탕 위 흰빛 카드, 작은 대문자 라벨,
+   숫자 아래 얇은 색 막대, 따뜻한 격자. 맨 아래 안내는 복숭아색 띠에 코랄 글자 */
+:root[data-theme="light"] .profile { --card: #fffdf9; --peach: #f8e6da; --coral: #c8623f; }
+:root[data-theme="light"] :is(.kpi, .chart-card) {
+  background: var(--card); border-color: rgb(var(--ink) / .12); border-radius: 10px;
+  box-shadow: 0 1px 0 rgb(var(--ink) / .05), 0 2px 8px -4px rgb(var(--ink) / .12);
+}
+:root[data-theme="light"] .kpi .k, :root[data-theme="light"] .turns th {
+  font-size: 11px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; color: var(--dim); /* 한글은 고정폭·자간이 어색해 본문 글꼴 */
+}
+:root[data-theme="light"] .kpi .v { letter-spacing: -.02em; color: #241c16; }
+:root[data-theme="light"] :is(.kpi .gauge, .kpi .tbar) { height: 4px; background: rgb(var(--ink) / .08); }
+:root[data-theme="light"] .kpi .gauge i { background: var(--coral); }
+:root[data-theme="light"] .kpi .gauge i.warn { background: var(--decision); }
+:root[data-theme="light"] .kpi svg.spark polyline { stroke: var(--coral); }
+:root[data-theme="light"] .chart-head h3 { color: var(--text); font-weight: 650; }
+:root[data-theme="light"] .chart .gl { stroke: rgb(var(--ink) / .09); stroke-dasharray: 2 3; }
+:root[data-theme="light"] .hbar .b { background: rgb(var(--ink) / .07); }
+:root[data-theme="light"] .hbar .b i { background: var(--s-read); }
+:root[data-theme="light"] .turns tr:hover td { background: #faf3ea; }
+:root[data-theme="light"] .profile-note {
+  align-self: stretch; padding: 7px 14px; border-radius: 8px; background: var(--peach); border: 1px solid #efcfba;
+  color: var(--coral); font-size: 11px; font-weight: 600;
+}
+
 /* 흰 몸 캐릭터(브랜드·매니저·질문 창)는 밝은 바탕에 묻히니 어두운 빛 */
 /* 다크의 흰 빛 번짐 대신 주변에 은은한 어두운 빛 — 외곽선 없이 밝은 바탕에서 몸이 떠 보이게.
    바깥 요소는 작업 중 빛 번짐 애니메이션이 filter 를 덮어쓰므로 안쪽 그림(.clawd)에 건다 */
