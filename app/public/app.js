@@ -2609,11 +2609,12 @@ $('#auto-queue').addEventListener('change', (e) => { if (selected) api(`/api/wor
 // 뒤에 남은 작은 방울이 끈적하게 이어져 따라오다 합쳐지며, 도착하면 납작해졌다 출렁이며 멈춘다(style.css, index.html 의 gooey 필터).
 // 움직이는 동안 다시 누르면(클릭·Enter·Space) 무시한다 — 중간에 방향이 뒤집히며 상태와 위치가 어긋나지 않게
 // ---------- 전송·개행 키 세트 (헤더 ⌨) ----------
-// 1: Alt(⌘)+Enter 전송 · Enter 개행 (기본)   2: Enter 전송 · Shift/Ctrl+Enter 개행 · ⌘(Alt)+Enter 는 아무 일도 안 함
+// 1: Alt(⌘)+Enter 전송 · Enter 개행   2: Enter 전송 · Shift/Ctrl+Enter 개행 · ⌘(Alt)+Enter 는 아무 일도 안 함 (기본)
 // 업무 지시·메모·메모 고치기·입력 확인 창·CLI 터미널이 모두 이 규칙을 따른다. 브라우저에 기억(am.keys)
 const KEYS_KEY = 'am.keys';
-let keySet = '1';
-try { if (localStorage.getItem(KEYS_KEY) === '2') keySet = '2'; } catch {}
+// 기본은 2(Enter 전송). 예전엔 1 이 기본이라 저장값이 없었다 — 이제 1 을 고른 사람만 '1' 로 남긴다
+let keySet = '2';
+try { if (localStorage.getItem(KEYS_KEY) === '1') keySet = '1'; } catch {}
 // Enter 가 할 일: 'send' | 'newline' | null(아무 일도 안 함)
 function enterAction(e) {
   if (keySet === '2') return e.metaKey || e.altKey ? null : e.shiftKey || e.ctrlKey ? 'newline' : 'send';
@@ -2672,7 +2673,7 @@ keysPop.addEventListener('click', (e) => {
   const b = e.target.closest('[data-keys]');
   if (!b || b.dataset.keys === keySet) return;
   keySet = b.dataset.keys;
-  try { keySet === '1' ? localStorage.removeItem(KEYS_KEY) : localStorage.setItem(KEYS_KEY, keySet); } catch {}
+  try { keySet === '2' ? localStorage.removeItem(KEYS_KEY) : localStorage.setItem(KEYS_KEY, keySet); } catch {}
   applyKeyHints();
   setKeysPop(false);
   keysBtn.focus();
