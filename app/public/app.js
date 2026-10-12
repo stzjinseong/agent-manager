@@ -1188,11 +1188,11 @@ function renderHint() {
   box.innerHTML = kind === 'create'
     ? `<div class="hint-art create"><span class="hint-slot"><span class="avatar">${clawdSVG()}</span></span><span class="hint-plus">+</span></div>
        <h2>${_t('워커를 생성해보세요!')}</h2>
-       <p>${state.profiles.length ? _t('대기실 카드의 <b>▶ 투입</b>이나 ') : ''}${_t('<b>+ 워커 추가</b>로 첫 Claude 를 투입하면 여기서 터미널·업무 지시·타임라인을 볼 수 있어요.')}</p>
+       <p>${state.profiles.length ? _t('대기실 카드의 <b>▶ 투입</b>이나 ') : ''}${_t('<b>+ 워커 추가</b>로 첫 Claude 를 투입하면 여기서 터미널·Tasks·타임라인을 볼 수 있어요.')}</p>
        <button class="btn primary" data-hint="new">${_t('+ 워커 추가')}</button>`
     : `<div class="hint-art click"><span class="avatar">${clawdSVG()}</span><span class="hint-ring"></span>${CURSOR_SVG}</div>
        <h2>${_t('워커를 클릭해보세요!')}</h2>
-       <p>${_t(min ? '위의 워커 칩을 누르면 여기에 그 워커의 터미널·업무 지시·타임라인이 열려요.' : '위의 워커 카드를 누르면 여기에 그 워커의 터미널·업무 지시·타임라인이 열려요.')}</p>`;
+       <p>${_t(min ? '위의 워커 칩을 누르면 여기에 그 워커의 터미널·Tasks·타임라인이 열려요.' : '위의 워커 카드를 누르면 여기에 그 워커의 터미널·Tasks·타임라인이 열려요.')}</p>`;
 }
 $('#hint').addEventListener('click', (e) => { if (e.target.closest('[data-hint="new"]')) toggleNewPanel(); });
 
@@ -1237,7 +1237,7 @@ function renderDetail() {
   $('#auto-queue').checked = !state.manualQueue?.[w.name];
   const queueEl = $('#queue');
   const queueHtml = w.queue.length ? queueHead(w) +
-      w.queue.map((q, i) => `<div class="qi"><span class="n">${i + 1}</span><span class="tx"><span class="qt">${esc(q)}</span>${attachChips(q, 'sm')}</span><button class="btn mini ghost memo-ic" data-tomemo="${i}" title="${_t('나중에 할 작업으로 되돌리기')}" aria-label="${_t('나중에 할 작업으로 되돌리기')}">${UNDO_SVG}</button><button class="btn mini ghost memo-ic" data-unqueue="${i}" title="${_t('큐에서 빼기')}" aria-label="${_t('큐에서 빼기')}">${X_SVG}</button></div>`).join('')
+      w.queue.map((q, i) => `<div class="qi"><span class="n">${i + 1}</span><span class="tx"><span class="qt">${esc(q)}</span>${attachChips(q, 'sm')}</span><button class="btn mini ghost memo-ic" data-tomemo="${i}" title="${_t('Backlog 로 되돌리기')}" aria-label="${_t('Backlog 로 되돌리기')}">${UNDO_SVG}</button><button class="btn mini ghost memo-ic" data-unqueue="${i}" title="${_t('큐에서 빼기')}" aria-label="${_t('큐에서 빼기')}">${X_SVG}</button></div>`).join('')
     : '';
   // 상태가 올 때마다 통째로 바꾸면 썸네일이 다시 로드되고 누르는 중인 타일이 사라진다 → 바뀐 때만
   if (queueEl._html !== queueHtml) { queueEl.innerHTML = queueEl._html = queueHtml; tickQueueCountdown(); }
@@ -2354,7 +2354,7 @@ const submitOnEnter = (form) => onEnterKey(form.text, () => form.requestSubmit()
 submitOnEnter(taskForm);
 // ---------- 메모 (역할별, 자동 실행 안 됨) ----------
 let memoSig = '';
-// 메모 카드의 수정(연필)·업무 지시로 보내기(종이비행기) 아이콘 — 같은 모양의 버튼(.memo-ic)
+// 메모 카드의 수정(연필)·Tasks 로 보내기(종이비행기) 아이콘 — 같은 모양의 버튼(.memo-ic)
 const MEMO_EDIT_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"/></svg>';
 const MEMO_SEND_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3 10 14M21 3l-7 18-4-7-7-4 18-7z"/></svg>';
 // 수정 중: 저장(체크)·취소(엑스) — 같은 모양의 아이콘 버튼
@@ -2368,8 +2368,8 @@ function renderMemos(w) {
   memoSig = sig;
   const fmt = (t) => new Date(t + clockSkew).toLocaleString(uiLocale(), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
   $('#memos').innerHTML = list.length
-    ? `<li class="mh">${_t('{n}건', { n: list.length })}</li>` + list.map((m) => `<li data-id="${m.id}" draggable="true" title="${_t('워커 카드에 끌어다 놓으면 그 워커의 나중에 할 작업으로 옮겨집니다')}"><span class="mt">${esc(m.text)}</span>${attachChips(m.text, 'sm')}
-        <span class="ma"><time>${fmt(m.createdAt)}</time><button class="btn mini ghost memo-ic" data-memo="edit" title="${_t('내용 수정')}" aria-label="${_t('내용 수정')}">${MEMO_EDIT_SVG}</button><button class="btn mini ghost memo-ic" data-memo="send" title="${_t('업무 지시로 보내기 (작업 중이면 대기열)')}" aria-label="${_t('업무 지시로 보내기')}">${MEMO_SEND_SVG}</button><button class="btn mini ghost memo-ic" data-memo="remove" title="${_t('삭제')}" aria-label="${_t('삭제')}">${X_SVG}</button></span></li>`).join('')
+    ? `<li class="mh">${_t('{n}건', { n: list.length })}</li>` + list.map((m) => `<li data-id="${m.id}" draggable="true" title="${_t('워커 카드에 끌어다 놓으면 그 워커의 Backlog 로 옮겨집니다')}"><span class="mt">${esc(m.text)}</span>${attachChips(m.text, 'sm')}
+        <span class="ma"><time>${fmt(m.createdAt)}</time><button class="btn mini ghost memo-ic" data-memo="edit" title="${_t('내용 수정')}" aria-label="${_t('내용 수정')}">${MEMO_EDIT_SVG}</button><button class="btn mini ghost memo-ic" data-memo="send" title="${_t('Tasks 로 보내기 (작업 중이면 대기열)')}" aria-label="${_t('Tasks 로 보내기')}">${MEMO_SEND_SVG}</button><button class="btn mini ghost memo-ic" data-memo="remove" title="${_t('삭제')}" aria-label="${_t('삭제')}">${X_SVG}</button></span></li>`).join('')
     : ''; // 비어 있으면 아무것도 두지 않는다 — 업무 지시처럼 입력칸에서 섹션이 끝나 타임라인과의 간격이 같다
 }
 // 수정: 본문 자리에 입력칸을 띄운다. 키 세트의 전송 키로 저장 · Esc 취소 — 추가 칸과 같은 키
@@ -2589,7 +2589,7 @@ async function memoDrop(e) {
   const to = memoTargetName(n);
   const r = await api('/api/memos', { role: d.role, op: 'move', id: d.id, to });
   if (r.error) { d.li.classList.remove('busy'); toast(r.error, 3000); }
-  else toast(_t("'{name}' 의 나중에 할 작업으로 옮겼습니다", { name: to }));
+  else toast(_t("'{name}' 의 Backlog 로 옮겼습니다", { name: to }));
 }
 const dockList = $('#dock-list');
 // 칩 줄은 스크롤바를 숨겼다(style.css .dock-list) — 세로 휠을 가로 스크롤로
@@ -2650,7 +2650,7 @@ $('#queue').addEventListener('click', (e) => {
   const op = b.dataset.tomemo != null ? 'tomemo' : 'unqueue', i = Number(b.dataset.tomemo ?? b.dataset.unqueue);
   b.disabled = true;
   fetch(`/api/workers/${w.id}/${op}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ index: i, text: w.queue[i] }) })
-    .then((r) => { if (r.status === 409) toast(_t('이미 CLI 로 보낸 지시라 옮기지 못했어요')); else if (op === 'tomemo' && r.ok) toast(_t('나중에 할 작업으로 옮겼어요')); })
+    .then((r) => { if (r.status === 409) toast(_t('이미 CLI 로 보낸 지시라 옮기지 못했어요')); else if (op === 'tomemo' && r.ok) toast(_t('Backlog 로 옮겼어요')); })
     .catch(() => { b.disabled = false; });
 });
 
@@ -4054,7 +4054,7 @@ async function memoMenu(li) {
   const lis = [...$('#memos').querySelectorAll('li[data-id]')], i = lis.indexOf(li);
   const others = cardOrder().filter((n) => n !== w.name); // 끌어 놓기처럼 대기실 역할에도 옮길 수 있다
   const key = await sheet($('.mt', li)?.textContent.slice(0, 80) || '', [
-    { key: 'send', label: _t('업무 지시로 보내기') },
+    { key: 'send', label: _t('Tasks 로 보내기') },
     { key: 'edit', label: _t('내용 수정') },
     { key: 'up', label: _t('↑ 위로'), disabled: i <= 0 },
     { key: 'down', label: _t('↓ 아래로'), disabled: i >= lis.length - 1 },
@@ -4074,7 +4074,7 @@ async function memoMenu(li) {
     li.classList.add('busy');
     const r = await api('/api/memos', { role: w.name, op: 'move', id: li.dataset.id, to });
     if (r.error) { li.classList.remove('busy'); toast(r.error, 3000); }
-    else toast(_t("'{name}' 의 나중에 할 작업으로 옮겼습니다", { name: to }));
+    else toast(_t("'{name}' 의 Backlog 로 옮겼습니다", { name: to }));
   } else if (key) memoAct(key, li, w);
 }
 
