@@ -221,6 +221,7 @@ const EN = {
   '📷 캡처': '📷 Capture',
   '📄 결과물': '📄 Output',
   '클릭: 새 탭에서 열기': 'Click: open in a new tab',
+  '클릭: 열기 · Ctrl/⌘+클릭: 새 탭': 'Click: open · Ctrl/⌘+click: new tab',
   '캡처': 'Capture',
   '클릭해 크게 보기': 'Click to enlarge',
   '바깥을 누르거나 Esc 로 닫기': 'Click outside or press Esc to close',

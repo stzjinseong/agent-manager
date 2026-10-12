@@ -860,8 +860,9 @@ function onHook(w, ev, res) {
       break;
     case 'PostToolUse':
       // 서브에이전트가 쓴 문서도 결과물이다
-      if (ev.agent_id) { scheduleProfile(w); if (trackDoc(w, ev)) emitState(); break; }
+      if (ev.agent_id) { scheduleProfile(w); if (trackDoc(w, ev) | trackShellDocs(w, ev)) emitState(); break; }
       trackDoc(w, ev);
+      trackShellDocs(w, ev);
       trackTasks(w, ev);
       if (isCommit(ev)) { progress.commit(w); broadcast({ type: 'fx', kind: 'commit', id: w.id }); }
       // 터미널에서 직접 승인한 경우 등, 도구가 실행됐으면 해당 도구의 대기 결정은 무효
@@ -1258,7 +1259,11 @@ function createTheme(id) {
 // themes 폴더를 이 PC 의 파일 관리자(Finder · 탐색기)로 연다 — 브라우저는 로컬 폴더를 못 연다
 function openThemeDir() {
   fs.mkdirSync(THEME_DIR, { recursive: true });
-  const [cmd, args] = process.platform === 'darwin' ? ['open', [THEME_DIR]] : process.platform === 'win32' ? ['explorer', [THEME_DIR]] : ['xdg-open', [THEME_DIR]];
+  return openPath(THEME_DIR);
+}
+// 폴더·파일을 이 PC 에서 더블클릭한 것처럼 연다 (파일은 OS 기본 앱)
+function openPath(target) {
+  const [cmd, args] = process.platform === 'darwin' ? ['open', [target]] : process.platform === 'win32' ? ['explorer', [target]] : ['xdg-open', [target]];
   try { spawnProcess(cmd, args, { detached: true, stdio: 'ignore' }).on('error', () => {}).unref(); return true; } catch { return false; }
 }
 
@@ -1340,10 +1345,10 @@ function readJsonLimited(req, limit) {
 }
 
 // ---------- 결과물 문서 ----------
-// 워커가 Write/Edit 로 쓴 문서(html·md·pdf·svg·txt·csv·json 등)를 타임라인에 카드로 보여 주고, 누르면 새 탭으로 연다.
-// 코드 소스(js·py 등)·설정(yaml·toml 등)은 넣지 않는다 — 개발 중 Write 로 새 소스를 만들 때마다 결과물로 뜬다
-// 열어 주는 것은 워커가 직접 쓴 바로 그 파일뿐이다 — w.docs 에 기록된 경로를 문서 id 로만 찾는다.
-// Bash 로 만든 파일은 알 수 없다
+// 워커가 Write/Edit 로 쓴 문서(html·md·pdf·svg·txt·csv·json 등)를 타임라인에 카드로 보여 주고, 누르면 이 PC 에서는 OS 기본 앱으로,
+// 다른 기기(휴대폰 등)에서는 새 탭으로 연다. 코드 소스(js·py 등)·설정(yaml·toml 등)은 넣지 않는다 — 개발 중 Write 로 새 소스를 만들 때마다 결과물로 뜬다.
+// Bash 로 스크립트를 돌려 만든 파일(docx·xlsx·png 등 — Write 로는 못 만든다)은 명령·출력에 나온 경로 중 이번 턴에 쓰인 것을 잡는다(trackShellDocs).
+// 열어 주는 것은 w.docs 에 기록된 바로 그 파일뿐이다 — 경로는 문서 id 로만 찾는다
 const VIDEO_TYPES = { mp4: 'video/mp4', m4v: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm', ogv: 'video/ogg' };
 // 파일을 구간 요청(Range: bytes=a-b)대로 보낸다 — <video> 가 앞뒤로 옮겨 보거나, Safari 가 재생을 시작하려면 필요하다
 function sendRange(req, res, full, type) {
@@ -1365,6 +1370,12 @@ const DOC_TYPES = {
   // 글로 보여 주는 결과물 (json·xml 도 브라우저 뷰어 대신 그대로 글로)
   txt: 'text/plain', text: 'text/plain', log: 'text/plain', csv: 'text/plain', tsv: 'text/plain', json: 'text/plain', jsonl: 'text/plain', xml: 'text/plain',
 };
+const IMAGE_TYPES = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp' };
+// Bash 로 만든 결과물로 칠 형식 — 스크립트가 만드는 바이너리 문서·그림·영상·압축과 pdf·svg.
+// 글 형식(md·json·html 등)은 넣지 않는다: git status 같은 출력에 Edit 로 고친 기존 소스가 찍혀 결과물로 잘못 잡힌다
+const SHELL_DOC_EXT = ['pdf', 'svg', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt', 'hwp', 'hwpx', 'odt', 'ods', 'odp', 'rtf',
+  'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'mp4', 'm4v', 'mov', 'webm', 'zip', '7z'];
+const SHELL_DOC_RE = new RegExp(`(["'])([^"'\\n]+?\\.(?:${SHELL_DOC_EXT.join('|')}))\\1|([^\\s"'\`<>|;&()=,]+\\.(?:${SHELL_DOC_EXT.join('|')}))(?![\\w.])`, 'gi');
 const DOC_KEEP = 50;
 const CLAUDE_HOME = path.join(os.homedir(), '.claude');
 const docExt = (file) => path.extname(file).slice(1).toLowerCase();
@@ -1389,11 +1400,35 @@ function trackDoc(w, ev) {
   // 결과물은 Write 로 새로 만든 문서에서 시작한다. 원래 있던 파일을 Edit 로 고친 것(웹 프로젝트의 html 소스 등)은
   // 결과물이 아니다 — Write 로 만든 문서를 나중에 Edit 로 고친 건 계속 반영
   if (ev.tool_name !== 'Write' && !(w.docs || []).some((d) => d.id === id)) return false;
+  addDoc(w, full, id, ev.tool_name);
+  return true;
+}
+function addDoc(w, full, id, tool) {
   w.docs = (w.docs || []).filter((d) => d.id !== id); // 같은 파일을 다시 고치면 최신 시각으로 옮긴다
-  w.docs.push({ id, url: `/docs/${w.id}/${id}`, path: full, name: path.basename(full), title: docExt(full) === 'pdf' || docExt(full) === 'svg' ? '' : docTitle(full), t: Date.now(), tool: ev.tool_name });
+  const ext = docExt(full);
+  w.docs.push({ id, url: `/docs/${w.id}/${id}`, path: full, name: path.basename(full), title: ext !== 'svg' && DOC_TYPES[ext]?.startsWith('text/') ? docTitle(full) : '', t: Date.now(), tool });
   if (w.docs.length > DOC_KEEP) w.docs.splice(0, w.docs.length - DOC_KEEP);
   saveWorkersSoon();
-  return true;
+}
+// Bash 로 만든 결과물: 명령·출력에 나온 경로(따옴표 안이나 공백 없는 토큰) 중 이번 턴에 쓰인 파일.
+// ls 처럼 경로만 찍힌 기존 파일은 수정 시각으로 거른다
+function trackShellDocs(w, ev) {
+  if (ev.tool_name !== 'Bash' || !w.turnStartedAt) return false;
+  const out = ev.tool_response || {};
+  const text = [ev.tool_input?.command, out.stdout, out.stderr].filter((s) => typeof s === 'string').join('\n').slice(0, 200000);
+  const found = new Set();
+  for (const m of text.matchAll(SHELL_DOC_RE)) { found.add(m[2] || m[3]); if (found.size >= 20) break; }
+  let added = false;
+  for (const raw of found) {
+    const full = path.resolve(ev.cwd || w.cwd || ROOT, raw.replace(/^~(?=[\\/])/, os.homedir()));
+    if (!isDocCandidate(full) || /[\\/](node_modules|\.git)[\\/]/i.test(full)) continue;
+    let st;
+    try { st = fs.statSync(full); } catch { continue; }
+    if (!st.isFile() || st.mtimeMs < w.turnStartedAt - 5000) continue;
+    addDoc(w, full, crypto.createHash('sha1').update(full).digest('hex').slice(0, 12), 'Bash');
+    added = true;
+  }
+  return added;
 }
 const UPLOAD_LIMIT = 20 * 1024 * 1024;
 // 7일 지난 첨부는 정리 (Claude 가 이미 읽어 트랜스크립트에 담겼으므로 원본은 오래 둘 필요 없음)
@@ -1505,7 +1540,7 @@ const server = http.createServer(async (req, res) => {
     const full = path.join(UPLOAD_DIR, name);
     if (path.dirname(full) !== UPLOAD_DIR || !fs.existsSync(full)) return json(res, 404, {});
     const ext = docExt(name);
-    const img = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp' }[ext];
+    const img = IMAGE_TYPES[ext];
     // 동영상은 화면의 뷰어(<video>)로 본다 — 예전엔 형식을 몰라 내려받기로 갔다. 탐색·Safari 재생에는 구간 요청(Range)이 필요하다
     const video = VIDEO_TYPES[ext];
     if (video) return sendRange(req, res, full, video);
@@ -1542,11 +1577,15 @@ const server = http.createServer(async (req, res) => {
     let ok = false;
     try { ok = !!d && fs.statSync(d.path).isFile(); } catch {}
     if (!ok) return json(res, 404, { error: '문서가 없습니다 (지워졌거나 옮겨짐)' });
-    const ext = docExt(d.path), type = DOC_TYPES[ext];
+    const ext = docExt(d.path);
+    if (VIDEO_TYPES[ext]) return sendRange(req, res, d.path, VIDEO_TYPES[ext]);
+    // 브라우저가 못 보여 주는 형식(docx 등)은 내려받기 — 이 PC 에서는 화면이 OS 기본 앱으로 열고(/api/docs/…/open), 여기는 다른 기기에서만 온다
+    const img = IMAGE_TYPES[ext], type = img || DOC_TYPES[ext];
     res.writeHead(200, {
-      'content-type': type.startsWith('text/') || ext === 'svg' ? `${type}; charset=utf-8` : type,
+      'content-type': !type ? 'application/octet-stream' : type.startsWith('text/') || ext === 'svg' ? `${type}; charset=utf-8` : type,
       'cache-control': 'no-cache', 'x-content-type-options': 'nosniff',
-      ...(ext === 'pdf' ? {} : { 'content-security-policy': 'sandbox allow-scripts allow-popups allow-modals allow-downloads' }),
+      ...(img || ext === 'pdf' ? {} : { 'content-security-policy': 'sandbox allow-scripts allow-popups allow-modals allow-downloads' }),
+      ...(type ? {} : { 'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(d.name)}` }),
     });
     return fs.createReadStream(d.path).pipe(res);
   }
@@ -1760,6 +1799,14 @@ const server = http.createServer(async (req, res) => {
   }
 
   let m;
+  // 결과물 문서를 이 PC 의 OS 기본 앱으로 (더블클릭과 같게). trackDoc 이 기록한 파일만
+  if (req.method === 'POST' && (m = p.match(/^\/api\/docs\/(W\d+)\/([0-9a-f]{12})\/open$/))) {
+    const d = workers.get(m[1])?.docs?.find((x) => x.id === m[2]);
+    let ok = false;
+    try { ok = !!d && fs.statSync(d.path).isFile(); } catch {}
+    if (!ok) return json(res, 404, { error: '문서가 없습니다 (지워졌거나 옮겨짐)' });
+    return json(res, 200, { ok: openPath(d.path) });
+  }
   if (req.method === 'POST' && (m = p.match(/^\/api\/workers\/(W\d+)\/(task|kill|remove|interrupt|unqueue|tomemo|resume|autoqueue|rename|diffclear)$/))) {
     const w = workers.get(m[1]);
     if (!w) return json(res, 404, { error: 'no worker' });

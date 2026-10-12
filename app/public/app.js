@@ -1257,11 +1257,25 @@ function recentMedia(w) {
   return { shot: fresh((w.shots || []).at(-1)), doc: fresh((w.docs || []).at(-1)) };
 }
 // 결과물 문서 카드. 미리보기(iframe)는 넣지 않는다 — 타임라인은 줄이 늘 때마다 통째로 다시 그려서 계속 다시 로드된다
-const DOC_ICON = { html: '🌐', htm: '🌐', md: '📝', markdown: '📝', pdf: '📕', svg: '🖼️', csv: '📊', tsv: '📊', json: '🧾', jsonl: '🧾', xml: '🧾' };
+const DOC_ICON = {
+  html: '🌐', htm: '🌐', md: '📝', markdown: '📝', pdf: '📕', svg: '🖼️', csv: '📊', tsv: '📊', json: '🧾', jsonl: '🧾', xml: '🧾',
+  docx: '📘', doc: '📘', hwp: '📘', hwpx: '📘', odt: '📘', rtf: '📘', xlsx: '📗', xls: '📗', ods: '📗', pptx: '📙', ppt: '📙', odp: '📙',
+  png: '🖼️', jpg: '🖼️', jpeg: '🖼️', gif: '🖼️', webp: '🖼️', bmp: '🖼️', mp4: '🎬', m4v: '🎬', mov: '🎬', webm: '🎬', zip: '🗜️', '7z': '🗜️',
+};
+// 결과물 문서는 이 PC 에서 보고 있으면 OS 기본 앱으로 연다(탐색기·Finder 에서 더블클릭한 것처럼) — Ctrl/⌘+클릭은 새 탭.
+// 휴대폰 등 다른 기기에서는 그 PC 에서 열려 봐야 소용없으니 새 탭
+const LOCAL_VIEW = /^(127\.0\.0\.1|localhost|\[::1\])$/.test(location.hostname);
+const docOpenHint = () => _t(LOCAL_VIEW ? '클릭: 열기 · Ctrl/⌘+클릭: 새 탭' : '클릭: 새 탭에서 열기');
+document.addEventListener('click', (e) => {
+  const a = e.target.closest?.('a.card-doc, a.dock-doc, a.tl-doc');
+  if (!a || !LOCAL_VIEW || e.button || e.ctrlKey || e.metaKey || e.shiftKey) return;
+  e.preventDefault();
+  api(`/api${a.getAttribute('href')}/open`);
+}, true);
 // 워커 카드용 작은 타일 (아이콘 + 확장자). 끌면 링크가 아니라 카드가 끌리게 draggable=false
 function docTile(d, cls = 'card-doc') {
   const ext = d.name.split('.').pop().toLowerCase();
-  return `<a class="${cls}" href="${esc(d.url)}" target="_blank" rel="noopener" draggable="false" title="${esc(d.title ? `${d.title}\n` : '')}${esc(d.name)}&#10;${_t('클릭: 새 탭에서 열기')}">` +
+  return `<a class="${cls}" href="${esc(d.url)}" target="_blank" rel="noopener" draggable="false" title="${esc(d.title ? `${d.title}\n` : '')}${esc(d.name)}&#10;${docOpenHint()}">` +
     `<span class="ic">${DOC_ICON[ext] || '📄'}</span><span class="ext">${esc(ext.toUpperCase())}</span></a>`;
 }
 function docCard(d) {
@@ -1269,7 +1283,7 @@ function docCard(d) {
   // 폴더는 끝쪽 두 단계만 (전체 경로는 마우스를 올리면)
   const parts = d.path.slice(0, -d.name.length - 1).split(/[\\/]/), sep = d.path.includes('\\') ? '\\' : '/';
   const dir = parts.length > 3 ? `…${sep}${parts.slice(-2).join(sep)}` : parts.join(sep);
-  return `<a class="tl-doc" href="${esc(d.url)}" target="_blank" rel="noopener" title="${esc(d.path)}&#10;${_t('클릭: 새 탭에서 열기')}">` +
+  return `<a class="tl-doc" href="${esc(d.url)}" target="_blank" rel="noopener" title="${esc(d.path)}&#10;${docOpenHint()}">` +
     `<span class="ic">${DOC_ICON[ext] || '📄'}</span><span class="meta">` +
     (d.title ? `<span class="ti">${esc(d.title)}</span>` : '') +
     `<span class="nm">${esc(d.name)}</span><span class="dir">${esc(dir)}</span></span></a>`;
