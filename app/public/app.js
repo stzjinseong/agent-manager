@@ -1141,7 +1141,10 @@ function dockLinkPoints(chip) {
   const cr = chip.getBoundingClientRect(), lr = $('#dock-list').getBoundingClientRect(), dk = $('#dock').getBoundingClientRect(), t = linkTarget();
   const cx = cr.left + cr.width / 2;
   if (cx < lr.left || cx > lr.right || t.top < dk.bottom + 14) return null;
-  return [[Math.round(cx + scrollX), Math.round(cr.bottom + scrollY)], [t.x, t.y]]; // 칩 아래 가장자리에 맞닿게
+  // 도착점은 패널 위 가장자리 가운데가 아니라 출발점에서 가운데 쪽으로 1cm(≈38px)만 비켜난 곳 — 칩 줄과 패널이 붙어 있어
+  // 가운데까지 비스듬히 가로지르면 선이 길게 눕는다. 가운데가 1cm 보다 가까우면 가운데
+  const x = cx + scrollX, ex = x + Math.sign(t.x - x) * Math.min(38, Math.abs(t.x - x));
+  return [[Math.round(x), Math.round(cr.bottom + scrollY)], [Math.round(ex), t.y]]; // 칩 아래 가장자리에 맞닿게
 }
 for (const sel of ['#floor', '#detail', '#hint', '#compare']) { const n = $(sel); if (n) new ResizeObserver(scheduleSelLink).observe(n); }
 new ResizeObserver(scheduleSelLink).observe(document.body);
