@@ -190,7 +190,7 @@ function termTheme(light) {
   const t = curTheme()?.terminal?.[light ? 'light' : 'dark'];
   return t ? { ...baseTermTheme(light), ...t } : baseTermTheme(light);
 }
-// Claude Code 는 이 터미널에 256색 번호로 색을 찍는다(실측: 24비트 아님). 그중 몇 번호를 이 화면에서만 다른 색으로 —
+// Claude Code 는 예전엔 이 터미널에 256색 번호로 색을 찍었다(2.1.29x 부터 diff·요청 줄은 24비트 — 아래 recolorTerm 이 같은 번호의 색으로 바꾼다). 그중 몇 번호를 이 화면에서만 다른 색으로 —
 //  · diff: 22 추가 줄 배경 · 28 추가 단어 · 52 삭제 줄 · 88 삭제 단어 · 77 '+' 글자 · 167 '-' 글자. 기본은 원색에 가까워 너무 진하다 → 차분한 초록/빨강
 //  · 237: 지난 요청(❯ 요청 글) 줄 배경 — 회색 대신 타임라인 요청 행처럼 강조색(--accent)을 배경에 섞은 연한 색(라이트 11% · 다크는 바탕이 더 어두워 15%)
 //  · 231(흰 글자): 요청 줄 글자색. 라이트에선 대비 보정만으로는 회색으로 남아서 기본 글자색(검정)으로
@@ -202,6 +202,23 @@ const TERM_256 = {
   dark: { ...TERM_DIFF, 237: '#271916' },
   light: { ...TERM_DIFF, 237: '#efe3dc', 231: '#1b1d23' },
 };
+// Claude Code 2.1.29x 부터 diff·요청 줄 배경을 256색 번호가 아니라 24비트 RGB 로 찍는다(실측 2026-10-12, 2.1.296: 버퍼 배경 팔레트 0칸,
+// RGB #001b29·#003047·#3d0100·#5c0200·#373737) → 위 번호 매핑이 안 먹어 예전 색 그대로였다. 들어오는 출력에서 알려진 값만 같은 번호의 색으로 바꿔 쓴다.
+// 값은 Claude 테마별 — dark-daltonized(라이트 계열 사용자의 워커 테마, server.js workerTheme)는 실측, dark 는 Claude 기본 다크 값
+const RGB_REMAP = {
+  '0;27;41': 22, '0;48;71': 28, '61;1;0': 52, '92;2;0': 88, // dark-daltonized: 추가 줄·단어 / 삭제 줄·단어
+  '34;92;43': 22, '56;166;96': 28, '122;41;54': 52, '179;89;107': 88, // dark
+  '55;55;55': 237, // 지난 요청 줄
+};
+const hexRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)).join(';');
+function recolorTerm(data) {
+  if (!data.includes('48;2;')) return data;
+  const map = TERM_256[document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'];
+  return data.replace(/(?<=\x1b\[(?:[\d;]*;)?)48;2;(\d{1,3});(\d{1,3});(\d{1,3})(?=[;m])/g, (m, rr, g, b) => {
+    const n = RGB_REMAP[`${rr};${g};${b}`];
+    return n != null && map[n] ? `48;2;${hexRgb(map[n])}` : m;
+  });
+}
 const extAnsi = (map) => { const a = []; for (const [n, c] of Object.entries(map)) a[n - 16] = c; return a; }; // 16번부터, 빈 칸은 기본색
 function baseTermTheme(light) {
   // 스크롤바는 회색 둥근 막대(모양은 style.css #term .slider). xterm 기본값(글자색 20%)은 라이트에서 거의 안 보여서 조금 진하게,
@@ -549,11 +566,11 @@ function connect() {
       render();
     }
     else if (msg.type === 'fx') mgrOnFx(msg);
-    else if (msg.type === 'pty' && msg.id === selected) term.write(msg.data);
+    else if (msg.type === 'pty' && msg.id === selected) term.write(recolorTerm(msg.data));
     else if (msg.type === 'ptysize' && msg.id === selected && TOUCH) { ptyCols = msg.cols; fitTerm(); } // PC 에서 터미널 폭이 바뀌면 따라간다
     else if (msg.type === 'scrollback' && msg.id === selected) {
       if (TOUCH) { ptyCols = msg.cols || TERM_COLS; fitTerm(); } // 기록은 pty 폭으로 만들어졌다 — 그 폭으로 받아야 줄이 어긋나지 않는다
-      term.reset(); term.write(msg.data, () => restoreTermScroll(msg.id));
+      term.reset(); term.write(recolorTerm(msg.data), () => restoreTermScroll(msg.id));
     }
     else if (msg.type === 'clearScrollback' && msg.id === selected) term.write('\x1b[3J'); // /clear — 이전 대화 기록만 지움
   };
