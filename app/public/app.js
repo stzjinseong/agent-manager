@@ -1130,38 +1130,56 @@ selLink.setAttribute('aria-hidden', 'true');
 var selLinkRaf = 0, selLinkSig = ''; // var: 이 줄보다 먼저 도는 초기화(setFloorMin·renderDetail)에서도 부를 수 있게
 function scheduleSelLink() { if (!selLinkRaf) selLinkRaf = requestAnimationFrame(() => { selLinkRaf = 0; drawSelLink(); }); }
 function drawSelLink() {
-  const card = selected && $(`#nodes .node[data-id="${selected}"]`), detail = $('#detail'), av = $('#detail-avatar');
-  if (!card || detail.hidden || $('#floor').hidden || document.body.classList.contains('term-full')) {
+  const detail = $('#detail'), min = $('#floor').hidden;
+  // 최소화 중엔 칩 줄(#dock — 헤더 아래 붙박이)의 선택 칩에서 출발
+  const from = selected && (min ? $(`#dock-list .dchip[data-id="${selected}"]`) : $(`#nodes .node[data-id="${selected}"]`));
+  const pts = from && !detail.hidden && !document.body.classList.contains('term-full') && (min ? dockLinkPoints(from) : cardLinkPoints(from));
+  if (!pts) {
     if (selLinkSig) { selLink.innerHTML = ''; selLinkSig = ''; }
     return;
   }
-  const sx0 = window.scrollX, sy0 = window.scrollY;
-  // 선택 카드는 translateY(-2px) 로 떠 있다(호버도) — 이동분을 빼고 레이아웃 자리로 잰다(회로선과 같은 이유)
-  const m = getComputedStyle(card).transform, ty = m && m !== 'none' ? new DOMMatrixReadOnly(m).m42 : 0;
-  const cr = card.getBoundingClientRect(), nr = $('#nodes').getBoundingClientRect(), fr = $('#floor').getBoundingClientRect();
-  const dr = detail.getBoundingClientRect(), ar = av.getBoundingClientRect();
-  const sx = Math.round(cr.left + cr.width / 2 + sx0), sy = Math.round(cr.bottom - ty + sy0 + 12); // 선택 표시 막대(::after, 아래 9px) 밑에서
-  const tx = Math.round((ar.width ? ar.left + ar.width / 2 : dr.left + 40) + sx0), ty2 = Math.round((ar.height ? ar.top - 3 : dr.top) + sy0);
-  const midY = Math.round((fr.bottom + dr.top) / 2 + sy0); // 카드 영역과 상세 패널 사이
-  // 같은 칸 아래에 카드가 더 있나 (레이아웃 좌표로)
-  const below = [...document.querySelectorAll('#nodes > .node, #nodes > .node-add')].some((n) => n !== card && n.offsetTop > card.offsetTop && n.offsetLeft < card.offsetLeft + card.offsetWidth && n.offsetLeft + n.offsetWidth > card.offsetLeft);
-  let pts;
-  if (below) {
-    const rowY = sy + 5, gx = Math.round(cr.right + sx0 + 11); // 줄 사이(34px)·칸 사이(22px) 골목 한가운데
-    pts = [[sx, sy], [sx, rowY], [gx, rowY], [gx, midY], [tx, midY], [tx, ty2]]; // 골목을 끝까지 내려와 패널 사이에서 꺾음
-  } else pts = [[sx, sy], [sx, midY], [tx, midY], [tx, ty2]];
-  pts = pts.filter((p, i) => !i || p[0] !== pts[i - 1][0] || p[1] !== pts[i - 1][1]); // 겹친 점(곧장 내려가는 경우) 정리
-  const color = card.style.getPropertyValue('--avatar');
+  const color = from.style.getPropertyValue('--avatar');
   const sig = `${color}|${pts.join(';')}`;
   if (sig === selLinkSig) return;
   selLinkSig = sig;
   if (color) selLink.style.setProperty('--avatar', color); else selLink.style.removeProperty('--avatar');
-  const d = roundedPath(pts, 10), end = pts.at(-1);
-  selLink.innerHTML = `<path class="base" d="${d}"/><path class="flow" d="${d}"/><circle cx="${sx}" cy="${sy}" r="3"/><circle cx="${end[0]}" cy="${end[1]}" r="3"/>`;
+  const d = roundedPath(pts, 10), start = pts[0], end = pts.at(-1);
+  selLink.innerHTML = `<path class="base" d="${d}"/><path class="flow" d="${d}"/><circle cx="${start[0]}" cy="${start[1]}" r="3"/><circle cx="${end[0]}" cy="${end[1]}" r="3"/>`;
+}
+// 상세 패널 아바타 위쪽 가운데 (페이지 좌표). top 은 패널 위 가장자리(화면 좌표)
+function linkTarget() {
+  const dr = $('#detail').getBoundingClientRect(), ar = $('#detail-avatar').getBoundingClientRect();
+  return { x: Math.round((ar.width ? ar.left + ar.width / 2 : dr.left + 40) + scrollX), y: Math.round((ar.height ? ar.top - 3 : dr.top) + scrollY), top: dr.top };
+}
+const dedupePts = (pts) => pts.filter((p, i) => !i || p[0] !== pts[i - 1][0] || p[1] !== pts[i - 1][1]); // 겹친 점(곧장 내려가는 경우) 정리
+function cardLinkPoints(card) {
+  const t = linkTarget();
+  // 선택 카드는 translateY(-2px) 로 떠 있다(호버도) — 이동분을 빼고 레이아웃 자리로 잰다(회로선과 같은 이유)
+  const m = getComputedStyle(card).transform, ty = m && m !== 'none' ? new DOMMatrixReadOnly(m).m42 : 0;
+  const cr = card.getBoundingClientRect(), fr = $('#floor').getBoundingClientRect();
+  const sx = Math.round(cr.left + cr.width / 2 + scrollX), sy = Math.round(cr.bottom - ty + scrollY + 12); // 선택 표시 막대(::after, 아래 9px) 밑에서
+  const midY = Math.round((fr.bottom + t.top) / 2 + scrollY); // 카드 영역과 상세 패널 사이
+  // 같은 칸 아래에 카드가 더 있나 (레이아웃 좌표로)
+  const below = [...document.querySelectorAll('#nodes > .node, #nodes > .node-add')].some((n) => n !== card && n.offsetTop > card.offsetTop && n.offsetLeft < card.offsetLeft + card.offsetWidth && n.offsetLeft + n.offsetWidth > card.offsetLeft);
+  if (!below) return dedupePts([[sx, sy], [sx, midY], [t.x, midY], [t.x, t.y]]);
+  const rowY = sy + 5, gx = Math.round(cr.right + scrollX + 11); // 줄 사이(34px)·칸 사이(22px) 골목 한가운데
+  return dedupePts([[sx, sy], [sx, rowY], [gx, rowY], [gx, midY], [t.x, midY], [t.x, t.y]]); // 골목을 끝까지 내려와 패널 사이에서 꺾음
+}
+// 칩 줄은 페이지를 굴려도 헤더 아래 붙어 있다 — 칩 줄 아래 가장자리에서 내려와 패널 사이에서 꺾음.
+// 칩이 줄 밖으로 밀려 안 보이거나, 패널을 올려 칩 줄 밑으로 들어갔으면 숨김
+function dockLinkPoints(chip) {
+  const cr = chip.getBoundingClientRect(), lr = $('#dock-list').getBoundingClientRect(), dk = $('#dock').getBoundingClientRect(), t = linkTarget();
+  const cx = cr.left + cr.width / 2;
+  if (cx < lr.left || cx > lr.right || t.top < dk.bottom + 14) return null;
+  const sx = Math.round(cx + scrollX), sy = Math.round(dk.bottom + scrollY + 3), midY = Math.round(dk.bottom + scrollY + Math.min(18, (t.top - dk.bottom) / 2));
+  return dedupePts([[sx, sy], [sx, midY], [t.x, midY], [t.x, t.y]]);
 }
 for (const sel of ['#floor', '#detail', '#hint', '#compare']) { const n = $(sel); if (n) new ResizeObserver(scheduleSelLink).observe(n); }
 new ResizeObserver(scheduleSelLink).observe(document.body);
 window.addEventListener('resize', scheduleSelLink);
+// 최소화 중엔 칩 줄이 붙박이라 페이지를 굴리면 선이 따라가야 한다(펼친 상태는 둘 다 페이지와 함께 움직여 그대로)
+window.addEventListener('scroll', () => { if ($('#floor').hidden) scheduleSelLink(); }, { passive: true });
+$('#dock-list').addEventListener('scroll', scheduleSelLink, { passive: true });
 
 // ---------- 빈 자리 안내 ----------
 // 워커를 열지 않았으면 아래가 비어 보인다 — 살아 있는 워커가 없으면 만들기를, 있으면 카드 누르기를 권한다.
