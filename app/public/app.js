@@ -1146,7 +1146,7 @@ function drawSelLink() {
 // 상세 패널(CLI 가 든 카드) 위쪽 가장자리 가운데 (페이지 좌표). top 은 패널 위 가장자리(화면 좌표)
 function linkTarget() {
   const dr = $('#detail').getBoundingClientRect();
-  return { x: Math.round(dr.left + dr.width / 2 + scrollX), y: Math.round(dr.top + scrollY), top: dr.top };
+  return { x: Math.round(dr.left + dr.width / 2 + scrollX), y: Math.round(dr.top + scrollY), top: dr.top, l: dr.left + scrollX, r: dr.right + scrollX };
 }
 function cardLinkPoints(card) {
   const t = linkTarget();
@@ -1162,8 +1162,9 @@ function dockLinkPoints(chip) {
   const cx = cr.left + cr.width / 2;
   if (cx < lr.left || cx > lr.right || t.top < dk.bottom + 14) return null;
   // 도착점은 패널 위 가장자리 가운데가 아니라 출발점에서 가운데 쪽으로 1cm(≈38px)만 비켜난 곳 — 칩 줄과 패널이 붙어 있어
-  // 가운데까지 비스듬히 가로지르면 선이 길게 눕는다. 가운데가 1cm 보다 가까우면 가운데
-  const x = cx + scrollX, ex = x + Math.sign(t.x - x) * Math.min(38, Math.abs(t.x - x));
+  // 가운데까지 비스듬히 가로지르면 선이 길게 눕는다. 가운데가 1cm 보다 가까우면 가운데.
+  // 칩이 패널 폭 밖(패널이 좁아 한쪽에 있을 때)이면 가까운 쪽 모서리에서 1cm 안쪽 — 출발점 기준이면 패널 밖 허공에서 끝났다
+  const x = cx + scrollX, from = Math.min(Math.max(x, t.l), t.r), ex = from + Math.sign(t.x - from) * Math.min(38, Math.abs(t.x - from));
   return [[Math.round(x), Math.round(cr.bottom + scrollY)], [Math.round(ex), t.y]]; // 칩 아래 가장자리에 맞닿게
 }
 for (const sel of ['#floor', '#detail', '#hint', '#compare']) { const n = $(sel); if (n) new ResizeObserver(scheduleSelLink).observe(n); }
