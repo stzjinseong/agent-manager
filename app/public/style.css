@@ -1528,8 +1528,9 @@ body.card-drag .dadd { opacity: .25; }
 .dchip.socket .avatar { opacity: .3; filter: grayscale(1); }
 .dchip.socket .dname { color: var(--text-2); font-weight: 500; }
 .dchip.socket .dst { color: var(--dim); }
-/* 글자 줄 높이(1.5) 그대로면 Pretendard 글자가 위로 떠 보였다 — 줄 높이 1 로 상자를 글자에 맞추고 가운데 정렬 */
-.dchip .dlaunch { flex: none; display: inline-flex; align-items: center; gap: 3px; font-size: 11px; line-height: 1; padding: 5px 8px 4px; border-radius: 999px; }
+/* 칩은 폭이 빠듯해 글자 없이 ▶ 만 — 글꼴마다 ▶ 글자 위치가 달라 SVG 로 그려 동그라미 정가운데에 (설명은 title·aria-label) */
+.dchip .dlaunch { flex: none; display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border-radius: 50%; }
+.dchip .dlaunch svg { width: 10px; height: 10px; fill: currentColor; }
 .dchip.unseen .dst { font-weight: 700; }
 .dock-expand { flex: none; padding: 4px 10px; font-size: 12px; }
 /* 최소화 중 연출 도착: 칩이 빛나고 캐릭터가 통 튐 · 매니저 '+N XP' 는 헤더에 가리지 않게 아래로 떠내려감 */

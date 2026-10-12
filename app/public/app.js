@@ -889,7 +889,7 @@ function renderFloor() {
 }
 
 // ---------- 최소화한 회로 기판 (헤더 아래 한 줄) ----------
-// 칩은 회로 기판과 같은 항목·순서(대기실 슬롯도 — 흐린 점선 칩에 ▶ 투입). id 별로 한 번 만들고 내용만 갱신 — 캐릭터 애니메이션이 리셋되지 않게.
+// 칩은 회로 기판과 같은 항목·순서(대기실 슬롯도 — 흐린 점선 칩에 ▶ 동그라미 버튼). id 별로 한 번 만들고 내용만 갱신 — 캐릭터 애니메이션이 리셋되지 않게.
 // 칩도 끌어서 순서를 바꾼다 — 놓으면 회로 기판과 같은 순서(state.order)로 저장된다
 const dockEls = new Map();
 let dockDrag = null; // 끌고 있는 칩 (아래 '최소화한 칩 끌어서 순서 바꾸기')
@@ -965,14 +965,14 @@ function renderDockSocket(list, key, prev) {
   let c = dockEls.get(key);
   if (!p) return prev;
   if (!c) {
-    const slot = el(`<div class="dslot"><div class="dchip socket" draggable="true"><span class="avatar">${clawdSVG('head')}</span><span class="dname"></span><span class="dst">${_t('대기실')}</span><button class="btn primary dlaunch" data-act="launch">${_t('▶ 투입')}</button></div></div>`);
+    const slot = el(`<div class="dslot"><div class="dchip socket" draggable="true"><span class="avatar">${clawdSVG('head')}</span><span class="dname"></span><span class="dst">${_t('대기실')}</span><button class="btn primary dlaunch" data-act="launch" aria-label="${_t('투입')}"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M3 1.8v6.4L8.4 5z"/></svg></button></div></div>`);
     c = slot.firstChild; dockEls.set(key, c);
   }
   c.dataset.name = c.dataset.profile = p.name;
   c.classList.toggle('dragging', c === dockDrag);
   $('.dname', c).textContent = p.name;
   const at = state.resumable?.[p.name];
-  $('.dlaunch', c).title = at ? _t('마지막 세션({t})을 이어서 시작 · Shift+클릭: 새 세션으로', { t: fmtAgo(at) }) : _t('새 세션으로 시작');
+  $('.dlaunch', c).title = _t('투입') + ' · ' + (at ? _t('마지막 세션({t})을 이어서 시작 · Shift+클릭: 새 세션으로', { t: fmtAgo(at) }) : _t('새 세션으로 시작'));
   const slot = c.parentElement;
   if (!dockDrag) {
     const want = prev ? prev.nextSibling : list.firstChild;

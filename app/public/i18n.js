@@ -126,6 +126,7 @@ const EN = {
   '할 일': 'To-do',
   '대기실': 'Standby',
   '▶ 투입': '▶ Launch',
+  '투입': 'Launch',
   '저장된 역할 삭제': 'Delete saved role',
   '이번 턴 경과': 'Time in this turn',
   '마지막 갱신': 'Last update',
