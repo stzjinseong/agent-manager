@@ -440,6 +440,7 @@ const EN = {
   '셸 명령': 'Shell',
   '바이너리 파일 — 내용은 비교하지 않음': 'Binary file — contents not compared',
   '변경 전': 'Before',
+  '휠·+/− 확대 · 드래그 이동 · 더블클릭·0 원래대로': 'Wheel/+/− zoom · drag to pan · double-click/0 reset',
   '변경 후': 'After',
   '그림을 꺼낼 수 없음': 'Image unavailable',
   '없음 (새 파일)': 'None (new file)',

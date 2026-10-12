@@ -1379,10 +1379,33 @@ function openShot(url, single) { // single: { cap } — 결과물 그림 한 장
   let i = Math.max(0, list.findIndex((s) => s.url === url));
   const box = el(`<div class="shot-view" title="${_t('바깥을 누르거나 Esc 로 닫기')}">
     <button class="shot-nav prev" title="${_t('이전 캡처 (←)')}">‹</button>
-    <figure><img alt="${_t('캡처')}"><figcaption><div class="cap"></div><div class="meta"></div><div class="note"></div></figcaption></figure>
-    <button class="shot-nav next" title="${_t('다음 캡처 (→)')}">›</button></div>`);
+    <figure><img alt="${_t('캡처')}" draggable="false"><figcaption><div class="cap"></div><div class="meta"></div><div class="note"></div></figcaption></figure>
+    <button class="shot-nav next" title="${_t('다음 캡처 (→)')}">›</button>
+    <div class="zoom-bar"><span class="zoom-pct">100%</span><span class="zoom-help">${_t('휠·+/− 확대 · 드래그 이동 · 더블클릭·0 원래대로')}</span></div></div>`);
+  // 확대: 휠(커서 자리 기준)·+/−·더블클릭(2.5배 ↔ 맞춤), 확대 중엔 끌어서 이동, 0 이면 원래대로. 넘기면 맞춤으로 돌아간다
+  const img = $('img', box), pctEl = $('.zoom-pct', box);
+  let z = 1, tx = 0, ty = 0;
+  const paint = () => { img.style.transform = z === 1 ? '' : `translate(${tx}px, ${ty}px) scale(${z})`; box.classList.toggle('zoomed', z > 1); pctEl.textContent = `${Math.round(z * 100)}%`; };
+  // 화면 점 (sx, sy) 아래의 그림 자리가 그대로 있도록 배율만 바꾼다 — 가운데(C)는 변환 전 그림의 중심
+  const zoomAt = (nz, sx, sy) => {
+    nz = Math.min(12, Math.max(1, nz));
+    // 변환 전 자리(offset*)로 잰다 — getBoundingClientRect 는 전환(.08s) 중간 값이라 휠을 연달아 굴리면 기준점이 밀렸다. 바탕(.shot-view)이 화면 전체 고정이라 offset 이 곧 화면 좌표
+    const cx = img.offsetLeft + img.offsetWidth / 2, cy = img.offsetTop + img.offsetHeight / 2;
+    if (sx == null) { sx = cx + tx; sy = cy + ty; }
+    const ux = (sx - cx - tx) / z, uy = (sy - cy - ty) / z;
+    z = nz; tx = nz === 1 ? 0 : sx - cx - ux * nz; ty = nz === 1 ? 0 : sy - cy - uy * nz;
+    paint();
+  };
+  box.addEventListener('wheel', (e) => { e.preventDefault(); zoomAt(z * (e.deltaY < 0 ? 1.2 : 1 / 1.2), e.clientX, e.clientY); }, { passive: false });
+  img.addEventListener('dblclick', (e) => zoomAt(z > 1 ? 1 : 2.5, e.clientX, e.clientY));
+  let drag = null, dragged = false;
+  img.addEventListener('pointerdown', (e) => { if (z === 1 || e.button) return; e.preventDefault(); img.setPointerCapture(e.pointerId); drag = { x: e.clientX - tx, y: e.clientY - ty }; dragged = false; box.classList.add('panning'); });
+  img.addEventListener('pointermove', (e) => { if (!drag) return; tx = e.clientX - drag.x; ty = e.clientY - drag.y; dragged = true; paint(); });
+  const endDrag = () => { drag = null; box.classList.remove('panning'); };
+  img.addEventListener('pointerup', endDrag); img.addEventListener('pointercancel', endDrag);
   const show = () => {
     const s = list[i] || { url, tool: '', arg: '' };
+    z = 1; tx = ty = 0; paint();
     $('img', box).src = s.url;
     $('.cap', box).textContent = single ? `${_t('결과물')} · ${single.cap}` : upload ? `${_t('사람이 첨부')} · data/uploads/${decodeURIComponent(url.slice('/uploads/'.length))}` : [s.tool, s.arg].filter(Boolean).join(' · ');
     $('.meta', box).textContent = list.length ? `${i + 1} / ${list.length}${s.t ? ` · ${new Date(s.t + clockSkew).toLocaleString(uiLocale(), { hour12: false })}` : ''}` : '';
@@ -1396,8 +1419,12 @@ function openShot(url, single) { // single: { cap } — 결과물 그림 한 장
     if (e.key === 'Escape') { e.stopPropagation(); close(); }
     else if (e.key === 'ArrowLeft') { e.preventDefault(); e.stopPropagation(); go(-1); }
     else if (e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); go(1); }
+    else if (e.key === '+' || e.key === '=') { e.preventDefault(); e.stopPropagation(); zoomAt(z * 1.25); }
+    else if (e.key === '-') { e.preventDefault(); e.stopPropagation(); zoomAt(z / 1.25); }
+    else if (e.key === '0') { e.preventDefault(); e.stopPropagation(); zoomAt(1); }
   };
   box.addEventListener('click', (e) => {
+    if (dragged) { dragged = false; return; } // 끌다가 바깥에서 놓아도 닫지 않는다
     const nav = e.target.closest('.shot-nav');
     if (nav) { go(nav.classList.contains('prev') ? -1 : 1); return; }
     if (e.target.closest('figure')) return; // 그림·설명을 눌러도 닫지 않는다(글자 복사 등)
