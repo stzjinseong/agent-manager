@@ -601,7 +601,9 @@ body.term-full .side-grip { left: -6px; }
 .kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
 .kpi { background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 11px 13px; min-width: 0; }
 .kpi .k { font-size: 12px; color: var(--dim); }
-.kpi .v { font-size: 22px; font-weight: 700; letter-spacing: -.01em; font-variant-numeric: tabular-nums; margin-top: 2px; }
+/* 숫자는 크고 굵게, 단위(.u — app.js kpiValue)는 작고 흐리게 — 참고: Claude Motion 대시보드 타일 */
+.kpi .v { font-size: 27px; font-weight: 800; line-height: 1.15; letter-spacing: -.03em; font-variant-numeric: tabular-nums; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kpi .v .u { font-size: .56em; font-weight: 600; letter-spacing: 0; color: var(--dim); margin: 0 1px; }
 .kpi .s { font-size: 11.5px; color: var(--text-2); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .kpi .gauge { height: 5px; border-radius: 3px; background: var(--bg); margin-top: 7px; overflow: hidden; }
 .kpi .gauge i { display: block; height: 100%; border-radius: 3px; background: var(--text-2); }
@@ -1380,7 +1382,7 @@ html[data-char="clawd-white"] :is(.node, .dchip, .detail-avatar, .term-wrap) { -
 :root[data-theme="light"] .kpi .k, :root[data-theme="light"] .turns th {
   font-size: 11px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; color: var(--dim); /* 한글은 고정폭·자간이 어색해 본문 글꼴 */
 }
-:root[data-theme="light"] .kpi .v { letter-spacing: -.02em; color: #241c16; }
+:root[data-theme="light"] .kpi .v { color: #241c16; }
 :root[data-theme="light"] :is(.kpi .gauge, .kpi .tbar) { height: 4px; background: rgb(var(--ink) / .08); }
 :root[data-theme="light"] .kpi .gauge i { background: var(--coral); }
 :root[data-theme="light"] .kpi .gauge i.warn { background: var(--decision); }

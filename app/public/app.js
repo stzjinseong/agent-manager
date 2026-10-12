@@ -1604,9 +1604,14 @@ function timeBar(tm) {
     .map((x) => `<i style="width:${(tm[x.key] / tm.total) * 100}%;background:${x.color}"></i>`).join('') + '</div>';
 }
 
+// 큰 숫자 옆 단위($ · M · k · % · 초 · 분)와 구분점(·)은 작고 흐리게 — 숫자가 먼저 읽히게. 태그(<small> 등) 앞 글자만 손댄다
+function kpiValue(v) {
+  const i = v.indexOf('<'), head = i < 0 ? v : v.slice(0, i);
+  return head.replace(/[^\d.,\s—]+/g, (u) => `<span class="u">${u}</span>`) + (i < 0 ? '' : v.slice(i));
+}
 function kpi(k, v, s, extra = '') {
   const key = k.split(' <')[0];
-  return `<div class="kpi"${INFO[key] ? ` data-info="${key}"` : ''}><div class="k">${_t(k)}${INFO[key] ? ' <i class="info">ⓘ</i>' : ''}</div>${v ? `<div class="v">${v}</div>` : ''}<div class="s">${s}</div>${extra}</div>`;
+  return `<div class="kpi"${INFO[key] ? ` data-info="${key}"` : ''}><div class="k">${_t(k)}${INFO[key] ? ' <i class="info">ⓘ</i>' : ''}</div>${v ? `<div class="v">${kpiValue(v)}</div>` : ''}<div class="s">${s}</div>${extra}</div>`;
 }
 
 // ---------- 항목 설명 툴팁: 의미 · 근거 · 활용 · 신뢰도 ----------
