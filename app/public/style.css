@@ -1332,7 +1332,7 @@ html[data-char="clawd-white"] :is(.node, .dchip, .detail-avatar, .term-wrap) { -
    다크와 같은 역할의 값을 밝은 면 기준으로. 터미널도 밝아진다(바탕 = 업무 지시 입력칸 색, app.js termTheme) */
 :root[data-theme="light"] {
   color-scheme: light;
-  --term-bg: #f8f4ec;
+  --term-bg: #fcfbf7;
   --ink: 58 42 28; /* 따뜻한 갈색 잉크 — 테두리·격자·그림자가 회색 대신 베이지로 */
   --shade: .4;
   --av-l: 0.62;
@@ -1370,7 +1370,9 @@ html[data-char="clawd-white"] :is(.node, .dchip, .detail-avatar, .term-wrap) { -
 }
 /* 라이트 · 세션 프로파일 — 참고 이미지(Claude Motion 대시보드)의 결: 크림 바탕 위 흰빛 카드, 작은 대문자 라벨,
    숫자 아래 얇은 색 막대, 따뜻한 격자. 맨 아래 안내는 복숭아색 띠에 코랄 글자 */
-:root[data-theme="light"] .profile { --card: #fffdf9; --peach: #f8e6da; --coral: #c8623f; }
+/* CLI·세션 프로파일이 든 상세 패널 바탕은 참고 이미지 카드 바탕(#f6f5ee, 점 찍은 곳에서 추출)으로 — 크림보다 덜 노란 웜 화이트 */
+:root[data-theme="light"] .detail { background: #f6f5ee; }
+:root[data-theme="light"] .profile { --card: #fefefc; --peach: #f8e6da; --coral: #c8623f; }
 :root[data-theme="light"] :is(.kpi, .chart-card) {
   background: var(--card); border-color: rgb(var(--ink) / .12); border-radius: 10px;
   box-shadow: 0 1px 0 rgb(var(--ink) / .05), 0 2px 8px -4px rgb(var(--ink) / .12);
