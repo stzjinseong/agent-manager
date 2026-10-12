@@ -1144,7 +1144,7 @@ body.resizing-term { cursor: row-resize; user-select: none; }
 }
 .node.sel::after { background: var(--avatar, var(--accent)); }
 /* 선택한 카드 → 상세 패널 연결선 (app.js drawSelLink). 페이지 좌표 오버레이 — 원점(문서 왼쪽 위)에 1px 로 두고 넘쳐 그린다(크기 0 이면 Chrome 이 그리지 않음) */
-.sel-link { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; z-index: 2; }
+.sel-link { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; z-index: 2; opacity: .5; } /* 반투명 — 가로지르는 UI 가 비쳐 보이게 */
 .sel-link path { fill: none; stroke-linejoin: round; stroke-linecap: round; }
 .sel-link path.base { stroke: color-mix(in srgb, var(--avatar, var(--accent)) 55%, transparent); stroke-width: 2; }
 .sel-link path.flow { stroke: var(--avatar, var(--accent)); stroke-width: 2; stroke-dasharray: 3 14; animation: flow 1.1s linear infinite; }

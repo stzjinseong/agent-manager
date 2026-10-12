@@ -1123,7 +1123,7 @@ new ResizeObserver(() => requestAnimationFrame(drawTraces)).observe($('#floor'))
 
 // 선택한 워커 카드 → 아래 상세 패널(아바타)로 워커 색 연결선 — 어느 카드의 터미널을 보고 있는지 한눈에.
 // 카드 영역(#floor)과 상세 패널은 따로 놓인 형제라 #traces 에 못 그리고, 페이지 좌표의 오버레이(body 아래 #sel-link)에 그린다.
-// 아랫줄에 카드가 있으면 카드 오른쪽 골목으로 내려가 카드를 가로지르지 않게. 최소화·크게 보기·카드 끄는 중엔 숨김
+// 반투명 곡선으로 다른 UI 위를 그대로 가로지른다. 최소화 중엔 칩에서 출발. 크게 보기·카드 끄는 중엔 숨김
 const selLink = document.body.appendChild(Object.assign(document.createElementNS('http://www.w3.org/2000/svg', 'svg'), { id: 'sel-link' }));
 selLink.setAttribute('class', 'sel-link');
 selLink.setAttribute('aria-hidden', 'true');
@@ -1143,7 +1143,9 @@ function drawSelLink() {
   if (sig === selLinkSig) return;
   selLinkSig = sig;
   if (color) selLink.style.setProperty('--avatar', color); else selLink.style.removeProperty('--avatar');
-  const d = roundedPath(pts, 10), start = pts[0], end = pts.at(-1);
+  // 위아래로 늘어진 S 곡선 (다른 UI 를 피하지 않고 가로지름)
+  const [start, end] = pts, k = Math.max(24, Math.abs(end[1] - start[1]) / 2);
+  const d = `M${start[0]} ${start[1]} C${start[0]} ${start[1] + k} ${end[0]} ${end[1] - k} ${end[0]} ${end[1]}`;
   selLink.innerHTML = `<path class="base" d="${d}"/><path class="flow" d="${d}"/><circle cx="${start[0]}" cy="${start[1]}" r="3"/><circle cx="${end[0]}" cy="${end[1]}" r="3"/>`;
 }
 // 상세 패널 아바타 위쪽 가운데 (페이지 좌표). top 은 패널 위 가장자리(화면 좌표)
@@ -1151,28 +1153,20 @@ function linkTarget() {
   const dr = $('#detail').getBoundingClientRect(), ar = $('#detail-avatar').getBoundingClientRect();
   return { x: Math.round((ar.width ? ar.left + ar.width / 2 : dr.left + 40) + scrollX), y: Math.round((ar.height ? ar.top - 3 : dr.top) + scrollY), top: dr.top };
 }
-const dedupePts = (pts) => pts.filter((p, i) => !i || p[0] !== pts[i - 1][0] || p[1] !== pts[i - 1][1]); // 겹친 점(곧장 내려가는 경우) 정리
 function cardLinkPoints(card) {
   const t = linkTarget();
   // 선택 카드는 translateY(-2px) 로 떠 있다(호버도) — 이동분을 빼고 레이아웃 자리로 잰다(회로선과 같은 이유)
   const m = getComputedStyle(card).transform, ty = m && m !== 'none' ? new DOMMatrixReadOnly(m).m42 : 0;
-  const cr = card.getBoundingClientRect(), fr = $('#floor').getBoundingClientRect();
-  const sx = Math.round(cr.left + cr.width / 2 + scrollX), sy = Math.round(cr.bottom - ty + scrollY + 12); // 선택 표시 막대(::after, 아래 9px) 밑에서
-  const midY = Math.round((fr.bottom + t.top) / 2 + scrollY); // 카드 영역과 상세 패널 사이
-  // 같은 칸 아래에 카드가 더 있나 (레이아웃 좌표로)
-  const below = [...document.querySelectorAll('#nodes > .node, #nodes > .node-add')].some((n) => n !== card && n.offsetTop > card.offsetTop && n.offsetLeft < card.offsetLeft + card.offsetWidth && n.offsetLeft + n.offsetWidth > card.offsetLeft);
-  if (!below) return dedupePts([[sx, sy], [sx, midY], [t.x, midY], [t.x, t.y]]);
-  const rowY = sy + 5, gx = Math.round(cr.right + scrollX + 11); // 줄 사이(34px)·칸 사이(22px) 골목 한가운데
-  return dedupePts([[sx, sy], [sx, rowY], [gx, rowY], [gx, midY], [t.x, midY], [t.x, t.y]]); // 골목을 끝까지 내려와 패널 사이에서 꺾음
+  const cr = card.getBoundingClientRect();
+  return [[Math.round(cr.left + cr.width / 2 + scrollX), Math.round(cr.bottom - ty + scrollY + 12)], [t.x, t.y]]; // 선택 표시 막대(::after, 아래 9px) 밑에서
 }
-// 칩 줄은 페이지를 굴려도 헤더 아래 붙어 있다 — 칩 줄 아래 가장자리에서 내려와 패널 사이에서 꺾음.
+// 칩 줄은 페이지를 굴려도 헤더 아래 붙어 있다 — 칩 줄 아래 가장자리, 선택 칩 밑에서 출발.
 // 칩이 줄 밖으로 밀려 안 보이거나, 패널을 올려 칩 줄 밑으로 들어갔으면 숨김
 function dockLinkPoints(chip) {
   const cr = chip.getBoundingClientRect(), lr = $('#dock-list').getBoundingClientRect(), dk = $('#dock').getBoundingClientRect(), t = linkTarget();
   const cx = cr.left + cr.width / 2;
   if (cx < lr.left || cx > lr.right || t.top < dk.bottom + 14) return null;
-  const sx = Math.round(cx + scrollX), sy = Math.round(dk.bottom + scrollY + 3), midY = Math.round(dk.bottom + scrollY + Math.min(18, (t.top - dk.bottom) / 2));
-  return dedupePts([[sx, sy], [sx, midY], [t.x, midY], [t.x, t.y]]);
+  return [[Math.round(cx + scrollX), Math.round(dk.bottom + scrollY + 3)], [t.x, t.y]];
 }
 for (const sel of ['#floor', '#detail', '#hint', '#compare']) { const n = $(sel); if (n) new ResizeObserver(scheduleSelLink).observe(n); }
 new ResizeObserver(scheduleSelLink).observe(document.body);
