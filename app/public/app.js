@@ -1298,19 +1298,26 @@ const DOC_ICON = {
   png: '🖼️', jpg: '🖼️', jpeg: '🖼️', gif: '🖼️', webp: '🖼️', bmp: '🖼️', mp4: '🎬', m4v: '🎬', mov: '🎬', webm: '🎬', zip: '🗜️', '7z': '🗜️',
 };
 // 결과물 문서는 이 PC 에서 보고 있으면 OS 기본 앱으로 연다(탐색기·Finder 에서 더블클릭한 것처럼) — Ctrl/⌘+클릭은 새 탭.
-// 휴대폰 등 다른 기기에서는 그 PC 에서 열려 봐야 소용없으니 새 탭
+// 휴대폰 등 다른 기기에서는 그 PC 에서 열려 봐야 소용없으니 새 탭.
+// 그림(data-img)은 캡처처럼 앱 안에서 크게 본다 — 같은 png 가 캡처는 미리보기, 결과물은 OS 앱으로 열려 헷갈렸다. Ctrl/⌘+클릭이 OS 앱(다른 기기면 새 탭)
 const LOCAL_VIEW = /^(127\.0\.0\.1|localhost|\[::1\])$/.test(location.hostname);
-const docOpenHint = () => _t(LOCAL_VIEW ? '클릭: 열기 · Ctrl/⌘+클릭: 새 탭' : '클릭: 새 탭에서 열기');
+const IMG_DOC = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp']);
+const docOpenHint = (img) => _t(img ? (LOCAL_VIEW ? '클릭: 크게 보기 · Ctrl/⌘+클릭: 열기' : '클릭: 크게 보기 · Ctrl/⌘+클릭: 새 탭')
+  : LOCAL_VIEW ? '클릭: 열기 · Ctrl/⌘+클릭: 새 탭' : '클릭: 새 탭에서 열기');
 document.addEventListener('click', (e) => {
   const a = e.target.closest?.('a.card-doc, a.dock-doc, a.tl-doc');
-  if (!a || !LOCAL_VIEW || e.button || e.ctrlKey || e.metaKey || e.shiftKey) return;
+  if (!a || e.button || e.shiftKey) return;
+  const mod = e.ctrlKey || e.metaKey, img = a.dataset.img != null;
+  if (img && !mod) { e.preventDefault(); openShot(a.getAttribute('href'), { cap: a.dataset.img }); return; }
+  if (!LOCAL_VIEW || (mod && !img)) return;
   e.preventDefault();
   api(`/api${a.getAttribute('href')}/open`);
 }, true);
+const docImgAttr = (d, ext) => IMG_DOC.has(ext) ? ` data-img="${esc(d.path || d.name)}"` : '';
 // 워커 카드용 작은 타일 (아이콘 + 확장자). 끌면 링크가 아니라 카드가 끌리게 draggable=false
 function docTile(d, cls = 'card-doc') {
   const ext = d.name.split('.').pop().toLowerCase();
-  return `<a class="${cls}" href="${esc(d.url)}" target="_blank" rel="noopener" draggable="false" title="${esc(d.title ? `${d.title}\n` : '')}${esc(d.name)}&#10;${docOpenHint()}">` +
+  return `<a class="${cls}" href="${esc(d.url)}" target="_blank" rel="noopener" draggable="false"${docImgAttr(d, ext)} title="${esc(d.title ? `${d.title}\n` : '')}${esc(d.name)}&#10;${docOpenHint(IMG_DOC.has(ext))}">` +
     `<span class="ic">${DOC_ICON[ext] || '📄'}</span><span class="ext">${esc(ext.toUpperCase())}</span></a>`;
 }
 function docCard(d) {
@@ -1318,7 +1325,7 @@ function docCard(d) {
   // 폴더는 끝쪽 두 단계만 (전체 경로는 마우스를 올리면)
   const parts = d.path.slice(0, -d.name.length - 1).split(/[\\/]/), sep = d.path.includes('\\') ? '\\' : '/';
   const dir = parts.length > 3 ? `…${sep}${parts.slice(-2).join(sep)}` : parts.join(sep);
-  return `<a class="tl-doc" href="${esc(d.url)}" target="_blank" rel="noopener" title="${esc(d.path)}&#10;${docOpenHint()}">` +
+  return `<a class="tl-doc" href="${esc(d.url)}" target="_blank" rel="noopener"${docImgAttr(d, ext)} title="${esc(d.path)}&#10;${docOpenHint(IMG_DOC.has(ext))}">` +
     `<span class="ic">${DOC_ICON[ext] || '📄'}</span><span class="meta">` +
     (d.title ? `<span class="ti">${esc(d.title)}</span>` : '') +
     `<span class="nm">${esc(d.name)}</span><span class="dir">${esc(dir)}</span></span></a>`;
@@ -1365,10 +1372,10 @@ function syncAttach(ta) {
 // 썸네일은 data-shot 에 원본 주소를 달아 두고, 어디서 눌러도(타임라인·카드) 같은 크게 보기를 연다
 const shotImg = (s, cls) => `<img class="${cls}" src="${esc(s.url)}" data-shot="${esc(s.url)}" alt="${_t('캡처')}" loading="lazy" draggable="false" title="${_t('클릭해 크게 보기')}">`;
 // 같은 워커의 캡처끼리 ←/→ 로 넘겨 본다. 몇 번째인지·찍힌 시각과 보관 한도 안내를 아래에 둔다
-function openShot(url) {
+function openShot(url, single) { // single: { cap } — 결과물 그림 한 장(넘기기·보관 안내 없음)
   const upload = url.startsWith('/uploads/');
   const id = url.split('/')[2];
-  const list = upload ? [] : state.workers.find((w) => w.id === id)?.shots || [];
+  const list = upload || single ? [] : state.workers.find((w) => w.id === id)?.shots || [];
   let i = Math.max(0, list.findIndex((s) => s.url === url));
   const box = el(`<div class="shot-view" title="${_t('바깥을 누르거나 Esc 로 닫기')}">
     <button class="shot-nav prev" title="${_t('이전 캡처 (←)')}">‹</button>
@@ -1377,9 +1384,9 @@ function openShot(url) {
   const show = () => {
     const s = list[i] || { url, tool: '', arg: '' };
     $('img', box).src = s.url;
-    $('.cap', box).textContent = upload ? `${_t('사람이 첨부')} · data/uploads/${decodeURIComponent(url.slice('/uploads/'.length))}` : [s.tool, s.arg].filter(Boolean).join(' · ');
+    $('.cap', box).textContent = single ? `${_t('결과물')} · ${single.cap}` : upload ? `${_t('사람이 첨부')} · data/uploads/${decodeURIComponent(url.slice('/uploads/'.length))}` : [s.tool, s.arg].filter(Boolean).join(' · ');
     $('.meta', box).textContent = list.length ? `${i + 1} / ${list.length}${s.t ? ` · ${new Date(s.t + clockSkew).toLocaleString(uiLocale(), { hour12: false })}` : ''}` : '';
-    $('.note', box).textContent = upload ? _t('첨부 원본을 그대로 보여 줍니다 (7일 지나면 정리됨).') : _t('이미지는 최대 {n}장까지 관리됩니다.', { n: state.shotKeep || 50 });
+    $('.note', box).textContent = single ? _t(LOCAL_VIEW ? '결과물 카드를 Ctrl/⌘+클릭하면 OS 기본 앱으로 엽니다.' : '결과물 카드를 Ctrl/⌘+클릭하면 새 탭에서 엽니다.') : upload ? _t('첨부 원본을 그대로 보여 줍니다 (7일 지나면 정리됨).') : _t('이미지는 최대 {n}장까지 관리됩니다.', { n: state.shotKeep || 50 });
     $('.prev', box).disabled = i <= 0;
     $('.next', box).disabled = i >= list.length - 1;
   };
