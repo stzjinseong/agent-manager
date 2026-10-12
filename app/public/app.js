@@ -1143,6 +1143,7 @@ function drawSelLink() {
   if (sig === selLinkSig) return;
   selLinkSig = sig;
   if (color) selLink.style.setProperty('--avatar', color); else selLink.style.removeProperty('--avatar');
+  selLink.classList.toggle('on-dock', min);
   // 위아래로 늘어진 S 곡선 (다른 UI 를 피하지 않고 가로지름)
   const [start, end] = pts, k = Math.max(24, Math.abs(end[1] - start[1]) / 2);
   const d = `M${start[0]} ${start[1]} C${start[0]} ${start[1] + k} ${end[0]} ${end[1] - k} ${end[0]} ${end[1]}`;
@@ -1160,13 +1161,13 @@ function cardLinkPoints(card) {
   const cr = card.getBoundingClientRect();
   return [[Math.round(cr.left + cr.width / 2 + scrollX), Math.round(cr.bottom - ty + scrollY + 12)], [t.x, t.y]]; // 선택 표시 막대(::after, 아래 9px) 밑에서
 }
-// 칩 줄은 페이지를 굴려도 헤더 아래 붙어 있다 — 칩 줄 아래 가장자리, 선택 칩 밑에서 출발.
+// 칩 줄은 페이지를 굴려도 헤더 아래 붙어 있다 — 선택 칩 아래 가장자리에서 출발(칩 줄 위로 그리게 .on-dock).
 // 칩이 줄 밖으로 밀려 안 보이거나, 패널을 올려 칩 줄 밑으로 들어갔으면 숨김
 function dockLinkPoints(chip) {
   const cr = chip.getBoundingClientRect(), lr = $('#dock-list').getBoundingClientRect(), dk = $('#dock').getBoundingClientRect(), t = linkTarget();
   const cx = cr.left + cr.width / 2;
   if (cx < lr.left || cx > lr.right || t.top < dk.bottom + 14) return null;
-  return [[Math.round(cx + scrollX), Math.round(dk.bottom + scrollY + 3)], [t.x, t.y]];
+  return [[Math.round(cx + scrollX), Math.round(cr.bottom + scrollY)], [t.x, t.y]]; // 칩 아래 가장자리에 맞닿게
 }
 for (const sel of ['#floor', '#detail', '#hint', '#compare']) { const n = $(sel); if (n) new ResizeObserver(scheduleSelLink).observe(n); }
 new ResizeObserver(scheduleSelLink).observe(document.body);
