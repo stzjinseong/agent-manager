@@ -2204,11 +2204,11 @@ newForm.cwd.addEventListener('keydown', (e) => { if (e.key === 'ArrowDown' && re
 document.addEventListener('pointerdown', (e) => { if (!recentPop.hidden && !e.target.closest('#recent-pop, #btn-recent')) setRecentPop(false); });
 $('#btn-pick').onclick = async (e) => {
   const btn = e.currentTarget;
-  btn.disabled = true; btn.textContent = '…';
+  btn.disabled = true; btn.classList.add('busy');
   try {
     const { path } = await api('/api/pick-folder', { start: newForm.cwd.value || state.recentCwds[0] || '' });
     if (path) newForm.cwd.value = path;
-  } finally { btn.disabled = false; btn.textContent = '📁'; }
+  } finally { btn.disabled = false; btn.classList.remove('busy'); }
 };
 newForm.onsubmit = async (e) => {
   e.preventDefault();

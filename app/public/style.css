@@ -111,6 +111,12 @@ main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24p
 #btn-recent .ic-hist { width: 17px; height: 17px; stroke-width: 2; }
 #btn-recent .ic-chev { width: 10px; height: 10px; stroke-width: 1.8; opacity: .7; transition: transform .15s; }
 #btn-recent[aria-expanded="true"] .ic-chev { transform: rotate(180deg); }
+/* 폴더 선택 — 이모지 📁 대신 클로드 캐릭터와 같은 도트(crispEdges) 폴더. 선택 창이 떠 있는 동안(.busy)은 깜박임 */
+#btn-pick { display: inline-flex; align-items: center; padding: 6px 10px; }
+#btn-pick .ic-folder { width: 18px; height: 16px; fill: currentColor; } /* 다크에선 흰색, 라이트에선 글자색 */
+#btn-pick .ic-folder .back { opacity: .5; } /* 뒷장(탭) 은 흐리게, 앞장은 진하게 — 겹친 두 장으로 보이게 */
+#btn-pick.busy .ic-folder { animation: pick-blink .8s steps(2) infinite; }
+@keyframes pick-blink { 50% { opacity: .35; } }
 .recent-pop {
   position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 30; max-height: 320px; overflow-y: auto; padding: 5px;
   display: flex; flex-direction: column; gap: 2px; border-radius: 10px;
