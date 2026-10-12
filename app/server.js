@@ -413,7 +413,7 @@ function spawnWorker({ name, cwd, args = '', permissionMode = 'default', resume 
   if (!PERMISSION_MODES.includes(permissionMode)) permissionMode = 'default';
   // 터미널은 PTY 호스트가 띄우고 붙잡는다 — 이 서버를 재시작해도 워커는 살아 있다
   hostSend({ op: 'spawn', id, file: CLAUDE_BIN, args: ['--settings', settingsPath, '--permission-mode', permissionMode, ...extra], cwd, env, cols: 120, rows: 34 });
-  const term = hostTerm(id);
+  const term = hostTerm(id, '120x34', (s) => { w.ptySize = s; });
 
   const w = {
     id, name: name || id, cwd, args, permissionMode, pid: term.pid,
@@ -425,6 +425,7 @@ function spawnWorker({ name, cwd, args = '', permissionMode = 'default', resume 
     log: [], // 최근 이벤트 타임라인
     tx: null, // 트랜스크립트 프로파일러 상태 (profile.js)
     approvalWaits: [], // 결정함을 거친 권한 승인 대기 시간 [{ toolUseId, ms }] — 트랜스크립트엔 없어서 서버가 기록
+    ptySize: '120x34', // PTY 의 마지막 크기 — 재시작 뒤 같은 크기 resize 를 거르는 데 쓴다 (hostTerm)
     term,
   };
   workers.set(id, w);
@@ -1065,15 +1066,16 @@ const snapWaiters = new Map(); // 스냅샷 요청 번호 → 요청한 브라�
 
 function hostSend(msg) { if (host?.readyState === 1) host.send(JSON.stringify(msg)); }
 
-function hostTerm(id) {
+function hostTerm(id, size = null, onSize = () => {}) {
   // 같은 크기 resize 는 보내지 않는다 — ConPTY 는 같은 크기여도 화면 전체를 다시 그려 보낸다.
-  // 탭이 여럿이어도 여기서 한 번 걸러진다
-  let size = null;
+  // 탭이 여럿이어도 여기서 한 번 걸러진다. 마지막 크기는 워커 기록(ptySize)에 남겨 서버 재시작 뒤에도 거른다 —
+  // 비어 있으면 재시작 직후 첫 resize 가 그대로 가서, 스냅샷 위에 ConPTY 가 다시 그린 화면이 덧그려져 TUI 가 겹쳐 보였다
   return {
     write: (data) => hostSend({ op: 'write', id, data }),
     resize: (cols, rows) => {
       if (size === `${cols}x${rows}` || host?.readyState !== 1) return;
       size = `${cols}x${rows}`;
+      onSize(size);
       hostSend({ op: 'resize', id, cols, rows });
       broadcast({ type: 'ptysize', id, cols, rows }); // 크기를 바꾸지 않는 화면(휴대폰)이 이 폭에 맞춰 그리게
     },
@@ -1117,7 +1119,7 @@ function onHostHello({ ptys }) {
   for (const rec of saved) {
     if (workers.has(rec.id)) continue;
     const p = alive.get(rec.id);
-    const w = { ...rec, term: hostTerm(rec.id), tx: rec.txPath ? openProfile(rec.txPath) : null };
+    const w = { ...rec, term: hostTerm(rec.id, rec.ptySize || null, (s) => { w.ptySize = s; }), tx: rec.txPath ? openProfile(rec.txPath) : null };
     delete w.txPath;
     delete w.shellPending; // 예전 버전이 워커 객체에 두어 {} 로 저장된 것
     const wasHeld = Boolean(w.queueHeld); // 없앤 대기열 멈춤(질문·투입 실패·넘어온 대기열·⏸) — 풀고 이어서 투입
