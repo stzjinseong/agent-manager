@@ -1340,7 +1340,8 @@ function readJsonLimited(req, limit) {
 }
 
 // ---------- 결과물 문서 ----------
-// 워커가 Write/Edit 로 쓴 문서(html·md·pdf·svg)를 타임라인에 카드로 보여 주고, 누르면 새 탭으로 연다.
+// 워커가 Write/Edit 로 쓴 문서(html·md·pdf·svg·txt·csv·json 등)를 타임라인에 카드로 보여 주고, 누르면 새 탭으로 연다.
+// 코드 소스(js·py 등)·설정(yaml·toml 등)은 넣지 않는다 — 개발 중 Write 로 새 소스를 만들 때마다 결과물로 뜬다
 // 열어 주는 것은 워커가 직접 쓴 바로 그 파일뿐이다 — w.docs 에 기록된 경로를 문서 id 로만 찾는다.
 // Bash 로 만든 파일은 알 수 없다
 const VIDEO_TYPES = { mp4: 'video/mp4', m4v: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm', ogv: 'video/ogg' };
@@ -1359,7 +1360,11 @@ function sendRange(req, res, full, type) {
   res.writeHead(206, { ...head, 'content-length': end - start + 1, 'content-range': `bytes ${start}-${end}/${size}` });
   return fs.createReadStream(full, { start, end }).pipe(res);
 }
-const DOC_TYPES = { html: 'text/html', htm: 'text/html', md: 'text/plain', markdown: 'text/plain', svg: 'image/svg+xml', pdf: 'application/pdf' };
+const DOC_TYPES = {
+  html: 'text/html', htm: 'text/html', md: 'text/plain', markdown: 'text/plain', svg: 'image/svg+xml', pdf: 'application/pdf',
+  // 글로 보여 주는 결과물 (json·xml 도 브라우저 뷰어 대신 그대로 글로)
+  txt: 'text/plain', text: 'text/plain', log: 'text/plain', csv: 'text/plain', tsv: 'text/plain', json: 'text/plain', jsonl: 'text/plain', xml: 'text/plain',
+};
 const DOC_KEEP = 50;
 const CLAUDE_HOME = path.join(os.homedir(), '.claude');
 const docExt = (file) => path.extname(file).slice(1).toLowerCase();

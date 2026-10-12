@@ -803,7 +803,7 @@ function updateNode(node, w) {
   let thumb = $('.card-shot', node);
   if (showShot && thumb?.dataset.shot !== showShot.url) { thumb?.remove(); thumb = el(shotImg(showShot, 'card-shot')); $('.stage', node).append(thumb); }
   if (!showShot && thumb) thumb.remove();
-  // 같은 규칙으로 최근 결과물 문서(html·md·pdf·svg)를 무대 오른쪽 아래에 작은 타일로. 누르면 새 탭
+  // 같은 규칙으로 최근 결과물 문서(html·md·pdf·svg·txt·csv·json 등)를 무대 오른쪽 아래에 작은 타일로. 누르면 새 탭
   let tile = $('.card-doc', node);
   const docKey = showDoc && `${showDoc.url}@${showDoc.t}`;
   if (showDoc && tile?.dataset.key !== docKey) { tile?.remove(); tile = el(docTile(showDoc)); tile.dataset.key = docKey; $('.stage', node).append(tile); }
@@ -1257,7 +1257,7 @@ function recentMedia(w) {
   return { shot: fresh((w.shots || []).at(-1)), doc: fresh((w.docs || []).at(-1)) };
 }
 // 결과물 문서 카드. 미리보기(iframe)는 넣지 않는다 — 타임라인은 줄이 늘 때마다 통째로 다시 그려서 계속 다시 로드된다
-const DOC_ICON = { html: '🌐', htm: '🌐', md: '📝', markdown: '📝', pdf: '📕', svg: '🖼️' };
+const DOC_ICON = { html: '🌐', htm: '🌐', md: '📝', markdown: '📝', pdf: '📕', svg: '🖼️', csv: '📊', tsv: '📊', json: '🧾', jsonl: '🧾', xml: '🧾' };
 // 워커 카드용 작은 타일 (아이콘 + 확장자). 끌면 링크가 아니라 카드가 끌리게 draggable=false
 function docTile(d, cls = 'card-doc') {
   const ext = d.name.split('.').pop().toLowerCase();
