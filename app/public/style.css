@@ -1420,8 +1420,11 @@ html[data-char="clawd-white"] :is(.node, .dchip, .detail-avatar, .term-wrap) { -
 :root[data-theme="light"] :is(.memos, .queue) .btn.memo-ic:hover { background: #14161c; border-color: #14161c; }
 
 /* ---------- diff 보기: 워커가 고친 파일의 변경 (터미널 자리에 덮어 보여 줌, app.js setDiffOpen) ---------- */
-:root { --d-add: #52d19b; --d-del: #ff8a80; --d-add-bg: rgb(82 209 155 / .12); --d-del-bg: rgb(255 120 110 / .12); }
-:root[data-theme="light"] { --d-add: #128a55; --d-del: #c93a2f; --d-add-bg: rgb(18 138 85 / .1); --d-del-bg: rgb(201 58 47 / .09); }
+:root { --d-add: #52d19b; --d-del: #ff8a80; }
+:root[data-theme="light"] { --d-add: #128a55; --d-del: #c93a2f; }
+/* diff 줄 색은 라이트·다크 같은 한 벌 — GitHub 풍(참고 이미지에서 추출): 연한 줄 · 조금 진한 줄 번호 칸 · 진한 기호. 줄이 밝아 글자는 늘 진하게.
+   CLI 터미널(app.js TERM_DIFF)도 같은 값 */
+:root { --dl-add-bg: #e9ffed; --dl-add-num: #d5ffdc; --dl-add-fg: #1a7f37; --dl-del-bg: #fdeeef; --dl-del-num: #fbdce0; --dl-del-fg: #cf222e; --dl-text: #1f2328; --dl-num: #57606a; }
 .d-add { color: var(--d-add); }
 .d-del { color: var(--d-del); }
 .btn-diff b { font-weight: 600; margin-left: 2px; color: var(--accent-hi); }
@@ -1488,10 +1491,12 @@ html[data-char="clawd-white"] :is(.node, .dchip, .detail-avatar, .term-wrap) { -
 .diff-tbl td:nth-child(-n+2) { width: 1%; min-width: 34px; text-align: right; color: var(--faint); user-select: none; }
 .diff-tbl td.dl-s { width: 1%; padding: 0 4px; user-select: none; color: var(--dim); }
 .diff-tbl td:last-child { white-space: pre-wrap; word-break: break-all; }
-.diff-tbl tr.dl-add { background: var(--d-add-bg); }
-.diff-tbl tr.dl-add td.dl-s { color: var(--d-add); }
-.diff-tbl tr.dl-del { background: var(--d-del-bg); }
-.diff-tbl tr.dl-del td.dl-s { color: var(--d-del); }
+.diff-tbl tr.dl-add { background: var(--dl-add-bg); color: var(--dl-text); }
+.diff-tbl tr.dl-add td:nth-child(-n+2) { background: var(--dl-add-num); color: var(--dl-num); }
+.diff-tbl tr.dl-add td.dl-s { color: var(--dl-add-fg); font-weight: 700; }
+.diff-tbl tr.dl-del { background: var(--dl-del-bg); color: var(--dl-text); }
+.diff-tbl tr.dl-del td:nth-child(-n+2) { background: var(--dl-del-num); color: var(--dl-num); }
+.diff-tbl tr.dl-del td.dl-s { color: var(--dl-del-fg); font-weight: 700; }
 .diff-tbl tr.dl-hunk td { width: auto; padding: 3px 10px; color: var(--dim); background: var(--surface-2); text-align: left; }
 .diff-tbl tr.dl-meta td { color: var(--dim); font-style: italic; }
 .diff-empty { padding: 40px 20px; text-align: center; color: var(--text-2); line-height: 1.7; }

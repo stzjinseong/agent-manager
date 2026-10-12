@@ -195,9 +195,12 @@ function termTheme(light) {
 //  · 237: 지난 요청(❯ 요청 글) 줄 배경 — 회색 대신 타임라인 요청 행처럼 강조색(--accent)을 배경에 섞은 연한 색(라이트 11% · 다크는 바탕이 더 어두워 15%)
 //  · 231(흰 글자): 요청 줄 글자색. 라이트에선 대비 보정만으로는 회색으로 남아서 기본 글자색(검정)으로
 // 이 번호들은 diff·요청 줄 말고는 거의 쓰이지 않는다. 글자 대비는 minimumContrastRatio 가 맞춘다
+// diff 색은 라이트·다크 같은 한 벌 — GitHub 풍 연한 초록/분홍 줄에 진한 단어 강조(diff 화면 --dl-* 과 같은 값). 다크에서도 줄은 밝아서
+// 그 위 흰 글자는 minimumContrastRatio 가 어둡게 맞춘다
+const TERM_DIFF = { 22: '#e9ffed', 28: '#addeb2', 52: '#fdeeef', 88: '#f2bac4', 77: '#1a7f37', 167: '#cf222e' };
 const TERM_256 = {
-  dark: { 22: '#173325', 28: '#24603d', 52: '#3d1f24', 88: '#6e2f37', 77: '#6fcf8e', 167: '#ef7b80', 237: '#271916' },
-  light: { 22: '#dcefe0', 28: '#b4dfbf', 52: '#f7dfe0', 88: '#efb8bd', 77: '#2f8a4c', 167: '#c4434b', 237: '#efe3dc', 231: '#1b1d23' },
+  dark: { ...TERM_DIFF, 237: '#271916' },
+  light: { ...TERM_DIFF, 237: '#efe3dc', 231: '#1b1d23' },
 };
 const extAnsi = (map) => { const a = []; for (const [n, c] of Object.entries(map)) a[n - 16] = c; return a; }; // 16번부터, 빈 칸은 기본색
 function baseTermTheme(light) {
