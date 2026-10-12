@@ -105,7 +105,12 @@ main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24p
 .with-btn .btn { flex: none; padding: 6px 10px; }
 /* 최근 작업 폴더 목록 (app.js setRecentPop) — 입력칸 바로 아래, 폴더 이름 + 전체 경로 */
 .f-cwd .with-btn { position: relative; }
-.with-btn #btn-recent { font-size: 14px; line-height: 1; }
+.with-btn #btn-recent { display: inline-flex; align-items: center; gap: 3px; padding: 6px 8px 6px 9px; line-height: 1; }
+/* 시계 되감기(최근) + 펼침 화살표 — 예전 ▾ 글자는 작고 흐려 버튼인지 안 보였다. 열리면 화살표가 뒤집힌다 */
+#btn-recent svg { fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; }
+#btn-recent .ic-hist { width: 17px; height: 17px; stroke-width: 2; }
+#btn-recent .ic-chev { width: 10px; height: 10px; stroke-width: 1.8; opacity: .7; transition: transform .15s; }
+#btn-recent[aria-expanded="true"] .ic-chev { transform: rotate(180deg); }
 .recent-pop {
   position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 30; max-height: 320px; overflow-y: auto; padding: 5px;
   display: flex; flex-direction: column; gap: 2px; border-radius: 10px;
