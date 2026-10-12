@@ -1045,7 +1045,7 @@ function renderCompare() {
 }
 $('#cmp').addEventListener('click', (e) => { const r = e.target.closest('.cmp-row'); if (r) select(r.dataset.id); });
 
-// 코어 → 각 칩으로 회로선. 첫 줄은 곧장 내려가고, 아랫줄은 칩 왼쪽 골목으로 돌아 들어간다.
+// 코어 → 각 칩으로 회로선. 매니저 아래에서 칩 위쪽 가운데로 S 곡선.
 let traceSig = '';
 function drawTraces() {
   scheduleSelLink();
@@ -1058,7 +1058,7 @@ function drawTraces() {
   const m = getComputedStyle(mark).transform, ty = m && m !== 'none' ? new DOMMatrixReadOnly(m).m42 : 0;
   const cx = Math.round(cr.left + cr.width / 2 - fr.left), cy = Math.round(cr.bottom - ty - fr.top + 4);
   // 칩 위치는 레이아웃 좌표(offsetTop/Left)로 잰다. getBoundingClientRect 는 호버·선택 시 떠오르는
-  // translateY(-2px) 까지 반영해서, 같은 줄인데도 "첫 줄"이 아니라고 판정돼 선이 왼쪽 골목으로 우회했었다.
+  // translateY(-2px) 까지 반영해서, 떠오를 때마다 선 끝이 흔들리고 다시 그려졌다.
   const nr = $('#nodes').getBoundingClientRect();
   const list = [...nodeEls.values()].filter((n) => n.isConnected).map((n) => {
     const w = state.workers.find((x) => x.id === n.dataset.id);
@@ -1071,31 +1071,18 @@ function drawTraces() {
   if (sig === traceSig) return;
   traceSig = sig;
   if (!list.length) { $('#traces').innerHTML = ''; return; }
-  const firstTop = Math.min(...list.map((o) => o.y));
-  // 워커마다 전용 차선 — 선끼리 겹치지 않게 한다.
-  //  · 출발점: 매니저 캐릭터 아래 가장자리에 목표 x 순서대로 펼쳐 둔다
-  //  · 가로 차선: 코어에서 먼 워커일수록 코어에 가까운(위쪽) 차선 → 괄호처럼 포개져 서로 교차하지 않는다
-  //  · 첫 줄은 칩 위로, 아랫줄은 칩 왼쪽 골목으로(같은 골목을 쓰면 세로 차선을 4px 씩 비켜 둔다)
-  const gutterUse = new Map();
-  const targets = list.map((o) => {
-    if (o.y === firstTop) return { ...o, tx: o.x + Math.round(o.w / 2), first: true };
-    const k = gutterUse.get(o.x) || 0; gutterUse.set(o.x, k + 1);
-    return { ...o, tx: o.x - 7 - k * 4, first: false };
-  }).sort((a, b) => a.tx - b.tx);
+  // 워커마다 매니저 캐릭터 아래 가장자리에 출발점을 목표 x 순서대로 펼쳐 두고, 칩 위쪽 가운데로 S 곡선.
+  // 아랫줄 칩으로 가는 선은 윗줄 칩 뒤로 지나간다(칩이 회로선 위에 그려짐)
+  const targets = list.map((o) => ({ ...o, tx: o.x + Math.round(o.w / 2) })).sort((a, b) => a.tx - b.tx || a.y - b.y);
   const n = targets.length;
   const span = Math.min(cr.width - 16, Math.max(0, (n - 1) * 14));
   targets.forEach((t, i) => {
     t.ax = Math.round(cx - span / 2 + (n > 1 ? (span * i) / (n - 1) : span / 2));
     t.ay = cy;
   });
-  const laneTop = cy + 10, laneBottom = firstTop - 16;
-  const step = n > 1 ? Math.max(3, Math.min(10, (laneBottom - laneTop) / (n - 1))) : 0;
-  [...targets].sort((a, b) => Math.abs(b.tx - cx) - Math.abs(a.tx - cx)).forEach((t, rank) => { t.ly = Math.round(laneTop + rank * step); });
   const routes = targets.map((t) => {
-    const pts = t.first
-      ? [[t.ax, t.ay], [t.ax, t.ly], [t.tx, t.ly], [t.tx, t.y - 7]]
-      : [[t.ax, t.ay], [t.ax, t.ly], [t.tx, t.ly], [t.tx, t.y + 46], [t.x - 1, t.y + 46]];
-    return { ...t, pts, d: roundedPath(pts, 8) };
+    const ey = t.y - 7, k = Math.max(20, Math.round((ey - t.ay) / 2));
+    return { ...t, pts: [[t.ax, t.ay], [t.tx, ey]], d: `M${t.ax} ${t.ay} C${t.ax} ${t.ay + k} ${t.tx} ${ey - k} ${t.tx} ${ey}` };
   });
   const svg = routes.map((o) => {
     const cls = o.st === 'socket' ? 't-socket' : `t-${o.st}`;
@@ -1104,19 +1091,6 @@ function drawTraces() {
       `<circle class="pad" cx="${o.ax}" cy="${o.ay}" r="2"/><circle class="pad" cx="${end[0]}" cy="${end[1]}" r="3.5"/></g>`;
   }).join('');
   $('#traces').innerHTML = ELECTRIC_DEFS + svg;
-}
-
-// 직교 꺾은선을 모서리만 둥글린 경로로 (반지름은 인접 구간 길이의 절반을 넘지 않게)
-function roundedPath(pts, r) {
-  let d = `M${pts[0][0]} ${pts[0][1]}`;
-  for (let i = 1; i < pts.length - 1; i++) {
-    const [px, py] = pts[i - 1], [x, y] = pts[i], [nx, ny] = pts[i + 1];
-    const rr = Math.min(r, Math.hypot(x - px, y - py) / 2, Math.hypot(nx - x, ny - y) / 2);
-    const ux = Math.sign(x - px), uy = Math.sign(y - py), vx = Math.sign(nx - x), vy = Math.sign(ny - y);
-    d += ` L${x - ux * rr} ${y - uy * rr} Q${x} ${y} ${x + vx * rr} ${y + vy * rr}`;
-  }
-  const last = pts.at(-1);
-  return d + ` L${last[0]} ${last[1]}`;
 }
 
 new ResizeObserver(() => requestAnimationFrame(drawTraces)).observe($('#floor'));
