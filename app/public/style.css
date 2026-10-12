@@ -1461,6 +1461,14 @@ html[data-char="clawd-white"] :is(.node, .dchip, .detail-avatar, .term-wrap) { -
 .diff-reqline b { margin-right: 8px; color: var(--accent-hi); font-weight: 600; }
 .diff-path small { margin-left: 10px; font-weight: 400; color: var(--dim); font-family: inherit; }
 .diff-edit { margin: 10px 10px 0; border: 1px solid var(--line-2); border-radius: 8px; overflow: hidden; }
+/* 셸 명령이 바꾼 그림 — 전/후 좌우 분할. 투명 부분이 보이게 체크무늬 바탕, 큰 그림은 칸에 맞춰 줄이고 누르면 새 탭에서 원본 */
+.diff-img { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line-2); }
+.di-side { margin: 0; padding: 8px 10px 10px; background: var(--surface); min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.di-side figcaption { font-size: 11.5px; font-weight: 600; color: var(--dim); }
+.di-side a { display: grid; place-items: center; min-height: 80px; border-radius: 6px; padding: 6px;
+  background: repeating-conic-gradient(rgb(var(--ink) / .07) 0 25%, transparent 0 50%) 0 0 / 14px 14px; }
+.di-side img { display: block; max-width: 100%; max-height: 360px; object-fit: contain; }
+.di-none { display: grid; place-items: center; min-height: 80px; border-radius: 6px; border: 1px dashed var(--line-2); font-size: 12px; color: var(--dim); }
 .de-head { display: flex; align-items: center; gap: 8px; padding: 5px 10px; background: var(--surface); color: var(--text-2); font-size: 12px; }
 .de-head > span:first-child { margin-right: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .de-head .d-add, .de-head .d-del { font-family: var(--mono); }

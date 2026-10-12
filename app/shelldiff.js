@@ -62,7 +62,24 @@ export async function changedSince(pre) {
   repo.last = post;
   if (base === post.tree) return [];
   const out = await git(repo.root, ['diff', '--no-color', '--no-ext-diff', '--no-renames', '-U3', base, post.tree]);
-  return out ? parseDiff(out, repo.root) : [];
+  const files = out ? parseDiff(out, repo.root) : [];
+  // 그림은 diff 화면에서 전/후를 나란히 보여 준다 — 찍기(git add)로 저장소 오브젝트에 이미 들어간 blob 을 "트리:경로" 로 가리켜 둔다.
+  // 트리는 어느 브랜치에도 안 걸린 오브젝트라 git gc 가 오래된 것(기본 2주)을 치우면 못 꺼낸다(화면은 빈 칸)
+  for (const f of files) {
+    if (!f.binary || !IMAGE_EXT.test(f.file)) continue;
+    const rel = path.relative(repo.root, f.file).split(path.sep).join('/');
+    f.img = { root: repo.root, before: f.kind === 'create' ? null : `${base}:${rel}`, after: f.kind === 'delete' ? null : `${post.tree}:${rel}` };
+  }
+  return files;
+}
+
+const IMAGE_EXT = /\.(png|jpe?g|gif|webp|bmp)$/i;
+// "트리:경로" 의 blob 내용 → Buffer | null (diff 화면 그림 비교)
+export function readBlob(root, spec) {
+  return new Promise((resolve) => {
+    execFile('git', ['cat-file', 'blob', spec], { cwd: root, encoding: 'buffer', maxBuffer: 64 << 20, timeout: 8000, windowsHide: true },
+      (err, out) => resolve(err ? null : out));
+  });
 }
 
 function unquote(p) {

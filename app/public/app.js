@@ -3877,8 +3877,13 @@ function renderDiff() {
         return `<tr><td>${o++}</td><td>${n++}</td><td class="dl-s"></td><td>${text}</td></tr>`;
       }).join('');
       return `<tr class="dl-hunk"><td colspan="4">@@ −${h.oldStart},${h.oldLines} +${h.newStart},${h.newLines} @@</td></tr>${rows}`;
-    }).join('') || (ed.binary ? `<tr class="dl-meta"><td></td><td></td><td></td><td>${_t('바이너리 파일 — 내용은 비교하지 않음')}</td></tr>` : '');
-    return `<section class="diff-edit"><div class="de-head"><span title="${esc(head)}">${esc(head)}</span><span class="d-add">+${ed.add}</span><span class="d-del">−${ed.del}</span>${ed.userModified ? `<i class="de-user" title="${_t('승인 창에서 사람이 내용을 고쳐서 반영됨')}">${_t('사람이 고침')}</i>` : ''}${ed.cut ? `<i title="${_t('너무 길어 앞부분만 보여 줌')}">${_t('일부만')}</i>` : ''}</div><table class="diff-tbl">${body}</table></section>`;
+    }).join('') || (ed.binary && !ed.img ? `<tr class="dl-meta"><td></td><td></td><td></td><td>${_t('바이너리 파일 — 내용은 비교하지 않음')}</td></tr>` : '');
+    // 셸 명령이 바꾼 그림: 전/후를 좌우로 나란히(새 파일은 전, 지운 파일은 후가 빈 칸). 못 꺼내면(git gc 등) 그 칸에 안내
+    const imgSide = (side, label) => `<figure class="di-side"><figcaption>${_t(label)}</figcaption>${ed.img[side]
+      ? `<a href="/api/workers/${selected}/diff-image?edit=${encodeURIComponent(ed.id)}&side=${side}" target="_blank" rel="noopener"><img loading="lazy" alt="${_t(label)}" src="/api/workers/${selected}/diff-image?edit=${encodeURIComponent(ed.id)}&side=${side}" onerror="this.parentNode.outerHTML='<span class=&quot;di-none&quot;>${_t('그림을 꺼낼 수 없음')}</span>'"></a>`
+      : `<span class="di-none">${_t(side === 'before' ? '없음 (새 파일)' : '없음 (삭제됨)')}</span>`}</figure>`;
+    const imgCmp = ed.img ? `<div class="diff-img">${imgSide('before', '변경 전')}${imgSide('after', '변경 후')}</div>` : '';
+    return `<section class="diff-edit"><div class="de-head"><span title="${esc(head)}">${esc(head)}</span><span class="d-add">+${ed.add}</span><span class="d-del">−${ed.del}</span>${ed.userModified ? `<i class="de-user" title="${_t('승인 창에서 사람이 내용을 고쳐서 반영됨')}">${_t('사람이 고침')}</i>` : ''}${ed.cut ? `<i title="${_t('너무 길어 앞부분만 보여 줌')}">${_t('일부만')}</i>` : ''}</div>${body ? `<table class="diff-tbl">${body}</table>` : ''}${imgCmp}</section>`;
   }).join('');
   const view = `${g.key}|${f.file}`; // 같은 요청·파일을 다시 그릴 땐 보던 스크롤 자리를 지킨다
   if (main._html !== html) {

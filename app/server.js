@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import WebSocket, { WebSocketServer } from 'ws';
 import { createRequire } from 'node:module';
 import { createProfile, readProfile, profileSummary, runningSubagents, editLog, trimHunks, pruneEdits, clearEdits } from './profile.js';
-import { snapshot, changedSince } from './shelldiff.js';
+import { snapshot, changedSince, readBlob } from './shelldiff.js';
 import { createProgress, isCommit } from './progress.js';
 import { L } from './cli-lang.js';
 import { createUpdates } from './updates.js';
@@ -779,7 +779,7 @@ function closeShell(w, id) {
     const ts = Date.now();
     const recs = files.map((f, i) => ({
       id: `${id}:${i}`, toolUseId: id, ts, tool: 'Bash', cmd: pend.cmd.slice(0, 500), agent: pend.agent, file: f.file, kind: f.kind,
-      binary: f.binary || undefined, ...trimHunks(f.hunks),
+      binary: f.binary || undefined, img: f.img, ...trimHunks(f.hunks),
     }));
     const txPath = pend.txPath || w.tx?.path;
     if (txPath) {
@@ -1622,6 +1622,18 @@ const server = http.createServer(async (req, res) => {
     const log = w.tx ? editLog(w.tx) : { files: [], requests: [] };
     const shellTracked = Boolean(await snapshotRepo(w.cwd));
     return json(res, 200, { cwd: w.cwd, shellTracked, files: log.files.map((x) => ({ ...x, rel: rel(x.file) })), requests: log.requests });
+  }
+
+  // diff 화면의 그림 전/후 — 셸 수정 기록(img)에 남은 blob 만 꺼낸다(기록에 없는 경로·저장소는 받지 않는다)
+  const im = req.method === 'GET' && p.match(/^\/api\/workers\/(W\d+)\/diff-image$/);
+  if (im) {
+    const ed = workers.get(im[1])?.tx?.shellEdits.find((x) => x.id === url.searchParams.get('edit'));
+    const side = url.searchParams.get('side'), spec = ed?.img && (side === 'before' || side === 'after') ? ed.img[side] : null;
+    const type = spec && IMAGE_TYPES[path.extname(ed.file).slice(1).toLowerCase()];
+    const buf = type && await readBlob(ed.img.root, spec);
+    if (!buf) return json(res, 404, { error: '그림을 꺼낼 수 없습니다' });
+    res.writeHead(200, { 'content-type': type, 'cache-control': 'max-age=86400', 'x-content-type-options': 'nosniff' });
+    return res.end(buf);
   }
 
   if (req.method === 'POST' && p === '/api/workers') {
