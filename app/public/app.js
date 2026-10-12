@@ -1005,6 +1005,7 @@ function setFloorMin(on) {
   renderDock();
   renderHint();
   if (!on) requestAnimationFrame(() => { traceSig = ''; drawTraces(); mgrUpdate(); });
+  scheduleSelLink();
 }
 $('#btn-floor-min').addEventListener('click', () => setFloorMin(true));
 $('#btn-dock-expand').addEventListener('click', () => setFloorMin(false));
@@ -1047,6 +1048,7 @@ $('#cmp').addEventListener('click', (e) => { const r = e.target.closest('.cmp-ro
 // 코어 → 각 칩으로 회로선. 첫 줄은 곧장 내려가고, 아랫줄은 칩 왼쪽 골목으로 돌아 들어간다.
 let traceSig = '';
 function drawTraces() {
+  scheduleSelLink();
   const floor = $('#floor');
   const fr = floor.getBoundingClientRect();
   // 매니저 = 흰 클로드 캐릭터. 선은 캐릭터 아래 가장자리에서 출발한다
@@ -1119,6 +1121,48 @@ function roundedPath(pts, r) {
 
 new ResizeObserver(() => requestAnimationFrame(drawTraces)).observe($('#floor'));
 
+// 선택한 워커 카드 → 아래 상세 패널(아바타)로 워커 색 연결선 — 어느 카드의 터미널을 보고 있는지 한눈에.
+// 카드 영역(#floor)과 상세 패널은 따로 놓인 형제라 #traces 에 못 그리고, 페이지 좌표의 오버레이(body 아래 #sel-link)에 그린다.
+// 아랫줄에 카드가 있으면 카드 오른쪽 골목으로 내려가 카드를 가로지르지 않게. 최소화·크게 보기·카드 끄는 중엔 숨김
+const selLink = document.body.appendChild(Object.assign(document.createElementNS('http://www.w3.org/2000/svg', 'svg'), { id: 'sel-link' }));
+selLink.setAttribute('class', 'sel-link');
+selLink.setAttribute('aria-hidden', 'true');
+var selLinkRaf = 0, selLinkSig = ''; // var: 이 줄보다 먼저 도는 초기화(setFloorMin·renderDetail)에서도 부를 수 있게
+function scheduleSelLink() { if (!selLinkRaf) selLinkRaf = requestAnimationFrame(() => { selLinkRaf = 0; drawSelLink(); }); }
+function drawSelLink() {
+  const card = selected && $(`#nodes .node[data-id="${selected}"]`), detail = $('#detail'), av = $('#detail-avatar');
+  if (!card || detail.hidden || $('#floor').hidden || document.body.classList.contains('term-full')) {
+    if (selLinkSig) { selLink.innerHTML = ''; selLinkSig = ''; }
+    return;
+  }
+  const sx0 = window.scrollX, sy0 = window.scrollY;
+  // 선택 카드는 translateY(-2px) 로 떠 있다(호버도) — 이동분을 빼고 레이아웃 자리로 잰다(회로선과 같은 이유)
+  const m = getComputedStyle(card).transform, ty = m && m !== 'none' ? new DOMMatrixReadOnly(m).m42 : 0;
+  const cr = card.getBoundingClientRect(), nr = $('#nodes').getBoundingClientRect(), fr = $('#floor').getBoundingClientRect();
+  const dr = detail.getBoundingClientRect(), ar = av.getBoundingClientRect();
+  const sx = Math.round(cr.left + cr.width / 2 + sx0), sy = Math.round(cr.bottom - ty + sy0 + 12); // 선택 표시 막대(::after, 아래 9px) 밑에서
+  const tx = Math.round((ar.width ? ar.left + ar.width / 2 : dr.left + 40) + sx0), ty2 = Math.round((ar.height ? ar.top - 3 : dr.top) + sy0);
+  const midY = Math.round((fr.bottom + dr.top) / 2 + sy0); // 카드 영역과 상세 패널 사이
+  // 같은 칸 아래에 카드가 더 있나 (레이아웃 좌표로)
+  const below = [...document.querySelectorAll('#nodes > .node, #nodes > .node-add')].some((n) => n !== card && n.offsetTop > card.offsetTop && n.offsetLeft < card.offsetLeft + card.offsetWidth && n.offsetLeft + n.offsetWidth > card.offsetLeft);
+  let pts;
+  if (below) {
+    const rowY = sy + 5, gx = Math.round(cr.right + sx0 + 11); // 줄 사이(34px)·칸 사이(22px) 골목 한가운데
+    pts = [[sx, sy], [sx, rowY], [gx, rowY], [gx, midY], [tx, midY], [tx, ty2]]; // 골목을 끝까지 내려와 패널 사이에서 꺾음
+  } else pts = [[sx, sy], [sx, midY], [tx, midY], [tx, ty2]];
+  pts = pts.filter((p, i) => !i || p[0] !== pts[i - 1][0] || p[1] !== pts[i - 1][1]); // 겹친 점(곧장 내려가는 경우) 정리
+  const color = card.style.getPropertyValue('--avatar');
+  const sig = `${color}|${pts.join(';')}`;
+  if (sig === selLinkSig) return;
+  selLinkSig = sig;
+  if (color) selLink.style.setProperty('--avatar', color); else selLink.style.removeProperty('--avatar');
+  const d = roundedPath(pts, 10), end = pts.at(-1);
+  selLink.innerHTML = `<path class="base" d="${d}"/><path class="flow" d="${d}"/><circle cx="${sx}" cy="${sy}" r="3"/><circle cx="${end[0]}" cy="${end[1]}" r="3"/>`;
+}
+for (const sel of ['#floor', '#detail', '#hint', '#compare']) { const n = $(sel); if (n) new ResizeObserver(scheduleSelLink).observe(n); }
+new ResizeObserver(scheduleSelLink).observe(document.body);
+window.addEventListener('resize', scheduleSelLink);
+
 // ---------- 빈 자리 안내 ----------
 // 워커를 열지 않았으면 아래가 비어 보인다 — 살아 있는 워커가 없으면 만들기를, 있으면 카드 누르기를 권한다.
 // 그림 애니메이션이 매번 처음부터 시작하지 않게 종류가 바뀔 때만 다시 그린다
@@ -1163,6 +1207,7 @@ function renderDetail() {
   const w = state.workers.find((x) => x.id === selected);
   const wasHidden = $('#detail').hidden;
   $('#detail').hidden = !w;
+  scheduleSelLink();
   $('#term-wrap').classList.toggle('unseen', Boolean(w && isUnseenDone(w))); // 확인 안 한 완료 빛 — 카드 대신 여기(unseenOnCard)
   if (!w) return;
   if (wasHidden) requestAnimationFrame(() => { fitTerm(); placeMeters(); });
@@ -3655,6 +3700,7 @@ function setTermFull(on) {
   const first = wrap.getBoundingClientRect();
   wrap.classList.toggle('full', on);
   document.body.classList.toggle('term-full', on);
+  scheduleSelLink();
   $('#btn-full').textContent = _t(on ? '⛶ 원래대로' : '⛶ 크게');
   const w = state.workers.find((x) => x.id === selected);
   $('#term-title').textContent = w ? w.name : '';
