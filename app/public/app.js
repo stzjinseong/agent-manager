@@ -2832,6 +2832,54 @@ async function loadThemes() {
 }
 // ---------- 내 테마 만들기 안내 ----------
 // ① 예시를 복사해 새 테마 폴더 만들기(바로 적용) · themes 폴더 열기 ② 원하는 느낌을 적으면 워커에게 줄 요청문 만들기(복사 · 입력칸에 넣기)
+// ---------- 글꼴 (꾸미기 → 글꼴) ----------
+// 이 PC 에 설치된 글꼴 이름만 지정한다 — 글꼴 파일은 싣지 않는다. 브라우저에 기억(am.font.ui · am.font.term), 비우면 기본.
+// 화면 글꼴은 --ui-family, CLI 글꼴은 터미널(xterm 은 CSS 를 따르지 않아 옵션으로)과 --mono(경로·시각 등 작은 고정폭 글자) 앞에 붙인다
+const FONT_KEYS = { ui: 'am.font.ui', term: 'am.font.term' };
+const BASE_UI = getComputedStyle(document.documentElement).getPropertyValue('--ui-family').trim();
+const BASE_MONO = getComputedStyle(document.documentElement).getPropertyValue('--mono').trim();
+function fontPrefs() {
+  const get = (k) => { try { return (localStorage.getItem(k) || '').trim(); } catch { return ''; } };
+  return { ui: get(FONT_KEYS.ui), term: get(FONT_KEYS.term) };
+}
+const fontStack = (name, base) => (name ? `"${name.replace(/["\\;{}]/g, '')}", ${base}` : base);
+function applyFonts() {
+  const f = fontPrefs(), root = document.documentElement.style;
+  if (f.ui) root.setProperty('--ui-family', fontStack(f.ui, BASE_UI)); else root.removeProperty('--ui-family');
+  if (f.term) root.setProperty('--mono', fontStack(f.term, BASE_MONO)); else root.removeProperty('--mono');
+  const fam = fontStack(f.term, BASE_MONO);
+  if (term.options.fontFamily !== fam) { term.options.fontFamily = fam; requestAnimationFrame(() => fitTerm(true)); }
+}
+applyFonts();
+const fontModal = $('#font-modal');
+function openFontSet() {
+  const f = fontPrefs();
+  $('#fs-ui').value = f.ui; $('#fs-term').value = f.term;
+  fontModal.hidden = false;
+  requestAnimationFrame(() => $('#fs-ui').focus());
+}
+function closeFontSet() { fontModal.hidden = true; charBtn.focus(); }
+function saveFont(which, v) {
+  try { v ? localStorage.setItem(FONT_KEYS[which], v) : localStorage.removeItem(FONT_KEYS[which]); } catch {}
+  applyFonts();
+}
+$('#fs-ui').addEventListener('input', (e) => saveFont('ui', e.target.value.trim()));
+$('#fs-term').addEventListener('input', (e) => saveFont('term', e.target.value.trim()));
+fontModal.addEventListener('click', async (e) => {
+  const act = e.target.closest('[data-fs]')?.dataset.fs;
+  if (e.target === fontModal || act === 'close') { closeFontSet(); return; }
+  if (act === 'reset') { $('#fs-ui').value = ''; $('#fs-term').value = ''; saveFont('ui', ''); saveFont('term', ''); return; }
+  if (act === 'load') {
+    // Chrome·Edge 의 Local Font Access — 처음 한 번 브라우저가 권한을 묻는다. 없거나 거절하면 이름을 직접 적는다
+    if (!window.queryLocalFonts) { toast(_t('이 브라우저는 글꼴 목록을 못 불러와요 — 이름을 직접 적어 주세요'), 4000); return; }
+    try {
+      const names = [...new Set((await window.queryLocalFonts()).map((x) => x.family))].sort((a, b) => a.localeCompare(b));
+      $('#fs-list').innerHTML = names.map((n) => `<option value="${esc(n)}">`).join('');
+      toast(_t('글꼴 {n}개 — 입력 칸을 누르면 골라 쓸 수 있어요', { n: names.length }), 3500);
+    } catch { toast(_t('글꼴 목록 권한이 거절됐어요 — 이름을 직접 적어 주세요'), 4000); }
+  }
+});
+fontModal.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); closeFontSet(); } });
 const themeModal = $('#theme-modal');
 const tgId = () => $('#tg-id').value.trim();
 function tgFail(m) { const el = $('#tg-err'); el.textContent = m; el.hidden = !m; }
@@ -2905,6 +2953,8 @@ function renderCharPop() {
     return `<button class="lang-item skin-item${on ? ' on' : ''}" role="menuitemradio" aria-checked="${on}" data-skin="${esc(k.id)}">
       <span class="lang-check" aria-hidden="true">${on ? '✓' : ''}</span><span class="skin-sw" style="background:${esc(k.swatch || 'var(--surface-3)')}"></span><span class="char-nm">${esc(k.name)}</span></button>`;
   }).join('') + `<button class="lang-item char-add" data-theme-guide>${_t('+ 테마 만들기')}</button>`);
+  const f = fontPrefs();
+  charPop.insertAdjacentHTML('beforeend', `<div class="pop-h">${_t('글꼴')}</div><button class="lang-item char-add" data-font-set>${esc([f.ui, f.term].filter(Boolean).join(' · ') || _t('기본 글꼴'))} — ${_t('바꾸기…')}</button>`);
 }
 function setCharPop(open) {
   charPop.hidden = !open;
@@ -2943,6 +2993,7 @@ charBtn.addEventListener('click', () => setCharPop(charPop.hidden));
 charPop.addEventListener('click', async (e) => {
   if (e.target.closest('[data-add]')) { setCharPop(false); openCharEditor(null); return; }
   if (e.target.closest('[data-theme-guide]')) { setCharPop(false); openThemeGuide(); return; }
+  if (e.target.closest('[data-font-set]')) { setCharPop(false); openFontSet(); return; }
   const ed = e.target.closest('[data-edit]')?.dataset.edit;
   if (ed) { setCharPop(false); openCharEditor(ed); return; }
   const del = e.target.closest('[data-del]')?.dataset.del;

@@ -33,7 +33,8 @@
   --copper: #b98a5a;
   --radius: 14px;
   /* 시스템 고정폭: macOS SF Mono/Menlo, Windows Cascadia Mono/Consolas */
-  --mono: ui-monospace, SFMono-Regular, Menlo, "Cascadia Mono", Consolas, monospace;
+  --mono: ui-monospace, SFMono-Regular, Menlo, "Cascadia Mono", Consolas, monospace; /* 꾸미기 → 글꼴의 CLI 글꼴이 앞에 붙는다(app.js applyFonts) */
+  --ui-family: "Pretendard Variable", Pretendard, system-ui, -apple-system, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; /* 화면 글꼴도 같은 방식 */
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -43,7 +44,7 @@ html { background: var(--bg); scrollbar-gutter: stable; }
 body {
   margin: 0; color: var(--text);
   /* Pretendard(웹폰트) 우선, 오프라인이면 각 OS 시스템 글꼴 — macOS: SF/Apple SD Gothic Neo, Windows: Segoe UI/맑은 고딕 */
-  font: 14px/1.5 "Pretendard Variable", Pretendard, system-ui, -apple-system, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  font: 14px/1.5 var(--ui-family);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -1815,6 +1816,9 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 
 /* ---------- 내 테마 만들기 안내 창 ---------- */
 .modal.theme-guide { width: min(520px, calc(100% - 32px)); }
+.font-set .char-name span { flex: none; width: 72px; }
+.fs-prev { margin: -4px 0 14px 82px; padding: 8px 10px; border-radius: 8px; background: var(--surface-3); color: var(--text); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#fs-term-prev { font-family: var(--mono); font-size: 13px; }
 .theme-guide p { margin: 0 0 8px; font-size: 12.5px; line-height: 1.6; color: var(--text-2); }
 .theme-guide code { font: 11.5px var(--mono); padding: 1px 5px; border-radius: 4px; background: var(--surface-3); color: var(--text); }
 .theme-guide .tg-lead { margin-bottom: 14px; font-size: 13px; }

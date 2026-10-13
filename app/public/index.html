@@ -314,6 +314,21 @@
   </div>
 
   <!-- 캐릭터 추가·고치기 — app.js openCharEditor() -->
+  <!-- 글꼴 (꾸미기 → 글꼴) — app.js openFontSet. 이 PC 에 설치된 글꼴 이름만 지정한다(글꼴 파일을 싣지 않음), 브라우저에 기억 -->
+  <div class="modal-back" id="font-modal" hidden>
+    <div class="modal panel theme-guide font-set" role="dialog" aria-modal="true" aria-labelledby="fs-title">
+      <h3 id="fs-title" data-i18n>글꼴</h3>
+      <p class="tg-lead" data-i18n>이 PC 에 설치된 글꼴 이름을 적으면 이 브라우저에서만 바뀌어요. 비우면 기본 글꼴이에요.</p>
+      <label class="char-name"><span data-i18n>화면 글꼴</span><input id="fs-ui" list="fs-list" autocomplete="off" spellcheck="false" placeholder="Pretendard"></label>
+      <div class="fs-prev" id="fs-ui-prev">가나다라 ABCabc 0123 — 클로드 키우기</div>
+      <label class="char-name"><span data-i18n>CLI 글꼴</span><input id="fs-term" list="fs-list" autocomplete="off" spellcheck="false" placeholder="Cascadia Mono · Consolas"></label>
+      <div class="fs-prev" id="fs-term-prev">가나다라 ABCabc 0123 │ ❯ +12 −3</div>
+      <datalist id="fs-list"></datalist>
+      <div class="tg-acts"><button class="btn ghost" data-fs="load" data-i18n>이 PC 글꼴 목록 불러오기</button></div>
+      <p class="tg-foot" data-i18n>CLI 글꼴은 고정폭이고 한글이 영문 두 칸 폭이어야 표 선이 맞아요(D2Coding 등). 경로·시각 같은 작은 고정폭 글자도 CLI 글꼴을 따라요. 없는 이름이면 기본 글꼴로 보여요.</p>
+      <div class="modal-acts"><button class="btn ghost" data-fs="reset" data-i18n>기본값</button><button class="btn" data-fs="close" data-i18n>닫기</button></div>
+    </div>
+  </div>
   <!-- 내 테마 만들기 안내 (꾸미기 → 테마 → + 테마 만들기) — app.js openThemeGuide -->
   <div class="modal-back" id="theme-modal" hidden>
     <div class="modal panel theme-guide" role="dialog" aria-modal="true" aria-labelledby="tg-title">
