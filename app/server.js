@@ -475,6 +475,8 @@ function logDraft(w, cli, where) {
 async function assignTask(w, text) {
   text = String(text || '').trim();
   if (!text) return {};
+  // 시작 중엔 받지 않는다 — 대기열로 조용히 넘어가 '안 보냈는데 들어갔다/안 들어갔다' 헷갈렸다. 화면이 흔들며 되돌린다
+  if (w.status === 'starting') return { rejected: 'starting' };
   if (isIdle(w)) {
     const cli = await cliDraft(w);
     if (isIdle(w) && cli.state !== 'empty') { logDraft(w, cli, 'reject'); return { rejected: cli.state, seen: seenDraft(cli) }; }
@@ -495,6 +497,30 @@ async function assignTask(w, text) {
   w.queue.push(text); pushLog(w, 'queue', text); emitState();
   return {};
 }
+// ---------- 시작 중 터미널 가림 ----------
+// 시작 중(SessionStart 전)엔 화면이 터미널 입력을 막아 둔다(app.js term-boot). 다만 처음 여는 폴더의 신뢰 확인처럼 터미널에서
+// 골라야 넘어가는 화면이 이때 뜬다 → 화면에 무언가 떴는데 입력창이 아니면(blocked) 가림을 걷는다(w.bootOpen).
+// 입력창이 떴는데 SessionStart 가 안 오거나(훅 실패) 오래 걸리면 영영 막히지 않게 입력창 5초 · 시작 30초가 지나도 걷는다
+const BOOT_OPEN_INPUT_MS = 5000, BOOT_OPEN_MAX_MS = 30000;
+let bootScan = false;
+setInterval(async () => {
+  if (bootScan) return;
+  bootScan = true;
+  try {
+    for (const w of workers.values()) {
+      if (w.status !== 'starting') { if (w.bootOpen) { delete w.bootOpen; delete w.bootInputAt; } continue; }
+      if (w.bootOpen) continue;
+      let open = Date.now() - w.startedAt > BOOT_OPEN_MAX_MS;
+      if (!open) {
+        const cli = await cliDraft(w);
+        if (cli.state === 'blocked') { open = Boolean(cli.shown); w.bootInputAt = 0; }
+        else { w.bootInputAt ||= Date.now(); open = Date.now() - w.bootInputAt > BOOT_OPEN_INPUT_MS; }
+      }
+      if (open && w.status === 'starting') { w.bootOpen = true; emitState(); }
+    }
+  } finally { bootScan = false; }
+}, 1000);
+
 // ---------- 턴이 끝난 뒤 대기열 잇기 ----------
 // 대기열은 사람이 안 보는 사이 넘어가기 쉽다. 그래서
 //   1) 바로 넣지 않고 DISPATCH_GRACE_MS 동안 기다린다(w.dispatchAt — 화면에 남은 초). 그사이 자동 투입을 끄면 보내지 않는다
@@ -592,7 +618,7 @@ async function cliDraft(w) {
       // 프롬프트는 ❯ — 유니코드 미지원으로 판단된 환경의 Claude 는 > (위 spawnWorker 의 TERM 이전에 띄운 워커)
       const at = first.search(/[❯>]/);
       // 입력창 자리인데 프롬프트가 아니면(! 셸 모드 등) 지시를 넣으면 안 되는 상태
-      if (at < 0 || first.slice(0, at).trim()) return { state: 'blocked', text: first.trim() };
+      if (at < 0 || first.slice(0, at).trim()) return { state: 'blocked', text: first.trim(), shown: true };
       let text = '';
       for (let i = top + 1; i < bottom; i++) {
         const line = rows[i];
@@ -612,7 +638,7 @@ async function cliDraft(w) {
       for (let i = top - 1; i >= Math.max(0, top - STATUS_SCAN); i--) if (/^\s*[^\s⎿⏺…│|]\s+[^\s…].*…/.test(line(i))) busy = true;
       return { state: text ? 'draft' : 'empty', text, busy };
     }
-    return { state: 'blocked', text: '' };
+    return { state: 'blocked', text: '', shown: last >= 0 }; // shown: 화면에 뭔가 있음(시작 중 선택창 판단용)
   } catch { return { state: 'empty', text: '' }; } finally { t.dispose(); }
 }
 
@@ -1684,7 +1710,7 @@ const server = http.createServer(async (req, res) => {
       if (w.status === 'exited') return json(res, 409, { error: '종료된 워커에는 지시할 수 없습니다' });
       const r = await assignTask(w, m.text);
       // CLI 에 쓰던 글이 있는 등 보내지 못했으면 메모를 그대로 둔다
-      if (r.rejected) return json(res, 409, { error: r.rejected === 'blocked' ? 'CLI 가 입력 대기 화면이 아니어서 보내지 못했습니다' : 'CLI 입력창에 쓰던 글이 있어 보내지 못했습니다' + (r.seen ? ` [감지: "${r.seen}"]` : '') });
+      if (r.rejected) return json(res, 409, { error: r.rejected === 'starting' ? '워커가 아직 시작 중이라 보내지 못했습니다' : r.rejected === 'blocked' ? 'CLI 가 입력 대기 화면이 아니어서 보내지 못했습니다' : 'CLI 입력창에 쓰던 글이 있어 보내지 못했습니다' + (r.seen ? ` [감지: "${r.seen}"]` : '') });
       config.memos[role] = list.filter((x) => x.id !== id);
     }
     // 다른 역할로 옮기기: 워커 카드(대기실 슬롯 포함)에 끌어다 놓으면 그 역할 목록 끝으로 간다

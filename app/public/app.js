@@ -254,8 +254,11 @@ if (window.Unicode11Addon) {
 term.open($('#term'));
 // Enter 는 키 처리기가 정해 둔 대로 바꿔 보낸다(아래 attachCustomKeyEventHandler 참고)
 let enterAs = null;
+// 시작 중(신뢰 확인 같은 선택창 없이)엔 터미널 입력을 막는다 — 가림막(#term-boot)과 같은 조건
+const termLocked = () => { const w = selected && state.workers.find((x) => x.id === selected); return Boolean(w && w.status === 'starting' && !w.bootOpen); };
 term.onData((data) => {
   if (enterAs && (data === '\r' || data === '\x1b\r')) { data = enterAs; enterAs = null; }
+  if (termLocked()) return;
   if (selected) send({ type: 'input', id: selected, data });
 });
 // ---------- Safari: 조합 이벤트 없이 들어오는 한글 ----------
@@ -288,7 +291,7 @@ if (IS_SAFARI && term.textarea) {
     p = Math.max(p, Math.min(imeRunStart, before.length, after.length));
     const data = '\x7f'.repeat(before.length - p) + after.slice(p);
     imeBefore = after;
-    if (!data) return;
+    if (!data || termLocked()) return;
     if (selected) send({ type: 'input', id: selected, data });
   }, true);
 }
@@ -1220,6 +1223,7 @@ function renderDetail() {
   $('#detail').hidden = !w;
   scheduleSelLink();
   $('#term-wrap').classList.toggle('unseen', Boolean(w && isUnseenDone(w))); // 확인 안 한 완료 빛 — 카드 대신 여기(unseenOnCard)
+  $('#term-boot').hidden = !termLocked();
   if (!w) return;
   if (wasHidden) requestAnimationFrame(() => { fitTerm(); placeMeters(); });
   else if ($('#detail-name').textContent !== w.name) requestAnimationFrame(placeMeters); // 다른 워커로 바꾸면 이름 폭이 달라진다
@@ -2341,7 +2345,7 @@ taskForm.onsubmit = async (e) => {
   // 쉬는 워커의 CLI 입력창에 쓰던 글이 있거나 입력창이 아닌 화면(선택창·! 셸 모드)이면 서버가 보내지 않는다(대기열에도 안 넣음 — server.js assignTask).
   // 흔들림 = 전송 실패: 글은 입력 칸에 남겨 두고 알린다
   if (r?.rejected) {
-    toast(r.rejected === 'blocked'
+    toast(r.rejected === 'starting' ? _t('전송 실패 — 워커가 아직 시작 중입니다. 준비되면 다시 보내세요') : r.rejected === 'blocked'
       ? _t('전송 실패 — CLI 가 입력 대기 화면이 아닙니다(선택창, ! 셸 모드 등). 입력창으로 돌아온 뒤 다시 보내세요')
       : _t('전송 실패 — CLI 입력창에 쓰던 글이 있습니다. 그 글을 보내거나 지운 뒤 다시 보내세요') + (r.seen ? ` · ${_t('감지한 글')}: "${r.seen}"` : ''), r.seen ? 8000 : 4500);
     shake(ta);
@@ -4106,7 +4110,7 @@ termKeys.addEventListener('pointerdown', (e) => { if (e.target.closest('button')
 termKeys.addEventListener('click', async (e) => {
   const k = e.target.closest('[data-key]')?.dataset.key;
   if (!k || !selected) return;
-  if (TERM_KEYS[k]) { send({ type: 'input', id: selected, data: TERM_KEYS[k] }); return; }
+  if (TERM_KEYS[k]) { if (!termLocked()) send({ type: 'input', id: selected, data: TERM_KEYS[k] }); return; }
   if (k === 'type') setTermTyping(!termTyping);
   if (k === 'zoom') {
     termZoom = !termZoom;

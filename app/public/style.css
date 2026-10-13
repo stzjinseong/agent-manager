@@ -450,6 +450,14 @@ body.card-drag .node-add { opacity: .25; transition: opacity .2s; }
 /* 터미널 스크롤바 막대: 각진 사각형 대신 가장자리에서 조금 떨어진 둥근 막대(색은 app.js 터미널 테마) */
 #term .xterm-scrollable-element > .scrollbar > .slider { box-sizing: border-box; border: 3px solid transparent; background-clip: padding-box; border-radius: 999px; }
 .term-stage { position: relative; height: 100%; }
+/* 시작 중 가림막 — 터미널 입력을 막는 동안(app.js termLocked). 신뢰 확인 같은 선택창이 뜨면 서버가 걷는다(w.bootOpen) */
+.term-boot { position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  background: color-mix(in srgb, var(--term-bg) 82%, transparent); backdrop-filter: blur(2px); color: var(--text); font-weight: 600; cursor: progress; }
+.term-boot[hidden] { display: none; }
+.term-boot small { color: var(--dim); font-weight: 400; }
+.tb-spin { width: 22px; height: 22px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--avatar, var(--accent)) 25%, transparent); border-top-color: var(--avatar, var(--accent)); animation: tb-spin .8s linear infinite; }
+@keyframes tb-spin { to { transform: rotate(1turn); } }
+@media (prefers-reduced-motion: reduce) { .tb-spin { animation-duration: 2.4s; } }
 /* 너무 좁아 110칸이 안 들어가면(app.js fitTerm — 칸 수는 줄이지 않는다) 터미널을 넓히고 옆으로 밀어 본다. diff 보기는 밀리지 않게 */
 .term-wrap.zoomed .term-stage { overflow-x: auto; overflow-y: hidden; }
 .term-wrap.zoomed.diffing .term-stage { overflow: hidden; }
