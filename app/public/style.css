@@ -1015,7 +1015,7 @@ body.term-full::before {
     var(--unseen-bg) padding-box,
     conic-gradient(from var(--unseen-ang), var(--halo-dim) 0turn, var(--halo-dim) .3turn, var(--halo-tail) .42turn, var(--halo) .48turn .5turn, var(--halo-dim) .51turn,
       var(--halo-dim) .8turn, var(--halo-tail) .92turn, var(--halo) .98turn 1turn) border-box !important;
-  animation: unseen-spin 1.4s linear infinite, unseen-glow 1.4s ease-in-out infinite;
+  animation: unseen-spin 4.2s linear infinite, unseen-glow 1.4s ease-in-out infinite;
 }
 .node.unseen { --unseen-bg: linear-gradient(180deg, color-mix(in srgb, var(--halo) 7%, var(--surface-2)), var(--surface)); padding: 13px 13px 11px; }
 .dchip.unseen { --unseen-bg: linear-gradient(var(--surface), var(--surface)); padding: 3px 9px 3px 7px; }
@@ -1031,7 +1031,7 @@ body.term-full::before {
     var(--unseen-bg) padding-box,
     conic-gradient(from var(--unseen-ang), var(--halo-dim) 0turn, var(--halo-dim) .3turn, var(--halo-tail) .42turn, var(--halo) .48turn .5turn, var(--halo-dim) .51turn,
       var(--halo-dim) .8turn, var(--halo-tail) .92turn, var(--halo) .98turn 1turn) border-box;
-  animation: unseen-spin 1.4s linear infinite, unseen-glow 1.4s ease-in-out infinite;
+  animation: unseen-spin 4.2s linear infinite, unseen-glow 1.4s ease-in-out infinite;
 }
 :root[data-theme="light"] :is(.node, .dchip, .term-wrap).unseen { --halo: var(--accent); }
 @keyframes unseen-spin { to { --unseen-ang: 1turn; } }
