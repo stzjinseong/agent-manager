@@ -615,8 +615,8 @@ async function cliDraft(w) {
       if (bottom - top < 2) continue;
       if (last - bottom > BELOW_BOX_MAX) break;
       const first = rows[top + 1].translateToString(true);
-      // 프롬프트는 ❯ — 유니코드 미지원으로 판단된 환경의 Claude 는 > (위 spawnWorker 의 TERM 이전에 띄운 워커)
-      const at = first.search(/[❯>]/);
+      // 프롬프트는 ❯ — 유니코드 미지원으로 판단된 환경의 Claude 는 > (위 spawnWorker 의 TERM 이전에 띄운 워커). › 는 app.js PROMPT_RE 와 맞춤
+      const at = first.search(/[❯›>]/);
       // 입력창 자리인데 프롬프트가 아니면(! 셸 모드 등) 지시를 넣으면 안 되는 상태
       if (at < 0 || first.slice(0, at).trim()) return { state: 'blocked', text: first.trim(), shown: true };
       let text = '';
