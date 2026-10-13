@@ -2072,7 +2072,8 @@ nodesEl.addEventListener('dragstart', (e) => {
   e.dataTransfer.effectAllowed = 'move';
   e.dataTransfer.setData('text/plain', n.dataset.name || '');
   // 드래그 이미지가 찍힌 뒤 흐리게 · 카드와 휴지통 말고는 어둡게(body.card-drag)
-  requestAnimationFrame(() => { n.classList.add('dragging'); trashEl.classList.add('show'); document.body.classList.add('card-drag'); });
+  // 바로 놓으면 dragend 가 이 프레임보다 먼저 와 휴지통이 남았다 — 아직 끄는 중일 때만
+  requestAnimationFrame(() => { if (dragEl === n) { n.classList.add('dragging'); trashEl.classList.add('show'); document.body.classList.add('card-drag'); } });
 });
 nodesEl.addEventListener('dragover', (e) => {
   if (memoDrag) return memoDragOver(e);
@@ -2095,7 +2096,8 @@ nodesEl.addEventListener('dragleave', (e) => {
   const n = e.target.closest?.('.node');
   if (n && !n.contains(e.relatedTarget)) n.classList.remove('dropping');
 });
-nodesEl.addEventListener('dragend', () => {
+nodesEl.addEventListener('dragend', () => endNodeDrag());
+function endNodeDrag() {
   trashEl.classList.remove('show', 'over');
   document.body.classList.remove('card-drag');
   if (!dragEl) return;
@@ -2105,7 +2107,14 @@ nodesEl.addEventListener('dragend', () => {
   state.order = order; // 서버 응답 전 깜빡임 방지
   api('/api/order', { order });
   requestAnimationFrame(drawTraces);
-});
+}
+// 끄는 도중 상태 갱신으로 카드·칩이 다시 그려져 DOM 에서 빠지면 dragend 가 떨어진 노드에서 나 위로 올라오지 않는다 → 휴지통이 남았다.
+// 끄는 동안엔 mousemove 가 오지 않으므로, 끌기 표시가 남은 채 마우스가 움직이면 끌기가 끝난 것으로 정리
+document.addEventListener('mousemove', () => {
+  if (dragEl) endNodeDrag();
+  else if (dockDrag) endDockDrag();
+  else if (trashEl.classList.contains('show')) { trashEl.classList.remove('show', 'over'); document.body.classList.remove('card-drag'); }
+}, { passive: true });
 
 // ---------- 휴지통: 칩을 끌기 시작하면 위에 뜨고, 놓으면 제거 ----------
 // 워커 칩은 상세의 '제거'와 같고(실행 중이면 세션 종료), 대기실 칩은 저장된 역할 삭제와 같다. 둘 다 확인을 받는다
@@ -2606,7 +2615,7 @@ dockList.addEventListener('dragstart', (e) => {
   dockDrag = c;
   e.dataTransfer.effectAllowed = 'move';
   e.dataTransfer.setData('text/plain', c.dataset.name || '');
-  requestAnimationFrame(() => { c.classList.add('dragging'); trashEl.classList.add('show'); document.body.classList.add('card-drag'); }); // 카드 끌기와 같은 휴지통·어둡게
+  requestAnimationFrame(() => { if (dockDrag === c) { c.classList.add('dragging'); trashEl.classList.add('show'); document.body.classList.add('card-drag'); } }); // 카드 끌기와 같은 휴지통·어둡게
 });
 dockList.addEventListener('dragover', (e) => {
   if (memoDrag) return memoDragOver(e);
@@ -2618,7 +2627,8 @@ dockList.addEventListener('dragover', (e) => {
   const ref = e.clientX > r.left + r.width / 2 ? over.nextSibling : over;
   if (ref !== slot && slot.nextSibling !== ref) dockList.insertBefore(slot, ref);
 });
-dockList.addEventListener('dragend', () => {
+dockList.addEventListener('dragend', () => endDockDrag());
+function endDockDrag() {
   trashEl.classList.remove('show', 'over');
   document.body.classList.remove('card-drag');
   if (!dockDrag) return;
@@ -2635,7 +2645,7 @@ dockList.addEventListener('dragend', () => {
   renderFloor(); // 펼쳤을 때도 같은 순서로
   renderDock();
   api('/api/order', { order });
-});
+}
 dockList.addEventListener('drop', (e) => { if (memoDrag) { e.preventDefault(); memoDrop(e); } });
 dockList.addEventListener('dragleave', (e) => {
   const c = e.target.closest?.('.dchip');
