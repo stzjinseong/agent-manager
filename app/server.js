@@ -406,6 +406,10 @@ function spawnWorker({ name, cwd, args = '', permissionMode = 'default', resume 
   // macOS 에서 Finder 로 연 Launch.app 은 로케일 환경변수 없이 뜬다. 그대로 두면 워커 CLI 가 UTF-8 이 아닌
   // 로케일로 돈다 — Mac 에서 한글 완성 음절(가)만 안 보이던 문제(단독 자모 ㄱ·ㅏ 는 보임)의 유력 원인. 터미널이 주던 값과 맞춘다
   if (process.platform === 'darwin' && !env.LANG && !env.LC_ALL && !env.LC_CTYPE) env.LANG = 'en_US.UTF-8';
+  // Windows 에서 Claude 는 유니코드 글리프를 쓸 터미널인지 WT_SESSION(Windows Terminal)·TERM 등으로 판단한다(is-unicode-supported).
+  // 탐색기·바로가기(Launch.vbs)로 띄운 서버는 둘 다 없어 ASCII 대체 글리프로 돌았다 — 입력창 프롬프트가 ❯ 대신 > 라
+  // cliDraft 가 입력창을 못 찾아 업무 지시가 늘 '입력 대기 화면이 아님'으로 막혔다(Windows Terminal 에서 띄운 PC 는 정상). 화면은 xterm.js 라 실제와도 맞다
+  env.TERM = 'xterm-256color';
 
   const extra = args.trim() ? args.trim().split(/\s+/) : [];
   if (resume) extra.push('--resume', resume); // 역할의 마지막 세션 이어서 (저장되는 역할 인자에는 넣지 않는다)
@@ -585,8 +589,9 @@ async function cliDraft(w) {
       if (bottom - top < 2) continue;
       if (last - bottom > BELOW_BOX_MAX) break;
       const first = rows[top + 1].translateToString(true);
-      const at = first.indexOf('❯');
-      // 입력창 자리인데 ❯ 가 아니면(! 셸 모드 등) 지시를 넣으면 안 되는 상태
+      // 프롬프트는 ❯ — 유니코드 미지원으로 판단된 환경의 Claude 는 > (위 spawnWorker 의 TERM 이전에 띄운 워커)
+      const at = first.search(/[❯>]/);
+      // 입력창 자리인데 프롬프트가 아니면(! 셸 모드 등) 지시를 넣으면 안 되는 상태
       if (at < 0 || first.slice(0, at).trim()) return { state: 'blocked', text: first.trim() };
       let text = '';
       for (let i = top + 1; i < bottom; i++) {
