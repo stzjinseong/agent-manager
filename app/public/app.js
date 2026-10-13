@@ -1224,6 +1224,9 @@ function renderDetail() {
   scheduleSelLink();
   $('#term-wrap').classList.toggle('unseen', Boolean(w && isUnseenDone(w))); // 확인 안 한 완료 빛 — 카드 대신 여기(unseenOnCard)
   $('#term-boot').hidden = !termLocked();
+  // 종료된 워커는 PTY 호스트에 화면이 없어 빈 터미널에 커서만 보였다 — 종료 안내로 덮고, 중단 버튼은 감춘다
+  $('#term-gone').hidden = !(w && w.status === 'exited');
+  $('#btn-interrupt').hidden = Boolean(w && w.status === 'exited');
   if (!w) return;
   if (wasHidden) requestAnimationFrame(() => { fitTerm(); placeMeters(); });
   else if ($('#detail-name').textContent !== w.name) requestAnimationFrame(placeMeters); // 다른 워커로 바꾸면 이름 폭이 달라진다

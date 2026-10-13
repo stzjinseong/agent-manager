@@ -441,6 +441,8 @@ const EN = {
   '바이너리 파일 — 내용은 비교하지 않음': 'Binary file — contents not compared',
   '감지한 글': 'Detected text',
   'Claude 시작 중…': 'Starting Claude…',
+  '프로세스 종료됨': 'Process exited',
+  '터미널 화면은 남아 있지 않아요 · 대기실 카드의 ▶ 투입으로 이어서 띄울 수 있어요': 'The terminal screen is gone · launch it again with ▶ on its waiting-room card',
   '준비되면 입력할 수 있어요': 'You can type once it is ready',
   '전송 실패 — 워커가 아직 시작 중입니다. 준비되면 다시 보내세요': 'Not sent — the worker is still starting. Send again once it is ready',
   '변경 전': 'Before',

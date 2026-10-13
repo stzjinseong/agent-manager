@@ -225,6 +225,9 @@ function renameRole(from, to, worker) {
     [...workers.values()].some((x) => x !== worker && x.status !== 'exited' && x.name === to);
   if (taken) return { error: `"${to}" 은(는) 이미 쓰는 이름입니다` };
   if (worker) { worker.name = to; pushLog(worker, 'status', `이름 변경: ${from} → ${to}`); }
+  // 같은 역할의 종료된 워커 기록도 함께 — 화면은 저장된 역할과 이름이 같은 종료 기록을 대기실 카드 한 장으로 접는데,
+  // 옛 이름에 남겨 두면 그 이름의 역할이 없어져 기록마다 '종료됨' 카드로 펼쳐졌다(이름 바꾼 뒤 옛 이름 카드가 여러 장)
+  for (const x of workers.values()) if (x !== worker && x.name === from && x.status === 'exited') x.name = to;
   config.profiles = config.profiles.map((x) => (x.name === from ? { ...x, name: to } : x));
   config.order = (config.order || []).map((x) => (x === from ? to : x));
   if (config.colors?.[from] != null && config.colors[to] == null) { config.colors[to] = config.colors[from]; delete config.colors[from]; }
