@@ -251,8 +251,15 @@ function pickFolder(start) {
     '$f=New-Object System.Windows.Forms.FolderBrowserDialog',
     '$f.Description="워커 작업 폴더 선택"',
     start ? `$f.SelectedPath='${String(start).replace(/'/g, "''")}'` : '',
-    '$o=New-Object System.Windows.Forms.Form -Property @{TopMost=$true}',
+    // 서버(백그라운드 프로세스)가 띄운 창은 Windows 포그라운드 잠금 때문에 브라우저 뒤에 숨었다 — 누르면 아이콘만 깜빡이고 창이 안 보였다.
+    // 보이지 않는 맨 위 창을 실제로 띄워 앞으로 끌어온 뒤(Alt 키 한 번 = 잠금 풀기 관례) 그 창을 주인으로 대화상자를 연다
+    'Add-Type -Name W -Namespace AM -MemberDefinition \'[DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h); [DllImport("user32.dll")] public static extern void keybd_event(byte k, byte s, uint f, UIntPtr e);\'',
+    '$o=New-Object System.Windows.Forms.Form -Property @{TopMost=$true;ShowInTaskbar=$false;Opacity=0;FormBorderStyle="None";StartPosition="CenterScreen";Width=1;Height=1}',
+    '$o.Show()',
+    '[AM.W]::keybd_event(0x12,0,0,[UIntPtr]::Zero);[AM.W]::keybd_event(0x12,0,2,[UIntPtr]::Zero)',
+    '[void][AM.W]::SetForegroundWindow($o.Handle);$o.Activate()',
     'if($f.ShowDialog($o) -eq "OK"){ $f.SelectedPath }',
+    '$o.Close()',
   ].filter(Boolean).join(';');
   return new Promise((resolve) => {
     execFile('powershell.exe', ['-NoProfile', '-STA', '-Command', script], { encoding: 'utf8', windowsHide: true }, (err, out) => resolve(err ? null : out.trim() || null));
