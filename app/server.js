@@ -461,12 +461,19 @@ function setStatus(w, status, note) {
 // (/resume·/model 선택창, ! 셸 모드 등 — 지시가 검색칸·셸 명령으로 들어간다) 보내지 않는다. 대기열에도 넣지 않고 실패로 돌려주면
 // 화면이 글을 입력 칸에 되돌리고 흔든다({ rejected: 'draft' | 'blocked' })
 const isIdle = (w) => w.status === 'idle' || w.status === 'done' || w.status === 'interrupted';
+// 'draft' 판정 때 입력창에서 글로 센 내용 — 거부 안내·서버 로그에 붙인다. 화면 읽기(cliDraft)가 PC 마다 다르게 잡는 일이 있어
+// (지웠는데도 계속 거부 — 흐리게 안 그려진 안내 문구 등으로 추정) 무엇을 글로 봤는지 남겨 원인을 가린다
+const seenDraft = (cli) => (cli.state === 'draft' && cli.text ? (cli.text.length > 60 ? cli.text.slice(0, 60) + '…' : cli.text) : '');
+const seenNote = (cli) => { const s = seenDraft(cli); return s ? ` [감지: "${s}"]` : ''; };
+function logDraft(w, cli, where) {
+  if (cli.state === 'draft') console.log(`[cli-draft] ${w.id} ${w.name || ''} ${where}: ${JSON.stringify(cli.text)}`);
+}
 async function assignTask(w, text) {
   text = String(text || '').trim();
   if (!text) return {};
   if (isIdle(w)) {
     const cli = await cliDraft(w);
-    if (isIdle(w) && cli.state !== 'empty') return { rejected: cli.state };
+    if (isIdle(w) && cli.state !== 'empty') { logDraft(w, cli, 'reject'); return { rejected: cli.state, seen: seenDraft(cli) }; }
   }
   // 자동 투입을 끈 대기열은 그대로 두고, 쉬는 워커에 새로 보낸 지시는 바로 넣는다
   if (isIdle(w) && w.queue.length && !manualQueue(w)) {
@@ -519,18 +526,18 @@ function cancelDispatch(w) {
 async function dispatchQueued(w, force = false) {
   if (!w.queue.length || !isIdle(w) || (!force && manualQueue(w))) return;
   const cli = await cliDraft(w);
-  if (cli.state !== 'empty') { holdForDraft(w, cli.state); emitState(); return cli.state; } // 'draft' | 'blocked' — 기다리는 이유
+  if (cli.state !== 'empty') { logDraft(w, cli, 'hold'); holdForDraft(w, cli.state, seenNote(cli)); emitState(); return cli.state; } // 'draft' | 'blocked' — 기다리는 이유
   if (!w.queue.length || !isIdle(w)) return;
   sendPrompt(w, w.queue.shift());
 }
 // 입력창이 빌 때까지 1.5초마다 다시 본다. 사람이 그 글을 보내 턴이 시작되면 그만 — 그 턴이 끝날 때(Stop) 큐가 이어진다.
 // 타이머는 워커 객체 밖에 둔다 — 워커는 화면 상태·workers.json 으로 JSON 직렬화된다(Timeout 은 순환 참조라 서버가 죽었다)
 const draftTimers = new Map(); // 워커 id → setInterval
-function holdForDraft(w, state) {
+function holdForDraft(w, state, note = '') {
   if (draftTimers.has(w.id)) return;
   pushLog(w, 'notice', state === 'blocked'
     ? 'CLI 가 입력 대기 화면이 아니어서(/resume 같은 선택창, ! 셸 모드 등) 업무 지시를 대기열에 두었습니다 — 입력창으로 돌아오면 이어서 투입'
-    : 'CLI 입력창에 쓰던 글이 있어 업무 지시를 대기열에 두었습니다 — 그 글을 보내거나 지우면 이어서 투입');
+    : 'CLI 입력창에 쓰던 글이 있어 업무 지시를 대기열에 두었습니다 — 그 글을 보내거나 지우면 이어서 투입' + note);
   const stop = () => { clearInterval(draftTimers.get(w.id)); draftTimers.delete(w.id); };
   let busy = false; // 화면 읽기가 주기보다 오래 걸려도 두 번 투입하지 않게
   draftTimers.set(w.id, setInterval(async () => {
@@ -1672,7 +1679,7 @@ const server = http.createServer(async (req, res) => {
       if (w.status === 'exited') return json(res, 409, { error: '종료된 워커에는 지시할 수 없습니다' });
       const r = await assignTask(w, m.text);
       // CLI 에 쓰던 글이 있는 등 보내지 못했으면 메모를 그대로 둔다
-      if (r.rejected) return json(res, 409, { error: r.rejected === 'blocked' ? 'CLI 가 입력 대기 화면이 아니어서 보내지 못했습니다' : 'CLI 입력창에 쓰던 글이 있어 보내지 못했습니다' });
+      if (r.rejected) return json(res, 409, { error: r.rejected === 'blocked' ? 'CLI 가 입력 대기 화면이 아니어서 보내지 못했습니다' : 'CLI 입력창에 쓰던 글이 있어 보내지 못했습니다' + (r.seen ? ` [감지: "${r.seen}"]` : '') });
       config.memos[role] = list.filter((x) => x.id !== id);
     }
     // 다른 역할로 옮기기: 워커 카드(대기실 슬롯 포함)에 끌어다 놓으면 그 역할 목록 끝으로 간다
