@@ -1,0 +1,294 @@
+// ---------- 나의 Claude 사용 리포트 (사용자 프로파일) ----------
+// 워커 세션들을 모은 서버 집계(/api/user-profile — userprofile.js)를 받아, 기간(전체·30일·7일)으로 거른 뒤 그린다.
+// 차트는 모두 손으로 그린 SVG(바깥 라이브러리 없음). 색은 화면 테마 변수(--accent 등)를 따른다.
+// 사람이 보낸 요청만 센다 — 백그라운드·서브에이전트 알림(auto)과 슬래시 명령(cmd)은 빼고, 비용·도구 같은 세션 값은 그 기간에 요청이 있던 세션 기준
+(() => {
+  const KIND = {
+    feature: { label: '작업 지시', color: '#6aa8ff' },
+    bug: { label: '버그·문제 해결', color: '#ef6b6b' },
+    ask: { label: '조사·질문', color: '#b48cff' },
+    ops: { label: '커밋·빌드·배포', color: '#f2b24c' },
+    review: { label: '리뷰·정리', color: '#4fd1a5' },
+    reply: { label: '확인·짧은 답', color: '#8d96ab' },
+    etc: { label: '기타', color: '#5b6273' },
+  };
+  const PERSONA = {
+    feature: ['빌더형', '아이디어를 바로 기능으로 옮기는 타입 — 만들고 고치는 지시가 가장 많아요'],
+    bug: ['해결사형', '문제를 잡는 데 Claude 를 가장 많이 써요 — 버그·오류 해결 요청이 중심이에요'],
+    ask: ['탐험가형', '먼저 묻고 이해한 뒤 움직이는 타입 — 조사·질문 비중이 높아요'],
+    ops: ['운영자형', '커밋·빌드·배포 같은 흐름 관리를 Claude 에 많이 맡겨요'],
+    review: ['정리형', '리뷰·리팩터링으로 코드를 다듬는 요청이 두드러져요'],
+    reply: ['대화형', 'Claude 와 짧게 주고받으며 방향을 잡아 가는 타입이에요'],
+    etc: ['자유형', '여러 종류의 요청을 고르게 섞어 써요'],
+  };
+  const DAY = 86_400_000;
+  const $u = (s) => document.querySelector(s);
+  const T = (s, v) => (typeof _t === 'function' ? _t(s, v) : s);
+  const E = (s) => (typeof esc === 'function' ? esc(s) : String(s));
+  const money = (v) => (v >= 100 ? `$${Math.round(v).toLocaleString()}` : `$${v.toFixed(v >= 10 ? 1 : 2)}`);
+  const num = (v) => (v >= 10_000 ? `${(v / 1000).toFixed(v >= 100_000 ? 0 : 1)}k` : Math.round(v).toLocaleString());
+  const pct = (v) => `${Math.round(v * 100)}%`;
+  const hrs = (ms) => (ms >= 3_600_000 ? `${(ms / 3_600_000).toFixed(1)}h` : `${Math.round(ms / 60_000)}m`);
+  const dayKey = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  const WEEK = ['일', '월', '화', '수', '목', '금', '토'];
+
+  let data = null, range = 30;
+  const modal = $u('#ur-modal');
+
+  // ---------- 집계 ----------
+  function crunch() {
+    const since = range ? Date.now() - range * DAY : 0;
+    const reqs = [], sess = [];
+    let auto = 0, cmds = 0;
+    for (const s of data.sessions) {
+      let any = false;
+      for (const t of s.turns) {
+        if (t.t < since) continue;
+        any = true;
+        if (t.kind === 'auto') { auto++; continue; }
+        if (t.kind === 'cmd') { cmds++; continue; }
+        reqs.push({ ...t, role: s.role });
+      }
+      if (any) sess.push(s);
+    }
+    const cost = data.sessions.reduce((a, s) => a + s.turns.filter((t) => t.t >= since).reduce((b, t) => b + t.cost, 0), 0);
+    const tok = sess.reduce((a, s) => { a.in += s.tokens.input + s.tokens.cacheWrite + s.tokens.cacheRead; a.read += s.tokens.cacheRead; return a; }, { in: 0, read: 0 });
+    const kinds = {};
+    for (const r of reqs) kinds[r.kind] = (kinds[r.kind] || 0) + 1;
+    const tools = {};
+    for (const s of sess) for (const [k, v] of Object.entries(s.tools || {})) tools[k] = (tools[k] || 0) + v;
+    const models = {};
+    for (const s of sess) for (const [k, v] of Object.entries(s.models || {})) models[k] = (models[k] || 0) + v;
+    const roles = new Map();
+    for (const s of data.sessions) {
+      const ts = s.turns.filter((t) => t.t >= since);
+      if (!ts.length) continue;
+      const r = roles.get(s.role) || { role: s.role, req: 0, cost: 0, sess: 0, read: 0, in: 0, edits: 0 };
+      r.req += ts.filter((t) => t.kind !== 'auto' && t.kind !== 'cmd').length; r.cost += ts.reduce((a, t) => a + t.cost, 0); r.sess++;
+      r.read += s.tokens.cacheRead; r.in += s.tokens.input + s.tokens.cacheWrite + s.tokens.cacheRead; r.edits += s.edits.add + s.edits.del;
+      roles.set(s.role, r);
+    }
+    // 날짜별 — 기간이 전체면 기록이 있는 첫날부터(최대 120일)
+    const first = reqs.length ? Math.min(...reqs.map((r) => r.t)) : Date.now();
+    const nDays = Math.max(7, Math.min(range || 120, Math.ceil((Date.now() - first) / DAY) + 1));
+    const days = [];
+    for (let i = nDays - 1; i >= 0; i--) { const t = Date.now() - i * DAY; days.push({ key: dayKey(t), t, req: 0, cost: 0 }); }
+    const dayIdx = new Map(days.map((d, i) => [d.key, i]));
+    for (const s of data.sessions) for (const t of s.turns) {
+      const i = dayIdx.get(dayKey(t.t));
+      if (i == null || t.t < since) continue;
+      days[i].cost += t.cost;
+      if (t.kind !== 'auto' && t.kind !== 'cmd') days[i].req++;
+    }
+    const punch = Array.from({ length: 7 }, () => new Array(24).fill(0));
+    for (const r of reqs) { const d = new Date(r.t); punch[d.getDay()][d.getHours()]++; }
+    const sum = (f) => sess.reduce((a, s) => a + f(s), 0);
+    return {
+      reqs, sess, auto, cmds, cost, kinds, tools, models, days, punch,
+      roles: [...roles.values()].sort((a, b) => b.cost - a.cost),
+      cacheHit: tok.in ? tok.read / tok.in : null,
+      interrupts: sum((s) => s.interrupts || 0), compactions: sum((s) => s.compactions || 0),
+      subagents: sum((s) => s.subagents || 0),
+      edits: { add: sum((s) => s.edits.add), del: sum((s) => s.edits.del), files: sum((s) => s.edits.files) },
+      work: sum((s) => (s.time?.model || 0) + (s.time?.tool || 0)),
+      toolCalls: Object.values(tools).reduce((a, b) => a + b, 0),
+    };
+  }
+
+  // ---------- 그리기 도우미 ----------
+  function spark(vals, color) {
+    if (vals.length < 2) return '';
+    const W = 120, H = 30, max = Math.max(...vals, 1);
+    const pts = vals.map((v, i) => [(i / (vals.length - 1)) * W, H - 2 - (v / max) * (H - 4)]);
+    const line = pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join('');
+    const id = `sp${Math.random().toString(36).slice(2, 7)}`;
+    return `<svg class="ur-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".45"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>
+      <path d="${line}L${W},${H}L0,${H}Z" fill="url(#${id})"/><path d="${line}" fill="none" stroke="${color}" stroke-width="1.6" vector-effect="non-scaling-stroke"/></svg>`;
+  }
+  function ring(v, color) {
+    const r = 15, c = 2 * Math.PI * r, f = v == null ? 0 : Math.max(0, Math.min(1, v));
+    return `<svg class="ur-ring" viewBox="0 0 40 40"><circle cx="20" cy="20" r="${r}" fill="none" stroke="rgb(var(--ink) / .08)" stroke-width="5"/>
+      <circle class="ur-ring-v" cx="20" cy="20" r="${r}" fill="none" stroke="${color}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${(c * f).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 20 20)"/></svg>`;
+  }
+  const card = (title, sub, body, cls = '') => `<section class="ur-card ${cls}"><header><h4>${E(T(title))}</h4>${sub ? `<small>${sub}</small>` : ''}</header>${body}</section>`;
+
+  function kpis(d) {
+    const human = d.reqs.length;
+    const reqSeries = d.days.map((x) => x.req), costSeries = d.days.map((x) => x.cost);
+    const items = [
+      { k: '내 요청', v: human, f: num, s: T('하루 평균 {n}건', { n: (human / d.days.length).toFixed(1) }), extra: spark(reqSeries, 'var(--accent)') },
+      { k: '사용 금액(API 환산)', v: d.cost, f: money, s: T('요청 1건 평균 {v}', { v: money(human ? d.cost / human : 0) }), extra: spark(costSeries, '#f2b24c') },
+      { k: '캐시 적중', v: (d.cacheHit ?? 0) * 100, f: (x) => `${Math.round(x)}%`, s: d.cacheHit == null ? '—' : d.cacheHit >= 0.95 ? T('아주 좋음') : d.cacheHit >= 0.9 ? T('보통') : T('낮음 — 비용이 새고 있어요'), extra: ring(d.cacheHit, d.cacheHit >= 0.95 ? '#4fd1a5' : d.cacheHit >= 0.9 ? '#f2b24c' : '#ef6b6b'), side: true },
+      { k: 'Claude 작업 시간', v: d.work, f: hrs, s: T('세션 {n}개', { n: d.sess.length }) },
+      { k: '바꾼 코드 줄', v: d.edits.add + d.edits.del, f: num, s: `<b class="ur-add">+${num(d.edits.add)}</b> <b class="ur-del">−${num(d.edits.del)}</b> · ${T('파일 {n}개', { n: num(d.edits.files) })}` },
+      { k: '도구 호출', v: d.toolCalls, f: num, s: T('서브에이전트 {n}번', { n: d.subagents }) },
+    ];
+    return `<div class="ur-kpis">${items.map((it) => `<div class="ur-kpi${it.side ? ' ur-side' : ''}"><div class="ur-kpi-t"><span>${E(T(it.k))}</span><b class="ur-count" data-to="${it.v}" data-fmt="${items.indexOf(it)}">${it.f(0)}</b><small>${it.s}</small></div>${it.extra || ''}</div>`).join('')}</div>`;
+  }
+  // 숫자가 0 부터 차오르는 연출
+  function countUp(d) {
+    const fmts = [num, money, (x) => `${Math.round(x)}%`, hrs, num, num];
+    const els = modal.querySelectorAll('.ur-count'), t0 = performance.now(), dur = 900;
+    const step = (now) => {
+      const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+      els.forEach((el) => { el.textContent = fmts[+el.dataset.fmt](Number(el.dataset.to) * e); });
+      if (k < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+
+  // 성향 레이더 — 요청 유형 비중(가장 큰 유형을 1로), 위임(요청당 서브에이전트), 자동화(도구 중 명령 실행 비율), 효율(캐시 적중)
+  function radar(d) {
+    const human = d.reqs.filter((r) => r.kind !== 'reply' && r.kind !== 'etc').length || 1;
+    const share = (k) => (d.kinds[k] || 0) / human;
+    const maxShare = Math.max(...['feature', 'bug', 'ask', 'ops', 'review'].map(share), 0.01);
+    const axes = [
+      ['구현', share('feature') / maxShare], ['디버깅', share('bug') / maxShare], ['탐구', share('ask') / maxShare],
+      ['운영', share('ops') / maxShare], ['위임', Math.min(1, (d.subagents / Math.max(1, d.reqs.length)) * 5)],
+      ['자동화', Math.min(1, ((d.tools.Bash || 0) + (d.tools.PowerShell || 0)) / Math.max(1, d.toolCalls) * 2.5)], ['효율', d.cacheHit ?? 0],
+    ];
+    const C = 130, R = 92, n = axes.length;
+    const pt = (i, v) => { const a = -Math.PI / 2 + (i * 2 * Math.PI) / n; return [C + Math.cos(a) * R * v, C + Math.sin(a) * R * v]; };
+    const grid = [0.25, 0.5, 0.75, 1].map((g) => `<polygon class="ur-rgrid" points="${axes.map((_, i) => pt(i, g).join(',')).join(' ')}"/>`).join('');
+    const spokes = axes.map((_, i) => `<line class="ur-rgrid" x1="${C}" y1="${C}" x2="${pt(i, 1)[0]}" y2="${pt(i, 1)[1]}"/>`).join('');
+    const shape = axes.map(([, v], i) => pt(i, Math.max(0.06, v)).join(',')).join(' ');
+    const labels = axes.map(([k, v], i) => { const [x, y] = pt(i, 1.2); return `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle">${E(T(k))}<tspan class="ur-rv" x="${x}" dy="13">${Math.round(v * 100)}</tspan></text>`; }).join('');
+    const dots = axes.map(([, v], i) => { const [x, y] = pt(i, Math.max(0.06, v)); return `<circle class="ur-rdot" cx="${x}" cy="${y}" r="3.2"/>`; }).join('');
+    return `<svg class="ur-radar" viewBox="-20 -14 300 290"><defs><radialGradient id="ur-rg" cx="50%" cy="50%" r="60%"><stop offset="0" stop-color="var(--accent)" stop-opacity=".55"/><stop offset="1" stop-color="var(--accent)" stop-opacity=".12"/></radialGradient></defs>
+      ${grid}${spokes}<polygon class="ur-rshape" points="${shape}" fill="url(#ur-rg)"/>${dots}${labels}</svg>`;
+  }
+  function persona(d) {
+    const top = Object.entries(d.kinds).filter(([k]) => k !== 'reply' && k !== 'etc').sort((a, b) => b[1] - a[1])[0]?.[0] || 'etc';
+    const [name, desc] = PERSONA[top];
+    return `<div class="ur-persona"><span class="ur-badge" style="--k:${KIND[top].color}">${E(T(name))}</span><p>${E(T(desc))}</p></div>`;
+  }
+  function donut(d) {
+    const total = d.reqs.length || 1, R = 64, r = 42, C = 80;
+    let a0 = -Math.PI / 2;
+    const order = Object.keys(KIND).filter((k) => d.kinds[k]);
+    const arcs = order.map((k) => {
+      const f = d.kinds[k] / total, a1 = a0 + f * Math.PI * 2, big = a1 - a0 > Math.PI ? 1 : 0;
+      const p = (rad, ang) => `${C + Math.cos(ang) * rad},${C + Math.sin(ang) * rad}`;
+      const path = f >= 0.999 ? `M${C - R},${C}a${R},${R} 0 1,0 ${R * 2},0a${R},${R} 0 1,0 ${-R * 2},0M${C - r},${C}a${r},${r} 0 1,1 ${r * 2},0a${r},${r} 0 1,1 ${-r * 2},0`
+        : `M${p(R, a0)}A${R},${R} 0 ${big} 1 ${p(R, a1)}L${p(r, a1)}A${r},${r} 0 ${big} 0 ${p(r, a0)}Z`;
+      a0 = a1;
+      return `<path class="ur-arc" d="${path}" fill="${KIND[k].color}"><title>${E(T(KIND[k].label))} ${d.kinds[k]} (${pct(f)})</title></path>`;
+    }).join('');
+    const legend = order.map((k) => `<li><i style="background:${KIND[k].color}"></i>${E(T(KIND[k].label))}<b>${pct(d.kinds[k] / total)}</b><small>${d.kinds[k]}</small></li>`).join('');
+    return `<div class="ur-donut-wrap"><svg class="ur-donut" viewBox="0 0 160 160">${arcs}<text x="80" y="76" text-anchor="middle" class="ur-donut-n">${num(d.reqs.length)}</text><text x="80" y="95" text-anchor="middle" class="ur-donut-s">${E(T('요청'))}</text></svg><ul class="ur-legend">${legend}</ul></div>`;
+  }
+  // 날짜별 요청(막대) + 금액(선)
+  function timeline(d) {
+    const W = 760, H = 210, padL = 34, padR = 44, padT = 14, padB = 26, n = d.days.length;
+    const maxR = Math.max(...d.days.map((x) => x.req), 1), maxC = Math.max(...d.days.map((x) => x.cost), 0.01);
+    const bw = (W - padL - padR) / n, x = (i) => padL + i * bw;
+    const yR = (v) => H - padB - (v / maxR) * (H - padT - padB), yC = (v) => H - padB - (v / maxC) * (H - padT - padB);
+    const bars = d.days.map((dd, i) => `<rect class="ur-bar" x="${(x(i) + bw * 0.18).toFixed(1)}" y="${yR(dd.req).toFixed(1)}" width="${Math.max(1, bw * 0.64).toFixed(1)}" height="${(H - padB - yR(dd.req)).toFixed(1)}" rx="${Math.min(3, bw * 0.3).toFixed(1)}"><title>${dd.key} · ${T('요청 {n}건', { n: dd.req })} · ${money(dd.cost)}</title></rect>`).join('');
+    const pts = d.days.map((dd, i) => [x(i) + bw / 2, yC(dd.cost)]);
+    const line = pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join('');
+    const ticks = d.days.map((dd, i) => (i % Math.ceil(n / 8) === 0 || i === n - 1 ? `<text class="ur-tick" x="${(x(i) + bw / 2).toFixed(1)}" y="${H - 8}" text-anchor="middle">${dd.key.slice(5).replace('-', '/')}</text>` : '')).join('');
+    const gy = [0, 0.5, 1].map((g) => `<line class="ur-gline" x1="${padL}" x2="${W - padR}" y1="${yR(maxR * g)}" y2="${yR(maxR * g)}"/><text class="ur-tick" x="${padL - 6}" y="${yR(maxR * g) + 3}" text-anchor="end">${Math.round(maxR * g)}</text><text class="ur-tick ur-tick-c" x="${W - padR + 6}" y="${yC(maxC * g) + 3}">${money(maxC * g)}</text>`).join('');
+    return `<svg class="ur-timeline" viewBox="0 0 ${W} ${H}"><defs><linearGradient id="ur-bar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent-hi)"/><stop offset="1" stop-color="var(--accent)" stop-opacity=".55"/></linearGradient>
+      <linearGradient id="ur-area" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f2b24c" stop-opacity=".28"/><stop offset="1" stop-color="#f2b24c" stop-opacity="0"/></linearGradient></defs>
+      ${gy}${bars}<path d="${line}L${pts.at(-1)[0]},${H - padB}L${pts[0][0]},${H - padB}Z" fill="url(#ur-area)"/><path class="ur-cline" d="${line}"/>${pts.map((p, i) => (d.days[i].cost ? `<circle class="ur-cdot" cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.4"/>` : '')).join('')}${ticks}</svg>
+      <div class="ur-keys"><span><i class="k-bar"></i>${E(T('요청 수'))}</span><span><i class="k-line"></i>${E(T('사용 금액'))}</span></div>`;
+  }
+  // 요일 × 시간 — 원 크기·진하기 = 요청 수
+  function punchcard(d) {
+    const max = Math.max(...d.punch.flat(), 1), cw = 26, ch = 26, padL = 26, padT = 6;
+    const order = [1, 2, 3, 4, 5, 6, 0];
+    const dots = order.map((wd, row) => d.punch[wd].map((v, h) => {
+      if (!v) return `<circle class="ur-pc0" cx="${padL + h * cw + cw / 2}" cy="${padT + row * ch + ch / 2}" r="1.6"/>`;
+      const f = v / max;
+      return `<circle class="ur-pc" cx="${padL + h * cw + cw / 2}" cy="${padT + row * ch + ch / 2}" r="${(3 + f * 8.5).toFixed(1)}" style="opacity:${(0.35 + f * 0.65).toFixed(2)}"><title>${T(WEEK[wd])} ${h}${T('시')} · ${T('요청 {n}건', { n: v })}</title></circle>`;
+    }).join('')).join('');
+    const rows = order.map((wd, row) => `<text class="ur-tick" x="${padL - 8}" y="${padT + row * ch + ch / 2 + 4}" text-anchor="end">${E(T(WEEK[wd]))}</text>`).join('');
+    const cols = [0, 6, 12, 18, 23].map((h) => `<text class="ur-tick" x="${padL + h * cw + cw / 2}" y="${padT + 7 * ch + 12}" text-anchor="middle">${h}${E(T('시'))}</text>`).join('');
+    // 가장 바쁜 시간대
+    let best = [0, 0, 0];
+    d.punch.forEach((r, wd) => r.forEach((v, h) => { if (v > best[0]) best = [v, wd, h]; }));
+    const peak = best[0] ? T('가장 활발: {w}요일 {h}시', { w: T(WEEK[best[1]]), h: best[2] }) : '';
+    return { svg: `<svg class="ur-punch" viewBox="0 0 ${padL + 24 * cw + 4} ${padT + 7 * ch + 18}">${rows}${dots}${cols}</svg>`, peak };
+  }
+  function toolBars(d) {
+    const top = Object.entries(d.tools).sort((a, b) => b[1] - a[1]).slice(0, 9), max = top[0]?.[1] || 1;
+    return `<ul class="ur-hbars">${top.map(([k, v], i) => `<li><span>${E(k)}</span><div><i style="width:${((v / max) * 100).toFixed(1)}%;--d:${i * 60}ms"></i></div><b>${num(v)}</b><small>${pct(v / Math.max(1, d.toolCalls))}</small></li>`).join('')}</ul>`;
+  }
+  function roleTable(d) {
+    const max = Math.max(...d.roles.map((r) => r.cost), 0.01);
+    return `<table class="ur-roles"><thead><tr><th>${E(T('역할'))}</th><th>${E(T('요청'))}</th><th>${E(T('금액'))}</th><th>${E(T('캐시'))}</th><th>${E(T('바꾼 줄'))}</th></tr></thead><tbody>${
+      d.roles.slice(0, 10).map((r, i) => `<tr><td><span class="ur-rank">${i + 1}</span>${E(r.role)}<small>${T('세션 {n}', { n: r.sess })}</small></td><td>${num(r.req)}</td>
+        <td class="ur-cost"><div><i style="width:${((r.cost / max) * 100).toFixed(1)}%"></i></div>${money(r.cost)}</td>
+        <td><span class="ur-hit ${r.in && r.read / r.in >= 0.95 ? 'good' : r.in && r.read / r.in >= 0.9 ? 'mid' : 'bad'}">${r.in ? pct(r.read / r.in) : '—'}</span></td><td>${num(r.edits)}</td></tr>`).join('')}</tbody></table>`;
+  }
+  function modelsAndLength(d) {
+    const tot = Object.values(d.models).reduce((a, b) => a + b, 0) || 1;
+    const palette = ['var(--accent)', '#6aa8ff', '#b48cff', '#4fd1a5', '#f2b24c'];
+    const ent = Object.entries(d.models).sort((a, b) => b[1] - a[1]);
+    const seg = ent.map(([m, v], i) => `<i style="width:${((v / tot) * 100).toFixed(2)}%;background:${palette[i % palette.length]}" title="${E(m)} ${pct(v / tot)}"></i>`).join('');
+    const leg = ent.map(([m, v], i) => `<span><i style="background:${palette[i % palette.length]}"></i>${E(m.replace(/^claude-/, ''))} <b>${pct(v / tot)}</b></span>`).join('');
+    // 요청 길이 분포(글자 수)
+    const bins = [[0, 10, '~10'], [10, 30, '~30'], [30, 80, '~80'], [80, 200, '~200'], [200, Infinity, '200+']];
+    const counts = bins.map(([a, b]) => d.reqs.filter((r) => r.len >= a && r.len < b).length), mx = Math.max(...counts, 1);
+    const hist = bins.map(([, , l], i) => `<div class="ur-col"><i style="height:${((counts[i] / mx) * 100).toFixed(1)}%;--d:${i * 70}ms" title="${counts[i]}"></i><small>${l}</small></div>`).join('');
+    const avg = d.reqs.length ? Math.round(d.reqs.reduce((a, r) => a + r.len, 0) / d.reqs.length) : 0;
+    return `<div class="ur-models"><div class="ur-seg">${seg}</div><div class="ur-seg-leg">${leg}</div></div>
+      <div class="ur-len"><div class="ur-len-h"><span>${E(T('요청 길이(글자)'))}</span><b>${T('평균 {n}자', { n: avg })}</b></div><div class="ur-hist">${hist}</div></div>`;
+  }
+  // 점검 — 규칙으로 찾은 좋은 점·바꿀 점
+  function insights(d) {
+    const out = [], human = d.reqs.length;
+    if (!human) return '';
+    const work = d.reqs.filter((r) => r.kind !== 'reply');
+    const short = work.filter((r) => r.len < 15).length / Math.max(1, work.length);
+    if (short > 0.3) out.push(['tip', '짧은 지시가 많아요', T('지시 {p}가 15자 미만이에요. 대상·완료 조건을 한 줄 더 적으면 되묻기와 왕복이 줄어요.', { p: pct(short) })]);
+    const reply = (d.kinds.reply || 0) / human;
+    if (reply > 0.2) out.push(['tip', '확인 답장이 잦아요', T('요청의 {p}가 "응·네" 같은 짧은 답이에요. 처음 지시에 "묻지 말고 진행" 범위를 정해 두면 흐름이 끊기지 않아요.', { p: pct(reply) })]);
+    const intr = d.interrupts / human;
+    if (intr > 0.08) out.push(['warn', '중간에 멈춘 작업', T('요청 {p}를 도중에 중단했어요. 방향이 어긋날 때가 많다면 큰 작업은 먼저 계획을 받아 보세요.', { p: pct(intr) })]);
+    if (d.cacheHit != null && d.cacheHit < 0.9) out.push(['warn', '캐시가 자주 깨져요', T('캐시 적중 {p}. 오래 쉬었다 이어 쓰거나 모델·설정을 자주 바꾸면 처음부터 다시 읽어 비용이 커져요.', { p: pct(d.cacheHit) })]);
+    else if (d.cacheHit != null && d.cacheHit >= 0.97) out.push(['good', '캐시 활용 최상급', T('캐시 적중 {p} — 같은 맥락을 이어 가며 아주 효율적으로 쓰고 있어요.', { p: pct(d.cacheHit) })]);
+    const perSess = human / Math.max(1, d.sess.length);
+    if (perSess > 60) out.push(['tip', '세션이 길어요', T('세션당 요청 {n}건 · 압축 {c}번. 주제가 바뀌면 /clear 로 새로 시작하는 편이 빠르고 싸요.', { n: Math.round(perSess), c: d.compactions })]);
+    const night = d.reqs.filter((r) => { const h = new Date(r.t).getHours(); return h >= 22 || h < 5; }).length / human;
+    if (night > 0.2) out.push(['tip', '야간 작업 비중', T('요청 {p}가 밤 10시~새벽 5시예요. 긴 작업은 맡겨 두고 쉬는 것도 방법이에요.', { p: pct(night) })]);
+    if (d.subagents / human > 0.15) out.push(['good', '위임을 잘 써요', T('요청 100건당 서브에이전트 {n}번 — 조사·병렬 작업을 잘 나눠 맡기고 있어요.', { n: Math.round((d.subagents / human) * 100) })]);
+    else if (human > 30 && d.subagents / human < 0.03) out.push(['tip', '서브에이전트를 거의 안 써요', T('넓은 조사는 서브에이전트에 맡기면 메인 맥락이 가벼워져요.')]);
+    const top = d.roles[0];
+    if (top && d.roles.length > 1 && top.cost / Math.max(0.01, d.cost) > 0.5) out.push(['info', '한 역할에 집중', T("'{r}' 역할이 금액의 {p}를 써요.", { r: top.role, p: pct(top.cost / d.cost) })]);
+    if (d.auto > human * 0.3) out.push(['good', '백그라운드 작업 활용', T('알림 {n}건 — 오래 걸리는 일을 뒤에서 돌리며 작업하고 있어요.', { n: d.auto })]);
+    const ICON = { good: '✦', tip: '➜', warn: '!', info: 'i' };
+    return `<div class="ur-insights">${out.map(([lv, h, p], i) => `<div class="ur-ins ${lv}" style="--d:${i * 60}ms"><span class="ur-ins-i">${ICON[lv]}</span><div><b>${E(T(h))}</b><p>${E(p)}</p></div></div>`).join('') || `<p class="ur-empty">${E(T('눈에 띄는 점이 없어요 — 고르게 잘 쓰고 있어요.'))}</p>`}</div>`;
+  }
+
+  function render() {
+    const body = $u('#ur-body');
+    if (!data) { body.innerHTML = `<div class="ur-loading"><span></span>${E(T('워커 세션을 읽는 중…'))}</div>`; return; }
+    const d = crunch();
+    $u('#ur-sub').textContent = T('워커 세션 {s}개 · 기록 시작 {d}', { s: data.sessions.length, d: new Date(data.since).toLocaleDateString() });
+    if (!d.reqs.length) { body.innerHTML = `<p class="ur-empty big">${E(T('이 기간에 워커로 보낸 요청이 없어요.'))}</p>`; return; }
+    const pc = punchcard(d);
+    body.innerHTML = kpis(d)
+      + `<div class="ur-grid two">${card('사용 성향', T('요청 유형·위임·자동화·캐시로 본 모양'), persona(d) + radar(d), 'ur-hero')}${card('요청 유형', T('키워드로 나눈 내 요청'), donut(d))}</div>`
+      + card('날짜별 활동', T('요청 수와 그날 쓴 금액'), timeline(d), 'wide')
+      + `<div class="ur-grid two">${card('언제 일하나', pc.peak, pc.svg)}${card('Claude 가 쓴 도구', T('호출 수 · 비율'), toolBars(d))}</div>`
+      + `<div class="ur-grid two">${card('역할별', T('금액 순'), roleTable(d))}${card('모델 · 요청 길이', '', modelsAndLength(d))}</div>`
+      + card('점검', T('규칙으로 찾은 좋은 점과 바꿔 볼 점'), insights(d), 'wide');
+    countUp(d);
+  }
+
+  async function open() {
+    modal.hidden = false;
+    data = null; render();
+    try { data = await (await fetch('/api/user-profile')).json(); } catch { data = { sessions: [], since: Date.now() }; }
+    render();
+  }
+  function close() { modal.hidden = true; }
+  $u('#btn-ureport').addEventListener('click', open);
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal || e.target.closest('[data-ur=close]')) return close();
+    const r = e.target.closest('[data-range]');
+    if (r) { range = Number(r.dataset.range); modal.querySelectorAll('[data-range]').forEach((b) => b.classList.toggle('on', b === r)); render(); }
+  });
+  modal.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } });
+})();

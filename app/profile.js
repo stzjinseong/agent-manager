@@ -176,7 +176,7 @@ function newTurn(p, text, ts) {
     firstAt: null, modelMs: 0, toolWallMs: 0, toolPer: {}, ...empty(), thinking: 0, toolErrors: 0, model: null,
     hasPrev: Boolean(last), gap: last ? ts - last.end : null, missReason: null, missCounted: false };
   p.turns.push(t);
-  if (p.turns.length > MAX_TURNS) p.turns.shift();
+  if (p.turns.length > (p.maxTurns || MAX_TURNS)) p.turns.shift(); // 사용자 프로파일(userprofile.js)은 전부 들고 읽는다
   return t;
 }
 
@@ -252,7 +252,7 @@ function apply(p, e, line) {
     p.lastKind = 'user';
     // 사용자 중단(Esc)은 Stop 훅이 오지 않고 이 문구의 user 메시지로만 남는다 — 턴이 아니라 중단 시각으로 기록
     const first = typeof c === 'string' ? c : Array.isArray(c) && c[0]?.type === 'text' ? c[0].text : '';
-    if (first.startsWith('[Request interrupted by user')) { p.interruptedAt = ts; return; }
+    if (first.startsWith('[Request interrupted by user')) { p.interruptedAt = ts; p.interrupts = (p.interrupts || 0) + 1; return; }
     if (e.isCompactSummary) return; // 압축 뒤 이어 붙는 요약 글 — 사람이 보낸 질문이 아니라 턴으로 세지 않는다
     const text = promptText(e);
     if (text) newTurn(p, text, ts);

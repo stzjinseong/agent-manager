@@ -14,6 +14,7 @@ import { createRequire } from 'node:module';
 import { createProfile, readProfile, profileSummary, runningSubagents, editLog, trimHunks, pruneEdits, clearEdits } from './profile.js';
 import { snapshot, changedSince, readBlob } from './shelldiff.js';
 import { createProgress, isCommit } from './progress.js';
+import { createUserProfile } from './userprofile.js';
 import { L } from './cli-lang.js';
 import { createUpdates } from './updates.js';
 import { gitBranch } from './branch.js';
@@ -86,6 +87,9 @@ function judgeCache(w) {
 }
 setInterval(() => progress.sample(workers.values()), progress.SAMPLE_MS);
 const config = loadConfig();
+// 사용자 프로파일(나의 사용 리포트) — 워커가 쓴 트랜스크립트를 모아 둔다. 역할마다 기억된 마지막 세션도 넣어 처음부터 조금은 보이게
+const userProfile = createUserProfile(DATA_DIR);
+for (const [name, s] of Object.entries(config.sessions || {})) if (s?.tx) userProfile.note(s.tx, { name, cwd: s.cwd });
 
 // ---------- 계정 사용량 (구독 5시간·주간 한도) ----------
 // 워커의 상태줄 명령(statusline.mjs)이 Claude Code 가 준 rate_limits 를 보낸다. 계정 단위라 어느 워커에서 오든 같은 값 —
@@ -352,7 +356,7 @@ function checkInterrupted(w) {
 
 // 서버 코드가 켜진 뒤 바뀌었는지 — 화면은 새로고침마다 새 코드를 받지만 서버는 재시작해야 바뀐다.
 // 어긋나면 새 화면이 모르는 API 를 부르다 404 가 나므로, 화면에 "서버 재시작 필요"를 띄우게 알려 준다
-const SERVER_FILES = ['server.js', 'profile.js', 'pricing.js', 'progress.js'].map((f) => path.join(APP_DIR, f));
+const SERVER_FILES = ['server.js', 'profile.js', 'pricing.js', 'progress.js', 'userprofile.js'].map((f) => path.join(APP_DIR, f));
 const mtimeOf = (f) => { try { return fs.statSync(f).mtimeMs; } catch { return 0; } };
 const BOOT_MTIMES = SERVER_FILES.map(mtimeOf);
 let staleCache = { at: 0, value: false };
@@ -854,7 +858,7 @@ function onHook(w, ev, res) {
   rememberSession(w, ev, name === 'Stop');
   const prevTx = w.tx; // /clear 직전 세션 — 그 세션의 컨텍스트 크기로 /clear 경험치를 정한다
   if (ev.transcript_path) {
-    if (!w.tx || w.tx.path !== ev.transcript_path) w.tx = openProfile(ev.transcript_path);
+    if (!w.tx || w.tx.path !== ev.transcript_path) { w.tx = openProfile(ev.transcript_path); userProfile.note(ev.transcript_path, w); }
     scheduleProfile(w);
   }
 
@@ -1172,6 +1176,7 @@ function onHostHello({ ptys }) {
     if (workers.has(rec.id)) continue;
     const p = alive.get(rec.id);
     const w = { ...rec, term: hostTerm(rec.id, rec.ptySize || null, (s) => { w.ptySize = s; }), tx: rec.txPath ? openProfile(rec.txPath) : null };
+    if (rec.txPath) userProfile.note(rec.txPath, w);
     delete w.txPath;
     delete w.shellPending; // 예전 버전이 워커 객체에 두어 {} 로 저장된 것
     const wasHeld = Boolean(w.queueHeld); // 없앤 대기열 멈춤(질문·투입 실패·넘어온 대기열·⏸) — 풀고 이어서 투입
@@ -1614,6 +1619,7 @@ const STATIC = {
   '/i18n.js': ['public/i18n.js', 'text/javascript; charset=utf-8'],
   '/info-en.js': ['public/info-en.js', 'text/javascript; charset=utf-8'],
   '/characters.js': ['public/characters.js', 'text/javascript; charset=utf-8'],
+  '/userreport.js': ['public/userreport.js', 'text/javascript; charset=utf-8'],
   '/style.css': ['public/style.css', 'text/css; charset=utf-8'],
   '/vendor/xterm.js': ['node_modules/@xterm/xterm/lib/xterm.js', 'text/javascript'],
   '/vendor/xterm.css': ['node_modules/@xterm/xterm/css/xterm.css', 'text/css'],
@@ -1851,6 +1857,7 @@ const server = http.createServer(async (req, res) => {
   // 사용자 테마 — 목록, 테마 폴더 안 파일(theme.css · 그림 · 글꼴)
   if (req.method === 'GET' && p === '/api/themes') return json(res, 200, { themes: listThemes(), dir: THEME_DIR });
   if (req.method === 'GET' && p === '/api/term-schemes') return json(res, 200, wtSchemes());
+  if (req.method === 'GET' && p === '/api/user-profile') return json(res, 200, userProfile.report());
   if (req.method === 'POST' && p === '/api/themes') {
     const { id } = await readBody(req);
     const r = createTheme(String(id || '').trim());
