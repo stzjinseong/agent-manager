@@ -1332,26 +1332,29 @@ const DOC_ICON = {
 const LOCAL_VIEW = /^(127\.0\.0\.1|localhost|\[::1\])$/.test(location.hostname);
 const IMG_DOC = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp']);
 const VID_DOC = new Set(['mp4', 'm4v', 'mov', 'webm', 'ogv']); // 서버 VIDEO_TYPES 와 같게
+// 글 위주 결과물 — 누르면 앱 안 글 뷰어(openText). md 는 서식을 입혀, 나머지는 원문 그대로(json 은 들여쓰기)
+const TXT_DOC = new Set(['md', 'markdown', 'txt', 'log', 'csv', 'tsv', 'json', 'jsonl', 'xml', 'yaml', 'yml', 'toml', 'ini']);
 const docOpenHint = (img) => _t(img ? (LOCAL_VIEW ? '클릭: 크게 보기 · Ctrl/⌘+클릭: 열기' : '클릭: 크게 보기 · Ctrl/⌘+클릭: 새 탭')
   : LOCAL_VIEW ? '클릭: 열기 · Ctrl/⌘+클릭: 새 탭' : '클릭: 새 탭에서 열기');
 document.addEventListener('click', (e) => {
   const a = e.target.closest?.('a.card-doc, a.dock-doc, a.tl-doc');
   if (!a || e.button || e.shiftKey) return;
-  const mod = e.ctrlKey || e.metaKey, vid = a.dataset.vid != null, img = a.dataset.img != null || vid;
+  const mod = e.ctrlKey || e.metaKey, vid = a.dataset.vid != null, txt = a.dataset.txt != null, img = a.dataset.img != null || vid || txt;
   if (img && !mod) {
     e.preventDefault();
-    if (vid) openVideo(a.getAttribute('href'), { cap: a.dataset.vid }); else openShot(a.getAttribute('href'), { cap: a.dataset.img });
+    if (txt) openText(a.getAttribute('href'), a.dataset.txt);
+    else if (vid) openVideo(a.getAttribute('href'), { cap: a.dataset.vid }); else openShot(a.getAttribute('href'), { cap: a.dataset.img });
     return;
   }
   if (!LOCAL_VIEW || (mod && !img)) return;
   e.preventDefault();
   api(`/api${a.getAttribute('href')}/open`);
 }, true);
-const docImgAttr = (d, ext) => IMG_DOC.has(ext) ? ` data-img="${esc(d.path || d.name)}"` : VID_DOC.has(ext) ? ` data-vid="${esc(d.path || d.name)}"` : '';
+const docImgAttr = (d, ext) => IMG_DOC.has(ext) ? ` data-img="${esc(d.path || d.name)}"` : VID_DOC.has(ext) ? ` data-vid="${esc(d.path || d.name)}"` : TXT_DOC.has(ext) ? ` data-txt="${esc(d.path || d.name)}"` : '';
 // 워커 카드용 작은 타일 (아이콘 + 확장자). 끌면 링크가 아니라 카드가 끌리게 draggable=false
 function docTile(d, cls = 'card-doc') {
   const ext = d.name.split('.').pop().toLowerCase();
-  return `<a class="${cls}" href="${esc(d.url)}" target="_blank" rel="noopener" draggable="false"${docImgAttr(d, ext)} title="${esc(d.title ? `${d.title}\n` : '')}${esc(d.name)}&#10;${docOpenHint(IMG_DOC.has(ext) || VID_DOC.has(ext))}">` +
+  return `<a class="${cls}" href="${esc(d.url)}" target="_blank" rel="noopener" draggable="false"${docImgAttr(d, ext)} title="${esc(d.title ? `${d.title}\n` : '')}${esc(d.name)}&#10;${docOpenHint(IMG_DOC.has(ext) || VID_DOC.has(ext) || TXT_DOC.has(ext))}">` +
     `<span class="ic">${DOC_ICON[ext] || '📄'}</span><span class="ext">${esc(ext.toUpperCase())}</span></a>`;
 }
 function docCard(d) {
@@ -1359,7 +1362,7 @@ function docCard(d) {
   // 폴더는 끝쪽 두 단계만 (전체 경로는 마우스를 올리면)
   const parts = d.path.slice(0, -d.name.length - 1).split(/[\\/]/), sep = d.path.includes('\\') ? '\\' : '/';
   const dir = parts.length > 3 ? `…${sep}${parts.slice(-2).join(sep)}` : parts.join(sep);
-  return `<a class="tl-doc" href="${esc(d.url)}" target="_blank" rel="noopener"${docImgAttr(d, ext)} title="${esc(d.path)}&#10;${docOpenHint(IMG_DOC.has(ext) || VID_DOC.has(ext))}">` +
+  return `<a class="tl-doc" href="${esc(d.url)}" target="_blank" rel="noopener"${docImgAttr(d, ext)} title="${esc(d.path)}&#10;${docOpenHint(IMG_DOC.has(ext) || VID_DOC.has(ext) || TXT_DOC.has(ext))}">` +
     `<span class="ic">${DOC_ICON[ext] || '📄'}</span><span class="meta">` +
     (d.title ? `<span class="ti">${esc(d.title)}</span>` : '') +
     `<span class="nm">${esc(d.name)}</span><span class="dir">${esc(dir)}</span></span></a>`;
@@ -1467,6 +1470,53 @@ function openShot(url, single) { // single: { cap } — 결과물 그림 한 장
   document.addEventListener('keydown', onKey, true);
   document.body.append(box);
   show();
+}
+// 결과물 글 보기 — 크게 보기(.shot-view)와 같은 어두운 바탕 위 글 패널. 바깥·Esc 로 닫는다.
+// md 는 marked 로 서식을 입히고 DOMPurify 로 거른다(처음 열 때만 CDN 에서 불러옴 — 못 불러오면 원문 그대로). 2MB 넘으면 앞부분만
+const TEXT_MAX = 2 << 20;
+let mdLibs = null;
+function loadMdLibs() {
+  const js = (src) => new Promise((ok, no) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = no; document.head.append(s); });
+  mdLibs ??= Promise.all([js('https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js'), js('https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js')])
+    .catch((e) => { mdLibs = null; throw e; });
+  return mdLibs;
+}
+async function openText(url, cap) {
+  const ext = cap.split('.').pop().toLowerCase(), md = ext === 'md' || ext === 'markdown';
+  const box = el(`<div class="shot-view txt-view" title="${_t('바깥을 누르거나 Esc 로 닫기')}">
+    <div class="tv-panel"><div class="tv-head"><span class="tv-cap"></span>${LOCAL_VIEW ? `<button class="btn ghost mini" data-tv="open">${_t('OS 앱으로 열기')}</button>` : ''}<button class="btn ghost mini" data-tv="close">✕</button></div>
+    <div class="tv-body"><div class="tv-note">${_t('불러오는 중…')}</div></div></div></div>`);
+  $('.tv-cap', box).textContent = `${_t('결과물')} · ${cap}`;
+  const close = () => { box.remove(); document.removeEventListener('keydown', onKey, true); };
+  const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+  box.addEventListener('click', (e) => {
+    const act = e.target.closest('[data-tv]')?.dataset.tv;
+    if (act === 'open') { api(`/api${url}/open`); return; }
+    if (act === 'close' || !e.target.closest('.tv-panel')) close();
+  });
+  document.addEventListener('keydown', onKey, true);
+  document.body.append(box);
+  const body = $('.tv-body', box);
+  let text;
+  try {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(String(r.status));
+    text = new TextDecoder().decode(await r.arrayBuffer());
+  } catch { body.innerHTML = `<div class="tv-note">${esc(_t('파일을 읽지 못했어요 (지워졌거나 옮겨짐)'))}</div>`; return; }
+  const cut = text.length > TEXT_MAX;
+  if (cut) text = text.slice(0, TEXT_MAX);
+  const note = cut ? `<div class="tv-note">${esc(_t('파일이 커서 앞부분만 보여 줘요'))}</div>` : '';
+  if (md) {
+    try {
+      await loadMdLibs();
+      body.innerHTML = note + `<article class="tv-md">${DOMPurify.sanitize(marked.parse(text))}</article>`;
+      for (const a of body.querySelectorAll('a[href]')) { a.target = '_blank'; a.rel = 'noopener'; }
+      return;
+    } catch {} // 못 불러오면(오프라인) 원문 그대로
+  }
+  if (ext === 'json') { try { text = JSON.stringify(JSON.parse(text), null, 2); } catch {} }
+  body.innerHTML = note + '<pre class="tv-pre"></pre>';
+  $('.tv-pre', body).textContent = text;
 }
 // 첨부 동영상 보기 — 캡처 크게 보기(.shot-view)와 같은 틀에 <video>. 바깥·Esc 로 닫는다
 function openVideo(url, single) { // single: { cap } — 결과물 동영상(첨부 안내 없음)

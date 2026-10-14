@@ -738,6 +738,32 @@ body.term-full .side-grip { left: -6px; }
 .att-live:empty { display: none; }
 .att-live .att { margin-top: 0; }
 .shot-view { position: fixed; inset: 0; z-index: 500; display: grid; place-items: center; background: rgba(0, 0, 0, .78); cursor: zoom-out; padding: 24px; }
+/* 결과물 글 보기 (app.js openText) */
+.txt-view { cursor: default; }
+.tv-panel { display: flex; flex-direction: column; width: min(920px, 100%); max-height: calc(100vh - 48px); background: var(--surface); color: var(--text); border: 1px solid var(--line-2); border-radius: 12px; box-shadow: 0 20px 60px rgb(0 0 0 / .4); overflow: hidden; }
+.tv-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px 10px 16px; border-bottom: 1px solid var(--line); }
+.tv-cap { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; font: 12px var(--mono); color: var(--dim); }
+.tv-body { overflow: auto; padding: 16px 22px 22px; }
+.tv-note { margin-bottom: 10px; font-size: 12.5px; color: var(--dim); }
+.tv-pre { margin: 0; font: 12.5px/1.6 var(--mono); white-space: pre-wrap; word-break: break-word; tab-size: 4; }
+.tv-md { font-size: 14px; line-height: 1.7; word-break: break-word; }
+.tv-md :is(h1, h2, h3, h4) { margin: 1.3em 0 .5em; line-height: 1.35; }
+.tv-md h1 { font-size: 1.55em; padding-bottom: .3em; border-bottom: 1px solid var(--line); }
+.tv-md h2 { font-size: 1.3em; padding-bottom: .25em; border-bottom: 1px solid var(--line); }
+.tv-md h3 { font-size: 1.12em; }
+.tv-md > :first-child { margin-top: 0; }
+.tv-md :is(p, ul, ol, pre, table, blockquote) { margin: 0 0 .9em; }
+.tv-md :is(ul, ol) { padding-left: 1.5em; }
+.tv-md a { color: var(--accent); }
+.tv-md code { font: .9em var(--mono); padding: 1px 5px; border-radius: 4px; background: var(--surface-3); }
+.tv-md pre { padding: 12px 14px; border-radius: 8px; background: var(--surface-3); overflow: auto; }
+.tv-md pre code { padding: 0; background: none; font-size: 12.5px; line-height: 1.55; }
+.tv-md blockquote { padding: 2px 14px; border-left: 3px solid var(--line-2); color: var(--text-2); }
+.tv-md table { border-collapse: collapse; display: block; overflow: auto; }
+.tv-md :is(th, td) { padding: 5px 10px; border: 1px solid var(--line); }
+.tv-md th { background: var(--surface-3); }
+.tv-md img { max-width: 100%; }
+.tv-md hr { border: 0; border-top: 1px solid var(--line); margin: 1.2em 0; }
 .shot-view figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 100%; max-height: 100%; }
 .shot-view :is(img, video) { max-width: min(92vw, 1600px); max-height: calc(100vh - 90px); object-fit: contain; border-radius: 8px; box-shadow: 0 10px 40px rgba(0, 0, 0, .6); background: #0c0d11; }
 .shot-view figcaption { color: var(--text-2); font: 12px var(--mono); word-break: break-all; text-align: center; display: flex; flex-direction: column; gap: 3px; cursor: text; }
