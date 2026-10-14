@@ -874,6 +874,9 @@ function onHook(w, ev, res) {
         if (prevTx) { try { readProfile(prevTx); } catch {} }
         award(w, progress.clear(w, prevTx?.context), 'clear');
       }
+      // 압축(/compact · 자동 압축)도 Claude 가 화면을 지우고 머리말부터 새로 그린다 — /clear 와 같은 까닭으로 기록이 안 지워져
+      // 예전 대화가 중간에 잘린 채(표 반쪽 등) 새 화면 바로 위에 붙어 꼬여 보였다. 타임라인은 같은 세션이라 그대로 둔다
+      if (ev.source === 'compact') setTimeout(() => { hostSend({ op: 'clearScrollback', id: w.id }); broadcast({ type: 'clearScrollback', id: w.id }); }, 300);
       // 지난 세션을 이어 붙였으면(▶ 투입의 --resume · 터미널의 /resume) 트랜스크립트를 다 읽은 뒤 지난 요청을 타임라인에 채운다
       if (ev.source === 'resume') w.seedAt = Date.now();
       setStatus(w, 'idle', `세션 시작 (${ev.source || 'startup'})`);
