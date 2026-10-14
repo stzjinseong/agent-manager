@@ -138,15 +138,19 @@
   }
 
   // 성향 레이더 — 요청 유형 비중(가장 큰 유형을 1로), 위임(요청당 서브에이전트), 자동화(도구 중 명령 실행 비율), 효율(캐시 적중)
-  function radar(d) {
+  function axesOf(d) {
     const human = d.reqs.filter((r) => r.kind !== 'reply' && r.kind !== 'etc').length || 1;
     const share = (k) => (d.kinds[k] || 0) / human;
     const maxShare = Math.max(...['feature', 'bug', 'ask', 'ops', 'review'].map(share), 0.01);
-    const axes = [
+    return [
       ['구현', share('feature') / maxShare], ['디버깅', share('bug') / maxShare], ['탐구', share('ask') / maxShare],
       ['운영', share('ops') / maxShare], ['위임', Math.min(1, (d.subagents / Math.max(1, d.reqs.length)) * 5)],
       ['자동화', Math.min(1, ((d.tools.Bash || 0) + (d.tools.PowerShell || 0)) / Math.max(1, d.toolCalls) * 2.5)], ['효율', d.cacheHit ?? 0],
     ];
+  }
+  const AXIS_WHY = { 구현: '작업 지시 비중', 디버깅: '버그·문제 요청 비중', 탐구: '조사·질문 비중', 운영: '커밋·빌드 요청 비중', 위임: '서브에이전트 활용', 자동화: '명령 실행 도구 비율', 효율: '캐시 적중' };
+  function radar(d) {
+    const axes = axesOf(d);
     const C = 130, R = 92, n = axes.length;
     const pt = (i, v) => { const a = -Math.PI / 2 + (i * 2 * Math.PI) / n; return [C + Math.cos(a) * R * v, C + Math.sin(a) * R * v]; };
     const grid = [0.25, 0.5, 0.75, 1].map((g) => `<polygon class="ur-rgrid" points="${axes.map((_, i) => pt(i, g).join(',')).join(' ')}"/>`).join('');
@@ -157,10 +161,28 @@
     return `<svg class="ur-radar" viewBox="-20 -14 300 290"><defs><radialGradient id="ur-rg" cx="50%" cy="50%" r="60%"><stop offset="0" stop-color="var(--accent)" stop-opacity=".55"/><stop offset="1" stop-color="var(--accent)" stop-opacity=".12"/></radialGradient></defs>
       ${grid}${spokes}<polygon class="ur-rshape" points="${shape}" fill="url(#ur-rg)"/>${dots}${labels}</svg>`;
   }
-  function persona(d) {
-    const top = Object.entries(d.kinds).filter(([k]) => k !== 'reply' && k !== 'etc').sort((a, b) => b[1] - a[1])[0]?.[0] || 'etc';
-    const [name, desc] = PERSONA[top];
-    return `<div class="ur-persona"><span class="ur-badge" style="--k:${KIND[top].color}">${E(T(name))}</span><p>${E(T(desc))}</p></div>`;
+  const topKind = (d) => Object.entries(d.kinds).filter(([k]) => k !== 'reply' && k !== 'etc').sort((a, b) => b[1] - a[1])[0]?.[0] || 'etc';
+  // 맨 위 성향 배너 — 들어오자마자 '당신은 ○○형' 을 크게, 근거 몇 개를 '왜?' 미끼로 보여 주고 아래 상세로 이끈다
+  function hero(d) {
+    const top = topKind(d), [name, desc] = PERSONA[top], col = KIND[top].color, total = d.reqs.length || 1;
+    const axes = axesOf(d).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 3);
+    const aiName = ai.last?.report?.persona?.name;
+    const chips = [
+      `<span><b>${pct((d.kinds[top] || 0) / total)}</b>${E(T('가장 많은 요청 · {k}', { k: T(KIND[top].label) }))}</span>`,
+      ...axes.map(([k, v]) => `<span><b>${Math.round(v * 100)}</b>${E(T(k))} · ${E(T(AXIS_WHY[k]))}</span>`),
+    ].join('');
+    return `<section class="ur-hero-banner" style="--k:${col}">
+      <div class="ur-hb-glow"></div><div class="ur-hb-stars"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="ur-hb-text">
+        <small>${E(T('나의 Claude 사용 성향'))}</small>
+        <h2>${E(T('당신은'))} <span class="ur-hb-name">${E(T(name))}</span>${E(T('이에요!'))}</h2>
+        <p>${E(T(desc))}</p>
+        <div class="ur-hb-chips">${chips}</div>
+        ${aiName ? `<p class="ur-hb-ai">${E(T('AI 코치는 당신을 “{n}” 라고 불러요', { n: aiName }))}</p>` : ''}
+        <button class="ur-hb-more" data-ur="why">${E(T('왜 그런지 보기'))} <span>↓</span></button>
+      </div>
+      <div class="ur-hb-radar">${radar(d)}</div>
+    </section>`;
   }
   function donut(d) {
     const total = d.reqs.length || 1, R = 64, r = 42, C = 80;
@@ -323,14 +345,13 @@
     $u('#ur-sub').textContent = T('워커 세션 {s}개 · 기록 시작 {d}', { s: data.sessions.length, d: new Date(data.since).toLocaleDateString() });
     if (!d.reqs.length) { body.innerHTML = `<p class="ur-empty big">${E(T('이 기간에 워커로 보낸 요청이 없어요.'))}</p>`; return; }
     const pc = punchcard(d);
-    body.innerHTML = kpis(d)
+    body.innerHTML = hero(d) + kpis(d)
       + metricsCard()
       + `<section class="ur-card wide ur-ai-card"><header><h4>${E(T('AI 코치 리포트'))}</h4><small>${E(T('Claude 가 내 요청 글을 읽고 주는 피드백'))}</small></header><div id="ur-ai">${aiBody()}</div></section>`
-      + `<div class="ur-grid two">${card('사용 성향', T('요청 유형·위임·자동화·캐시로 본 모양'), persona(d) + radar(d), 'ur-hero')}${card('요청 유형', T('키워드로 나눈 내 요청'), donut(d))}</div>`
+      + `<div class="ur-grid two" id="ur-why">${card('요청 유형', T('키워드로 나눈 내 요청 — 성향은 가장 많은 유형으로 정해요'), donut(d))}${card('언제 일하나', pc.peak, pc.svg)}</div>`
       + card('날짜별 활동', T('요청 수와 그날 쓴 금액'), timeline(d), 'wide')
-      + `<div class="ur-grid two">${card('언제 일하나', pc.peak, pc.svg)}${card('Claude 가 쓴 도구', T('호출 수 · 비율'), toolBars(d))}</div>`
-      + `<div class="ur-grid two">${card('역할별', T('금액 순'), roleTable(d))}${card('요청 길이', T('내가 보낸 요청이 몇 글자였나'), modelsAndLength(d))}</div>`
-      + card('점검', T('규칙으로 찾은 좋은 점과 바꿔 볼 점'), insights(d), 'wide');
+      + `<div class="ur-grid two">${card('Claude 가 쓴 도구', T('호출 수 · 비율'), toolBars(d))}${card('역할별', T('금액 순'), roleTable(d))}</div>`
+      + `<div class="ur-grid two">${card('요청 길이', T('내가 보낸 요청이 몇 글자였나'), modelsAndLength(d))}${card('점검', T('규칙으로 찾은 좋은 점과 바꿔 볼 점'), insights(d))}</div>`;
     countUp(d);
   }
 
@@ -348,6 +369,7 @@
     const r = e.target.closest('[data-range]');
     if (r) { range = Number(r.dataset.range); modal.querySelectorAll('[data-range]').forEach((b) => b.classList.toggle('on', b === r)); render(); loadAi(); }
     if (e.target.closest('[data-ai=run]') && !ai.busy) runAi();
+    if (e.target.closest('[data-ur=why]')) $u('#ur-why')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
   modal.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } });
 })();

@@ -2220,3 +2220,37 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 #profile .kpi svg.spark { height: 20px; margin-top: 6px; }
 #profile .kpi svg.spark rect { fill: color-mix(in srgb, var(--accent) 45%, transparent); }
 #profile .kpi svg.spark rect.now { fill: var(--accent); }
+
+/* 맨 위 성향 배너 — '당신은 ○○형이에요!' */
+.ur-hero-banner { position: relative; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); align-items: center; gap: 10px;
+  padding: 26px 30px; border-radius: 20px; border: 1px solid color-mix(in srgb, var(--k) 40%, var(--line-2));
+  background: linear-gradient(120deg, color-mix(in srgb, var(--k) 20%, transparent), transparent 55%), rgb(var(--ink) / .03); animation: ur-rise .6s both; flex: none; }
+.ur-hb-glow { position: absolute; left: -10%; top: -60%; width: 70%; height: 220%; background: radial-gradient(closest-side, color-mix(in srgb, var(--k) 38%, transparent), transparent); filter: blur(20px); animation: ur-pulse 5s ease-in-out infinite; pointer-events: none; }
+.ur-hb-stars { position: absolute; inset: 0; pointer-events: none; } /* 장식 — 그리드 칸을 차지하지 않게 */
+.ur-hb-stars i { position: absolute; width: 4px; height: 4px; border-radius: 50%; background: #fff; opacity: 0; box-shadow: 0 0 8px var(--k); animation: ur-twinkle 3.4s ease-in-out infinite; }
+.ur-hb-stars i:nth-child(1) { left: 8%; top: 18%; } .ur-hb-stars i:nth-child(2) { left: 38%; top: 12%; animation-delay: .6s; } .ur-hb-stars i:nth-child(3) { left: 50%; top: 78%; animation-delay: 1.2s; }
+.ur-hb-stars i:nth-child(4) { left: 22%; top: 86%; animation-delay: 1.8s; } .ur-hb-stars i:nth-child(5) { left: 92%; top: 14%; animation-delay: 2.4s; } .ur-hb-stars i:nth-child(6) { left: 64%; top: 30%; animation-delay: 3s; }
+@keyframes ur-twinkle { 50% { opacity: .9; transform: scale(1.4); } }
+.ur-hb-text { position: relative; }
+.ur-hb-text > small { font-size: 12px; font-weight: 700; letter-spacing: .08em; color: color-mix(in srgb, var(--k) 70%, var(--text)); }
+.ur-hb-text h2 { margin: 6px 0 10px; font-size: 34px; font-weight: 800; letter-spacing: -.03em; line-height: 1.2; }
+.ur-hb-name { display: inline-block; background: linear-gradient(100deg, var(--k), color-mix(in srgb, var(--k) 40%, #fff)); -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 4px 18px color-mix(in srgb, var(--k) 55%, transparent)); animation: ur-namepop .7s .15s cubic-bezier(.2, 1.6, .4, 1) both; }
+@keyframes ur-namepop { from { transform: scale(.6) translateY(6px); opacity: 0; } }
+.ur-hb-text > p { margin: 0 0 14px; font-size: 14px; color: var(--text-2); line-height: 1.6; max-width: 520px; }
+.ur-hb-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.ur-hb-chips span { display: inline-flex; align-items: baseline; gap: 7px; padding: 6px 12px; border-radius: 10px; font-size: 12px; color: var(--text-2); background: rgb(var(--ink) / .06); animation: ur-rise .5s both; }
+.ur-hb-chips span:nth-child(2) { animation-delay: .08s; } .ur-hb-chips span:nth-child(3) { animation-delay: .16s; } .ur-hb-chips span:nth-child(4) { animation-delay: .24s; }
+.ur-hb-chips b { font-size: 16px; font-weight: 800; color: var(--text); }
+.ur-hb-ai { margin: 12px 0 0 !important; font-size: 12.5px !important; color: #b48cff !important; }
+.ur-hb-more { margin-top: 16px; display: inline-flex; align-items: center; gap: 8px; border: 1px solid color-mix(in srgb, var(--k) 50%, transparent); background: color-mix(in srgb, var(--k) 14%, transparent);
+  color: var(--text); font: inherit; font-size: 13px; font-weight: 600; padding: 7px 16px; border-radius: 999px; cursor: pointer; transition: background .15s; }
+.ur-hb-more:hover { background: color-mix(in srgb, var(--k) 26%, transparent); }
+.ur-hb-more span { display: inline-block; animation: ur-bob 1.4s ease-in-out infinite; }
+@keyframes ur-bob { 50% { transform: translateY(3px); } }
+.ur-hb-radar { position: relative; display: grid; place-items: center; }
+.ur-hb-radar .ur-radar { width: 100%; max-height: 280px; }
+@media (max-width: 860px) { .ur-hero-banner { grid-template-columns: 1fr; } .ur-hb-text h2 { font-size: 27px; } }
+.ur-hb-radar stop { stop-color: var(--k); } /* 배너 레이더는 성향 색으로 */
+.ur-hb-radar .ur-rshape { stroke: color-mix(in srgb, var(--k) 70%, #fff); filter: drop-shadow(0 0 12px color-mix(in srgb, var(--k) 60%, transparent)); }
+.ur-hb-radar .ur-rdot { fill: color-mix(in srgb, var(--k) 70%, #fff); }
