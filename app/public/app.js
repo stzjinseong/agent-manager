@@ -307,6 +307,136 @@ async function copySelection() {
   term.clearSelection();
   return true;
 }
+// ---------- 잘라내기 (Ctrl/⌘+X) ----------
+// xterm 화면엔 CLI 가 그린 글자만 있고 입력 내용은 Claude 안에 있다 → 선택을 복사한 뒤 키로 지운다:
+// 커서를 선택 시작으로 옮기고, → 로 선택 끝까지 가며 몇 번 눌렀는지 세서, 그만큼 Backspace.
+// 화면에서 글자 수를 셀 수 없어 커서를 보며 옮긴다(실측 v2.1.296): 입력칸은 단어 단위로 접히고 접힌 자리의 공백은 안 보인다
+// (줄 끝 → 다음 줄 첫 칸이 두 번), 단어 중간에서 접히면 줄 끝 칸에는 커서가 가지 않는다(한 번), 줄바꿈도 두 번. ←/→ 는 한 글자씩
+// 줄을 넘어 움직이고 커서는 진짜 터미널 커서다. 입력칸이 아니거나(메뉴·! 셸) Vim 모드·붙여넣기 묶음([Pasted text #1])이면 복사만 한다
+const CUT_INDENT = 2; // '❯ ' · 이어지는 줄 들여쓰기
+let cutting = false;
+function cutBox() {
+  const b = term.buffer.active, rows = [];
+  for (let i = b.baseY; i < b.length; i++) rows.push(i);
+  const str = (y) => b.getLine(y)?.translateToString(true) || '';
+  const rule = rows.filter((y) => /^\s*─{20,}/.test(str(y)));
+  for (let k = rule.length - 1; k > 0; k--) {
+    const top = rule[k - 1], bottom = rule[k];
+    if (bottom - top < 2) continue;
+    const first = str(top + 1), at = first.search(/[❯›>]/);
+    if (at < 0 || first.slice(0, at).trim()) return null;
+    const below = rows.filter((y) => y > bottom).map(str).join('\n');
+    if (/-- (INSERT|NORMAL|VISUAL)/.test(below)) return null;
+    return { top, bottom, start: at + CUT_INDENT, cur: { y: b.baseY + b.cursorY, x: b.cursorX } };
+  }
+  return null;
+}
+// 줄 y 의 글자 끝 칸(마지막 글자 다음 칸)
+function cutRowEnd(y) {
+  const l = term.buffer.active.getLine(y);
+  let end = 0;
+  for (let x = 0; l && x < l.length; x++) { const c = l.getCell(x); if (c && c.getChars().trim()) end = x + Math.max(1, c.getWidth()); }
+  return end;
+}
+// a 부터 b 까지(같은 줄) 글자 수 — 두 칸 글자(한글)는 한 글자
+function cutChars(y, a, b) {
+  const l = term.buffer.active.getLine(y);
+  let n = 0;
+  for (let x = a; l && x < b; x++) if (l.getCell(x)?.getWidth()) n++;
+  return n;
+}
+// 화면이 다시 그려질 때까지(조용해진 뒤 40ms, 길어야 400ms)
+function cutSettle() {
+  return new Promise((done) => {
+    let quiet, sub;
+    const end = () => { clearTimeout(quiet); clearTimeout(cap); sub?.dispose(); done(); };
+    const cap = setTimeout(end, 400);
+    sub = term.onWriteParsed(() => { clearTimeout(quiet); quiet = setTimeout(end, 40); });
+  });
+}
+// 잘라낼 글 — 화면 그대로(getSelection)면 접힌 자리마다 줄바꿈·들여쓰기가 끼므로 입력 글로 되돌린다.
+// 접힌 자리: 줄이 끝 칸(cols-2)까지 찼으면 단어 중간에서 접힘(이어 붙임), 다음 줄 첫 단어가 이 줄에 안 들어가면 공백에서 접힘,
+// 들어가는데 내려갔으면 줄바꿈
+function cutText(s, e, start) {
+  const b = term.buffer.active, limit = term.cols - 2;
+  const slice = (y, a, z) => { const l = b.getLine(y); let t = ''; for (let x = a; l && x < z; x++) { const c = l.getCell(x); if (c?.getWidth()) t += c.getChars() || ' '; } return t; };
+  let out = '';
+  for (let y = s.y; y <= e.y; y++) {
+    const end = cutRowEnd(y);
+    out += slice(y, y === s.y ? s.x : start, y === e.y ? e.x : end);
+    if (y === e.y) break;
+    const next = b.getLine(y + 1);
+    let w = 0; // 다음 줄 첫 단어의 칸 수
+    while (next && start + w < next.length && next.getCell(start + w)?.getChars().trim()) w += next.getCell(start + w).getWidth() || 1;
+    out += end >= limit ? '' : end > start && end + 1 + w > limit ? ' ' : '\n';
+  }
+  return out;
+}
+async function cutKeys(data) { send({ type: 'input', id: selected, data }); await cutSettle(); return cutBox(); }
+async function cutSelection() {
+  const sel = term.getSelectionPosition(), text = term.getSelection();
+  if (!sel || !text) return;
+  const id = selected;
+  // 클립보드는 키 이벤트 안에서(첫 await 전에) 쓴다 — Safari 는 사용자 동작 중에만 허용
+  const copyOnly = (why) => { copySelection(); toast(_t(why)); };
+  let box = cutBox();
+  if (cutting || !box || termLocked() || !id) return copyOnly('입력칸 밖이라 복사만 했어요');
+  // 선택을 입력칸 글자 범위로 줄인다 — 줄 앞 '❯ '·들여쓰기와 줄 끝 빈칸은 빼고, 두 칸 글자의 오른쪽 반에 걸치면 그 글자까지
+  let s = { y: sel.start.y, x: Math.max(sel.start.x, box.start) }, e = { y: sel.end.y, x: sel.end.x };
+  if (s.x >= cutRowEnd(s.y) && s.y < e.y) s = { y: s.y + 1, x: box.start };
+  e.x = Math.min(e.x, Math.max(cutRowEnd(e.y), box.start));
+  if (s.y <= box.top || e.y >= box.bottom || (s.y === e.y && s.x >= e.x)) return copyOnly('입력칸 밖이라 복사만 했어요');
+  if (!term.buffer.active.getLine(s.y)?.getCell(s.x)?.getWidth()) s.x--;
+  if (term.buffer.active.getLine(e.y)?.getCell(e.x)?.getWidth() === 0) e.x++;
+  for (let y = s.y; y <= e.y; y++) {
+    const line = term.buffer.active.getLine(y)?.translateToString(true) || '';
+    if (/\[(Pasted text|Image) #\d+/.test(line)) return copyOnly('붙여넣은 묶음이 있는 줄은 복사만 했어요');
+  }
+  if (box.cur.y <= box.top || box.cur.y >= box.bottom) return copyOnly('입력칸 밖이라 복사만 했어요');
+  try { navigator.clipboard.writeText(cutText(s, e, box.start)).catch(() => {}); } catch {}
+  term.clearSelection();
+  cutting = true;
+  try {
+    // 입력칸 맨 위 가로선 기준 상대 줄로 다룬다 — 도중에 위쪽 출력이 늘어 화면이 밀려도 맞도록
+    const rel = (p, bx) => ({ y: p.y - bx.top, x: p.x });
+    const key = (p) => p.y * 10000 + p.x;
+    const top0 = box.top, S = rel(s, box), E = rel(e, box);
+    const at = (bx, p) => bx && bx.cur.y - bx.top === p.y && bx.cur.x === p.x;
+    // 1) 선택 시작으로: 보이는 글자 수만큼 한 번에(접힌 자리를 0 으로 쳐 넘치지 않게), 나머지는 한 칸씩
+    let cur = rel(box.cur, box), guard = 400;
+    const rowEnd = (y) => Math.max(cutRowEnd(y + top0), box.start); // 빈 줄이면 들여쓰기 칸
+    const between = (a, b) => { let n = 0; for (let y = a.y; y <= b.y; y++) n += cutChars(y + top0, y === a.y ? a.x : box.start, y === b.y ? b.x : rowEnd(y)); return n; };
+    const k = key(cur) < key(S) ? between(cur, S) : between(S, cur);
+    if (k) { box = await cutKeys((key(cur) < key(S) ? '\x1b[C' : '\x1b[D').repeat(k)); if (!box) throw 0; cur = rel(box.cur, box); }
+    while (!at(box, S)) {
+      if (!guard-- || !box) throw 0;
+      const fwd = key(cur) < key(S);
+      box = await cutKeys(fwd ? '\x1b[C' : '\x1b[D');
+      if (!box) throw 0;
+      const next = rel(box.cur, box);
+      if (key(next) === key(cur) || (fwd ? key(next) > key(S) : key(next) < key(S))) throw 0; // 못 가거나 지나침
+      cur = next;
+    }
+    // 2) 선택 끝까지 → 를 누르며 센다. 줄마다 그 줄 글자만큼 한 번에, 줄 끝에 멈췄으면(접힌 공백·줄바꿈) 한 번 더
+    let n = 0;
+    for (let y = S.y; y <= E.y; y++) {
+      const from = y === S.y ? S.x : box.start, last = y === E.y;
+      const to = last ? E.x : rowEnd(y), m = cutChars(y + top0, from, to);
+      if (m) { box = await cutKeys('\x1b[C'.repeat(m)); n += m; if (!box) throw 0; }
+      cur = rel(box.cur, box);
+      const nextRow = { y: y + 1, x: box.start };
+      if (last) { if (!(at(box, { y, x: to }) || (to === rowEnd(y) && at(box, nextRow)))) throw 0; break; }
+      if (at(box, nextRow)) continue; // 단어 중간에서 접힘 — 이미 다음 줄
+      if (!at(box, { y, x: to })) throw 0;
+      box = await cutKeys('\x1b[C'); n++;
+      if (!at(box, nextRow)) throw 0;
+    }
+    if (!n) throw 0;
+    send({ type: 'input', id, data: '\x7f'.repeat(n) });
+  } catch {
+    toast(_t('커서를 옮기지 못해 복사만 했어요'));
+  } finally { cutting = false; }
+}
 term.attachCustomKeyEventHandler((e) => {
   if (e.type !== 'keydown') return true;
   // Enter 는 헤더 ⌨ 의 키 세트대로(enterAction) — 업무 지시 입력창과 같은 규칙. 세트 1: Enter 줄바꿈 · Alt(⌥)·Cmd+Enter 제출,
@@ -332,6 +462,8 @@ term.attachCustomKeyEventHandler((e) => {
   // e.key 가 아니라 물리 키(e.code)로 판정 — 한글 입력 상태면 Ctrl+V 의 key 가 'ㅍ', Ctrl+C 는 'ㅊ' 로 온다
   if (mod && e.code === 'KeyC' && (term.hasSelection() || e.shiftKey || e.metaKey)) { e.preventDefault(); copySelection(); return false; }
   if (mod && e.code === 'KeyV') return false; // 기본 paste 이벤트로 넘김
+  // Ctrl/⌘+X: 선택이 있으면 잘라내기(입력칸 밖이면 복사만), 없으면 그대로 CLI 로
+  if (mod && e.code === 'KeyX' && term.hasSelection()) { e.preventDefault(); cutSelection(); return false; }
   return true;
 });
 // ---------- 파일 첨부 ----------
