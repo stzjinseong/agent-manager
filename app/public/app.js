@@ -3479,7 +3479,7 @@ function updRow(title, x, kind) {
     status = `<b class="upd-new">${_t('새 버전 {v}', { v: esc(latest) })}</b>`;
     guide = kind === 'app'
       ? `<div class="upd-guide">${_t('프로젝트 폴더에서 <code>git pull</code> 후 <b>↻ 서버 재시작</b>')}</div>`
-      : `<div class="upd-guide">${_t('터미널에서 <code>claude update</code> · 이미 떠 있는 워커는 새로 띄워야 적용돼요')}</div>`;
+      : `<div class="upd-guide">${_t('· 터미널에서 <code>claude update</code><br>· 서버 + 워커 모두 종료 후 다시 돌아와 작업 중이던 워커를 투입해야 해요.')}</div>`;
   } else status = `<span class="upd-ok">${_t('최신 버전이에요')}</span>`;
   const cur = x?.current != null ? (kind === 'app' ? `release-${x.current}` : x.current) : '—';
   // 클로드 키우기: 릴리즈 노트 — 누르면 큰 창에 모든 릴리즈(최신 → 과거)를 스크롤로

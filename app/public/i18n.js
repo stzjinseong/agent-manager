@@ -544,7 +544,7 @@ const EN = {
   '인터넷에 접속하지 못해 최신 버전을 모르겠어요': 'Couldn\'t reach the internet to check the latest version',
   '새 버전 {v}': 'New version {v}',
   '프로젝트 폴더에서 <code>git pull</code> 후 <b>↻ 서버 재시작</b>': 'Run <code>git pull</code> in the project folder, then <b>↻ Restart server</b>',
-  '터미널에서 <code>claude update</code> · 이미 떠 있는 워커는 새로 띄워야 적용돼요': 'Run <code>claude update</code> in a terminal · running workers need a relaunch to use it',
+  '· 터미널에서 <code>claude update</code><br>· 서버 + 워커 모두 종료 후 다시 돌아와 작업 중이던 워커를 투입해야 해요.': '· Run <code>claude update</code> in a terminal<br>· Shut down the server and all workers, then come back and redeploy the workers you were using.',
   '최신 버전이에요': 'You\'re up to date',
   '확인 중…': 'Checking…',
   '마지막 확인 {t}': 'Last checked {t}',
