@@ -962,6 +962,7 @@ function onHook(w, ev, res) {
     }
     case 'Stop':
       w.lastMessage = ev.last_assistant_message ?? w.lastMessage;
+      trackAnswerDocs(w, ev.last_assistant_message); // 아래 setStatus 가 상태를 민다
       w.currentTool = null;
       w.doneAt = Date.now(); // 화면의 '확인 안 한 완료' 표시 기준
       payout(w);
@@ -1441,7 +1442,7 @@ const IMAGE_TYPES = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', g
 // 글 형식(md·json·html 등)은 넣지 않는다: git status 같은 출력에 Edit 로 고친 기존 소스가 찍혀 결과물로 잘못 잡힌다
 const SHELL_DOC_EXT = ['pdf', 'svg', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt', 'hwp', 'hwpx', 'odt', 'ods', 'odp', 'rtf',
   'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'mp4', 'm4v', 'mov', 'webm', 'zip', '7z'];
-const SHELL_DOC_RE = new RegExp(`(["'])([^"'\\n]+?\\.(?:${SHELL_DOC_EXT.join('|')}))\\1|([^\\s"'\`<>|;&()=,]+\\.(?:${SHELL_DOC_EXT.join('|')}))(?![\\w.])`, 'gi');
+const SHELL_DOC_RE = new RegExp(`(["'])([^"'\\n]+?\\.(?:${SHELL_DOC_EXT.join('|')}))\\1|([^\\s"'\`<>|;&()=,]+\\.(?:${SHELL_DOC_EXT.join('|')}))(?!\\w|\\.\\w)`, 'gi'); // 끝에 마침표만 붙은 경로("…\\clip.mp4.")도
 const DOC_KEEP = 50;
 const CLAUDE_HOME = path.join(os.homedir(), '.claude');
 const docExt = (file) => path.extname(file).slice(1).toLowerCase();
@@ -1481,17 +1482,29 @@ function addDoc(w, full, id, tool) {
 function trackShellDocs(w, ev) {
   if (ev.tool_name !== 'Bash' || !w.turnStartedAt) return false;
   const out = ev.tool_response || {};
-  const text = [ev.tool_input?.command, out.stdout, out.stderr].filter((s) => typeof s === 'string').join('\n').slice(0, 200000);
+  const text = [ev.tool_input?.command, out.stdout, out.stderr].filter((s) => typeof s === 'string').join('\n');
+  return trackPathsIn(w, text, ev.cwd, 'Bash');
+}
+// 턴 끝 답변에 적힌 경로 — 녹화·변환을 PowerShell·MCP 도구·백그라운드로 하면 위 Bash 검사에 안 걸려, 답에 경로만 있고
+// 결과물 카드가 안 떴다. 답에 나온 경로 중 이번 턴에 생기거나 바뀐 파일만(Bash 와 같은 형식·시각 조건)
+function trackAnswerDocs(w, text) {
+  if (!w.turnStartedAt || typeof text !== 'string' || !text) return false;
+  return trackPathsIn(w, text, null, '답변');
+}
+function trackPathsIn(w, text, cwd, tool) {
+  text = text.slice(0, 200000);
   const found = new Set();
   for (const m of text.matchAll(SHELL_DOC_RE)) { found.add(m[2] || m[3]); if (found.size >= 20) break; }
   let added = false;
   for (const raw of found) {
-    const full = path.resolve(ev.cwd || w.cwd || ROOT, raw.replace(/^~(?=[\\/])/, os.homedir()));
+    // ~/… 는 홈, Windows 에서 Git Bash 꼴 /c/Users/… 는 C:/Users/…
+    const p = raw.replace(/^~(?=[\\/])/, os.homedir()).replace(/^\/([a-z])\//i, (m, d) => (process.platform === 'win32' ? `${d.toUpperCase()}:/` : m));
+    const full = path.resolve(cwd || w.cwd || ROOT, p);
     if (!isDocCandidate(full) || /[\\/](node_modules|\.git)[\\/]/i.test(full)) continue;
     let st;
     try { st = fs.statSync(full); } catch { continue; }
     if (!st.isFile() || st.mtimeMs < w.turnStartedAt - 5000) continue;
-    addDoc(w, full, crypto.createHash('sha1').update(full).digest('hex').slice(0, 12), 'Bash');
+    addDoc(w, full, crypto.createHash('sha1').update(full).digest('hex').slice(0, 12), tool);
     added = true;
   }
   return added;
