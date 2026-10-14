@@ -179,6 +179,7 @@ const EN = {
   '이미지 첨부 실패: {msg}': 'Could not attach image: {msg}',
   '파일 첨부 실패: {msg}': 'Could not attach file: {msg}',
   '서버에 연결할 수 없습니다': 'Cannot reach the server',
+  'CLI 행간': 'CLI line height',
   '입력칸 밖이라 복사만 했어요': 'Outside the input box — copied only',
   '붙여넣은 묶음이 있는 줄은 복사만 했어요': 'Line has a pasted block — copied only',
   '커서를 옮기지 못해 복사만 했어요': "Couldn't move the cursor — copied only",

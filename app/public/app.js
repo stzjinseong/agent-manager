@@ -3069,12 +3069,14 @@ async function loadThemes() {
 // ---------- 글꼴 (꾸미기 → 글꼴) ----------
 // 이 PC 에 설치된 글꼴 이름만 지정한다 — 글꼴 파일은 싣지 않는다. 브라우저에 기억(am.font.ui · am.font.term), 비우면 기본.
 // 화면 글꼴은 --ui-family, CLI 글꼴은 터미널(xterm 은 CSS 를 따르지 않아 옵션으로)과 --mono(경로·시각 등 작은 고정폭 글자) 앞에 붙인다
-const FONT_KEYS = { ui: 'am.font.ui', term: 'am.font.term' };
+const FONT_KEYS = { ui: 'am.font.ui', term: 'am.font.term', lh: 'am.font.lh' };
 const BASE_UI = getComputedStyle(document.documentElement).getPropertyValue('--ui-family').trim();
 const BASE_MONO = getComputedStyle(document.documentElement).getPropertyValue('--mono').trim();
 function fontPrefs() {
   const get = (k) => { try { return (localStorage.getItem(k) || '').trim(); } catch { return ''; } };
-  return { ui: get(FONT_KEYS.ui), term: get(FONT_KEYS.term) };
+  // CLI 행간(xterm lineHeight, 글자 높이의 배수) — 같은 글꼴도 PC(화면 배율·글꼴 파일)마다 줄 사이가 달라 보여 PC 마다 맞춘다
+  const lh = Number(get(FONT_KEYS.lh));
+  return { ui: get(FONT_KEYS.ui), term: get(FONT_KEYS.term), lh: lh >= 1 && lh <= 2 ? lh : 1 };
 }
 const fontStack = (name, base) => (name ? `"${name.replace(/["\\;{}]/g, '')}", ${base}` : base);
 function applyFonts() {
@@ -3082,13 +3084,17 @@ function applyFonts() {
   if (f.ui) root.setProperty('--ui-family', fontStack(f.ui, BASE_UI)); else root.removeProperty('--ui-family');
   if (f.term) root.setProperty('--mono', fontStack(f.term, BASE_MONO)); else root.removeProperty('--mono');
   const fam = fontStack(f.term, BASE_MONO);
-  if (term.options.fontFamily !== fam) { term.options.fontFamily = fam; requestAnimationFrame(() => fitTerm(true)); }
+  let refit = false;
+  if (term.options.fontFamily !== fam) { term.options.fontFamily = fam; refit = true; }
+  if (term.options.lineHeight !== f.lh) { term.options.lineHeight = f.lh; refit = true; } // 줄 높이가 바뀌면 한 화면 줄 수도 바뀐다
+  if (refit) requestAnimationFrame(() => fitTerm(true));
 }
 applyFonts();
 const fontModal = $('#font-modal');
 function openFontSet() {
   const f = fontPrefs();
   $('#fs-ui').value = f.ui; $('#fs-term').value = f.term;
+  $('#fs-lh').value = f.lh; $('#fs-lh-val').textContent = f.lh.toFixed(2);
   fontModal.hidden = false;
   if (!fontNames.length) loadFontNames(false).then(() => { if (document.activeElement?.closest('#font-modal .char-name')) setFontPop(document.activeElement); });
   requestAnimationFrame(() => $('#fs-ui').focus());
@@ -3147,12 +3153,17 @@ for (const id of ['fs-ui', 'fs-term']) {
     else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setFontPop(null); }
   });
 }
+$('#fs-lh').addEventListener('input', (e) => {
+  const v = Number(e.target.value);
+  $('#fs-lh-val').textContent = v.toFixed(2);
+  saveFont('lh', v === 1 ? '' : String(v));
+});
 fontPop.addEventListener('mousedown', (e) => e.preventDefault()); // 입력칸 포커스를 뺏지 않게(blur 로 닫히지 않게)
 fontPop.addEventListener('click', (e) => { const b = e.target.closest('[data-font]'); if (b) pickFont(b.dataset.font); });
 fontModal.addEventListener('click', async (e) => {
   const act = e.target.closest('[data-fs]')?.dataset.fs;
   if (e.target === fontModal || act === 'close') { closeFontSet(); return; }
-  if (act === 'reset') { setFontPop(null); $('#fs-ui').value = ''; $('#fs-term').value = ''; saveFont('ui', ''); saveFont('term', ''); return; }
+  if (act === 'reset') { setFontPop(null); $('#fs-ui').value = ''; $('#fs-term').value = ''; saveFont('ui', ''); saveFont('term', ''); $('#fs-lh').value = 1; $('#fs-lh-val').textContent = '1.00'; saveFont('lh', ''); return; }
   if (act === 'load') {
     // Chrome·Edge 의 Local Font Access — 처음 한 번 브라우저가 권한을 묻는다. 없거나 거절하면 이름을 직접 적는다
     await loadFontNames(true);
