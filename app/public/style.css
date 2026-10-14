@@ -2208,3 +2208,15 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 #profile .sa { border-radius: 10px; }
 @media (max-width: 1100px) { .charts.three { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
 @media (max-width: 760px) { .charts.three { grid-template-columns: minmax(0, 1fr); } }
+
+/* 세션 프로파일 막대는 한 가지 모양 — 각지고 투박한 단색 막대(둥근 모서리·그라데이션 없음), 강조색 하나와 그 옅은 단계만.
+   응답 시간 구성 막대(모델·도구·승인·기타)도 같은 색의 진하기로 나눈다(툴팁 범례도 같은 변수) */
+:root { --t-model: var(--accent); --t-tool: color-mix(in srgb, var(--accent) 62%, var(--surface)); --t-wait: color-mix(in srgb, var(--accent) 38%, var(--surface)); --t-other: rgb(var(--ink) / .22); }
+#profile { --blk-h: 8px; --blk-track: rgb(var(--ink) / .08); }
+#profile .kpi .gauge, #profile .kpi .tbar, #profile .hbar .b { height: var(--blk-h); border-radius: 0; background: var(--blk-track); }
+#profile .kpi .gauge i, #profile .hbar .b i, #profile #chart-tooltime .hbar .b i { border-radius: 0; background: var(--accent); box-shadow: none; }
+#profile .kpi .gauge i.warn { background: var(--decision); }
+#profile .kpi .tbar { gap: 2px; }
+#profile .kpi svg.spark { height: 20px; margin-top: 6px; }
+#profile .kpi svg.spark rect { fill: color-mix(in srgb, var(--accent) 45%, transparent); }
+#profile .kpi svg.spark rect.now { fill: var(--accent); }

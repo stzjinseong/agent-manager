@@ -2134,11 +2134,11 @@ document.addEventListener('mouseout', (e) => {
   if (el && !el.contains(e.relatedTarget)) { $('#tip').hidden = true; $('#tip').classList.remove('info-tip'); }
 });
 
+// 턴별 값 흐름 — 각진 막대 기둥(세션 프로파일의 막대들과 같은 모양). 마지막(지금) 기둥만 진하게
 function sparkline(vals) {
   if (vals.length < 2) return '<svg class="spark"></svg>';
-  const W = 100, H = 22, max = Math.max(...vals, 1);
-  const pts = vals.map((v, i) => `${(i / (vals.length - 1)) * W},${H - 2 - (v / max) * (H - 4)}`).join(' ');
-  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="var(--text-2)" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>`;
+  const v = vals.slice(-40), W = 100, H = 22, max = Math.max(...v, 1), bw = W / v.length;
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${v.map((x, i) => { const h = Math.max(1, (x / max) * H); return `<rect x="${(i * bw).toFixed(2)}" y="${(H - h).toFixed(2)}" width="${Math.max(0.5, bw - 0.8).toFixed(2)}" height="${h.toFixed(2)}"${i === v.length - 1 ? ' class="now"' : ''}/>`; }).join('')}</svg>`;
 }
 
 // 최근 요청 표: 행에 마우스를 올리면 그 턴의 토큰·캐시·시간·도구를 툴팁으로(예전 턴별 차트의 호버 내용)
