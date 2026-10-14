@@ -3090,27 +3090,72 @@ function openFontSet() {
   const f = fontPrefs();
   $('#fs-ui').value = f.ui; $('#fs-term').value = f.term;
   fontModal.hidden = false;
+  if (!fontNames.length) loadFontNames(false).then(() => { if (document.activeElement?.closest('#font-modal .char-name')) setFontPop(document.activeElement); });
   requestAnimationFrame(() => $('#fs-ui').focus());
 }
-function closeFontSet() { fontModal.hidden = true; charBtn.focus(); }
+function closeFontSet() { setFontPop(null); fontModal.hidden = true; charBtn.focus(); }
 function saveFont(which, v) {
   try { v ? localStorage.setItem(FONT_KEYS[which], v) : localStorage.removeItem(FONT_KEYS[which]); } catch {}
   applyFonts();
 }
-$('#fs-ui').addEventListener('input', (e) => saveFont('ui', e.target.value.trim()));
-$('#fs-term').addEventListener('input', (e) => saveFont('term', e.target.value.trim()));
+// 글꼴 목록 — 브라우저 자동완성(datalist)은 입력칸에 이미 적힌 이름과 맞는 것만 보여 줘서, 이름이 들어 있으면 목록이 사실상 안 떴다
+// → 직접 그리는 목록: 입력칸을 누르면(포커스·클릭·↓) 전체를 보이고 지금 이름에 맞춰 스크롤, 글자를 치면 그 글자가 든 이름만.
+// 이름마다 그 글꼴로 그린다. 목록은 '불러오기'(Local Font Access) 뒤에 생기고, 이미 허락한 브라우저면 창을 열 때 바로 읽는다
+let fontNames = [], fontPopFor = null, fontHl = -1;
+const fontPop = $('#fs-pop');
+async function loadFontNames(ask) {
+  if (!window.queryLocalFonts) { if (ask) toast(_t('이 브라우저는 글꼴 목록을 못 불러와요 — 이름을 직접 적어 주세요'), 4000); return; }
+  try {
+    if (!ask && (await navigator.permissions?.query({ name: 'local-fonts' }).catch(() => null))?.state !== 'granted') return;
+    fontNames = [...new Set((await window.queryLocalFonts()).map((x) => x.family))].sort((a, b) => a.localeCompare(b));
+    if (ask) toast(_t('글꼴 {n}개 — 입력 칸을 누르면 골라 쓸 수 있어요', { n: fontNames.length }), 3500);
+  } catch { if (ask) toast(_t('글꼴 목록 권한이 거절됐어요 — 이름을 직접 적어 주세요'), 4000); }
+}
+function setFontPop(input, filter = '') {
+  if (!input || !fontNames.length) { fontPop.hidden = true; fontPopFor = null; return; }
+  const q = filter.trim().toLowerCase(), cur = input.value.trim().toLowerCase();
+  const list = q ? fontNames.filter((n) => n.toLowerCase().includes(q)) : fontNames;
+  if (!list.length) { fontPop.hidden = true; fontPopFor = null; return; }
+  if (fontPop.parentElement !== input.parentElement) input.parentElement.append(fontPop);
+  fontPop.innerHTML = list.map((n) => `<button type="button" class="recent-item${n.toLowerCase() === cur ? ' on' : ''}" role="option" tabindex="-1" data-font="${esc(n)}" style="font-family:&quot;${esc(n.replace(/["\\;{}]/g, ''))}&quot;, var(--ui-family)">${esc(n)}</button>`).join('');
+  fontPop.hidden = false; fontPopFor = input; fontHl = -1;
+  fontPop.querySelector('.on')?.scrollIntoView({ block: 'center' });
+}
+function pickFont(name) {
+  const input = fontPopFor;
+  if (!input) return;
+  input.value = name; saveFont(input.id === 'fs-ui' ? 'ui' : 'term', name);
+  setFontPop(null); input.focus();
+}
+for (const id of ['fs-ui', 'fs-term']) {
+  const el = $('#' + id);
+  el.addEventListener('input', () => { saveFont(id === 'fs-ui' ? 'ui' : 'term', el.value.trim()); setFontPop(el, el.value); });
+  el.addEventListener('focus', () => setFontPop(el));
+  el.addEventListener('click', () => { if (fontPopFor !== el) setFontPop(el); });
+  el.addEventListener('blur', () => setTimeout(() => { if (fontPopFor === el && !fontPop.contains(document.activeElement)) setFontPop(null); }, 150));
+  el.addEventListener('keydown', (e) => {
+    const items = [...fontPop.querySelectorAll('.recent-item')];
+    if (e.key === 'ArrowDown' && fontPopFor !== el) { e.preventDefault(); setFontPop(el); return; }
+    if (fontPopFor !== el || !items.length) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (fontHl < 0) fontHl = Math.max(0, items.findIndex((b) => b.classList.contains('on')));
+      else fontHl = (fontHl + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+      items.forEach((b, i) => b.classList.toggle('hl', i === fontHl));
+      items[fontHl].scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter' && fontHl >= 0) { e.preventDefault(); pickFont(items[fontHl].dataset.font); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setFontPop(null); }
+  });
+}
+fontPop.addEventListener('mousedown', (e) => e.preventDefault()); // 입력칸 포커스를 뺏지 않게(blur 로 닫히지 않게)
+fontPop.addEventListener('click', (e) => { const b = e.target.closest('[data-font]'); if (b) pickFont(b.dataset.font); });
 fontModal.addEventListener('click', async (e) => {
   const act = e.target.closest('[data-fs]')?.dataset.fs;
   if (e.target === fontModal || act === 'close') { closeFontSet(); return; }
-  if (act === 'reset') { $('#fs-ui').value = ''; $('#fs-term').value = ''; saveFont('ui', ''); saveFont('term', ''); return; }
+  if (act === 'reset') { setFontPop(null); $('#fs-ui').value = ''; $('#fs-term').value = ''; saveFont('ui', ''); saveFont('term', ''); return; }
   if (act === 'load') {
     // Chrome·Edge 의 Local Font Access — 처음 한 번 브라우저가 권한을 묻는다. 없거나 거절하면 이름을 직접 적는다
-    if (!window.queryLocalFonts) { toast(_t('이 브라우저는 글꼴 목록을 못 불러와요 — 이름을 직접 적어 주세요'), 4000); return; }
-    try {
-      const names = [...new Set((await window.queryLocalFonts()).map((x) => x.family))].sort((a, b) => a.localeCompare(b));
-      $('#fs-list').innerHTML = names.map((n) => `<option value="${esc(n)}">`).join('');
-      toast(_t('글꼴 {n}개 — 입력 칸을 누르면 골라 쓸 수 있어요', { n: names.length }), 3500);
-    } catch { toast(_t('글꼴 목록 권한이 거절됐어요 — 이름을 직접 적어 주세요'), 4000); }
+    await loadFontNames(true);
   }
 });
 fontModal.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); closeFontSet(); } });

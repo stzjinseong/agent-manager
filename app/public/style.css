@@ -1848,6 +1848,11 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 /* ---------- 내 테마 만들기 안내 창 ---------- */
 .modal.theme-guide { width: min(520px, calc(100% - 32px)); }
 .font-set .char-name span { flex: none; width: 72px; }
+.font-set .char-name { position: relative; }
+.fs-pop { left: 82px; max-height: 240px; } /* 글꼴 목록 — 입력칸 아래(app.js setFontPop), 이름마다 그 글꼴로 */
+.fs-pop .recent-item { padding: 5px 10px; font-size: 14px; }
+.fs-pop .recent-item.on { color: var(--accent-hi); }
+.fs-pop .recent-item.hl { background: var(--surface-3); }
 .fs-prev { margin: -4px 0 14px 82px; padding: 8px 10px; border-radius: 8px; background: var(--surface-3); color: var(--text); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #fs-term-prev { font-family: var(--mono); font-size: 13px; }
 .theme-guide p { margin: 0 0 8px; font-size: 12.5px; line-height: 1.6; color: var(--text-2); }
