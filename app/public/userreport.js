@@ -324,7 +324,7 @@
         <b>${E(T(x.name))}</b><small>${E(x.desc)}</small>${comments[x.key] ? `<p class="ur-metric-ai">${E(comments[x.key])}</p>` : ''}
         ${x.examples?.length && x.score != null && x.score < 75 ? `<details><summary>${E(T('낮은 쪽 예시'))}</summary>${x.examples.map((e) => `<q>${E(e)}</q>`).join('')}</details>` : ''}</div>`;
     }).join('');
-    return `<section class="ur-card wide"><header><h4>${E(T('요청 습관 지표'))}</h4><small>${E(T('정해진 공식으로 센 값 — 다시 열어도 같은 숫자 · 링에 마우스를 올리면 공식'))}</small></header><div class="ur-metrics">${items}</div></section>`;
+    return `<section class="ur-card wide"><header><h4>${E(T('요청 습관 지표'))}</h4><small>${E(T('링에 마우스를 올리면 공식'))}</small></header><div class="ur-metrics">${items}</div></section>`;
   }
   function renderAi() { const el = $u('#ur-ai'); if (el) el.innerHTML = aiBody(); }
   async function runAi() {
@@ -345,13 +345,23 @@
     $u('#ur-sub').textContent = T('워커 세션 {s}개 · 기록 시작 {d}', { s: data.sessions.length, d: new Date(data.since).toLocaleDateString() });
     if (!d.reqs.length) { body.innerHTML = `<p class="ur-empty big">${E(T('이 기간에 워커로 보낸 요청이 없어요.'))}</p>`; return; }
     const pc = punchcard(d);
-    body.innerHTML = hero(d) + kpis(d)
+    // 읽는 순서 = 이야기 순서: 나는 누구(배너) → ① 왜 그 성향인가(근거) → ② 요청을 얼마나 잘 하나(지표·길이·점검)
+    // → ③ 무엇을 바꿀까(AI 코치) → ④ 얼마나 썼나(규모·추이) → ⑤ 자세히(도구·역할). 배너의 '왜 그런지 보기'는 ①로
+    const sec = (n, title, sub) => `<h3 class="ur-sec"${n === 1 ? ' id="ur-why"' : ''}><span>${n}</span>${E(title)}${sub ? `<small>${E(sub)}</small>` : ''}</h3>`;
+    const pname = T(PERSONA[topKind(d)][0]);
+    body.innerHTML = hero(d)
+      + sec(1, T('왜 {p}일까?', { p: pname }), T('성향은 가장 많이 보낸 요청 유형으로 정해요'))
+      + `<div class="ur-grid two">${card('요청 유형', T('키워드로 나눈 내 요청'), donut(d))}${card('언제 일하나', pc.peak, pc.svg)}</div>`
+      + sec(2, T('요청을 얼마나 잘 하고 있을까?'), T('정해진 공식으로 센 지표 — 돌릴 때마다 같은 값'))
       + metricsCard()
+      + `<div class="ur-grid two">${card('요청 길이', T('내가 보낸 요청이 몇 글자였나'), modelsAndLength(d))}${card('점검', T('규칙으로 찾은 좋은 점과 바꿔 볼 점'), insights(d))}</div>`
+      + sec(3, T('무엇을 바꿔 볼까?'), T('Claude 가 내 요청 글과 지표를 읽고 주는 코칭'))
       + `<section class="ur-card wide ur-ai-card"><header><h4>${E(T('AI 코치 리포트'))}</h4><small>${E(T('Claude 가 내 요청 글을 읽고 주는 피드백'))}</small></header><div id="ur-ai">${aiBody()}</div></section>`
-      + `<div class="ur-grid two" id="ur-why">${card('요청 유형', T('키워드로 나눈 내 요청 — 성향은 가장 많은 유형으로 정해요'), donut(d))}${card('언제 일하나', pc.peak, pc.svg)}</div>`
+      + sec(4, T('얼마나 썼을까?'), T('요청·금액·시간 규모와 날짜별 흐름'))
+      + kpis(d)
       + card('날짜별 활동', T('요청 수와 그날 쓴 금액'), timeline(d), 'wide')
-      + `<div class="ur-grid two">${card('Claude 가 쓴 도구', T('호출 수 · 비율'), toolBars(d))}${card('역할별', T('금액 순'), roleTable(d))}</div>`
-      + `<div class="ur-grid two">${card('요청 길이', T('내가 보낸 요청이 몇 글자였나'), modelsAndLength(d))}${card('점검', T('규칙으로 찾은 좋은 점과 바꿔 볼 점'), insights(d))}</div>`;
+      + sec(5, T('자세히'), T('Claude 가 쓴 도구와 역할별 사용'))
+      + `<div class="ur-grid two">${card('Claude 가 쓴 도구', T('호출 수 · 비율'), toolBars(d))}${card('역할별', T('금액 순'), roleTable(d))}</div>`;
     countUp(d);
   }
 

@@ -2254,3 +2254,8 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 .ur-hb-radar stop { stop-color: var(--k); } /* 배너 레이더는 성향 색으로 */
 .ur-hb-radar .ur-rshape { stroke: color-mix(in srgb, var(--k) 70%, #fff); filter: drop-shadow(0 0 12px color-mix(in srgb, var(--k) 60%, transparent)); }
 .ur-hb-radar .ur-rdot { fill: color-mix(in srgb, var(--k) 70%, #fff); }
+
+/* 리포트 구역 제목 ①~⑤ */
+.ur-sec { display: flex; align-items: baseline; gap: 10px; margin: 14px 2px -2px; font-size: 16px; font-weight: 750; letter-spacing: -.01em; scroll-margin-top: 8px; flex: none; }
+.ur-sec span { align-self: center; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 7px; font-size: 12px; font-weight: 800; color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent-hi)); }
+.ur-sec small { font-size: 12px; font-weight: 500; color: var(--dim); }
