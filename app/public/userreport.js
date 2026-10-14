@@ -269,12 +269,7 @@
   const RANGE_LABEL = { 7: '최근 7일', 30: '최근 30일', 0: '전체 기간' };
   async function loadAi() {
     try { ai = { ...ai, ...(await (await fetch(`/api/user-profile/llm?days=${range}`)).json()) }; } catch {}
-    renderAi();
-  }
-  function scoreRing(sc, i) {
-    const v = Math.max(0, Math.min(100, Number(sc.score) || 0)), r = 26, c = 2 * Math.PI * r;
-    const col = v >= 75 ? '#4fd1a5' : v >= 50 ? '#6aa8ff' : v >= 30 ? '#f2b24c' : '#ef6b6b';
-    return `<div class="ur-score" style="--d:${i * 90}ms;--c:${col}" title="${E(sc.why || '')}"><svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="${r}" class="bg"/><circle cx="32" cy="32" r="${r}" class="fg" stroke-dasharray="${(c * v / 100).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 32 32)"/><text x="32" y="37" text-anchor="middle">${v}</text></svg><b>${E(sc.name || '')}</b><small>${E(sc.why || '')}</small></div>`;
+    if (data) render(); else renderAi(); // 지표 카드의 AI 해설도 같이
   }
   function aiBody() {
     const note = T('요청 글 최근 {n}개와 통계를 이 PC 의 Claude(sonnet)로 보내 분석해요 · 구독 사용량을 써요 · 1분 안팎', { n: ai.count || 0 });
@@ -283,16 +278,31 @@
     const err = ai.err ? `<p class="ur-ai-err">${E(ai.err)}</p>` : '';
     const L = ai.last, R = L?.report;
     if (!R) return `<div class="ur-ai-cta"><div class="ur-ai-glow"></div><h5>${E(T('내 요청 습관을 Claude 에게 코칭받기'))}</h5><p>${E(T('강점·약점·바꿔 쓸 요청 예시·다음 주 실천 과제를 받아요.'))}</p>${btn('AI 분석 받기')}<small>${E(note)}</small>${err}</div>`;
-    const list = (arr, cls, ic) => `<ul class="ur-ai-list ${cls}">${(arr || []).map((x, i) => `<li style="--d:${i * 70}ms"><span class="ur-ai-ic">${ic}</span><div><b>${E(x.title || '')}</b><p>${E(x.detail || '')}</p></div></li>`).join('')}</ul>`;
+    const MN = {"clarity":"명확성","context":"맥락 제공","done":"완료 기준","firstpass":"한 번에 끝냄","flow":"한 번에 맡기기"};
+    const list = (arr, cls, ic) => (arr || []).length ? `<ul class="ur-ai-list ${cls}">${arr.map((x, i) => `<li style="--d:${i * 70}ms"><span class="ur-ai-ic">${ic}</span><div><b>${E(x.title || '')}</b><p>${E(x.detail || '')}</p>${x.evidence ? `<span class="ur-ev">${E(T('근거'))} · ${E(T(MN[x.metric] || x.metric || ''))} ${E(String(x.evidence).replace(new RegExp('^\\s*(' + x.metric + '|' + (MN[x.metric] || '') + ')\\s*', 'i'), ''))}</span>` : ''}</div></li>`).join('')}</ul>` : `<p class="ur-empty">${E(T('지표로 뒷받침되는 항목이 없어요'))}</p>`;
     return `<div class="ur-ai">
       <div class="ur-ai-top"><div><div class="ur-ai-head">${E(R.headline || '')}</div>
-        <div class="ur-ai-persona"><span class="ur-badge" style="--k:#b48cff">${E(R.persona?.name || '')}</span><p>${E(R.persona?.desc || '')}</p></div></div>
-        <div class="ur-scores">${(R.scores || []).slice(0, 5).map(scoreRing).join('')}</div></div>
+        <div class="ur-ai-persona"><span class="ur-badge" style="--k:#b48cff">${E(R.persona?.name || '')}</span><p>${E(R.persona?.desc || '')}</p></div></div></div>
       <div class="ur-ai-cols"><div><h5 class="ur-ai-h is-good">${E(T('잘하고 있는 점'))}</h5>${list(R.strengths, 'is-good', '✓')}</div><div><h5 class="ur-ai-h is-tip">${E(T('바꿔 보면 좋은 점'))}</h5>${list(R.improvements, 'is-tip', '➜')}</div></div>
       ${R.next ? `<div class="ur-next"><span>${E(T('다음 일주일 실천 과제'))}</span><b>${E(R.next)}</b></div>` : ''}
       ${(R.rewrites || []).length || (R.patterns || []).length ? `<details class="ur-more"><summary>${E(T('자세히 — 고쳐 쓰기 예시 {a}개 · 반복 패턴 {b}개', { a: (R.rewrites || []).length, b: (R.patterns || []).length }))}</summary>${(R.rewrites || []).map((w) => `<div class="ur-rw"><div class="ur-rw-b">${E(w.before || '')}</div><div class="ur-rw-a"><span>➜</span>${E(w.after || '')}</div>${w.why ? `<small>${E(w.why)}</small>` : ''}</div>`).join('')}${(R.patterns || []).length ? `<ul class="ur-pat">${R.patterns.map((p) => `<li>${E(p)}</li>`).join('')}</ul>` : ''}</details>` : ''}
       <div class="ur-ai-foot"><small>${E(T('{when} · {range} · 요청 {n}개 분석 · {model}', { when: new Date(L.at).toLocaleString(), range: T(RANGE_LABEL[L.days] || '전체 기간'), n: L.n, model: L.model || '' }))}</small>${btn('다시 분석')}</div>${err}
     </div>`;
+  }
+  // 요청 습관 지표 — 서버가 정해진 공식으로 센 값(userprofile.js metricsOf). 링 위에 마우스를 올리면 공식, AI 리포트가 있으면 그 지표 해설 한 줄
+  function metricsCard() {
+    const M = data.metrics?.[range];
+    if (!M) return '';
+    const comments = ai.last?.days === range ? ai.last?.report?.comments || {} : {};
+    const items = M.list.map((x, i) => {
+      const v = x.score ?? 0, r = 26, c = 2 * Math.PI * r;
+      const col = x.score == null ? 'rgb(var(--ink) / .2)' : v >= 75 ? '#4fd1a5' : v >= 50 ? '#6aa8ff' : v >= 30 ? '#f2b24c' : '#ef6b6b';
+      return `<div class="ur-metric" style="--d:${i * 80}ms;--c:${col}" title="${E(T('공식'))}: ${E(T(x.formula))}">
+        <svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="${r}" class="bg"/><circle cx="32" cy="32" r="${r}" class="fg" stroke-dasharray="${(c * v / 100).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 32 32)"/><text x="32" y="37" text-anchor="middle">${x.score ?? '–'}</text></svg>
+        <b>${E(T(x.name))}</b><small>${E(x.desc)}</small>${comments[x.key] ? `<p class="ur-metric-ai">${E(comments[x.key])}</p>` : ''}
+        ${x.examples?.length && x.score != null && x.score < 75 ? `<details><summary>${E(T('낮은 쪽 예시'))}</summary>${x.examples.map((e) => `<q>${E(e)}</q>`).join('')}</details>` : ''}</div>`;
+    }).join('');
+    return `<section class="ur-card wide"><header><h4>${E(T('요청 습관 지표'))}</h4><small>${E(T('정해진 공식으로 센 값 — 다시 열어도 같은 숫자 · 링에 마우스를 올리면 공식'))}</small></header><div class="ur-metrics">${items}</div></section>`;
   }
   function renderAi() { const el = $u('#ur-ai'); if (el) el.innerHTML = aiBody(); }
   async function runAi() {
@@ -301,7 +311,7 @@
       const r = await fetch('/api/user-profile/llm', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ days: range, lang: document.documentElement.lang === 'en' ? 'en' : 'ko' }) });
       const j = await r.json();
       if (!r.ok || j.error) ai.err = j.error === 'empty' ? T('이 기간에 분석할 요청이 없어요') : T('분석 결과를 읽지 못했어요 — 잠시 뒤 다시 시도해 주세요');
-      else ai.last = j;
+      else { ai.last = j; ai.busy = false; render(); return; }
     } catch { ai.err = T('서버에 연결할 수 없습니다'); }
     ai.busy = false; renderAi();
   }
@@ -314,6 +324,7 @@
     if (!d.reqs.length) { body.innerHTML = `<p class="ur-empty big">${E(T('이 기간에 워커로 보낸 요청이 없어요.'))}</p>`; return; }
     const pc = punchcard(d);
     body.innerHTML = kpis(d)
+      + metricsCard()
       + `<section class="ur-card wide ur-ai-card"><header><h4>${E(T('AI 코치 리포트'))}</h4><small>${E(T('Claude 가 내 요청 글을 읽고 주는 피드백'))}</small></header><div id="ur-ai">${aiBody()}</div></section>`
       + `<div class="ur-grid two">${card('사용 성향', T('요청 유형·위임·자동화·캐시로 본 모양'), persona(d) + radar(d), 'ur-hero')}${card('요청 유형', T('키워드로 나눈 내 요청'), donut(d))}</div>`
       + card('날짜별 활동', T('요청 수와 그날 쓴 금액'), timeline(d), 'wide')

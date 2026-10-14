@@ -2130,13 +2130,6 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 .ur-ai-persona { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
 .ur-ai-persona .ur-badge { font-size: 15px; flex: none; }
 .ur-ai-persona p { margin: 0; color: var(--text-2); font-size: 13px; line-height: 1.5; }
-.ur-scores { display: flex; gap: 6px; }
-.ur-score { width: 98px; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; animation: ur-rise .5s var(--d) both; cursor: help; }
-.ur-score svg { width: 64px; height: 64px; overflow: visible; }
-.ur-score .bg { fill: none; stroke: rgb(var(--ink) / .08); stroke-width: 6; }
-.ur-score .fg { fill: none; stroke: var(--c); stroke-width: 6; stroke-linecap: round; filter: drop-shadow(0 0 5px var(--c)); }
-.ur-score text { font-size: 17px; font-weight: 800; fill: var(--text); }
-.ur-score b { font-size: 12px; } .ur-score small { font-size: 10.5px; color: var(--dim); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .ur-ai-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 28px; padding-top: 4px; border-top: 1px solid var(--line); }
 .ur-ai-h { margin: 10px 0 6px; font-size: 12.5px; font-weight: 700; color: var(--text-2); } .ur-ai-h.is-good { color: #4fd1a5; } .ur-ai-h.is-tip { color: #6aa8ff; }
 .ur-ai-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
@@ -2165,3 +2158,22 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 .ur-ai-foot small { margin: 0; }
 .ur-ai-foot .ur-ai-btn { padding: 7px 14px; font-size: 12.5px; }
 @media (max-width: 980px) { .ur-ai-top { grid-template-columns: 1fr; } .ur-scores { flex-wrap: wrap; } .ur-ai-cols { grid-template-columns: 1fr; } }
+
+/* 요청 습관 지표 · AI 근거 칩 */
+.ur-metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+.ur-metric { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; padding: 6px 4px; animation: ur-rise .5s var(--d) both; cursor: help; }
+.ur-metric svg { width: 72px; height: 72px; overflow: visible; }
+.ur-metric .bg { fill: none; stroke: rgb(var(--ink) / .08); stroke-width: 6; }
+.ur-metric .fg { fill: none; stroke: var(--c); stroke-width: 6; stroke-linecap: round; filter: drop-shadow(0 0 5px var(--c)); }
+.ur-metric text { font-size: 18px; font-weight: 800; fill: var(--text); }
+.ur-metric b { font-size: 13px; margin-top: 2px; }
+.ur-metric small { font-size: 11.5px; color: var(--text-2); line-height: 1.45; }
+.ur-metric-ai { margin: 4px 0 0; font-size: 11.5px; color: #b48cff; line-height: 1.45; }
+.ur-metric details { width: 100%; margin-top: 4px; font-size: 11.5px; text-align: left; cursor: default; }
+.ur-metric summary { cursor: pointer; color: var(--dim); text-align: center; list-style: none; }
+.ur-metric summary::-webkit-details-marker { display: none; }
+.ur-metric summary::before { content: "▸ "; } .ur-metric details[open] summary::before { content: "▾ "; }
+.ur-metric q { display: block; margin-top: 5px; padding: 6px 8px; border-radius: 7px; background: rgb(var(--ink) / .04); color: var(--text-2); line-height: 1.45; quotes: none; }
+.ur-ev { display: inline-block; margin-top: 5px; padding: 2px 8px; border-radius: 6px; font-size: 11px; color: var(--text-2); background: rgb(var(--ink) / .06); }
+@media (max-width: 980px) { .ur-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .ur-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

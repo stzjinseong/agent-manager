@@ -296,6 +296,8 @@ function apply(p, e, line) {
   if (m.model && m.model !== '<synthetic>') { p.model = m.model; p.modelAt = ts; target.model = m.model; }
   p.context = usage.input + usage.cacheWrite + usage.cacheRead;
   target.context = p.context;
+  // 턴의 마지막 답 글 끝부분 — 사용자 프로파일이 다음 요청이 'Claude 의 질문에 대한 답'인지 가릴 때 쓴다
+  for (const b of m.content || []) if (b.type === 'text' && b.text?.trim()) target.lastText = b.text.trim().slice(-300);
   for (const b of m.content || []) {
     if (b.type !== 'tool_use' || p.toolTurn.has(b.id)) continue;
     p.toolTurn.set(b.id, target);
