@@ -280,15 +280,14 @@
     const err = ai.err ? `<p class="ur-ai-err">${E(ai.err)}</p>` : '';
     const L = ai.last, R = L?.report;
     if (!R) return `<div class="ur-ai-cta"><div class="ur-ai-glow"></div><h5>${E(T('내 요청 습관을 Claude 에게 코칭받기'))}</h5><p>${E(T('강점·약점·바꿔 쓸 요청 예시·다음 주 실천 과제를 받아요.'))}</p>${btn('AI 분석 받기')}<small>${E(note)}</small>${err}</div>`;
-    const list = (arr, cls) => `<ul class="ur-ai-list ${cls}">${(arr || []).map((x, i) => `<li style="--d:${i * 70}ms"><b>${E(x.title || '')}</b><p>${E(x.detail || '')}</p></li>`).join('')}</ul>`;
+    const list = (arr, cls, ic) => `<ul class="ur-ai-list ${cls}">${(arr || []).map((x, i) => `<li style="--d:${i * 70}ms"><span class="ur-ai-ic">${ic}</span><div><b>${E(x.title || '')}</b><p>${E(x.detail || '')}</p></div></li>`).join('')}</ul>`;
     return `<div class="ur-ai">
       <div class="ur-ai-top"><div><div class="ur-ai-head">${E(R.headline || '')}</div>
         <div class="ur-ai-persona"><span class="ur-badge" style="--k:#b48cff">${E(R.persona?.name || '')}</span><p>${E(R.persona?.desc || '')}</p></div></div>
         <div class="ur-scores">${(R.scores || []).slice(0, 5).map(scoreRing).join('')}</div></div>
-      <div class="ur-grid two"><div><h5 class="ur-ai-h is-good">${E(T('잘하고 있는 점'))}</h5>${list(R.strengths, 'is-good')}</div><div><h5 class="ur-ai-h is-tip">${E(T('바꿔 보면 좋은 점'))}</h5>${list(R.improvements, 'is-tip')}</div></div>
-      ${(R.rewrites || []).length ? `<h5 class="ur-ai-h">${E(T('이렇게 바꿔 써 보세요'))}</h5><div class="ur-rewrites">${R.rewrites.map((w, i) => `<div class="ur-rw" style="--d:${i * 90}ms"><div class="ur-rw-b"><span>${E(T('전'))}</span>${E(w.before || '')}</div><div class="ur-rw-arrow">➜</div><div class="ur-rw-a"><span>${E(T('후'))}</span>${E(w.after || '')}</div><small>${E(w.why || '')}</small></div>`).join('')}</div>` : ''}
-      ${(R.patterns || []).length ? `<div class="ur-chips">${R.patterns.map((p) => `<span>${E(p)}</span>`).join('')}</div>` : ''}
+      <div class="ur-ai-cols"><div><h5 class="ur-ai-h is-good">${E(T('잘하고 있는 점'))}</h5>${list(R.strengths, 'is-good', '✓')}</div><div><h5 class="ur-ai-h is-tip">${E(T('바꿔 보면 좋은 점'))}</h5>${list(R.improvements, 'is-tip', '➜')}</div></div>
       ${R.next ? `<div class="ur-next"><span>${E(T('다음 일주일 실천 과제'))}</span><b>${E(R.next)}</b></div>` : ''}
+      ${(R.rewrites || []).length || (R.patterns || []).length ? `<details class="ur-more"><summary>${E(T('자세히 — 고쳐 쓰기 예시 {a}개 · 반복 패턴 {b}개', { a: (R.rewrites || []).length, b: (R.patterns || []).length }))}</summary>${(R.rewrites || []).map((w) => `<div class="ur-rw"><div class="ur-rw-b">${E(w.before || '')}</div><div class="ur-rw-a"><span>➜</span>${E(w.after || '')}</div>${w.why ? `<small>${E(w.why)}</small>` : ''}</div>`).join('')}${(R.patterns || []).length ? `<ul class="ur-pat">${R.patterns.map((p) => `<li>${E(p)}</li>`).join('')}</ul>` : ''}</details>` : ''}
       <div class="ur-ai-foot"><small>${E(T('{when} · {range} · 요청 {n}개 분석 · {model}', { when: new Date(L.at).toLocaleString(), range: T(RANGE_LABEL[L.days] || '전체 기간'), n: L.n, model: L.model || '' }))}</small>${btn('다시 분석')}</div>${err}
     </div>`;
   }
