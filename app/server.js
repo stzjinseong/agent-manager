@@ -1456,7 +1456,9 @@ function docTitle(full) {
 }
 // 결과물로 칠 수 없는 곳: Claude 설정·메모리(~/.claude 아래), 규칙 파일, 이 앱(agent-manager) 자체의 파일(화면 소스 등)
 const underDir = (full, dir) => full.toLowerCase().startsWith(dir.toLowerCase() + path.sep);
-const isDocCandidate = (full) => !underDir(full, CLAUDE_HOME) && !underDir(full, ROOT) && !/^(CLAUDE|MEMORY)\.md$/i.test(path.basename(full));
+// 시스템 임시 폴더도 뺀다 — 커밋 메시지·스크립트 같은 작업용 파일이라 결과물이 아니다(macOS 는 /var ↔ /private/var 둘 다)
+const TMP_DIRS = [...new Set([os.tmpdir(), (() => { try { return fs.realpathSync.native(os.tmpdir()); } catch { return ''; } })()].filter(Boolean))];
+const isDocCandidate = (full) => !underDir(full, CLAUDE_HOME) && !underDir(full, ROOT) && !TMP_DIRS.some((d) => underDir(full, d)) && !/^(CLAUDE|MEMORY)\.md$/i.test(path.basename(full));
 function trackDoc(w, ev) {
   if (!['Write', 'Edit', 'MultiEdit'].includes(ev.tool_name)) return false;
   const file = ev.tool_input?.file_path;
