@@ -366,37 +366,22 @@
     countUp(d);
   }
 
-  // 여는 연출: 처음엔 성향 배너만 담긴 작은 창 → 잠시 뒤 창이 화면 높이까지 늘어나며 아래 구역들이 차례로 붙는다.
-  // 창 아무 곳이나 누르거나 휠을 굴리면 바로 펼침. 움직임 줄이기 설정이면 연출 없이 바로
+  // 여는 연출: 창은 처음부터 다 큰 크기, 카드가 위에서부터 차례로 떠오른다(배너 먼저). 기간을 바꿀 땐 연출 없이
   const box = modal.querySelector('.ur-modal');
-  let introT = null;
-  function grow() {
-    if (!box.classList.contains('ur-intro')) return;
-    clearTimeout(introT);
-    box.style.maxHeight = '';
-    box.classList.add('ur-grow');
-    box.classList.remove('ur-intro');
-    setTimeout(() => box.classList.remove('ur-grow'), 1800);
-  }
+  let seqT = null;
   async function open() {
     modal.hidden = false;
-    const intro = !matchMedia('(prefers-reduced-motion: reduce)').matches;
-    box.classList.remove('ur-grow'); box.classList.toggle('ur-intro', intro);
-    box.style.maxHeight = intro ? '300px' : ''; // 읽는 동안도 작은 창 — 큰 창이 떴다가 줄어들지 않게
+    box.classList.remove('ur-seq');
     data = null; render();
     try { data = await (await fetch('/api/user-profile')).json(); } catch { data = { sessions: [], since: Date.now() }; }
-    const hero = () => $u('#ur-body .ur-hero-banner');
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      box.classList.add('ur-seq');
+      clearTimeout(seqT); seqT = setTimeout(() => box.classList.remove('ur-seq'), 2600);
+    }
     render();
-    if (intro && hero()) {
-      const top = box.getBoundingClientRect().top, h = hero().getBoundingClientRect().bottom - top + 22;
-      box.style.maxHeight = `${Math.round(h)}px`;
-      introT = setTimeout(grow, 1700);
-    } else box.classList.remove('ur-intro');
     loadAi();
   }
-  function close() { clearTimeout(introT); box.classList.remove('ur-intro', 'ur-grow'); box.style.maxHeight = ''; modal.hidden = true; }
-  box.addEventListener('wheel', grow, { passive: true });
-  box.addEventListener('pointerdown', grow);
+  function close() { clearTimeout(seqT); box.classList.remove('ur-seq'); modal.hidden = true; }
   $u('#btn-ureport').addEventListener('click', open);
   modal.addEventListener('click', (e) => {
     if (e.target === modal || e.target.closest('[data-ur=close]')) return close();

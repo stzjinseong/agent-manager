@@ -1977,7 +1977,7 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 /* ---------- 나의 Claude 사용 리포트 — userreport.js ---------- */
 /* 창 높이에 맞춘 틀 안에서 본문만 스크롤 — 머리(기간 탭·닫기)는 늘 보이고, 바깥 스크롤에 기대지 않아 아래가 잘리지 않는다 */
 .ur-back { padding: 20px 0; place-items: center; }
-.modal.ur-modal { width: min(1180px, calc(100% - 32px)); max-height: calc(100dvh - 40px); display: flex; flex-direction: column; padding: 0; overflow: hidden; outline: none;
+.modal.ur-modal { width: min(1180px, calc(100% - 32px)); height: calc(100dvh - 40px); display: flex; flex-direction: column; padding: 0; overflow: hidden; outline: none;
   background: radial-gradient(1200px 380px at 12% -8%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%),
               radial-gradient(900px 340px at 100% 0%, color-mix(in srgb, #6aa8ff 10%, transparent), transparent 70%), var(--surface); }
 .ur-head { display: flex; align-items: center; gap: 16px; padding: 20px 24px 6px; }
@@ -2260,10 +2260,6 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 .ur-sec span { align-self: center; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 7px; font-size: 12px; font-weight: 800; color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent-hi)); }
 .ur-sec small { font-size: 12px; font-weight: 500; color: var(--dim); }
 
-/* 여는 연출 — userreport.js open/grow */
-.modal.ur-modal { transition: max-height .9s cubic-bezier(.2, .9, .3, 1); }
-.ur-modal.ur-intro .ur-body { overflow: hidden; }
-.ur-modal.ur-intro .ur-body > :not(.ur-hero-banner), .ur-modal.ur-intro .ur-foot { opacity: 0; transform: translateY(18px); }
-.ur-modal.ur-grow .ur-body > :not(.ur-hero-banner), .ur-modal.ur-grow .ur-foot { animation: ur-attach .55s cubic-bezier(.2, .9, .3, 1) both; animation-delay: calc(.25s + var(--i, 0) * 70ms); }
-@keyframes ur-attach { from { opacity: 0; transform: translateY(18px); } }
-.ur-modal.ur-intro .ur-hero-banner { box-shadow: 0 0 0 1px color-mix(in srgb, var(--k) 30%, transparent), 0 20px 60px color-mix(in srgb, var(--k) 25%, transparent); }
+/* 여는 연출 — 카드가 위에서부터 차례로 떠오름(userreport.js open · .ur-seq) */
+.ur-modal.ur-seq .ur-body > * { animation: ur-attach .55s cubic-bezier(.2, .9, .3, 1) both; animation-delay: calc(var(--i, 0) * 110ms); }
+@keyframes ur-attach { from { opacity: 0; transform: translateY(22px) scale(.985); } }
