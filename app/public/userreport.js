@@ -221,19 +221,22 @@
         <td class="ur-cost"><div><i style="width:${((r.cost / max) * 100).toFixed(1)}%"></i></div>${money(r.cost)}</td>
         <td><span class="ur-hit is-${r.in && r.read / r.in >= 0.95 ? 'good' : r.in && r.read / r.in >= 0.9 ? 'mid' : 'bad'}">${r.in ? pct(r.read / r.in) : '—'}</span></td><td>${num(r.edits)}</td></tr>`).join('')}</tbody></table>`;
   }
+  // 요청 길이 — 내가 보낸 요청 글이 몇 글자였나(구간별 건수·비율, 가로 막대). 모델이 둘 이상이면 아래에 모델 비중
+  // 요청 글은 세션 프로파일이 200자까지만 들고 있어 마지막 구간은 '200자 이상'
   function modelsAndLength(d) {
-    const tot = Object.values(d.models).reduce((a, b) => a + b, 0) || 1;
+    const bins = [[0, 11, '한 마디', '10자 이하'], [11, 31, '짧은 지시', '11~30자'], [31, 81, '보통', '31~80자'], [81, 200, '자세한 지시', '81~199자'], [200, Infinity, '긴 설명', '200자 이상']];
+    const n = d.reqs.length || 1;
+    const counts = bins.map(([lo, hi]) => d.reqs.filter((r) => r.len >= lo && r.len < hi).length), mx = Math.max(...counts, 1);
+    const top = counts.indexOf(Math.max(...counts));
+    const rows = bins.map(([, , name, range], i) => `<li class="${i === top ? 'is-top' : ''}"><span><b>${E(T(name))}</b><small>${E(T(range))}</small></span><div><i style="width:${((counts[i] / mx) * 100).toFixed(1)}%;--d:${i * 70}ms"></i></div><b>${counts[i]}${E(T('건'))}</b><small>${pct(counts[i] / n)}</small></li>`).join('');
+    const lens = d.reqs.map((r) => r.len).sort((x, y) => x - y), med = lens.length ? lens[Math.floor(lens.length / 2)] : 0;
+    const avg = d.reqs.length ? Math.round(d.reqs.reduce((s, r) => s + r.len, 0) / d.reqs.length) : 0;
+    const ent = Object.entries(d.models).sort((x, y) => y[1] - x[1]), tot = ent.reduce((s, [, v]) => s + v, 0) || 1;
     const palette = ['var(--accent)', '#6aa8ff', '#b48cff', '#4fd1a5', '#f2b24c'];
-    const ent = Object.entries(d.models).sort((a, b) => b[1] - a[1]);
-    const seg = ent.map(([m, v], i) => `<i style="width:${((v / tot) * 100).toFixed(2)}%;background:${palette[i % palette.length]}" title="${E(m)} ${pct(v / tot)}"></i>`).join('');
-    const leg = ent.map(([m, v], i) => `<span><i style="background:${palette[i % palette.length]}"></i>${E(m.replace(/^claude-/, ''))} <b>${pct(v / tot)}</b></span>`).join('');
-    // 요청 길이 분포(글자 수)
-    const bins = [[0, 10, '~10'], [10, 30, '~30'], [30, 80, '~80'], [80, 200, '~200'], [200, Infinity, '200+']];
-    const counts = bins.map(([a, b]) => d.reqs.filter((r) => r.len >= a && r.len < b).length), mx = Math.max(...counts, 1);
-    const hist = bins.map(([, , l], i) => `<div class="ur-col"><i style="height:${((counts[i] / mx) * 100).toFixed(1)}%;--d:${i * 70}ms" title="${counts[i]}"></i><small>${l}</small></div>`).join('');
-    const avg = d.reqs.length ? Math.round(d.reqs.reduce((a, r) => a + r.len, 0) / d.reqs.length) : 0;
-    return `<div class="ur-models"><div class="ur-seg">${seg}</div><div class="ur-seg-leg">${leg}</div></div>
-      <div class="ur-len"><div class="ur-len-h"><span>${E(T('요청 길이(글자)'))}</span><b>${T('평균 {n}자', { n: avg })}</b></div><div class="ur-hist">${hist}</div></div>`;
+    const models = ent.length > 1 ? `<div class="ur-models"><span class="ur-models-h">${E(T('답한 모델'))}</span><div class="ur-seg">${ent.map(([m, v], i) => `<i style="width:${((v / tot) * 100).toFixed(2)}%;background:${palette[i % palette.length]}" title="${E(m)} ${pct(v / tot)}"></i>`).join('')}</div><div class="ur-seg-leg">${ent.map(([m, v], i) => `<span><i style="background:${palette[i % palette.length]}"></i>${E(m.replace(/^claude-/, ''))} <b>${pct(v / tot)}</b></span>`).join('')}</div></div>`
+      : ent.length ? `<p class="ur-model-one">${E(T('답한 모델: {m} (전부)', { m: ent[0][0].replace(/^claude-/, '') }))}</p>` : '';
+    return `<div class="ur-len-stat"><div><b>${avg}${E(T('자'))}</b><small>${E(T('평균'))}</small></div><div><b>${med}${E(T('자'))}</b><small>${E(T('가운데 값'))}</small></div><div><b>${E(T(bins[top][2]))}</b><small>${E(T('가장 많은 길이'))}</small></div></div>
+      <ul class="ur-lenbars">${rows}</ul>${models}`;
   }
   // 점검 — 규칙으로 찾은 좋은 점·바꿀 점
   function insights(d) {
@@ -315,7 +318,7 @@
       + `<div class="ur-grid two">${card('사용 성향', T('요청 유형·위임·자동화·캐시로 본 모양'), persona(d) + radar(d), 'ur-hero')}${card('요청 유형', T('키워드로 나눈 내 요청'), donut(d))}</div>`
       + card('날짜별 활동', T('요청 수와 그날 쓴 금액'), timeline(d), 'wide')
       + `<div class="ur-grid two">${card('언제 일하나', pc.peak, pc.svg)}${card('Claude 가 쓴 도구', T('호출 수 · 비율'), toolBars(d))}</div>`
-      + `<div class="ur-grid two">${card('역할별', T('금액 순'), roleTable(d))}${card('모델 · 요청 길이', '', modelsAndLength(d))}</div>`
+      + `<div class="ur-grid two">${card('역할별', T('금액 순'), roleTable(d))}${card('요청 길이', T('내가 보낸 요청이 몇 글자였나'), modelsAndLength(d))}</div>`
       + card('점검', T('규칙으로 찾은 좋은 점과 바꿔 볼 점'), insights(d), 'wide');
     countUp(d);
   }
