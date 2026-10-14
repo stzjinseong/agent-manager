@@ -3138,7 +3138,7 @@ function openFontSet() {
   $('#fs-lh').value = f.lh; $('#fs-lh-val').textContent = f.lh.toFixed(2);
   renderSchemeSel(); loadWtSchemes();
   fontModal.hidden = false;
-  if (!fontNames.length) loadFontNames(false).then(() => { if (document.activeElement?.closest('#font-modal .char-name')) setFontPop(document.activeElement); });
+  if (!fontNames.length) loadFontNames(false);
   requestAnimationFrame(() => $('#fs-ui').focus());
 }
 function closeFontSet() { setFontPop(null); fontModal.hidden = true; charBtn.focus(); }
@@ -3147,7 +3147,7 @@ function saveFont(which, v) {
   applyFonts();
 }
 // 글꼴 목록 — 브라우저 자동완성(datalist)은 입력칸에 이미 적힌 이름과 맞는 것만 보여 줘서, 이름이 들어 있으면 목록이 사실상 안 떴다
-// → 직접 그리는 목록: 입력칸을 누르면(포커스·클릭·↓) 전체를 보이고 지금 이름에 맞춰 스크롤, 글자를 치면 그 글자가 든 이름만.
+// → 직접 그리는 목록: 입력칸을 누르면(클릭·↓ — 창을 열 때 자동 포커스로는 펼치지 않음) 전체를 보이고 지금 이름에 맞춰 스크롤, 글자를 치면 그 글자가 든 이름만.
 // 이름마다 그 글꼴로 그린다. 목록은 '불러오기'(Local Font Access) 뒤에 생기고, 이미 허락한 브라우저면 창을 열 때 바로 읽는다
 let fontNames = [], fontPopFor = null, fontHl = -1;
 const fontPop = $('#fs-pop');
@@ -3178,7 +3178,6 @@ function pickFont(name) {
 for (const id of ['fs-ui', 'fs-term']) {
   const el = $('#' + id);
   el.addEventListener('input', () => { saveFont(id === 'fs-ui' ? 'ui' : 'term', el.value.trim()); setFontPop(el, el.value); });
-  el.addEventListener('focus', () => setFontPop(el));
   el.addEventListener('click', () => { if (fontPopFor !== el) setFontPop(el); });
   el.addEventListener('blur', () => setTimeout(() => { if (fontPopFor === el && !fontPop.contains(document.activeElement)) setFontPop(null); }, 150));
   el.addEventListener('keydown', (e) => {
