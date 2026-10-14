@@ -1000,9 +1000,44 @@ function ackSeen(e) {
 document.addEventListener('pointerdown', ackSeen, true);
 document.addEventListener('keydown', ackSeen, true);
 
-// 역할별 캐릭터 색 — 밝기(L 0.76)·채도(C 0.15)를 고정한 OKLCH 라 어떤 색상각이어도 어둡지 않다
-// 밝기는 테마 변수(--av-l: 다크 0.76, 라이트 0.62) — 밝은 바탕에선 조금 어둡게
-const avatarColor = (name) => (state.colors?.[name] != null ? `oklch(var(--av-l, 0.76) 0.15 ${state.colors[name]})` : '');
+// 역할별 캐릭터 색 — 서버가 역할마다 정해 둔 색상각(0~360, 서로 멀게)을 고른 파스텔 팔레트의 가장 가까운 색으로 바꾼다.
+// 예전엔 밝기·채도를 고정한 OKLCH 를 색상각 그대로 써서 색상에 따라 탁하거나 형광처럼 튀었다(연두·청록 등) →
+// '클로드 놀이터' 테마 그림의 부드러운 톤(머티리얼 300~400 계열)으로 통일. 저장된 색상각은 그대로라 역할 색이 바뀌어도 순서는 유지
+const AVATAR_PALETTE = ['#ff8a65', '#ffb74d', '#ffd54f', '#aed581', '#7ccf8a', '#4db6ac', '#4dd0e1', '#64b5f6', '#7986cb', '#b39ddb', '#f48fb1', '#e57373'];
+// sRGB → OKLCH 색상각(도) — 팔레트 색을 색상각 순으로 세워 가장 가까운 것을 찾으려고
+function okHue(hex) {
+  const lin = (c) => { c /= 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+  const [r, g, b] = [1, 3, 5].map((i) => lin(parseInt(hex.slice(i, i + 2), 16)));
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  const A = 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s, B = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s;
+  return (Math.atan2(B, A) * 180 / Math.PI + 360) % 360;
+}
+const AVATAR_HUES = AVATAR_PALETTE.map(okHue);
+const hueGap = (a, b) => { const d = Math.abs(a - b) % 360; return Math.min(d, 360 - d); };
+// 역할마다 아직 다른 역할이 안 쓴 팔레트 색 중 색상각이 가장 가까운 것 — 같은 색이 두 역할에 겹치지 않게(먼저 생긴 역할부터).
+// 팔레트(12색)보다 역할이 많으면 그때부터는 가장 가까운 색을 함께 쓴다. 역할 색 목록이 바뀔 때만 다시 계산
+let avatarMap = { key: '', map: {} };
+const avatarColor = (name) => {
+  const colors = state.colors || {};
+  if (colors[name] == null) return '';
+  // 지금 쓰는 역할(떠 있는 워커 · 대기실에 저장된 역할)이 먼저 색을 받는다 — 지난 역할 기록이 좋은 색을 차지하지 않게
+  const live = new Set([...(state.workers || []).map((w) => w.name), ...(state.profiles || []).map((p) => p.name)]);
+  const key = JSON.stringify(colors) + [...live].join('|');
+  if (avatarMap.key !== key) {
+    const map = {}, used = new Set();
+    const names = Object.keys(colors).sort((a, b) => live.has(b) - live.has(a));
+    for (const n of names) {
+      const h = colors[n];
+      const order = AVATAR_HUES.map((x, i) => i).sort((a, b) => hueGap(AVATAR_HUES[a], h) - hueGap(AVATAR_HUES[b], h));
+      const pick = order.find((i) => !used.has(i)) ?? order[0];
+      used.add(pick); map[n] = AVATAR_PALETTE[pick];
+    }
+    avatarMap = { key, map };
+  }
+  return avatarMap.map[name];
+};
 
 function updateNode(node, w) {
   node.style.setProperty('--avatar', avatarColor(w.name) || 'var(--accent)');
