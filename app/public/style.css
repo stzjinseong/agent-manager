@@ -2084,7 +2084,6 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 .ur-insights { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; }
 .ur-ins { display: flex; gap: 11px; padding: 12px 13px; border-radius: 12px; border: 1px solid var(--line-2); background: rgb(var(--ink) / .03); animation: ur-rise .5s var(--d) both; --c: #6aa8ff; }
 .ur-ins.is-good { --c: #4fd1a5; } .ur-ins.is-tip { --c: #6aa8ff; } .ur-ins.is-warn { --c: #f2b24c; } .ur-ins.is-info { --c: #b48cff; }
-.ur-ins { border-left: 3px solid var(--c); }
 .ur-ins-i { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; font-weight: 800; font-size: 13px; color: var(--c); background: color-mix(in srgb, var(--c) 16%, transparent); }
 .ur-ins b { font-size: 13px; } .ur-ins p { margin: 3px 0 0; font-size: 12.5px; color: var(--text-2); line-height: 1.5; }
 @media (max-width: 980px) { .ur-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } .ur-grid.two { grid-template-columns: 1fr; } }
