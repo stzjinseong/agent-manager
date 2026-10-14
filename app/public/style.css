@@ -1975,8 +1975,9 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 .touch .term-wrap.diffing .term-keys { display: none; }
 
 /* ---------- 나의 Claude 사용 리포트 — userreport.js ---------- */
-.ur-back { padding: 20px 0; overflow-y: auto; place-items: start center; }
-.modal.ur-modal { width: min(1180px, calc(100% - 32px)); padding: 0; overflow: hidden; outline: none;
+/* 창 높이에 맞춘 틀 안에서 본문만 스크롤 — 머리(기간 탭·닫기)는 늘 보이고, 바깥 스크롤에 기대지 않아 아래가 잘리지 않는다 */
+.ur-back { padding: 20px 0; place-items: center; }
+.modal.ur-modal { width: min(1180px, calc(100% - 32px)); max-height: calc(100dvh - 40px); display: flex; flex-direction: column; padding: 0; overflow: hidden; outline: none;
   background: radial-gradient(1200px 380px at 12% -8%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%),
               radial-gradient(900px 340px at 100% 0%, color-mix(in srgb, #6aa8ff 10%, transparent), transparent 70%), var(--surface); }
 .ur-head { display: flex; align-items: center; gap: 16px; padding: 20px 24px 6px; }
@@ -1987,7 +1988,9 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 .ur-range button { border: 0; background: none; color: var(--text-2); font: inherit; font-size: 12.5px; padding: 5px 12px; border-radius: 7px; cursor: pointer; }
 .ur-range button.on { background: var(--surface-3); color: var(--text); box-shadow: 0 1px 4px rgb(0 0 0 / .2); }
 .ur-x { padding: 4px 10px; }
-.ur-body { padding: 12px 24px 6px; display: flex; flex-direction: column; gap: 14px; }
+.ur-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 12px 24px 18px; display: flex; flex-direction: column; gap: 14px; }
+.ur-head, .ur-foot, .ur-body > * { flex: none; } /* 본문 칸들이 틀 높이에 눌려 줄지 않게 */
+.ur-foot { border-top: 1px solid var(--line); padding-top: 10px; }
 .ur-foot { margin: 0; padding: 10px 24px 18px; color: var(--dim); font-size: 11.5px; }
 .ur-loading { display: grid; place-items: center; gap: 12px; padding: 90px 0; color: var(--dim); }
 .ur-loading span { width: 34px; height: 34px; border-radius: 50%; border: 3px solid rgb(var(--ink) / .1); border-top-color: var(--accent); animation: ur-spin .8s linear infinite; }
