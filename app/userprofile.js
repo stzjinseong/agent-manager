@@ -4,6 +4,8 @@
 // 범위: 워커 세션만. 이 PC 의 다른 Claude 세션(터미널에서 직접 연 것)은 넣지 않는다 — 워커가 쓴 경로만 기록하므로
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
+import { spawn } from 'node:child_process';
 import { createProfile, readProfile, profileSummary } from './profile.js';
 
 const VERSION = 2; // 요약 형식이 바뀌면 올린다 — 다른 값이면 모두 다시 읽는다
@@ -88,5 +90,80 @@ export function createUserProfile(dataDir) {
       .map(([tx, s]) => ({ id: path.basename(tx, '.jsonl'), role: s.role, cwd: s.cwd, first: s.first, ...s.sum }));
     return { sessions, tracked: Object.keys(db.sessions).length, since: Math.min(...Object.values(db.sessions).map((s) => s.first || Date.now()), Date.now()) };
   }
-  return { note, report };
+
+  // ---------- AI 코치 리포트 ----------
+  // 통계 요약 + 최근 요청 글 샘플을 이 PC 의 Claude CLI(claude -p, 구독 계정)로 보내 성향·개선점을 JSON 으로 받는다.
+  // 결과는 data/user-profile-llm.json 에 마지막 한 벌만 둔다. 한 번에 하나만 돈다
+  const llmFile = path.join(dataDir, 'user-profile-llm.json');
+  let llmRunning = null;
+  const lastLlm = () => { try { return JSON.parse(fs.readFileSync(llmFile, 'utf8')); } catch { return null; } };
+  function llmInput(days) {
+    const since = days ? Date.now() - days * 86_400_000 : 0;
+    const { sessions } = report();
+    const reqs = [], kinds = {}, hours = new Array(24).fill(0);
+    let interrupts = 0, read = 0, inp = 0;
+    for (const s of sessions) {
+      const ts = s.turns.filter((t) => t.t >= since);
+      if (!ts.length) continue;
+      interrupts += s.interrupts || 0; read += s.tokens.cacheRead; inp += s.tokens.input + s.tokens.cacheWrite + s.tokens.cacheRead;
+      for (const t of ts) {
+        if (t.kind === 'auto' || t.kind === 'cmd') continue;
+        kinds[t.kind] = (kinds[t.kind] || 0) + 1; hours[new Date(t.t).getHours()]++;
+        reqs.push({ t: t.t, role: s.role, kind: t.kind, p: t.p.replace(/\s+/g, ' ').trim() });
+      }
+    }
+    reqs.sort((a, b) => a.t - b.t);
+    const sample = reqs.slice(-LLM_SAMPLE);
+    const stats = { requests: reqs.length, sessions: sessions.filter((s) => s.turns.some((t) => t.t >= since)).length, kinds, interrupts,
+      cacheHit: inp ? +(read / inp).toFixed(3) : null, avgLen: reqs.length ? Math.round(reqs.reduce((a, r) => a + r.p.length, 0) / reqs.length) : 0, byHour: hours };
+    return { stats, sample };
+  }
+  function llmPrompt({ stats, sample }, lang) {
+    const en = lang === 'en';
+    return [
+      en ? 'You are a coach who analyzes how a developer uses an AI coding agent (Claude Code).' : '너는 개발자가 AI 코딩 에이전트(Claude Code)를 어떻게 쓰는지 분석하는 코치다.',
+      en ? 'Below are usage stats and a sample of the requests this user sent to their Claude Code workers (oldest first, [role|kind] prefix, truncated to 160 chars).' : '아래는 한 사용자가 Claude Code 워커들에게 보낸 요청의 통계와 요청 글 샘플이다(오래된 것부터, [역할|유형] 머리, 160자까지).',
+      en ? 'Do not use any tools. Output ONLY one JSON object, no code fence, in English, with this shape:' : '도구는 쓰지 말고, 아래 모양의 JSON 객체 하나만 출력해(코드 펜스 없이, 한국어로):',
+      '{"headline":"<≤40자 한 줄 요약>","persona":{"name":"<성향 이름>","desc":"<2문장>"},'
+        + '"scores":[{"name":"명확성","score":0-100,"why":"<한 문장>"},{"name":"맥락 제공",...},{"name":"작업 분할",...},{"name":"검증 요구",...},{"name":"위임·자동화",...}],'
+        + '"strengths":[{"title":"","detail":""}x3],"improvements":[{"title":"","detail":""}x3],'
+        + '"rewrites":[{"before":"<샘플의 실제 요청 그대로>","after":"<더 나은 요청>","why":"<한 문장>"}x2],'
+        + '"patterns":["<반복해서 보이는 습관>"x3-5],"next":"<다음 일주일 동안 해 볼 한 가지>"}',
+      en ? 'Be specific and grounded in the sample (quote it). Be candid but kind. Kinds: feature=work order, bug=fix, ask=question, ops=commit/build, review=refactor, reply=short reply, etc=other.'
+        : '샘플에 근거해 구체적으로(인용해서), 솔직하지만 다정하게. 유형: feature=작업 지시, bug=버그·문제, ask=조사·질문, ops=커밋·빌드, review=리뷰·정리, reply=짧은 답, etc=기타.',
+      '', 'STATS ' + JSON.stringify(stats), '', 'SAMPLE',
+      ...sample.map((r) => `[${r.role}|${r.kind}] ${r.p}`),
+    ].join('\n');
+  }
+  function llmRun({ days = 30, lang = 'ko', claudeBin }) {
+    if (llmRunning) return llmRunning;
+    const input = llmInput(days);
+    if (!input.sample.length) return Promise.resolve({ error: 'empty' });
+    llmRunning = new Promise((resolve) => {
+      const env = { ...process.env };
+      delete env.CLAUDECODE; delete env.CLAUDE_CODE_ENTRYPOINT;
+      const p = spawn(claudeBin, ['-p', '--output-format', 'json', '--model', LLM_MODEL, '--max-turns', '1'], { cwd: os.tmpdir(), env, windowsHide: true });
+      let out = '', err = '';
+      const kill = setTimeout(() => { try { p.kill(); } catch {} }, 240_000);
+      p.stdout.on('data', (d) => { out += d; });
+      p.stderr.on('data', (d) => { err += d; });
+      p.on('error', (e) => { err += String(e); });
+      p.on('close', () => {
+        clearTimeout(kill);
+        let res = null, rep = null;
+        try { res = JSON.parse(out); } catch {}
+        const text = String(res?.result || '').replace(/^\s*```(?:json)?\s*|\s*```\s*$/g, '');
+        try { rep = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)); } catch {}
+        if (!rep) return resolve({ error: 'parse', detail: (res?.result || err || out).slice(0, 400) });
+        const doc = { at: Date.now(), days, n: input.sample.length, total: input.stats.requests, model: Object.keys(res.modelUsage || {})[0] || LLM_MODEL, cost: res.total_cost_usd ?? null, report: rep };
+        try { fs.writeFileSync(llmFile, JSON.stringify(doc)); } catch {}
+        resolve(doc);
+      });
+      p.stdin.end(llmPrompt(input, lang));
+    }).finally(() => { llmRunning = null; });
+    return llmRunning;
+  }
+  return { note, report, lastLlm, llmRun, llmBusy: () => Boolean(llmRunning), llmCount: (days) => Math.min(LLM_SAMPLE, llmInput(days).stats.requests) };
 }
+const LLM_SAMPLE = 120; // 보내는 요청 글 수(최근 것부터)
+const LLM_MODEL = 'sonnet'; // 분석용 — 구독 사용량을 덜 쓰는 모델
