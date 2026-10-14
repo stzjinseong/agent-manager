@@ -362,17 +362,41 @@
       + card('날짜별 활동', T('요청 수와 그날 쓴 금액'), timeline(d), 'wide')
       + sec(5, T('자세히'), T('Claude 가 쓴 도구와 역할별 사용'))
       + `<div class="ur-grid two">${card('Claude 가 쓴 도구', T('호출 수 · 비율'), toolBars(d))}${card('역할별', T('금액 순'), roleTable(d))}</div>`;
+    [...body.children].forEach((c, i) => c.style.setProperty('--i', i)); // 펼칠 때 차례로 붙는 순서
     countUp(d);
   }
 
+  // 여는 연출: 처음엔 성향 배너만 담긴 작은 창 → 잠시 뒤 창이 화면 높이까지 늘어나며 아래 구역들이 차례로 붙는다.
+  // 창 아무 곳이나 누르거나 휠을 굴리면 바로 펼침. 움직임 줄이기 설정이면 연출 없이 바로
+  const box = modal.querySelector('.ur-modal');
+  let introT = null;
+  function grow() {
+    if (!box.classList.contains('ur-intro')) return;
+    clearTimeout(introT);
+    box.style.maxHeight = '';
+    box.classList.add('ur-grow');
+    box.classList.remove('ur-intro');
+    setTimeout(() => box.classList.remove('ur-grow'), 1800);
+  }
   async function open() {
     modal.hidden = false;
+    const intro = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+    box.classList.remove('ur-grow'); box.classList.toggle('ur-intro', intro);
+    box.style.maxHeight = intro ? '300px' : ''; // 읽는 동안도 작은 창 — 큰 창이 떴다가 줄어들지 않게
     data = null; render();
     try { data = await (await fetch('/api/user-profile')).json(); } catch { data = { sessions: [], since: Date.now() }; }
+    const hero = () => $u('#ur-body .ur-hero-banner');
     render();
+    if (intro && hero()) {
+      const top = box.getBoundingClientRect().top, h = hero().getBoundingClientRect().bottom - top + 22;
+      box.style.maxHeight = `${Math.round(h)}px`;
+      introT = setTimeout(grow, 1700);
+    } else box.classList.remove('ur-intro');
     loadAi();
   }
-  function close() { modal.hidden = true; }
+  function close() { clearTimeout(introT); box.classList.remove('ur-intro', 'ur-grow'); box.style.maxHeight = ''; modal.hidden = true; }
+  box.addEventListener('wheel', grow, { passive: true });
+  box.addEventListener('pointerdown', grow);
   $u('#btn-ureport').addEventListener('click', open);
   modal.addEventListener('click', (e) => {
     if (e.target === modal || e.target.closest('[data-ur=close]')) return close();
