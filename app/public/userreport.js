@@ -107,7 +107,7 @@
   }
   function ring(v, color) {
     const r = 15, c = 2 * Math.PI * r, f = v == null ? 0 : Math.max(0, Math.min(1, v));
-    return `<svg class="ur-ring" viewBox="0 0 40 40"><circle cx="20" cy="20" r="${r}" fill="none" stroke="rgb(var(--ink) / .08)" stroke-width="5"/>
+    return `<svg class="ur-ring" viewBox="0 0 40 40" style="--rc:${color}"><circle cx="20" cy="20" r="${r}" fill="none" stroke="rgb(var(--ink) / .08)" stroke-width="5"/>
       <circle class="ur-ring-v" cx="20" cy="20" r="${r}" fill="none" stroke="${color}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${(c * f).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 20 20)"/></svg>`;
   }
   const card = (title, sub, body, cls = '') => `<section class="ur-card ${cls}"><header><h4>${E(T(title))}</h4>${sub ? `<small>${sub}</small>` : ''}</header>${body}</section>`;

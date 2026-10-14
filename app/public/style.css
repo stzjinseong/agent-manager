@@ -2004,8 +2004,8 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 .ur-kpi-t small { font-size: 11.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ur-add { color: #4fd1a5; font-weight: 650; } .ur-del { color: #ef6b6b; font-weight: 650; }
 .ur-spark { width: 100%; height: 30px; margin-top: 4px; }
-.ur-ring { width: 54px; height: 54px; flex: none; }
-.ur-ring-v { transition: stroke-dasharray 1s ease; filter: drop-shadow(0 0 4px currentColor); }
+.ur-ring { width: 54px; height: 54px; flex: none; overflow: visible; } /* 빛 번짐이 SVG 네모 밖으로 나가도 잘리지 않게 */
+.ur-ring-v { transition: stroke-dasharray 1s ease; filter: drop-shadow(0 0 4px var(--rc)); }
 @keyframes ur-rise { from { opacity: 0; transform: translateY(8px); } }
 .ur-grid.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
 .ur-card { padding: 14px 16px; border-radius: 16px; background: rgb(var(--ink) / .03); border: 1px solid var(--line-2); min-width: 0; animation: ur-rise .5s .1s both; }
@@ -2123,7 +2123,7 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 .ur-ai-persona p { margin: 0; color: var(--text-2); font-size: 13px; line-height: 1.5; }
 .ur-scores { display: flex; gap: 6px; }
 .ur-score { width: 98px; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; animation: ur-rise .5s var(--d) both; cursor: help; }
-.ur-score svg { width: 64px; height: 64px; }
+.ur-score svg { width: 64px; height: 64px; overflow: visible; }
 .ur-score .bg { fill: none; stroke: rgb(var(--ink) / .08); stroke-width: 6; }
 .ur-score .fg { fill: none; stroke: var(--c); stroke-width: 6; stroke-linecap: round; filter: drop-shadow(0 0 5px var(--c)); }
 .ur-score text { font-size: 17px; font-weight: 800; fill: var(--text); }
