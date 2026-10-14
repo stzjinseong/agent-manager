@@ -309,7 +309,7 @@ async function copySelection() {
 }
 // ---------- 잘라내기 (Ctrl/⌘+X) ----------
 // xterm 화면엔 CLI 가 그린 글자만 있고 입력 내용은 Claude 안에 있다 → 선택을 복사한 뒤 키로 지운다:
-// 커서를 선택 시작으로 옮기고, → 로 선택 끝까지 가며 몇 번 눌렀는지 세서, 그만큼 Backspace.
+// 커서를 선택 한쪽 끝으로 옮기고, 반대쪽 끝까지 가며 몇 번 눌렀는지 세서, 그만큼 Delete(끝→시작) 또는 Backspace(시작→끝).
 // 화면에서 글자 수를 셀 수 없어 커서를 보며 옮긴다(실측 v2.1.296): 입력칸은 단어 단위로 접히고 접힌 자리의 공백은 안 보인다
 // (줄 끝 → 다음 줄 첫 칸이 두 번), 단어 중간에서 접히면 줄 끝 칸에는 커서가 가지 않는다(한 번), 줄바꿈도 두 번. ←/→ 는 한 글자씩
 // 줄을 넘어 움직이고 커서는 진짜 터미널 커서다. 입력칸이 아니거나(메뉴·! 셸) Vim 모드·붙여넣기 묶음([Pasted text #1])이면 복사만 한다
@@ -372,7 +372,8 @@ function cutText(s, e, start) {
   }
   return out;
 }
-async function cutKeys(data) { send({ type: 'input', id: selected, data }); await cutSettle(); return cutBox(); }
+// 키를 많이 한 번에 보내면 CLI 가 나눠 처리해 중간 화면에서 조용해질 수 있다 → 한 번 더 기다린다
+async function cutKeys(data) { send({ type: 'input', id: selected, data }); await cutSettle(); if (data.length > 60) await cutSettle(); return cutBox(); }
 async function cutSelection() {
   const sel = term.getSelectionPosition(), text = term.getSelection();
   if (!sel || !text) return;
@@ -402,37 +403,60 @@ async function cutSelection() {
     const key = (p) => p.y * 10000 + p.x;
     const top0 = box.top, S = rel(s, box), E = rel(e, box);
     const at = (bx, p) => bx && bx.cur.y - bx.top === p.y && bx.cur.x === p.x;
-    // 1) 선택 시작으로: 보이는 글자 수만큼 한 번에(접힌 자리를 0 으로 쳐 넘치지 않게), 나머지는 한 칸씩
     let cur = rel(box.cur, box), guard = 400;
     const rowEnd = (y) => Math.max(cutRowEnd(y + top0), box.start); // 빈 줄이면 들여쓰기 칸
     const between = (a, b) => { let n = 0; for (let y = a.y; y <= b.y; y++) n += cutChars(y + top0, y === a.y ? a.x : box.start, y === b.y ? b.x : rowEnd(y)); return n; };
-    const k = key(cur) < key(S) ? between(cur, S) : between(S, cur);
-    if (k) { box = await cutKeys((key(cur) < key(S) ? '\x1b[C' : '\x1b[D').repeat(k)); if (!box) throw 0; cur = rel(box.cur, box); }
-    while (!at(box, S)) {
-      if (!guard-- || !box) throw 0;
-      const fwd = key(cur) < key(S);
-      box = await cutKeys(fwd ? '\x1b[C' : '\x1b[D');
-      if (!box) throw 0;
-      const next = rel(box.cur, box);
-      if (key(next) === key(cur) || (fwd ? key(next) > key(S) : key(next) < key(S))) throw 0; // 못 가거나 지나침
-      cur = next;
-    }
-    // 2) 선택 끝까지 → 를 누르며 센다. 줄마다 그 줄 글자만큼 한 번에, 줄 끝에 멈췄으면(접힌 공백·줄바꿈) 한 번 더
-    let n = 0;
-    for (let y = S.y; y <= E.y; y++) {
-      const from = y === S.y ? S.x : box.start, last = y === E.y;
-      const to = last ? E.x : rowEnd(y), m = cutChars(y + top0, from, to);
-      if (m) { box = await cutKeys('\x1b[C'.repeat(m)); n += m; if (!box) throw 0; }
+    // 줄 끝 칸에 커서가 못 가는 자리(단어 중간 접힘)는 다음 줄 첫 칸이 같은 자리
+    const reached = (p) => at(box, p) || (p.x === rowEnd(p.y) && at(box, { y: p.y + 1, x: box.start }));
+    // 1) 목표 자리로: 보이는 글자 수만큼 한 번에(접힌 자리를 0 으로 쳐 넘치지 않게), 나머지는 한 칸씩
+    const moveTo = async (T) => {
+      const fwd0 = key(cur) < key(T), k = fwd0 ? between(cur, T) : between(T, cur);
+      if (k) { box = await cutKeys((fwd0 ? '\x1b[C' : '\x1b[D').repeat(k)); if (!box) throw 0; cur = rel(box.cur, box); }
+      while (!reached(T)) {
+        if (!guard--) throw 0;
+        const fwd = key(cur) < key(T);
+        box = await cutKeys(fwd ? '\x1b[C' : '\x1b[D');
+        if (!box) throw 0;
+        const next = rel(box.cur, box);
+        if (key(next) === key(cur) || (!reached(T) && (fwd ? key(next) > key(T) : key(next) < key(T)))) throw 0; // 못 가거나 지나침
+        cur = next;
+      }
       cur = rel(box.cur, box);
-      const nextRow = { y: y + 1, x: box.start };
-      if (last) { if (!(at(box, { y, x: to }) || (to === rowEnd(y) && at(box, nextRow)))) throw 0; break; }
-      if (at(box, nextRow)) continue; // 단어 중간에서 접힘 — 이미 다음 줄
-      if (!at(box, { y, x: to })) throw 0;
-      box = await cutKeys('\x1b[C'); n++;
-      if (!at(box, nextRow)) throw 0;
+    };
+    // 2) 선택 반대쪽 끝까지 한 방향으로 가며 누른 수를 센다(= 지울 글자 수). 줄마다 그 줄 글자만큼 한 번에, 줄을 넘는 한 칸은 따로 —
+    // 접힌 공백·줄바꿈이면 그 한 칸이 숨은 글자, 단어 중간 접힘이면 옆 줄 글자 하나
+    let n = 0;
+    if (key(cur) >= key(E)) {
+      // 커서가 선택 뒤(보통 맨 끝): 끝 → 시작으로 ← 하며 세고, 그 자리에서 Delete. 커서가 선택 너머로 갔다 오지 않는다
+      await moveTo(E);
+      while (!at(box, S)) {
+        if (!guard--) throw 0;
+        const to = cur.y === S.y ? S.x : box.start, m = cutChars(cur.y + top0, to, cur.x);
+        if (m) { box = await cutKeys('\x1b[D'.repeat(m)); n += m; if (!at(box, { y: cur.y, x: to })) throw 0; }
+        if (cur.y === S.y) break;
+        box = await cutKeys('\x1b[D'); n++;
+        if (!box || box.cur.y - box.top !== cur.y - 1) throw 0;
+        cur = rel(box.cur, box);
+      }
+      if (!n) throw 0;
+      send({ type: 'input', id, data: '\x1b[3~'.repeat(n) });
+    } else {
+      // 커서가 선택 앞이나 안: 시작 → 끝으로 → 하며 세고, Backspace
+      await moveTo(S);
+      for (let y = S.y; y <= E.y; y++) {
+        const from = y === S.y ? S.x : box.start, last = y === E.y;
+        const to = last ? E.x : rowEnd(y), m = cutChars(y + top0, from, to);
+        if (m) { box = await cutKeys('\x1b[C'.repeat(m)); n += m; if (!box) throw 0; }
+        const nextRow = { y: y + 1, x: box.start };
+        if (last) { if (!reached({ y, x: to })) throw 0; break; }
+        if (at(box, nextRow)) continue; // 단어 중간에서 접힘 — 이미 다음 줄
+        if (!at(box, { y, x: to })) throw 0;
+        box = await cutKeys('\x1b[C'); n++;
+        if (!at(box, nextRow)) throw 0;
+      }
+      if (!n) throw 0;
+      send({ type: 'input', id, data: '\x7f'.repeat(n) });
     }
-    if (!n) throw 0;
-    send({ type: 'input', id, data: '\x7f'.repeat(n) });
   } catch {
     toast(_t('커서를 옮기지 못해 복사만 했어요'));
   } finally { cutting = false; }
