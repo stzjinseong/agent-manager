@@ -445,6 +445,7 @@ const EN = {
   '기본 글꼴': 'Default fonts',
   '바꾸기…': 'change…',
   '이 PC 에 설치된 글꼴 이름을 적으면 이 브라우저에서만 바뀌어요. 비우면 기본 글꼴이에요.': 'Type the name of a font installed on this PC — it only changes in this browser. Leave empty for the default.',
+  '새로 설치한 글꼴은 브라우저 창을 <b>모두</b> 닫았다가 다시 켜야 보여요(켜진 동안은 글꼴 목록을 다시 읽지 않아요). 파일 이름이 아니라 글꼴 이름을 적어요 — 예: <code>MapleMono-Regular.ttf</code> → <code>Maple Mono</code>': 'A newly installed font shows up only after you close <b>all</b> browser windows and reopen it (the browser does not reload its font list while running). Type the font name, not the file name — e.g. <code>MapleMono-Regular.ttf</code> → <code>Maple Mono</code>',
   '화면 글꼴': 'UI font',
   'CLI 글꼴': 'CLI font',
   '이 PC 글꼴 목록 불러오기': 'Load fonts on this PC',
