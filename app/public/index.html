@@ -255,47 +255,22 @@
         <span id="profile-mini"></span>
       </div>
       <div class="kpis" id="kpis"></div>
-      <div class="charts">
-        <div class="chart-card">
-          <div class="chart-head">
-            <h3><span data-i18n>턴별 입력 토큰</span> <small data-i18n>최근 20턴</small> <i class="info" data-info="턴별 입력 토큰">ⓘ</i></h3>
-            <div class="legend">
-              <span><i style="background:var(--s-read)"></i><span data-i18n>캐시 읽기</span></span>
-              <span><i style="background:var(--s-write)"></i><span data-i18n>캐시 쓰기</span></span>
-              <span><i style="background:var(--s-new)"></i><span data-i18n>신규 입력</span></span>
-            </div>
-          </div>
-          <div class="chart" id="chart-input"></div>
-          <div class="chart-head sub"><h3><span data-i18n>턴별 출력 토큰</span> <i class="info" data-info="턴별 출력 토큰">ⓘ</i></h3></div>
-          <div class="chart" id="chart-output"></div>
-        </div>
+      <div class="charts three">
         <div class="chart-card">
           <div class="chart-head"><h3><span data-i18n>도구 사용</span> <small data-i18n>세션 누적</small> <i class="info" data-info="도구 사용">ⓘ</i></h3></div>
           <div id="chart-tools" class="hbars"></div>
-          <div class="chart-head sub"><h3><span data-i18n>서브에이전트</span> <small data-i18n>별도 트랜스크립트</small> <i class="info" data-info="서브에이전트 목록">ⓘ</i></h3></div>
-          <div id="subagents" class="subagents"></div>
-        </div>
-      </div>
-      <div class="charts">
-        <div class="chart-card">
-          <div class="chart-head">
-            <h3><span data-i18n>턴별 소요 시간</span> <small data-i18n>최근 20턴</small> <i class="info" data-info="턴별 소요 시간">ⓘ</i></h3>
-            <div class="legend">
-              <span><i style="background:var(--t-model)"></i><span data-i18n>모델 응답</span></span>
-              <span><i style="background:var(--t-tool)"></i><span data-i18n>도구 실행</span></span>
-              <span><i style="background:var(--t-wait)"></i><span data-i18n>승인 대기</span></span>
-              <span><i style="background:var(--t-other)"></i><span data-i18n>기타</span></span>
-            </div>
-          </div>
-          <div class="chart" id="chart-time"></div>
         </div>
         <div class="chart-card">
           <div class="chart-head"><h3><span data-i18n>도구별 소요 시간</span> <small data-i18n>세션 누적</small> <i class="info" data-info="도구별 소요 시간">ⓘ</i></h3></div>
           <div id="chart-tooltime" class="hbars"></div>
         </div>
+        <div class="chart-card">
+          <div class="chart-head"><h3><span data-i18n>서브에이전트</span> <small data-i18n>별도 트랜스크립트</small> <i class="info" data-info="서브에이전트 목록">ⓘ</i></h3></div>
+          <div id="subagents" class="subagents"></div>
+        </div>
       </div>
       <div class="chart-card">
-        <div class="chart-head"><h3><span data-i18n>최근 요청</span> <i class="info" data-info="최근 요청">ⓘ</i></h3></div>
+        <div class="chart-head"><h3><span data-i18n>최근 요청</span> <small data-i18n>행에 마우스를 올리면 그 턴의 토큰·시간</small> <i class="info" data-info="최근 요청">ⓘ</i></h3></div>
         <div class="table-wrap"><table class="turns" id="turns-table"></table></div>
       </div>
       <p class="profile-note" data-i18n>트랜스크립트(.jsonl) 기준 집계 · 비용은 API 단가 환산 추정치(구독 사용 시 실제 청구액 아님) · 파일 형식은 Claude Code 버전에 따라 바뀔 수 있음</p>

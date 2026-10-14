@@ -2177,3 +2177,31 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 .ur-ev { display: inline-block; margin-top: 5px; padding: 2px 8px; border-radius: 6px; font-size: 11px; color: var(--text-2); background: rgb(var(--ink) / .06); }
 @media (max-width: 980px) { .ur-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 600px) { .ur-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* ---------- 세션 프로파일 — 나의 사용 리포트와 같은 결 (턴별 차트 3개는 뺐다) ---------- */
+.charts.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+#profile .kpi { position: relative; overflow: hidden; border-radius: 14px; border-color: var(--line-2);
+  background: linear-gradient(160deg, rgb(var(--ink) / .05), rgb(var(--ink) / .015)), var(--surface-2); transition: border-color .3s; }
+#profile .kpi .v { transition: color .3s; }
+#profile .kpi .tw-on { animation: tw-glow 1s ease-out; }
+@keyframes tw-glow { 0% { color: var(--accent-hi); text-shadow: 0 0 14px color-mix(in srgb, var(--accent) 70%, transparent); } 100% { text-shadow: none; } }
+#profile .kpi .s.tw-on { animation: tw-glow-s 1s ease-out; }
+@keyframes tw-glow-s { 0% { color: var(--accent-hi); } }
+#profile .kpi svg.spark polyline { stroke: var(--accent); }
+#profile .kpi .gauge { height: 6px; border-radius: 3px; background: rgb(var(--ink) / .07); }
+#profile .kpi .gauge i { background: linear-gradient(90deg, #4fd1a5, #6aa8ff); transition: width .7s cubic-bezier(.2, 1, .4, 1); }
+#profile .kpi .gauge i.warn { background: linear-gradient(90deg, #f2b24c, #ef6b6b); }
+#profile .chart-card { border-radius: 16px; border-color: var(--line-2); background: rgb(var(--ink) / .03); }
+#profile .chart-head h3 { font-size: 13.5px; }
+#profile .hbars { display: flex; flex-direction: column; gap: 7px; }
+#profile .hbar .b { height: 10px; border-radius: 5px; background: rgb(var(--ink) / .06); }
+#profile .hbar .b i { border-radius: 5px; background: linear-gradient(90deg, #6aa8ff, #b48cff); transition: width .7s cubic-bezier(.2, 1, .4, 1); }
+#profile #chart-tooltime .hbar .b i { background: linear-gradient(90deg, #f2b24c, #e8865f); }
+#profile .hbar .n { color: var(--text-2); }
+#profile .hbar .c { font-weight: 650; }
+#profile .turns tbody tr { transition: background .15s; cursor: default; }
+#profile .turns tbody tr:hover { background: rgb(var(--ink) / .045); }
+#profile .turns tr.live td { background: color-mix(in srgb, var(--working) 9%, transparent); }
+#profile .sa { border-radius: 10px; }
+@media (max-width: 1100px) { .charts.three { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+@media (max-width: 760px) { .charts.three { grid-template-columns: minmax(0, 1fr); } }

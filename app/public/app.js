@@ -1791,8 +1791,6 @@ const TSERIES = [
   { key: 'approval', label: '승인 대기', color: 'var(--t-wait)' },
   { key: 'other', label: '기타', color: 'var(--t-other)' },
 ];
-const timeOf = (t, k) => (t.time?.[k] || 0) / 1000; // 초 단위로 그린다
-const fmtSec = (v) => (v < 60 ? _t('{s}초', { s: Math.round(v) }) : Math.round(v % 60) ? _t('{m}분 {s}초', { m: Math.floor(v / 60), s: Math.round(v % 60) }) : _t('{m}분', { m: Math.floor(v / 60) }));
 const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
 const fmtN = (n) => {
   if (n == null) return '—';
@@ -1817,7 +1815,7 @@ function renderProfile(w, force) {
   if (!p || !p.turnCount) {
     $('#kpis').innerHTML = `<div class="profile-empty">${_t('첫 지시가 끝나면 토큰 사용량이 여기에 쌓입니다.')}</div>`;
     // 이전 워커의 차트·목록·요약이 남지 않게 프로파일 칸을 전부 비운다
-    ['#chart-input', '#chart-output', '#chart-tools', '#chart-time', '#chart-tooltime', '#subagents', '#turns-table'].forEach((s) => ($(s).innerHTML = ''));
+    ['#chart-tools', '#chart-tooltime', '#subagents', '#turns-table'].forEach((s) => ($(s).innerHTML = ''));
     $('#profile-model').textContent = '';
     $('#profile-mini').textContent = '';
     return;
@@ -1847,19 +1845,17 @@ function renderProfile(w, force) {
       p.subagents.length ? `${fmtN(p.sub.tokens)} · ${fmtUsd(p.sub.cost)} <small>(${_t('메인 별도')})</small>` : _t('이 세션에서 사용 안 함')),
     errKpi(p),
   ].join('');
+  tweenProfile(w.id);
   renderSubagents(p);
 
-  profileTurns = turns.slice(-20);
-  drawStacked($('#chart-input'), profileTurns);
-  drawBars($('#chart-output'), profileTurns);
-  drawStacked($('#chart-time'), profileTurns, TSERIES, timeOf, 150, fmtSec);
+  profileTurns = turns.slice(-8).reverse(); // 최근 요청 표의 행 순서 — 행 호버 툴팁이 이 순서로 찾는다
   const maxMs = Math.max(1, ...p.toolTime.map((x) => x.ms));
   $('#chart-tooltime').innerHTML = p.toolTime.length
-    ? p.toolTime.map((x) => `<div class="hbar wide" title="${esc(x.name)} — ${_t('{n}회 · 총 {t} · 평균 {a} · 최대 {m}', { n: x.n, t: fmtMs(x.ms), a: fmtMs(x.ms / x.n), m: fmtMs(x.max) })}"><span class="n">${esc(x.name)}</span><span class="b"><i style="width:${(x.ms / maxMs) * 100}%;background:var(--t-tool)"></i></span><span class="c">${fmtMs(x.ms)}</span><span class="d">${_t('{n}회 · 평균 {a} · 최대 {m}', { n: x.n, a: fmtMs(x.ms / x.n), m: fmtMs(x.max) })}</span></div>`).join('')
+    ? p.toolTime.map((x) => `<div class="hbar wide" title="${esc(x.name)} — ${_t('{n}회 · 총 {t} · 평균 {a} · 최대 {m}', { n: x.n, t: fmtMs(x.ms), a: fmtMs(x.ms / x.n), m: fmtMs(x.max) })}"><span class="n">${esc(x.name)}</span><span class="b"><i style="width:${(x.ms / maxMs) * 100}%" data-k="t:${esc(x.name)}"></i></span><span class="c">${fmtMs(x.ms)}</span><span class="d">${_t('{n}회 · 평균 {a} · 최대 {m}', { n: x.n, a: fmtMs(x.ms / x.n), m: fmtMs(x.max) })}</span></div>`).join('')
     : `<div class="profile-empty">${_t('도구 실행 기록 없음')}</div>`;
   const maxTool = Math.max(1, ...p.toolTop.map((x) => x[1]));
   $('#chart-tools').innerHTML = p.toolTop.length
-    ? p.toolTop.map(([n, c]) => `<div class="hbar"><span class="n" title="${esc(n)}">${esc(n)}</span><span class="b"><i style="width:${(c / maxTool) * 100}%"></i></span><span class="c">${c}</span></div>`).join('')
+    ? p.toolTop.map(([n, c]) => `<div class="hbar"><span class="n" title="${esc(n)}">${esc(n)}</span><span class="b"><i style="width:${(c / maxTool) * 100}%" data-k="u:${esc(n)}"></i></span><span class="c">${c}</span></div>`).join('')
     : `<div class="profile-empty">${_t('도구 사용 없음')}</div>`;
 
   const fmtT = (ts) => new Date(ts).toLocaleTimeString(uiLocale(), { hour12: false, hour: '2-digit', minute: '2-digit' });
@@ -1868,11 +1864,66 @@ function renderProfile(w, force) {
     `<thead><tr><th>#</th><th>${_t('시각')}</th><th>${_t('질문')}</th><th class="r">${_t('첫 응답')}</th><th class="r">${_t('소요')}</th><th class="r">API</th><th class="r">${_t('도구')}</th><th class="r">${_t('입력')}</th><th class="r">${_t('캐시 적중')}</th><th class="r">${_t('출력')}</th><th class="r">${_t('비용')}</th><th>${_t('비고')}</th></tr></thead><tbody>` +
     turns.slice(-8).reverse().map((x, i) => {
       const inp = turnInput(x);
-      return `<tr class="${live && i === 0 ? 'live' : ''}"><td>${x.n}</td><td>${fmtT(x.start)}</td><td class="p" title="${esc(x.prompt)}">${esc(x.prompt)}</td>` +
+      return `<tr class="${live && i === 0 ? 'live' : ''}" data-i="${i}"><td>${x.n}</td><td>${fmtT(x.start)}</td><td class="p" title="${esc(x.prompt)}">${esc(x.prompt)}</td>` +
         `<td class="r">${fmtMs(x.time.first)}</td><td class="r" title="${_t('모델 {a} · 도구 {b}', { a: fmtMs(x.time.model), b: fmtMs(x.time.tool) })}${x.time.approval ? ` · ${_t('승인 대기 {t}', { t: fmtMs(x.time.approval) })}` : ''}">${fmtMs(x.time.total)}</td><td class="r">${x.calls}</td><td class="r">${x.tools}</td>` +
         `<td class="r">${fmtN(inp)}</td><td class="r">${inp ? Math.round((x.cacheRead / inp) * 100) + '%' : '—'}</td><td class="r">${fmtN(x.output)}</td>` +
         `<td class="r">${fmtUsd(x.cost)}</td><td class="note">${turnNotes(x)}</td></tr>`;
     }).join('') + '</tbody>';
+  growBars(w.id);
+}
+
+// ---------- 펼친 세션 프로파일: 숫자가 바뀌면 지난 값에서 새 값까지 차례로 올라가게(1→2→…→10), 막대는 지난 폭에서 늘어나게 ----------
+// 다시 그릴 때마다 KPI 칸 글을 기억해 두고, 같은 워커에서 글이 바뀌었으면 그 안의 숫자들만 옛 값 → 새 값으로 0.7초 동안 바꿔 쓴다.
+// 숫자 개수가 달라지면(형식이 바뀜) 애니메이션 없이 새 값 그대로
+const TWEEN_NUM = /\d[\d,]*(?:\.\d+)?/g;
+const twPrev = new Map();
+let twWorker = null;
+function tweenText(el, oldText) {
+  const olds = (oldText.match(TWEEN_NUM) || []).map((s) => Number(s.replace(/,/g, '')));
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), parts = [];
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    const nums = [];
+    n.nodeValue.replace(TWEEN_NUM, (s) => { nums.push({ s, to: Number(s.replace(/,/g, '')), dec: (s.split('.')[1] || '').length, comma: s.includes(',') }); return s; });
+    if (nums.length) parts.push({ n, tpl: n.nodeValue, nums });
+  }
+  const all = parts.flatMap((p) => p.nums);
+  if (!all.length || all.length !== olds.length) return;
+  all.forEach((x, i) => { x.from = olds[i]; });
+  if (all.every((x) => x.from === x.to)) return;
+  el.classList.remove('tw-on'); void el.offsetWidth; el.classList.add('tw-on');
+  const t0 = performance.now(), dur = 700;
+  const fmt = (x, v) => { const s = v.toFixed(x.dec); return x.comma ? Number(s).toLocaleString('en-US', { minimumFractionDigits: x.dec, maximumFractionDigits: x.dec }) : s; };
+  const step = (now) => {
+    if (!el.isConnected) return;
+    const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+    for (const p of parts) { let i = 0; p.n.nodeValue = p.tpl.replace(TWEEN_NUM, () => { const x = p.nums[i++]; return k >= 1 ? x.s : fmt(x, x.from + (x.to - x.from) * e); }); }
+    if (k < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+function tweenProfile(id) {
+  const same = twWorker === id;
+  twWorker = id;
+  for (const el of $('#kpis').querySelectorAll('.kpi')) {
+    const key = el.dataset.k || el.querySelector('.k')?.textContent;
+    for (const [part, sel] of [['v', '.v'], ['s', '.s']]) {
+      const box = el.querySelector(sel);
+      if (!box) continue;
+      const k = `${key}|${part}`, now = box.textContent, old = twPrev.get(k);
+      twPrev.set(k, now);
+      if (same && old != null && old !== now) tweenText(box, old);
+    }
+  }
+}
+const barPrev = new Map();
+function growBars(id) {
+  for (const i of document.querySelectorAll('#chart-tools .b i, #chart-tooltime .b i')) {
+    const k = `${id}|${i.dataset.k}`, to = i.style.width, from = barPrev.get(k);
+    barPrev.set(k, to);
+    if (from == null || from === to) continue;
+    i.style.transition = 'none'; i.style.width = from; void i.offsetWidth;
+    i.style.transition = ''; i.style.width = to;
+  }
 }
 
 const CTX_WARN = 150_000; // 이 이상이면 매 턴 캐시 읽기 비용이 커지는 구간 — 새 세션 고려
@@ -1954,7 +2005,7 @@ function kpiValue(v) {
 }
 function kpi(k, v, s, extra = '') {
   const key = k.split(' <')[0];
-  return `<div class="kpi"${INFO[key] ? ` data-info="${key}"` : ''}><div class="k">${_t(k)}${INFO[key] ? ' <i class="info">ⓘ</i>' : ''}</div>${v ? `<div class="v">${kpiValue(v)}</div>` : ''}<div class="s">${s}</div>${extra}</div>`;
+  return `<div class="kpi" data-k="${esc(key)}"${INFO[key] ? ` data-info="${key}"` : ''}><div class="k">${_t(k)}${INFO[key] ? ' <i class="info">ⓘ</i>' : ''}</div>${v ? `<div class="v">${kpiValue(v)}</div>` : ''}<div class="s">${s}</div>${extra}</div>`;
 }
 
 // ---------- 항목 설명 툴팁: 의미 · 근거 · 활용 · 신뢰도 ----------
@@ -2090,74 +2141,12 @@ function sparkline(vals) {
   return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="var(--text-2)" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>`;
 }
 
-// 보기 좋은 축 최대값 (1·2·5 × 10^n)
-function niceMax(v) {
-  if (v <= 0) return 1;
-  const e = 10 ** Math.floor(Math.log10(v)), f = v / e;
-  return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * e;
-}
-
-// 위쪽만 둥근 막대 (기준선 쪽은 각지게)
-function topRounded(x, y, w, h, r) {
-  r = Math.min(r, w / 2, h);
-  return `M${x} ${y + h}V${y + r}Q${x} ${y} ${x + r} ${y}H${x + w - r}Q${x + w} ${y} ${x + w} ${y + r}V${y + h}Z`;
-}
-
-function chartFrame(el, H, max, axis = fmtN) {
-  const W = Math.max(240, el.clientWidth), L = 44, B = 18, T = 6;
-  const ph = H - B - T, pw = W - L - 4;
-  const grid = [0, 0.5, 1].map((f) => {
-    const y = T + ph - f * ph;
-    return `<line class="gl" x1="${L}" x2="${W - 4}" y1="${y}" y2="${y}"/><text class="al" x="${L - 6}" y="${y + 3.5}" text-anchor="end">${axis(max * f)}</text>`;
-  }).join('');
-  return { W, L, B, T, ph, pw, grid };
-}
-
-// series 를 아래→위로 쌓는 막대. get(t, key) 로 값을 꺼내고 axis 로 눈금을 표시한다
-function drawStacked(el, turns, series = SERIES, get = (t, k) => t[k], H = 170, axis = fmtN) {
-  const totalOf = (t) => series.reduce((a, s) => a + (get(t, s.key) || 0), 0);
-  const max = niceMax(Math.max(...turns.map(totalOf), 1));
-  const f = chartFrame(el, H, max, axis);
-  const slot = f.pw / 20, bw = Math.min(28, slot * 0.62);
-  const cols = turns.map((t, i) => {
-    const x = f.L + slot * i + (slot - bw) / 2;
-    let y = f.T + f.ph, segs = '';
-    const visible = series.filter((s) => get(t, s.key) > 0);
-    visible.forEach((s, j) => {
-      const h = (get(t, s.key) / max) * f.ph;
-      const gap = j < visible.length - 1 ? 2 : 0; // 세그먼트 사이 2px 면 간격
-      const hh = Math.max(0, h - gap);
-      y -= h;
-      if (hh >= 0.5) segs += j === visible.length - 1 ? `<path d="${topRounded(x, y, bw, hh, 4)}" fill="${s.color}"/>` : `<rect x="${x}" y="${y + gap}" width="${bw}" height="${hh}" fill="${s.color}"/>`;
-    });
-    const miss = series === SERIES && t.cacheMiss ? `<text class="miss" x="${x + bw / 2}" y="${Math.max(f.T + 9, y - 5)}" text-anchor="middle">⚠</text>` : '';
-    return `<g class="col" data-i="${i}">${segs}${miss}<text class="al" x="${x + bw / 2}" y="${H - 4}" text-anchor="middle">${t.n}</text><rect x="${f.L + slot * i}" y="${f.T}" width="${slot}" height="${f.ph + f.B}" fill="transparent"/></g>`;
-  }).join('');
-  el.innerHTML = `<svg viewBox="0 0 ${f.W} ${H}" height="${H}">${f.grid}${cols}</svg>`;
-}
-
-function drawBars(el, turns) {
-  const H = 90, max = niceMax(Math.max(...turns.map((t) => t.output), 1));
-  const f = chartFrame(el, H, max);
-  const slot = f.pw / 20, bw = Math.min(28, slot * 0.62);
-  const cols = turns.map((t, i) => {
-    const x = f.L + slot * i + (slot - bw) / 2, h = (t.output / max) * f.ph;
-    return `<g class="col" data-i="${i}">${h >= 0.5 ? `<path d="${topRounded(x, f.T + f.ph - h, bw, h, 4)}" fill="var(--s-out)"/>` : ''}<text class="al" x="${x + bw / 2}" y="${H - 4}" text-anchor="middle">${t.n}</text><rect x="${f.L + slot * i}" y="${f.T}" width="${slot}" height="${f.ph + f.B}" fill="transparent"/></g>`;
-  }).join('');
-  el.innerHTML = `<svg viewBox="0 0 ${f.W} ${H}" height="${H}">${f.grid}${cols}</svg>`;
-}
-
-// 두 차트 공통 호버: 같은 턴을 양쪽에서 함께 강조하고 툴팁 하나로 보여준다
+// 최근 요청 표: 행에 마우스를 올리면 그 턴의 토큰·캐시·시간·도구를 툴팁으로(예전 턴별 차트의 호버 내용)
 function onChartHover(e) {
-  const col = e.target.closest('.col');
-  const charts = [$('#chart-input'), $('#chart-output'), $('#chart-time')];
-  if (!col) { charts.forEach((c) => c.classList.remove('hovering')); $('#tip').hidden = true; return; }
-  const i = Number(col.dataset.i), t = profileTurns[i];
+  const row = e.target.closest?.('tr[data-i]');
+  if (!row) { $('#tip').hidden = true; return; }
+  const t = profileTurns[Number(row.dataset.i)];
   if (!t) return;
-  charts.forEach((c) => {
-    c.classList.add('hovering');
-    c.querySelectorAll('.col').forEach((g) => g.classList.toggle('on', Number(g.dataset.i) === i));
-  });
   const inp = turnInput(t);
   const tip = $('#tip');
   tip.classList.remove("info-tip");
@@ -2177,10 +2166,8 @@ function onChartHover(e) {
   tip.style.left = `${Math.min(e.clientX + 14, innerWidth - r.width - 8)}px`;
   tip.style.top = `${Math.min(e.clientY + 14, innerHeight - r.height - 8)}px`;
 }
-['#chart-input', '#chart-output', '#chart-time'].forEach((s) => {
-  $(s).addEventListener('mousemove', onChartHover);
-  $(s).addEventListener('mouseleave', onChartHover);
-});
+$('#turns-table').addEventListener('mousemove', onChartHover);
+$('#turns-table').addEventListener('mouseleave', onChartHover);
 new ResizeObserver(() => {
   const w = state.workers.find((x) => x.id === selected);
   if (w) renderProfile(w);
