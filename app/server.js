@@ -1258,6 +1258,36 @@ const THEME_TYPES = {
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml',
   '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.otf': 'font/otf',
 };
+// 이 PC 의 Windows Terminal 색 구성표(settings.json 의 schemes — 사용자가 만들거나 들여온 것. 기본 구성표는 앱(app.js WT_SCHEMES)에 있다).
+// 스토어판 · 미리보기판 · 설치판(unpackaged) 순으로 찾아 모두 모은다. settings.json 은 주석·끝 쉼표가 있는 JSONC
+const WT_SETTINGS = IS_WIN ? [
+  'Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState/settings.json',
+  'Packages/Microsoft.WindowsTerminalPreview_8wekyb3d8bbwe/LocalState/settings.json',
+  'Microsoft/Windows Terminal/settings.json',
+].map((r) => path.join(process.env.LOCALAPPDATA || '', r)) : [];
+function parseJsonc(text) {
+  let out = '', i = 0;
+  while (i < text.length) {
+    const c = text[i];
+    if (c === '"') { const m = text.slice(i).match(/^"(?:[^"\\]|\\.)*"/); out += m ? m[0] : c; i += m ? m[0].length : 1; continue; }
+    if (c === '/' && text[i + 1] === '/') { while (i < text.length && text[i] !== '\n') i++; continue; }
+    if (c === '/' && text[i + 1] === '*') { const e = text.indexOf('*/', i + 2); i = e < 0 ? text.length : e + 2; continue; }
+    out += c; i++;
+  }
+  return JSON.parse(out.replace(/,(\s*[}\]])/g, '$1'));
+}
+function wtSchemes() {
+  const schemes = [], seen = new Set();
+  for (const f of WT_SETTINGS) {
+    let j;
+    try { j = parseJsonc(fs.readFileSync(f, 'utf8')); } catch { continue; }
+    for (const s of Array.isArray(j?.schemes) ? j.schemes : []) {
+      if (!s || typeof s.name !== 'string' || !/^#[0-9a-f]{6}$/i.test(s.background || '') || seen.has(s.name)) continue;
+      seen.add(s.name); schemes.push(s);
+    }
+  }
+  return { schemes };
+}
 function listThemes() {
   let dirs = [];
   try { dirs = fs.readdirSync(THEME_DIR, { withFileTypes: true }); } catch { return []; }
@@ -1820,6 +1850,7 @@ const server = http.createServer(async (req, res) => {
 
   // 사용자 테마 — 목록, 테마 폴더 안 파일(theme.css · 그림 · 글꼴)
   if (req.method === 'GET' && p === '/api/themes') return json(res, 200, { themes: listThemes(), dir: THEME_DIR });
+  if (req.method === 'GET' && p === '/api/term-schemes') return json(res, 200, wtSchemes());
   if (req.method === 'POST' && p === '/api/themes') {
     const { id } = await readBody(req);
     const r = createTheme(String(id || '').trim());

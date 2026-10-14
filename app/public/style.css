@@ -1849,6 +1849,10 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 .modal.theme-guide { width: min(520px, calc(100% - 32px)); }
 .font-set .char-name span { flex: none; width: 72px; }
 .font-set .char-name { position: relative; }
+.font-set select { flex: 1; min-width: 0; }
+.fs-scheme-prev { display: flex; align-items: center; gap: 3px; font: 13px var(--mono); border: 1px solid var(--line); }
+.fs-scheme-prev span { margin-right: 8px; }
+.fs-scheme-prev i { width: 14px; height: 14px; border-radius: 3px; flex: none; }
 .fs-lh input { flex: 1; accent-color: var(--accent); }
 .fs-lh output { flex: none; width: 36px; text-align: right; font: 12.5px var(--mono); color: var(--text-2); }
 .fs-pop { left: 82px; max-height: 240px; } /* 글꼴 목록 — 입력칸 아래(app.js setFontPop), 이름마다 그 글꼴로 */

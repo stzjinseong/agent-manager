@@ -195,10 +195,50 @@ setFavicon(false);
 let userThemes = [], themeDir = '';
 try { userThemes = JSON.parse(localStorage.getItem('am.themes') || '[]'); } catch {}
 const curTheme = () => userThemes.find((t) => t.id === document.documentElement.dataset.skin);
-// 터미널 색: 기본 다크/라이트 값에 지금 테마의 theme.json terminal.dark/light 를 덮어쓴다
+// 터미널 색: 기본 다크/라이트 값에 지금 테마의 theme.json terminal.dark/light 를 덮어쓴다.
+// CLI 색 구성표(꾸미기 → 글꼴 · CLI 색)를 골랐으면 그 색이 앞선다 — 다크/라이트·테마와 상관없이 이 PC 에선 그 색
 function termTheme(light) {
+  const sc = termScheme();
+  if (sc) return { ...baseTermTheme(sc.dark === false), ...schemeTheme(sc) };
   const t = curTheme()?.terminal?.[light ? 'light' : 'dark'];
   return t ? { ...baseTermTheme(light), ...t } : baseTermTheme(light);
+}
+// ---------- CLI 색 구성표 (Windows Terminal 형식) ----------
+// 고른 구성표를 통째로 브라우저에 기억(am.term.scheme) — 서버·다른 PC 없이도 그대로 쓴다. 목록은 Windows Terminal 기본 구성표 +
+// 서버 PC 의 Windows Terminal settings.json 에 있는 것(/api/term-schemes). 키 이름은 WT 그대로(purple · cursorColor) → schemeTheme 이 xterm 이름으로
+const WT_SCHEMES = [
+  { name: 'Campbell', background: '#0C0C0C', foreground: '#CCCCCC', cursorColor: '#FFFFFF', selectionBackground: '#FFFFFF', black: '#0C0C0C', red: '#C50F1F', green: '#13A10E', yellow: '#C19C00', blue: '#0037DA', purple: '#881798', cyan: '#3A96DD', white: '#CCCCCC', brightBlack: '#767676', brightRed: '#E74856', brightGreen: '#16C60C', brightYellow: '#F9F1A5', brightBlue: '#3B78FF', brightPurple: '#B4009E', brightCyan: '#61D6D6', brightWhite: '#F2F2F2' },
+  { name: 'Campbell Powershell', background: '#012456', foreground: '#CCCCCC', cursorColor: '#FFFFFF', selectionBackground: '#FFFFFF', black: '#0C0C0C', red: '#C50F1F', green: '#13A10E', yellow: '#C19C00', blue: '#0037DA', purple: '#881798', cyan: '#3A96DD', white: '#CCCCCC', brightBlack: '#767676', brightRed: '#E74856', brightGreen: '#16C60C', brightYellow: '#F9F1A5', brightBlue: '#3B78FF', brightPurple: '#B4009E', brightCyan: '#61D6D6', brightWhite: '#F2F2F2' },
+  { name: 'Vintage', background: '#000000', foreground: '#C0C0C0', cursorColor: '#FFFFFF', selectionBackground: '#FFFFFF', black: '#000000', red: '#800000', green: '#008000', yellow: '#808000', blue: '#000080', purple: '#800080', cyan: '#008080', white: '#C0C0C0', brightBlack: '#808080', brightRed: '#FF0000', brightGreen: '#00FF00', brightYellow: '#FFFF00', brightBlue: '#0000FF', brightPurple: '#FF00FF', brightCyan: '#00FFFF', brightWhite: '#FFFFFF' },
+  { name: 'One Half Dark', background: '#282C34', foreground: '#DCDFE4', cursorColor: '#FFFFFF', selectionBackground: '#FFFFFF', black: '#282C34', red: '#E06C75', green: '#98C379', yellow: '#E5C07B', blue: '#61AFEF', purple: '#C678DD', cyan: '#56B6C2', white: '#DCDFE4', brightBlack: '#5A6374', brightRed: '#E06C75', brightGreen: '#98C379', brightYellow: '#E5C07B', brightBlue: '#61AFEF', brightPurple: '#C678DD', brightCyan: '#56B6C2', brightWhite: '#DCDFE4' },
+  { name: 'One Half Light', background: '#FAFAFA', foreground: '#383A42', cursorColor: '#4F525D', selectionBackground: '#4F525D', black: '#383A42', red: '#E45649', green: '#50A14F', yellow: '#C18301', blue: '#0184BC', purple: '#A626A4', cyan: '#0997B3', white: '#FAFAFA', brightBlack: '#4F525D', brightRed: '#DF6C75', brightGreen: '#98C379', brightYellow: '#E4C07A', brightBlue: '#61AFEF', brightPurple: '#C577DD', brightCyan: '#56B5C1', brightWhite: '#FFFFFF' },
+  { name: 'Solarized Dark', background: '#002B36', foreground: '#839496', cursorColor: '#FFFFFF', selectionBackground: '#FFFFFF', black: '#002B36', red: '#DC322F', green: '#859900', yellow: '#B58900', blue: '#268BD2', purple: '#D33682', cyan: '#2AA198', white: '#EEE8D5', brightBlack: '#073642', brightRed: '#CB4B16', brightGreen: '#586E75', brightYellow: '#657B83', brightBlue: '#839496', brightPurple: '#6C71C4', brightCyan: '#93A1A1', brightWhite: '#FDF6E3' },
+  { name: 'Solarized Light', background: '#FDF6E3', foreground: '#657B83', cursorColor: '#002B36', selectionBackground: '#073642', black: '#002B36', red: '#DC322F', green: '#859900', yellow: '#B58900', blue: '#268BD2', purple: '#D33682', cyan: '#2AA198', white: '#EEE8D5', brightBlack: '#073642', brightRed: '#CB4B16', brightGreen: '#586E75', brightYellow: '#657B83', brightBlue: '#839496', brightPurple: '#6C71C4', brightCyan: '#93A1A1', brightWhite: '#FDF6E3' },
+  { name: 'Tango Dark', background: '#000000', foreground: '#D3D7CF', cursorColor: '#FFFFFF', selectionBackground: '#FFFFFF', black: '#000000', red: '#CC0000', green: '#4E9A06', yellow: '#C4A000', blue: '#3465A4', purple: '#75507B', cyan: '#06989A', white: '#D3D7CF', brightBlack: '#555753', brightRed: '#EF2929', brightGreen: '#8AE234', brightYellow: '#FCE94F', brightBlue: '#729FCF', brightPurple: '#AD7FA8', brightCyan: '#34E2E2', brightWhite: '#EEEEEC' },
+  { name: 'Tango Light', background: '#FFFFFF', foreground: '#555753', cursorColor: '#000000', selectionBackground: '#555753', black: '#000000', red: '#CC0000', green: '#4E9A06', yellow: '#C4A000', blue: '#3465A4', purple: '#75507B', cyan: '#06989A', white: '#D3D7CF', brightBlack: '#555753', brightRed: '#EF2929', brightGreen: '#8AE234', brightYellow: '#FCE94F', brightBlue: '#729FCF', brightPurple: '#AD7FA8', brightCyan: '#34E2E2', brightWhite: '#EEEEEC' },
+  { name: 'Dark+', background: '#1E1E1E', foreground: '#CCCCCC', cursorColor: '#808080', selectionBackground: '#FFFFFF', black: '#000000', red: '#CD3131', green: '#0DBC79', yellow: '#E5E510', blue: '#2472C8', purple: '#BC3FBC', cyan: '#11A8CD', white: '#E5E5E5', brightBlack: '#666666', brightRed: '#F14C4C', brightGreen: '#23D18B', brightYellow: '#F5F543', brightBlue: '#3B8EEA', brightPurple: '#D670D6', brightCyan: '#29B8DB', brightWhite: '#E5E5E5' },
+];
+const SCHEME_KEY = 'am.term.scheme';
+const hexOk = (v) => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v);
+// 밝은 바탕인지(구성표의 dark 표시) — 스크롤바·확장 색(diff 줄 등)을 라이트/다크 어느 쪽 값으로 둘지
+const isDarkBg = (hex) => { const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)); return 0.299 * r + 0.587 * g + 0.114 * b < 140; };
+function termScheme() {
+  try { const s = JSON.parse(localStorage.getItem(SCHEME_KEY) || 'null'); return s && hexOk(s.background) ? { ...s, dark: isDarkBg(s.background) } : null; } catch { return null; }
+}
+function schemeTheme(s) {
+  const t = { background: s.background, foreground: hexOk(s.foreground) ? s.foreground : undefined, cursorAccent: s.background };
+  if (hexOk(s.cursorColor)) t.cursor = s.cursorColor;
+  // WT 의 선택색은 불투명 색에 앱이 투명도를 입힌다 — xterm 은 색 그대로 칠하므로 같은 느낌이 나게 반투명(25%)으로
+  if (hexOk(s.selectionBackground)) t.selectionBackground = s.selectionBackground + '40';
+  for (const k of ['black', 'red', 'green', 'yellow', 'blue', 'cyan', 'white', 'brightBlack', 'brightRed', 'brightGreen', 'brightYellow', 'brightBlue', 'brightCyan', 'brightWhite']) if (hexOk(s[k])) t[k] = s[k];
+  if (hexOk(s.purple)) t.magenta = s.purple; if (hexOk(s.brightPurple)) t.brightMagenta = s.brightPurple;
+  for (const k of Object.keys(t)) if (t[k] === undefined) delete t[k];
+  return t;
+}
+// 터미널 둘레(.term-wrap 여백 등 --term-bg)도 구성표 바탕색으로
+function applyScheme() {
+  const sc = termScheme();
+  if (sc) document.documentElement.style.setProperty('--term-bg', sc.background); else document.documentElement.style.removeProperty('--term-bg');
 }
 // Claude Code 는 예전엔 이 터미널에 256색 번호로 색을 찍었다(2.1.29x 부터 diff·요청 줄은 24비트 — 아래 recolorTerm 이 같은 번호의 색으로 바꾼다). 그중 몇 번호를 이 화면에서만 다른 색으로 —
 //  · diff: 22 추가 줄 배경 · 28 추가 단어 · 52 삭제 줄 · 88 삭제 단어 · 77 '+' 글자 · 167 '-' 글자. 기본은 원색에 가까워 너무 진하다 → 차분한 초록/빨강
@@ -243,6 +283,7 @@ function baseTermTheme(light) {
     extendedAnsi: extAnsi(TERM_256.light),
   };
 }
+applyScheme();
 const term = new Terminal({
   fontFamily: 'ui-monospace, SFMono-Regular, Menlo, "Cascadia Mono", Consolas, monospace', // 시스템 고정폭 (style.css --mono 와 같음)
   fontSize: 13, cursorBlink: true, scrollback: 12000, // PTY 호스트 기록(10000줄)보다 넉넉히
@@ -3095,6 +3136,7 @@ function openFontSet() {
   const f = fontPrefs();
   $('#fs-ui').value = f.ui; $('#fs-term').value = f.term;
   $('#fs-lh').value = f.lh; $('#fs-lh-val').textContent = f.lh.toFixed(2);
+  renderSchemeSel(); loadWtSchemes();
   fontModal.hidden = false;
   if (!fontNames.length) loadFontNames(false).then(() => { if (document.activeElement?.closest('#font-modal .char-name')) setFontPop(document.activeElement); });
   requestAnimationFrame(() => $('#fs-ui').focus());
@@ -3153,6 +3195,39 @@ for (const id of ['fs-ui', 'fs-term']) {
     else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setFontPop(null); }
   });
 }
+// CLI 색 구성표 목록 — 기본은 앱 테마, 그 밑에 Windows Terminal 기본 구성표, 서버 PC 의 Windows Terminal 구성표(있으면)
+let wtLocal = [];
+const schemeAll = () => [...WT_SCHEMES, ...wtLocal];
+function renderSchemeSel() {
+  const sel = $('#fs-scheme'), cur = termScheme()?.name || '';
+  const opt = (s, g) => `<option value="${g}:${esc(s.name)}"${s.name === cur ? ' selected' : ''}>${esc(s.name)}</option>`;
+  sel.innerHTML = `<option value=""${cur ? '' : ' selected'}>${esc(_t('기본 (앱 테마 색)'))}</option>`
+    + `<optgroup label="${esc(_t('Windows Terminal 기본'))}">${WT_SCHEMES.map((s) => opt(s, 'wt')).join('')}</optgroup>`
+    + (wtLocal.length ? `<optgroup label="${esc(_t('이 PC 의 Windows Terminal'))}">${wtLocal.map((s) => opt(s, 'pc')).join('')}</optgroup>` : '');
+  // 지금 구성표가 목록에 없으면(다른 PC 에서 고른 것 등) 그 이름으로 한 줄 남긴다
+  if (cur && !schemeAll().some((s) => s.name === cur)) sel.insertAdjacentHTML('beforeend', `<option value="keep" selected>${esc(cur)}</option>`);
+  renderSchemeSwatch();
+}
+function renderSchemeSwatch() {
+  const sc = termScheme(), t = sc ? schemeTheme(sc) : termTheme(document.documentElement.dataset.theme === 'light');
+  const keys = ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white', 'brightBlack', 'brightRed', 'brightGreen', 'brightYellow', 'brightBlue', 'brightMagenta', 'brightCyan', 'brightWhite'];
+  $('#fs-scheme-prev').style.cssText = `background:${t.background || ''};color:${t.foreground || ''}`;
+  $('#fs-scheme-prev').innerHTML = `<span>❯ claude</span>` + keys.map((k) => `<i style="background:${t[k] || 'transparent'}" title="${k}"></i>`).join('');
+}
+async function loadWtSchemes() {
+  try { const j = await (await fetch('/api/term-schemes')).json(); wtLocal = Array.isArray(j.schemes) ? j.schemes.filter((s) => hexOk(s.background) && !WT_SCHEMES.some((w) => w.name === s.name)) : []; } catch { wtLocal = []; }
+  if (!fontModal.hidden) renderSchemeSel();
+}
+$('#fs-scheme').addEventListener('change', (e) => {
+  const v = e.target.value;
+  if (v === 'keep') return;
+  const [g, ...rest] = v.split(':'), name = rest.join(':');
+  const s = v ? (g === 'pc' ? wtLocal : WT_SCHEMES).find((x) => x.name === name) : null;
+  try { s ? localStorage.setItem(SCHEME_KEY, JSON.stringify(s)) : localStorage.removeItem(SCHEME_KEY); } catch {}
+  applyScheme();
+  term.options.theme = termTheme(document.documentElement.dataset.theme === 'light');
+  renderSchemeSwatch();
+});
 $('#fs-lh').addEventListener('input', (e) => {
   const v = Number(e.target.value);
   $('#fs-lh-val').textContent = v.toFixed(2);
@@ -3163,7 +3238,9 @@ fontPop.addEventListener('click', (e) => { const b = e.target.closest('[data-fon
 fontModal.addEventListener('click', async (e) => {
   const act = e.target.closest('[data-fs]')?.dataset.fs;
   if (e.target === fontModal || act === 'close') { closeFontSet(); return; }
-  if (act === 'reset') { setFontPop(null); $('#fs-ui').value = ''; $('#fs-term').value = ''; saveFont('ui', ''); saveFont('term', ''); $('#fs-lh').value = 1; $('#fs-lh-val').textContent = '1.00'; saveFont('lh', ''); return; }
+  if (act === 'reset') { setFontPop(null); $('#fs-ui').value = ''; $('#fs-term').value = ''; saveFont('ui', ''); saveFont('term', ''); $('#fs-lh').value = 1; $('#fs-lh-val').textContent = '1.00'; saveFont('lh', '');
+    try { localStorage.removeItem(SCHEME_KEY); } catch {}
+    applyScheme(); term.options.theme = termTheme(document.documentElement.dataset.theme === 'light'); renderSchemeSel(); return; }
   if (act === 'load') {
     // Chrome·Edge 의 Local Font Access — 처음 한 번 브라우저가 권한을 묻는다. 없거나 거절하면 이름을 직접 적는다
     await loadFontNames(true);
@@ -3244,7 +3321,7 @@ function renderCharPop() {
       <span class="lang-check" aria-hidden="true">${on ? '✓' : ''}</span><span class="skin-sw" style="background:${esc(k.swatch || 'var(--surface-3)')}"></span><span class="char-nm">${esc(k.name)}</span></button>`;
   }).join('') + `<button class="lang-item char-add" data-theme-guide>${_t('+ 테마 만들기')}</button>`);
   const f = fontPrefs();
-  charPop.insertAdjacentHTML('beforeend', `<div class="pop-h">${_t('글꼴')}</div><button class="lang-item char-add" data-font-set>${esc([f.ui, f.term].filter(Boolean).join(' · ') || _t('기본 글꼴'))} — ${_t('바꾸기…')}</button>`);
+  charPop.insertAdjacentHTML('beforeend', `<div class="pop-h">${_t('글꼴 · CLI 색')}</div><button class="lang-item char-add" data-font-set>${esc([f.ui, f.term, termScheme()?.name].filter(Boolean).join(' · ') || _t('기본 글꼴'))} — ${_t('바꾸기…')}</button>`);
 }
 function setCharPop(open) {
   charPop.hidden = !open;
