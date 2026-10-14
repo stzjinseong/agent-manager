@@ -39,6 +39,15 @@ function applyStage(stage) {
   const dot = $('.core-dot');
   for (let i = 1; i <= 5; i++) dot.classList.toggle(`ge${i}`, stage >= i);
   $('#floor').classList.toggle('royal', stage >= 4);
+  syncBrandMgr(redraw);
+}
+// 최소화 중 헤더 로고(.brand-mark.mgr-on)도 매니저 그림·단계 모습으로 — 펼치면 원래 로고(워커 머리 그림)로 돌아간다
+function syncBrandMgr(redraw = false) {
+  const mark = $('.brand-mark'), on = mark.classList.contains('mgr-on'), svg = mark.querySelector('svg.clawd');
+  const isMgr = svg?.classList.contains('mgr');
+  if (svg && (on !== isMgr || (on && redraw))) svg.outerHTML = on ? managerSVG(mgrStage) : clawdSVG('logo');
+  for (let i = 1; i <= 5; i++) mark.classList.toggle(`ge${i}`, on && mgrStage >= i);
+  mark.classList.toggle('party', on && $('.core-dot').classList.contains('party'));
 }
 
 // ---------- 진화하는 순간 ----------
@@ -92,7 +101,7 @@ function mgrStageSync() {
 const ACTIVE = new Set(['working', 'decision']);
 let mgrActTimer = null;
 function mgrAct(name, ms) {
-  const g = $('.mgr-act');
+  const g = $('.core-mark .mgr-act');
   if (!g) return;
   g.classList.remove('do-nod', 'do-hop', 'do-wave', 'do-yawn');
   void g.getBoundingClientRect(); // 같은 동작을 연달아 다시 재생하게
@@ -145,9 +154,10 @@ try {
 } catch {}
 // 매 렌더·30초마다: 시선 기울기, 졸음(모두 30분 넘게 쉬거나 늦은 밤)
 function mgrUpdate() {
-  const dot = $('.core-dot'), lean = $('.mgr-lean');
+  const dot = $('.core-dot'), lean = $('.core-mark .mgr-lean');
   if (!dot || !lean) return;
   dot.classList.toggle('party', mgrStage >= 4 && dot.classList.contains('party-day'));
+  $('.brand-mark').classList.toggle('party', dot.classList.contains('party') && $('.brand-mark').classList.contains('mgr-on'));
   let deg = 0;
   if (mgrStage >= 1) {
     const cr = dot.getBoundingClientRect(), cx = cr.left + cr.width / 2;
@@ -1079,6 +1089,7 @@ function renderDock() {
   mgr.classList.toggle('busy', min && core.classList.contains('busy'));
   mgr.classList.toggle('alert', min && core.classList.contains('alert'));
   if (min) mgr.title = core.title; else mgr.removeAttribute('title');
+  syncBrandMgr();
   if (!min) return;
   const list = $('#dock-list');
   // 순서는 화면의 카드 순서 그대로 — nodeEls(Map)는 카드를 처음 만든 순서라 끌어 옮긴 순서와 다르다.
