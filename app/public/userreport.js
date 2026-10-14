@@ -291,7 +291,7 @@
   const RANGE_LABEL = { 7: '최근 7일', 30: '최근 30일', 0: '전체 기간' };
   async function loadAi() {
     try { ai = { ...ai, ...(await (await fetch(`/api/user-profile/llm?days=${range}`)).json()) }; } catch {}
-    if (data) render(); else renderAi(); // 지표 카드의 AI 해설도 같이
+    renderAi(); renderAiNotes(); // 지표 카드의 AI 해설도 같이
   }
   function aiBody() {
     const note = T('요청 글 최근 {n}개와 통계를 이 PC 의 Claude(sonnet)로 보내 분석해요 · 구독 사용량을 써요 · 1분 안팎', { n: ai.count || 0 });
@@ -315,27 +315,52 @@
   function metricsCard() {
     const M = data.metrics?.[range];
     if (!M) return '';
-    const comments = ai.last?.days === range ? ai.last?.report?.comments || {} : {};
+    const comments = metricComments();
     const items = M.list.map((x, i) => {
       const v = x.score ?? 0, r = 26, c = 2 * Math.PI * r;
       const col = x.score == null ? 'rgb(var(--ink) / .2)' : v >= 75 ? '#4fd1a5' : v >= 50 ? '#6aa8ff' : v >= 30 ? '#f2b24c' : '#ef6b6b';
-      return `<div class="ur-metric" style="--d:${i * 80}ms;--c:${col}" title="${E(T('공식'))}: ${E(T(x.formula))}">
+      return `<div class="ur-metric" data-k="${E(x.key)}" style="--d:${i * 80}ms;--c:${col}" title="${E(T('공식'))}: ${E(T(x.formula))}">
         <svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="${r}" class="bg"/><circle cx="32" cy="32" r="${r}" class="fg" stroke-dasharray="${(c * v / 100).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 32 32)"/><text x="32" y="37" text-anchor="middle">${x.score ?? '–'}</text></svg>
         <b>${E(T(x.name))}</b><small>${E(x.desc)}</small>${comments[x.key] ? `<p class="ur-metric-ai">${E(comments[x.key])}</p>` : ''}
         ${x.examples?.length && x.score != null && x.score < 75 ? `<details><summary>${E(T('낮은 쪽 예시'))}</summary>${x.examples.map((e) => `<q>${E(e)}</q>`).join('')}</details>` : ''}</div>`;
     }).join('');
     return `<section class="ur-card wide"><header><h4>${E(T('요청 습관 지표'))}</h4><small>${E(T('링에 마우스를 올리면 공식'))}</small></header><div class="ur-metrics">${items}</div></section>`;
   }
-  function renderAi() { const el = $u('#ur-ai'); if (el) el.innerHTML = aiBody(); }
+  const metricComments = () => (ai.last?.days === range ? ai.last?.report?.comments || {} : {});
+  // AI 카드·지표 해설만 갈아 끼운다 — 본문 전체를 다시 그리면 이미 다 나온 카드들의 등장 연출이 처음부터 다시 돈다.
+  // 내용이 그대로면 손대지 않는다(다시 열 때 지난 리포트가 그대로 오는 경우 — 목록 연출이 또 돌지 않게)
+  let shownAi = '';
+  function renderAi() {
+    const el = $u('#ur-ai'), h = aiBody();
+    if (el && h !== shownAi) el.innerHTML = shownAi = h;
+  }
+  function renderAiNotes() {
+    const comments = metricComments();
+    document.querySelectorAll('#ur-body .ur-metric').forEach((m) => {
+      const t = comments[m.dataset.k] || '';
+      let p = m.querySelector('.ur-metric-ai');
+      if (!t) return p?.remove();
+      if (!p) { p = document.createElement('p'); p.className = 'ur-metric-ai'; m.querySelector('small').after(p); }
+      if (p.textContent !== t) p.textContent = t;
+    });
+    // 배너의 'AI 코치는 당신을 … 라고 불러요' 한 줄도 같이(hero)
+    const more = document.querySelector('#ur-body .ur-hb-more'), n = ai.last?.report?.persona?.name;
+    if (!more) return;
+    let hb = more.parentElement.querySelector('.ur-hb-ai');
+    if (!n) return hb?.remove();
+    if (!hb) { hb = document.createElement('p'); hb.className = 'ur-hb-ai'; more.before(hb); }
+    const t = T('AI 코치는 당신을 “{n}” 라고 불러요', { n });
+    if (hb.textContent !== t) hb.textContent = t;
+  }
   async function runAi() {
     ai.busy = true; ai.err = ''; renderAi();
     try {
       const r = await fetch('/api/user-profile/llm', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ days: range, lang: document.documentElement.lang === 'en' ? 'en' : 'ko' }) });
       const j = await r.json();
       if (!r.ok || j.error) ai.err = j.error === 'empty' ? T('이 기간에 분석할 요청이 없어요') : T('분석 결과를 읽지 못했어요 — 잠시 뒤 다시 시도해 주세요');
-      else { ai.last = j; ai.busy = false; render(); return; }
+      else ai.last = j;
     } catch { ai.err = T('서버에 연결할 수 없습니다'); }
-    ai.busy = false; renderAi();
+    ai.busy = false; renderAi(); renderAiNotes();
   }
 
   function render() {
@@ -356,7 +381,7 @@
       + metricsCard()
       + `<div class="ur-grid two">${card('요청 길이', T('내가 보낸 요청이 몇 글자였나'), modelsAndLength(d))}${card('점검', T('규칙으로 찾은 좋은 점과 바꿔 볼 점'), insights(d))}</div>`
       + sec(3, T('무엇을 바꿔 볼까?'), T('Claude 가 내 요청 글과 지표를 읽고 주는 코칭'))
-      + `<section class="ur-card wide ur-ai-card"><header><h4>${E(T('AI 코치 리포트'))}</h4><small>${E(T('Claude 가 내 요청 글을 읽고 주는 피드백'))}</small></header><div id="ur-ai">${aiBody()}</div></section>`
+      + `<section class="ur-card wide ur-ai-card"><header><h4>${E(T('AI 코치 리포트'))}</h4><small>${E(T('Claude 가 내 요청 글을 읽고 주는 피드백'))}</small></header><div id="ur-ai">${(shownAi = aiBody())}</div></section>`
       + sec(4, T('얼마나 썼을까?'), T('요청·금액·시간 규모와 날짜별 흐름'))
       + kpis(d)
       + card('날짜별 활동', T('요청 수와 그날 쓴 금액'), timeline(d), 'wide')
@@ -366,9 +391,10 @@
     countUp(d);
   }
 
-  // 여는 연출: 창은 처음부터 다 큰 크기, 카드가 위에서부터 차례로 떠오른다(배너 먼저). 기간을 바꿀 땐 연출 없이
+  // 여는 연출: 창은 처음부터 다 큰 크기, 카드가 위에서부터 차례로 떠오른다(배너 먼저). 기간을 바꿀 땐 연출 없이.
+  // .ur-seq 는 다 떠오른 뒤에도 떼지 않는다 — 떼면 배너·넓은 카드의 animation 이 ur-attach → ur-rise 로 바뀌어
+  // 처음부터 한 번 더 재생된다. 본문을 새로 그리기 직전(기간 바꾸기)이나 닫을 때만 뗀다
   const box = modal.querySelector('.ur-modal');
-  let seqT = null;
   async function open() {
     modal.hidden = false;
     box.classList.remove('ur-seq');
@@ -376,17 +402,16 @@
     try { data = await (await fetch('/api/user-profile')).json(); } catch { data = { sessions: [], since: Date.now() }; }
     if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
       box.classList.add('ur-seq');
-      clearTimeout(seqT); seqT = setTimeout(() => box.classList.remove('ur-seq'), 2600);
     }
     render();
     loadAi();
   }
-  function close() { clearTimeout(seqT); box.classList.remove('ur-seq'); modal.hidden = true; }
+  function close() { box.classList.remove('ur-seq'); modal.hidden = true; }
   $u('#btn-ureport').addEventListener('click', open);
   modal.addEventListener('click', (e) => {
     if (e.target === modal || e.target.closest('[data-ur=close]')) return close();
     const r = e.target.closest('[data-range]');
-    if (r) { range = Number(r.dataset.range); modal.querySelectorAll('[data-range]').forEach((b) => b.classList.toggle('on', b === r)); render(); loadAi(); }
+    if (r) { range = Number(r.dataset.range); modal.querySelectorAll('[data-range]').forEach((b) => b.classList.toggle('on', b === r)); box.classList.remove('ur-seq'); render(); loadAi(); }
     if (e.target.closest('[data-ai=run]') && !ai.busy) runAi();
     if (e.target.closest('[data-ur=why]')) $u('#ur-why')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
