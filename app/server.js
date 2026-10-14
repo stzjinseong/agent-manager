@@ -1311,6 +1311,22 @@ function openThemeDir() {
   fs.mkdirSync(THEME_DIR, { recursive: true });
   return openPath(THEME_DIR);
 }
+// 파일을 탐색기·Finder 에서 선택한 채로 그 폴더를 연다 (리눅스는 폴더만)
+function revealPath(target) {
+  // explorer 는 /select,"경로" 꼴만 알아듣는다 — node 가 인자 전체를 따옴표로 감싸지 않게 그대로 넘긴다(windowsVerbatimArguments)
+  const [cmd, args] = process.platform === 'darwin' ? ['open', ['-R', target]] : process.platform === 'win32' ? ['explorer', [`/select,"${target}"`]] : ['xdg-open', [path.dirname(target)]];
+  try { spawnProcess(cmd, args, { detached: true, stdio: 'ignore', windowsVerbatimArguments: true }).on('error', () => {}).unref(); return true; } catch { return false; }
+}
+// 화면의 파일 주소 → 이 PC 의 파일 경로 | null (/docs/W1/id · /uploads/이름 · /shots/id/이름 — 각 GET 경로와 같은 검사)
+function localFileOf(u) {
+  let p; try { p = decodeURIComponent(new URL(u, 'http://x').pathname); } catch { return null; }
+  let full = null;
+  let m = p.match(/^\/docs\/(W\d+)\/([0-9a-f]{12})$/);
+  if (m) full = workers.get(m[1])?.docs?.find((x) => x.id === m[2])?.path || null;
+  else if ((m = p.match(/^\/uploads\/([^/]+)$/))) { const f = path.join(UPLOAD_DIR, m[1]); if (path.dirname(f) === UPLOAD_DIR) full = f; }
+  else if ((m = p.match(/^\/shots\/([\w-]+)\/([\w-]+\.(?:png|jpg|gif|webp))$/))) full = path.join(SHOT_DIR, m[1], m[2]);
+  try { return full && fs.statSync(full).isFile() ? full : null; } catch { return null; }
+}
 // 폴더·파일을 이 PC 에서 더블클릭한 것처럼 연다 (파일은 OS 기본 앱)
 function openPath(target) {
   const [cmd, args] = process.platform === 'darwin' ? ['open', [target]] : process.platform === 'win32' ? ['explorer', [target]] : ['xdg-open', [target]];
@@ -1858,6 +1874,15 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && p === '/api/pick-folder') {
     const { start } = await readBody(req);
     return json(res, 200, { path: await pickFolder(start) });
+  }
+
+  // 뷰어(캡처·첨부·결과물)의 'OS 앱으로 열기' · '파일 위치 열기' — 화면이 보여 주던 주소를 이 PC 의 파일로 되돌린다.
+  // 결과물(trackDoc 기록) · 첨부(data/uploads) · 캡처(data/shots) 만, 각 GET 경로와 같은 검사로
+  if (req.method === 'POST' && p === '/api/file-open') {
+    const { url: u, folder } = await readBody(req);
+    const full = localFileOf(String(u || ''));
+    if (!full) return json(res, 404, { error: '파일이 없습니다 (지워졌거나 옮겨짐)' });
+    return json(res, 200, { ok: folder ? revealPath(full) : openPath(full) });
   }
 
   let m;

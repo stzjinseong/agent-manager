@@ -1409,6 +1409,20 @@ function syncAttach(ta) {
 // 썸네일은 data-shot 에 원본 주소를 달아 두고, 어디서 눌러도(타임라인·카드) 같은 크게 보기를 연다
 const shotImg = (s, cls) => `<img class="${cls}" src="${esc(s.url)}" data-shot="${esc(s.url)}" alt="${_t('캡처')}" loading="lazy" draggable="false" title="${_t('클릭해 크게 보기')}">`;
 // 같은 워커의 캡처끼리 ←/→ 로 넘겨 본다. 몇 번째인지·찍힌 시각과 보관 한도 안내를 아래에 둔다
+// 뷰어 공통: 'OS 앱으로 열기' · '파일 위치 열기' (이 PC 에서 볼 때만 — 다른 기기면 그 PC 에서 열려 봐야 소용없다).
+// cur() 는 지금 보이는 파일 주소(캡처 넘기기 등). 버튼 줄 클릭은 뷰어의 '바깥 누르면 닫기'로 번지지 않게 막는다
+function fileActs(box, cur) {
+  if (!LOCAL_VIEW) return;
+  const bar = el(`<div class="file-acts"><button class="btn mini" data-fa="open">${_t('OS 앱으로 열기')}</button><button class="btn mini" data-fa="folder">${_t('파일 위치 열기')}</button></div>`);
+  bar.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const b = e.target.closest('[data-fa]');
+    if (!b) return;
+    api('/api/file-open', { url: cur(), folder: b.dataset.fa === 'folder' }); // 없으면 api 가 서버 안내를 띄운다
+  });
+  bar.addEventListener('pointerdown', (e) => e.stopPropagation());
+  (box.querySelector('.tv-head') || box).append(bar);
+}
 function openShot(url, single) { // single: { cap } — 결과물 그림 한 장(넘기기·보관 안내 없음)
   const upload = url.startsWith('/uploads/');
   const id = url.split('/')[2];
@@ -1467,6 +1481,7 @@ function openShot(url, single) { // single: { cap } — 결과물 그림 한 장
     if (e.target.closest('figure')) return; // 그림·설명을 눌러도 닫지 않는다(글자 복사 등)
     close();
   });
+  fileActs(box, () => (list[i] || { url }).url);
   document.addEventListener('keydown', onKey, true);
   document.body.append(box);
   show();
@@ -1484,16 +1499,17 @@ function loadMdLibs() {
 async function openText(url, cap) {
   const ext = cap.split('.').pop().toLowerCase(), md = ext === 'md' || ext === 'markdown';
   const box = el(`<div class="shot-view txt-view" title="${_t('바깥을 누르거나 Esc 로 닫기')}">
-    <div class="tv-panel"><div class="tv-head"><span class="tv-cap"></span>${LOCAL_VIEW ? `<button class="btn ghost mini" data-tv="open">${_t('OS 앱으로 열기')}</button>` : ''}<button class="btn ghost mini" data-tv="close">✕</button></div>
+    <div class="tv-panel"><div class="tv-head"><span class="tv-cap"></span><button class="btn ghost mini tv-x" data-tv="close">✕</button></div>
     <div class="tv-body"><div class="tv-note">${_t('불러오는 중…')}</div></div></div></div>`);
   $('.tv-cap', box).textContent = `${_t('결과물')} · ${cap}`;
   const close = () => { box.remove(); document.removeEventListener('keydown', onKey, true); };
   const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
   box.addEventListener('click', (e) => {
     const act = e.target.closest('[data-tv]')?.dataset.tv;
-    if (act === 'open') { api(`/api${url}/open`); return; }
     if (act === 'close' || !e.target.closest('.tv-panel')) close();
   });
+  fileActs(box, () => url);
+  $('.tv-head', box).append($('.tv-x', box)); // ✕ 는 맨 끝
   document.addEventListener('keydown', onKey, true);
   document.body.append(box);
   const body = $('.tv-body', box);
@@ -1532,6 +1548,7 @@ function openVideo(url, single) { // single: { cap } — 결과물 동영상(첨
   const close = () => { v.pause(); box.remove(); document.removeEventListener('keydown', onKey, true); };
   const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
   box.addEventListener('click', (e) => { if (!e.target.closest('figure')) close(); });
+  fileActs(box, () => url);
   document.addEventListener('keydown', onKey, true);
   document.body.append(box);
 }
