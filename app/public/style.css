@@ -2256,7 +2256,8 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 .ur-hb-radar .ur-rdot { fill: color-mix(in srgb, var(--k) 70%, #fff); }
 
 /* 리포트 구역 제목 ①~⑤ */
-.ur-sec { display: flex; align-items: center; gap: 10px; margin: 16px 2px -2px; font-size: 16px; font-weight: 750; letter-spacing: -.01em; scroll-margin-top: 8px; flex: none; }
+/* 구역 제목 — .modal h3(margin 0 0 8px)이 이겨 위쪽 여백이 안 먹던 것: .ur-body 로 우선순위를 올림. 위 36px(gap 14 + 22) · 아래 12px — 제목이 아래 카드에 붙어 보이게 */
+.ur-body .ur-sec { display: flex; align-items: center; gap: 10px; margin: 22px 2px -2px; font-size: 16px; font-weight: 750; letter-spacing: -.01em; scroll-margin-top: 8px; flex: none; }
 /* 구역 번호 — 진한 주황 네모 대신 옅은 강조색 바탕 + 강조색 숫자, 글자 가운데 정렬 */
 .ur-sec span { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 8px; font: 700 12.5px/1 var(--mono); font-variant-numeric: tabular-nums; color: var(--accent-hi); background: color-mix(in srgb, var(--accent) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent); }
 .ur-sec small { font-size: 12px; font-weight: 500; color: var(--dim); margin-left: 2px; }
