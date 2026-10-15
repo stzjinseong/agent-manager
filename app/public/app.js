@@ -1117,6 +1117,9 @@ function repoLabels(cwds) {
   return out;
 }
 const repoHeadEls = new Map();
+// 묶음 보기 켜고 끄기 — 저장한 순서 그대로 보는 게 편한 사람도 있어 고를 수 있게(이 브라우저에만, 기본은 묶음)
+const REPO_GROUP_KEY = 'am.repoGroup';
+const repoGroupOn = () => { try { return localStorage.getItem(REPO_GROUP_KEY) !== '0'; } catch { return true; } };
 // repo 색: 묶음 머리줄·카드 머리·최소화 칩의 네모 표시. 폴더 키 가나다순으로 정해 묶음 순서를 바꿔도 색은 그대로.
 // 상태색(초록·호박·빨강·보라 백그라운드 대기)과 겹치지 않는 파랑·자홍·청록·올리브 — 넷을 넘으면 돌아 쓴다
 const REPO_COLORS = 4;
@@ -1143,7 +1146,13 @@ function renderFloor() {
   // repo 묶음: 묶음 순서는 그 묶음의 첫 카드 자리(저장된 순서), 묶음 안은 저장된 순서 그대로
   for (const it of items) { it.cwd = it.w ? it.w.cwd : it.p.cwd; it.repo = repoKey(it.cwd); }
   const repos = [...new Set(items.map((i) => i.repo))];
-  const grouped = repos.length > 1;
+  const grouped = repoGroupOn() && repos.length > 1;
+  // 보기 버튼은 폴더가 둘 이상일 때만 — 하나뿐이면 묶을 게 없다
+  const gb = $('#btn-floor-group');
+  gb.hidden = repos.length < 2;
+  gb.setAttribute('aria-pressed', String(repoGroupOn()));
+  gb.textContent = _t(repoGroupOn() ? '▦ repo별 묶음' : '☰ 저장 순서');
+  gb.title = _t(repoGroupOn() ? '지금: 작업 폴더(repo)별로 묶어 보기 · 누르면 저장한 순서 그대로' : '지금: 저장한 순서 그대로 · 누르면 작업 폴더(repo)별로 묶어 보기');
   if (grouped) items.sort((a, b) => repos.indexOf(a.repo) - repos.indexOf(b.repo));
   const labels = grouped ? repoLabels(repos.map((r) => items.find((i) => i.repo === r).cwd)) : new Map();
   for (const [k, h] of repoHeadEls) if (!labels.has(k)) { h.remove(); repoHeadEls.delete(k); }
@@ -1186,7 +1195,7 @@ function renderFloor() {
     let n = nodeEls.get(it.key);
     if (!n) { n = it.w ? nodeTemplate() : socketTemplate(); n.draggable = true; nodeEls.set(it.key, n); }
     n.dataset.name = it.name;
-    n.dataset.repo = it.repo;
+    n.dataset.repo = grouped ? it.repo : ''; // 끌기 제한(같은 묶음 안에서만)은 묶었을 때만
     n.classList.toggle('repo-folded', folded);
     setRepoSwatch(n, colorOf.get(it.repo), labels.get(it.repo));
     if (it.w) updateNode(n, it.w);
@@ -1340,6 +1349,10 @@ function setFloorMin(on) {
   scheduleSelLink();
 }
 $('#btn-floor-min').addEventListener('click', () => setFloorMin(true));
+$('#btn-floor-group').addEventListener('click', () => {
+  try { localStorage.setItem(REPO_GROUP_KEY, repoGroupOn() ? '0' : '1'); } catch {}
+  render();
+});
 $('#btn-dock-expand').addEventListener('click', () => setFloorMin(false));
 // 헤더 높이만큼 아래에 붙인다 (헤더가 줄바꿈되면 높이가 바뀜)
 new ResizeObserver(() => document.documentElement.style.setProperty('--topbar-h', `${$('.topbar').offsetHeight}px`)).observe($('.topbar'));

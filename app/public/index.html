@@ -142,7 +142,11 @@
   <section id="inbox"></section>
 
   <section class="floor" id="floor">
-    <button class="btn ghost floor-min" id="btn-floor-min" title="매니저·워커 카드를 헤더 아래 한 줄로 최소화" data-i18n data-i18n-attr="title">▴ 최소화</button>
+    <div class="floor-tools">
+      <!-- 카드 보기: repo(작업 폴더)별 묶음 ↔ 저장한 순서 그대로. 글자·눌림 상태는 app.js renderFloor 가 채운다 -->
+      <button class="btn ghost floor-group" id="btn-floor-group" aria-pressed="true" hidden></button>
+      <button class="btn ghost floor-min" id="btn-floor-min" title="매니저·워커 카드를 헤더 아래 한 줄로 최소화" data-i18n data-i18n-attr="title">▴ 최소화</button>
+    </div>
     <svg class="traces" id="traces" aria-hidden="true"></svg>
     <div class="core" id="core">
       <div class="core-dot">
