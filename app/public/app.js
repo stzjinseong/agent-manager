@@ -1439,7 +1439,7 @@ function drawTraces() {
   traceSig = sig;
   if (!list.length) { $('#traces').innerHTML = ''; return; }
   // 워커마다 매니저 캐릭터 아래 가장자리에 출발점을 목표 x 순서대로 펼쳐 두고, 칩 위쪽 가운데로 S 곡선.
-  // 아랫줄 칩으로 가는 선은 윗줄 칩 뒤로 지나간다(칩이 회로선 위에 그려짐)
+  // 회로선은 카드·묶음 머리줄 위에 그린다(.traces z-index) — 묶음을 나란히 놓은 뒤로 아랫줄 카드로 가는 선이 윗줄 카드 뒤로 숨어 어느 카드로 가는지 끊겨 보였다
   const targets = list.map((o) => ({ ...o, tx: o.x + Math.round(o.w / 2) })).sort((a, b) => a.tx - b.tx || a.y - b.y);
   const n = targets.length;
   const span = Math.min(cr.width - 16, Math.max(0, (n - 1) * 14));
