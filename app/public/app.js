@@ -1171,7 +1171,6 @@ function renderFloor() {
     if (!n) { n = it.w ? nodeTemplate() : socketTemplate(); n.draggable = true; nodeEls.set(it.key, n); }
     n.dataset.name = it.name;
     n.dataset.repo = grouped ? it.repo : ''; // 끌기 제한(같은 묶음 안에서만)은 묶었을 때만
-    n.classList.toggle('repo-folded', folded);
     setRepoSwatch(n, colorOf.get(it.repo), labels.get(it.repo));
     if (it.w) updateNode(n, it.w);
     else {
@@ -1183,6 +1182,8 @@ function renderFloor() {
       const at = state.resumable?.[it.p.name], lb = $('[data-act="launch"]', n);
       lb.title = at ? _t('마지막 세션({t})을 이어서 시작 · Shift+클릭: 새 세션으로', { t: fmtAgo(at) }) : _t('새 세션으로 시작');
     }
+    // updateNode 가 className 을 통째로 다시 써서 접힘 표시는 그 뒤에 붙인다 — 앞에 두면 실행 중 카드가 접히지 않았다
+    n.classList.toggle('repo-folded', folded);
     place(n);
   }
   let empty = $('.empty', nodes);
@@ -1195,8 +1196,60 @@ function renderFloor() {
   $('small', add).textContent = _t('역할 이름과 작업 폴더를 정해 투입');
   add.classList.toggle('on', !$('#new-panel').hidden);
   if (nodes.lastElementChild !== add) nodes.append(add);
+  layoutRepoGroups();
   tick();
   requestAnimationFrame(drawTraces);
+}
+
+// 묶음 배치: 묶음마다 카드 수만큼만 칸을 쓰고, 줄에 남는 칸에 다음 묶음을 옆으로 붙인다(선반 쌓기).
+// 카드 1~2장짜리 묶음이 줄마다 하나씩 쌓여 세로로 너무 길어졌다. 카드는 한 그리드(#nodes)의 자식 그대로 두고
+// 칸만 지정해서 끌기·회로선·최소화 칩은 그대로 쓴다. 자리는 DOM 순서(머리줄 → 그 묶음 카드)로 매번 다시 계산 —
+// 끄는 도중 옮긴 자리, 창 폭이 바뀌어 달라진 열 수도 그대로 반영된다
+function layoutRepoGroups() {
+  const nodes = $('#nodes'), kids = [...nodes.children];
+  if (!kids.some((k) => k.classList.contains('repo-head'))) {
+    for (const k of kids) k.style.gridRow = k.style.gridColumn = '';
+    return;
+  }
+  const cols = Math.max(1, getComputedStyle(nodes).gridTemplateColumns.split(' ').filter(Boolean).length);
+  const groups = [];
+  for (const k of kids) {
+    if (k.classList.contains('repo-head')) groups.push({ head: k, cards: [] });
+    else if (k.classList.contains('node') && groups.length) groups.at(-1).cards.push(k);
+  }
+  // 선반 채우기: 묶음은 들어갈 자리가 있는 가장 앞 선반에 넣는다(first-fit) — 앞 선반의 남는 칸을 비워 두지 않게.
+  // 카드가 열 수보다 많은 묶음은 선반 하나를 혼자 쓰고 여러 줄로 내려간다
+  const shelves = [];
+  for (const g of groups) {
+    g.shown = g.head.classList.contains('folded') ? 0 : g.cards.length; // 접은 묶음은 머리줄 한 칸만
+    g.w = Math.max(1, Math.min(g.shown, cols));
+    let sh = shelves.find((x) => x.used + g.w <= cols);
+    if (!sh) shelves.push(sh = { used: 0, deep: 0, groups: [] });
+    g.col = sh.used + 1;
+    sh.used += g.w;
+    sh.deep = Math.max(sh.deep, Math.ceil(g.shown / cols));
+    sh.groups.push(g);
+  }
+  let row = 1;
+  for (const sh of shelves) {
+    sh.row = row;
+    for (const g of sh.groups) {
+      g.head.style.gridRow = String(row);
+      g.head.style.gridColumn = `${g.col} / span ${g.w}`;
+      g.cards.forEach((c, i) => {
+        c.style.gridRow = String(row + 1 + Math.floor(i / cols));
+        c.style.gridColumn = String(g.col + (i % cols));
+      });
+    }
+    row += 1 + Math.max(1, sh.deep);
+  }
+  // '워커 추가' 카드: 칸이 남는 첫 선반의 카드 줄 끝, 없으면 맨 아래 줄 맨 앞
+  const add = $('.node-add', nodes);
+  if (add) {
+    const sh = shelves.find((x) => x.used < cols && x.deep <= 1);
+    add.style.gridRow = String(sh ? sh.row + 1 : row);
+    add.style.gridColumn = String(sh ? sh.used + 1 : 1);
+  }
 }
 
 // ---------- 최소화한 회로 기판 (헤더 아래 한 줄) ----------
@@ -1413,7 +1466,8 @@ function drawTraces() {
   $('#traces').innerHTML = ELECTRIC_DEFS + svg;
 }
 
-new ResizeObserver(() => requestAnimationFrame(drawTraces)).observe($('#floor'));
+// 폭이 바뀌면 그리드 열 수가 달라져 묶음 배치(layoutRepoGroups)도 다시 계산
+new ResizeObserver(() => requestAnimationFrame(() => { layoutRepoGroups(); drawTraces(); })).observe($('#floor'));
 
 // 선택한 워커 카드 → 아래 상세 패널(CLI 가 든 카드) 위쪽 가운데로 워커 색 연결선 — 어느 카드의 터미널을 보고 있는지 한눈에.
 // 카드 영역(#floor)과 상세 패널은 따로 놓인 형제라 #traces 에 못 그리고, 페이지 좌표의 오버레이(body 아래 #sel-link)에 그린다.
@@ -2453,6 +2507,7 @@ nodesEl.addEventListener('dragover', (e) => {
   const ref = after ? over.nextSibling : over;
   if (ref !== dragEl && dragEl.nextSibling !== ref) {
     nodesEl.insertBefore(dragEl, ref);
+    layoutRepoGroups(); // 묶음 보기에선 칸을 직접 지정하므로 DOM 순서만 바꿔서는 자리가 안 바뀐다
     requestAnimationFrame(drawTraces);
   }
 });

@@ -244,7 +244,6 @@ body.card-drag > :is(.topbar, section:not(.floor)), body.card-drag .floor > :not
   grid-column: 1 / -1; position: relative; display: flex; align-items: center; gap: 8px; margin: 0 0 -18px; padding: 0;
   border: 0; background: none; color: var(--text-2); font: inherit; font-size: 12.5px; cursor: pointer; text-align: left;
 }
-.repo-head ~ .repo-head { margin-top: 6px; }
 .repo-head::after { content: ""; flex: 1; height: 1px; background: rgb(var(--ink) / .1); }
 .repo-head > * { background: var(--floor); }
 /* repo 색 네모 — 둥근 상태 LED 와 헷갈리지 않게 각진 네모. 색은 user-report 의 범주색(--k-feature·bug·ops·review)과 같은 값 */
@@ -253,14 +252,15 @@ body.card-drag > :is(.topbar, section:not(.floor)), body.card-drag .floor > :not
 .repo-sw { flex: none; width: 9px; height: 9px; border-radius: 2px; background: var(--repo); }
 .repo-sw[hidden] { display: none; }
 .dchip .repo-sw { width: 7px; height: 7px; }
-.repo-head b { font: 600 12.5px/1.6 var(--mono); color: var(--text); padding-right: 2px; }
+.repo-head b { font: 600 12.5px/1.6 var(--mono); color: var(--text); padding-right: 2px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.repo-head > :not(b) { flex: none; }
+.repo-head::after { min-width: 12px; }
 .repo-head .rh-chev { width: 14px; text-align: center; color: var(--dim); transition: transform .15s; }
 .repo-head.folded .rh-chev { transform: rotate(-90deg); }
 .repo-head .rh-n { font-size: 11px; padding: 0 7px; border-radius: 999px; color: var(--dim); border: 1px solid rgb(var(--ink) / .14); }
 .repo-head .rh-busy:empty { display: none; }
 .repo-head .rh-busy { font-size: 11px; color: var(--working); }
 .repo-head:hover b, .repo-head:focus-visible b { color: var(--accent-hi); }
-.repo-head.folded + .repo-head, .repo-head.folded { margin-bottom: 0; }
 .node.repo-folded { display: none; }
 body.card-drag .repo-head { opacity: .25; transition: opacity .2s; }
 .empty { grid-column: 1 / -1; text-align: center; color: var(--dim); padding: 18px 0 6px; }
