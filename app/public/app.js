@@ -921,7 +921,7 @@ const ltrPath = (p) => (p ? `\u200E${p}` : '');
 function nodeTemplate() {
   return el(`
     <div class="node">
-      <div class="node-head"><span class="led"></span><span class="nid"></span><span class="nname" title="${_t('더블클릭해 이름 변경 · 칩을 끌어 순서 변경')}"></span><span class="pill"></span><button class="node-more" data-act="more" aria-label="${_t('메뉴')}">⋯</button></div>
+      <div class="node-head"><span class="led"></span><span class="repo-sw" hidden></span><span class="nid"></span><span class="nname" title="${_t('더블클릭해 이름 변경 · 칩을 끌어 순서 변경')}"></span><span class="pill"></span><button class="node-more" data-act="more" aria-label="${_t('메뉴')}">⋯</button></div>
       <div class="stage"><div class="avatar">${clawdSVG()}</div><div class="fx"><span></span><span></span><span></span><span class="mark"></span></div></div>
       <div class="bubble"></div>
       <div class="quest"><div class="quest-top"><span>${_t('할 일')}</span><b class="qn"></b></div><div class="qbar"><i></i></div></div>
@@ -938,7 +938,7 @@ function fmtAgo(t) {
 function socketTemplate() {
   return el(`
     <div class="node socket">
-      <div class="node-head"><span class="nid">SLOT</span><span class="nname" title="${_t('더블클릭해 이름 변경 · 칩을 끌어 순서 변경')}"></span><span class="pill">${_t('대기실')}</span><button class="node-more" data-act="more" aria-label="${_t('메뉴')}">⋯</button></div>
+      <div class="node-head"><span class="repo-sw" hidden></span><span class="nid">SLOT</span><span class="nname" title="${_t('더블클릭해 이름 변경 · 칩을 끌어 순서 변경')}"></span><span class="pill">${_t('대기실')}</span><button class="node-more" data-act="more" aria-label="${_t('메뉴')}">⋯</button></div>
       <div class="stage"><div class="avatar">${clawdSVG()}</div></div>
       <div class="path"></div>
       <div class="socket-acts"><button class="btn primary" data-act="launch">${_t('▶ 투입')}</button><button class="btn ghost" data-act="forget" title="${_t('저장된 역할 삭제')}">✕</button></div>
@@ -1117,6 +1117,16 @@ function repoLabels(cwds) {
   return out;
 }
 const repoHeadEls = new Map();
+// repo 색: 묶음 머리줄·카드 머리·최소화 칩의 네모 표시. 폴더 키 가나다순으로 정해 묶음 순서를 바꿔도 색은 그대로.
+// 상태색(초록·호박·빨강·보라 백그라운드 대기)과 겹치지 않는 파랑·자홍·청록·올리브 — 넷을 넘으면 돌아 쓴다
+const REPO_COLORS = 4;
+// 카드 머리·칩의 네모 — 묶였을 때만 보이고, 칩에는 카드에 붙은 색(--repo)을 그대로 옮긴다
+function setRepoSwatch(box, color, label) {
+  const sw = $('.repo-sw', box);
+  if (!sw) return;
+  sw.hidden = !color;
+  if (color) { box.style.setProperty('--repo', color); sw.title = label; } else box.style.removeProperty('--repo');
+}
 function renderFloor() {
   const nodes = $('#nodes');
   const liveNames = new Set(state.workers.filter((w) => w.status !== 'exited').map((w) => w.name));
@@ -1137,6 +1147,7 @@ function renderFloor() {
   if (grouped) items.sort((a, b) => repos.indexOf(a.repo) - repos.indexOf(b.repo));
   const labels = grouped ? repoLabels(repos.map((r) => items.find((i) => i.repo === r).cwd)) : new Map();
   for (const [k, h] of repoHeadEls) if (!labels.has(k)) { h.remove(); repoHeadEls.delete(k); }
+  const colorOf = new Map([...labels.keys()].sort().map((k, i) => [k, `var(--repo-${i % REPO_COLORS})`]));
   // 워커마다 가로 차선을 하나씩 쓰므로, 많아지면 코어와 칩 사이 간격을 넓혀 차선 간격을 확보
   $('.core').style.marginBottom = `${Math.max(44, 28 + items.length * 7)}px`;
   const keep = new Set(items.map((i) => i.key));
@@ -1156,7 +1167,7 @@ function renderFloor() {
     if (grouped && it.repo !== prevRepo) {
       let h = repoHeadEls.get(it.repo);
       if (!h) {
-        h = el(`<button type="button" class="repo-head"><span class="rh-chev" aria-hidden="true">▾</span><b></b><span class="rh-n"></span><span class="rh-busy"></span></button>`);
+        h = el(`<button type="button" class="repo-head"><span class="rh-chev" aria-hidden="true">▾</span><span class="repo-sw"></span><b></b><span class="rh-n"></span><span class="rh-busy"></span></button>`);
         h.dataset.repo = it.repo;
         repoHeadEls.set(it.repo, h);
       }
@@ -1167,6 +1178,7 @@ function renderFloor() {
       // 접어 둔 묶음에서도 일하는 워커가 있는지는 보이게
       $('.rh-busy', h).textContent = folded && busy ? _t('{n} 작업 중', { n: busy }) : '';
       h.classList.toggle('folded', folded);
+      h.style.setProperty('--repo', colorOf.get(it.repo));
       h.title = `${it.cwd || ''}\n${_t('눌러서 접기 · 펼치기')}`;
       place(h);
       prevRepo = it.repo;
@@ -1176,6 +1188,7 @@ function renderFloor() {
     n.dataset.name = it.name;
     n.dataset.repo = it.repo;
     n.classList.toggle('repo-folded', folded);
+    setRepoSwatch(n, colorOf.get(it.repo), labels.get(it.repo));
     if (it.w) updateNode(n, it.w);
     else {
       n.dataset.profile = it.p.name;
@@ -1230,7 +1243,7 @@ function renderDock() {
     let c = dockEls.get(id);
     // 칩(버튼) 아래에 그 워커의 최근 캡처·문서 썸네일 — 버튼 안에는 링크를 둘 수 없어 칩과 썸네일을 한 칸(.dslot)으로 묶는다
     if (!c) {
-      const slot = el(`<div class="dslot"><button class="dchip" draggable="true"><span class="led"></span><span class="avatar">${clawdSVG('head')}</span><span class="dname"></span><span class="dst"></span></button><div class="dthumbs"></div></div>`);
+      const slot = el(`<div class="dslot"><button class="dchip" draggable="true"><span class="led"></span><span class="repo-sw" hidden></span><span class="avatar">${clawdSVG('head')}</span><span class="dname"></span><span class="dst"></span></button><div class="dthumbs"></div></div>`);
       c = slot.firstChild; dockEls.set(id, c);
     }
     const media = recentMedia(w), thumbs = c.nextElementSibling;
@@ -1244,6 +1257,8 @@ function renderDock() {
     c.dataset.id = id;
     c.dataset.name = w.name;
     c.style.setProperty('--avatar', avatarColor(w.name) || 'var(--accent)');
+    const card = nodeEls.get(id);
+    setRepoSwatch(c, card?.style.getPropertyValue('--repo'), $('.repo-sw', card)?.title || '');
     $('.dname', c).textContent = w.name;
     $('.dst', c).textContent = statusLabel(st);
     c.title = _t(w.id === selected ? '{name} · {status} — 다시 누르면 닫기' : '{name} · {status} — 클릭해서 열기', { name: w.name, status: statusLabel(st) });
@@ -1280,10 +1295,12 @@ function renderDockSocket(list, key, prev) {
   let c = dockEls.get(key);
   if (!p) return prev;
   if (!c) {
-    const slot = el(`<div class="dslot"><div class="dchip socket" draggable="true"><span class="avatar">${clawdSVG('head')}</span><span class="dname"></span><span class="dst">${_t('대기실')}</span><button class="btn primary dlaunch" data-act="launch" aria-label="${_t('투입')}"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M3 1.8v6.4L8.4 5z"/></svg></button></div></div>`);
+    const slot = el(`<div class="dslot"><div class="dchip socket" draggable="true"><span class="repo-sw" hidden></span><span class="avatar">${clawdSVG('head')}</span><span class="dname"></span><span class="dst">${_t('대기실')}</span><button class="btn primary dlaunch" data-act="launch" aria-label="${_t('투입')}"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M3 1.8v6.4L8.4 5z"/></svg></button></div></div>`);
     c = slot.firstChild; dockEls.set(key, c);
   }
   c.dataset.name = c.dataset.profile = p.name;
+  const card = nodeEls.get(key);
+  setRepoSwatch(c, card?.style.getPropertyValue('--repo'), $('.repo-sw', card)?.title || '');
   c.classList.toggle('dragging', c === dockDrag);
   $('.dname', c).textContent = p.name;
   const at = state.resumable?.[p.name];

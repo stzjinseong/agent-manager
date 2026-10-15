@@ -247,6 +247,12 @@ body.card-drag > :is(.topbar, section:not(.floor)), body.card-drag .floor > :not
 .repo-head ~ .repo-head { margin-top: 6px; }
 .repo-head::after { content: ""; flex: 1; height: 1px; background: rgb(var(--ink) / .1); }
 .repo-head > * { background: var(--floor); }
+/* repo 색 네모 — 둥근 상태 LED 와 헷갈리지 않게 각진 네모. 색은 user-report 의 범주색(--k-feature·bug·ops·review)과 같은 값 */
+:root { --repo-0: #4f8fe6; --repo-1: #d65f8c; --repo-2: #16a0b2; --repo-3: #869a2c; }
+:root[data-theme="light"] { --repo-0: #2a78d6; --repo-1: #c4467a; --repo-2: #00899e; --repo-3: #6f8a12; }
+.repo-sw { flex: none; width: 9px; height: 9px; border-radius: 2px; background: var(--repo); }
+.repo-sw[hidden] { display: none; }
+.dchip .repo-sw { width: 7px; height: 7px; }
 .repo-head b { font: 600 12.5px/1.6 var(--mono); color: var(--text); padding-right: 2px; }
 .repo-head .rh-chev { width: 14px; text-align: center; color: var(--dim); transition: transform .15s; }
 .repo-head.folded .rh-chev { transform: rotate(-90deg); }
