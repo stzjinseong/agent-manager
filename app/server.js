@@ -1858,10 +1858,10 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && p === '/api/themes') return json(res, 200, { themes: listThemes(), dir: THEME_DIR });
   if (req.method === 'GET' && p === '/api/term-schemes') return json(res, 200, wtSchemes());
   if (req.method === 'GET' && p === '/api/user-profile') return json(res, 200, userProfile.report());
-  // AI 코치 리포트 — GET: 마지막 결과 + 지금 돌고 있는지 + 보낼 요청 글 수, POST: 새로 분석(1분 안팎, 끝날 때 응답)
+  // AI 코치 리포트 — GET: 기간별 마지막 결과 + 지금 돌고 있는지 + 보낼 요청 글 수, POST: 새로 분석(1분 안팎, 끝날 때 응답)
   if (req.method === 'GET' && p === '/api/user-profile/llm') {
     const days = Number(url.searchParams.get('days') ?? 30) || 0; // 0 = 전체
-    return json(res, 200, { last: userProfile.lastLlm(), busy: userProfile.llmBusy(), count: userProfile.llmCount(days) });
+    return json(res, 200, { byDays: userProfile.lastLlm(), busy: userProfile.llmBusy(), count: userProfile.llmCount(days) });
   }
   if (req.method === 'POST' && p === '/api/user-profile/llm') {
     const body = await readBody(req);

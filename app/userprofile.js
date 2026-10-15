@@ -96,15 +96,22 @@ export function createUserProfile(dataDir) {
       .map(([tx, s]) => ({ id: path.basename(tx, '.jsonl'), role: s.role, cwd: s.cwd, first: s.first, ...s.sum }));
     const DAY = 86_400_000, now = Date.now();
     const metrics = { 7: metricsOf(sessions, now - 7 * DAY), 30: metricsOf(sessions, now - 30 * DAY), 0: metricsOf(sessions, 0) };
-    return { sessions, metrics, tracked: Object.keys(db.sessions).length, since: Math.min(...Object.values(db.sessions).map((s) => s.first || Date.now()), Date.now()) };
+    // since = 가장 오래된 요청 시각. s.first 는 프로파일이 그 세션을 처음 본 때라, 그 전부터 이어진 대화 기록이 있으면 실제보다 늦게 나왔다
+    const oldest = sessions.reduce((m, s) => s.turns.reduce((a, t) => Math.min(a, t.t), m), Date.now());
+    return { sessions, metrics, tracked: Object.keys(db.sessions).length, since: Math.min(oldest, ...sessions.map((s) => s.first || Date.now())) };
   }
 
   // ---------- AI 코치 리포트 ----------
   // 통계 요약 + 최근 요청 글 샘플을 이 PC 의 Claude CLI(claude -p, 구독 계정)로 보내 성향·개선점을 JSON 으로 받는다.
-  // 결과는 data/user-profile-llm.json 에 마지막 한 벌만 둔다. 한 번에 하나만 돈다
+  // 결과는 data/user-profile-llm.json 에 기간(7·30·0=전체)마다 마지막 한 벌씩 둔다 — 한 벌만 두면 7일 탭에 30일 리포트가 떴다. 한 번에 하나만 돈다
   const llmFile = path.join(dataDir, 'user-profile-llm.json');
   let llmRunning = null;
-  const lastLlm = () => { try { return JSON.parse(fs.readFileSync(llmFile, 'utf8')); } catch { return null; } };
+  const lastLlm = () => {
+    let j = null;
+    try { j = JSON.parse(fs.readFileSync(llmFile, 'utf8')); } catch {}
+    if (j?.at && j.report) return { [j.days ?? 0]: j }; // 예전 파일(한 벌만 저장)
+    return j && typeof j === 'object' ? j : {};
+  };
   function llmInput(days) {
     const since = days ? Date.now() - days * 86_400_000 : 0;
     const { sessions } = report();
@@ -173,7 +180,7 @@ export function createUserProfile(dataDir) {
         delete rep.scores;
         const doc = { at: Date.now(), days, n: input.sample.length, total: input.stats.requests, model: Object.keys(res.modelUsage || {})[0] || LLM_MODEL, cost: res.total_cost_usd ?? null,
           dropped: dropped - rep.strengths.length - rep.improvements.length, metrics: input.metrics.list.map(({ examples, ...x }) => x), report: rep };
-        try { fs.writeFileSync(llmFile, JSON.stringify(doc)); } catch {}
+        try { fs.writeFileSync(llmFile, JSON.stringify({ ...lastLlm(), [days]: doc })); } catch {}
         resolve(doc);
       });
       p.stdin.end(llmPrompt(input, lang));

@@ -166,7 +166,7 @@
   function hero(d) {
     const top = topKind(d), [name, desc] = PERSONA[top], col = KIND[top].color, total = d.reqs.length || 1;
     const axes = axesOf(d).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 3);
-    const aiName = ai.last?.report?.persona?.name;
+    const aiName = lastAi()?.report?.persona?.name;
     const chips = [
       `<span><b>${pct((d.kinds[top] || 0) / total)}</b>${E(T('가장 많은 요청 · {k}', { k: T(KIND[top].label) }))}</span>`,
       ...axes.map(([k, v]) => `<span><b>${Math.round(v * 100)}</b>${E(T(k))} · ${E(T(AXIS_WHY[k]))}</span>`),
@@ -287,7 +287,9 @@
   }
 
   // ---------- AI 코치 리포트 — 이 PC 의 Claude CLI(구독 사용량)로 요청 글 샘플을 분석(/api/user-profile/llm) ----------
-  let ai = { last: null, busy: false, count: 0, err: '' };
+  // byDays = 기간(7·30·0)마다 마지막 리포트(서버가 따로 보관). 지금 탭의 것만 보여 준다 — 탭을 바꾸면 그 기간 리포트, 없으면 '분석 받기'
+  let ai = { byDays: {}, busy: false, count: 0, err: '' };
+  const lastAi = () => ai.byDays?.[range] || null;
   const RANGE_LABEL = { 7: '최근 7일', 30: '최근 30일', 0: '전체 기간' };
   async function loadAi() {
     try { ai = { ...ai, ...(await (await fetch(`/api/user-profile/llm?days=${range}`)).json()) }; } catch {}
@@ -298,7 +300,7 @@
     if (ai.busy) return `<div class="ur-ai-busy"><div class="ur-orb"><i></i><i></i><i></i></div><b>${E(T('Claude 가 요청 {n}개를 읽고 있어요…', { n: ai.count || 0 }))}</b><small>${E(T('창을 닫아도 계속 돌아요'))}</small><div class="ur-skel"><span></span><span></span><span></span></div></div>`;
     const btn = (label) => `<button class="ur-ai-btn" data-ai="run"${ai.count ? '' : ' disabled'}><span>✦</span>${E(T(label))}</button>`;
     const err = ai.err ? `<p class="ur-ai-err">${E(ai.err)}</p>` : '';
-    const L = ai.last, R = L?.report;
+    const L = lastAi(), R = L?.report;
     if (!R) return `<div class="ur-ai-cta"><div class="ur-ai-glow"></div><h5>${E(T('내 요청 습관을 Claude 에게 코칭받기'))}</h5><p>${E(T('강점·약점·바꿔 쓸 요청 예시·다음 주 실천 과제를 받아요.'))}</p>${btn('AI 분석 받기')}<small>${E(note)}</small>${err}</div>`;
     const MN = {"clarity":"명확성","context":"맥락 제공","done":"완료 기준","firstpass":"한 번에 끝냄","flow":"한 번에 맡기기"};
     const list = (arr, cls, ic) => (arr || []).length ? `<ul class="ur-ai-list ${cls}">${arr.map((x, i) => `<li style="--d:${i * 70}ms"><span class="ur-ai-ic">${ic}</span><div><b>${E(x.title || '')}</b><p>${E(x.detail || '')}</p>${x.evidence ? `<span class="ur-ev">${E(T('근거'))} · ${E(T(MN[x.metric] || x.metric || ''))} ${E(String(x.evidence).replace(new RegExp('^\\s*(' + x.metric + '|' + (MN[x.metric] || '') + ')\\s*', 'i'), ''))}</span>` : ''}</div></li>`).join('')}</ul>` : `<p class="ur-empty">${E(T('지표로 뒷받침되는 항목이 없어요'))}</p>`;
@@ -326,7 +328,7 @@
     }).join('');
     return `<section class="ur-card wide"><header><h4>${E(T('요청 습관 지표'))}</h4><small>${E(T('링에 마우스를 올리면 공식'))}</small></header><div class="ur-metrics">${items}</div></section>`;
   }
-  const metricComments = () => (ai.last?.days === range ? ai.last?.report?.comments || {} : {});
+  const metricComments = () => lastAi()?.report?.comments || {};
   // AI 카드·지표 해설만 갈아 끼운다 — 본문 전체를 다시 그리면 이미 다 나온 카드들의 등장 연출이 처음부터 다시 돈다.
   // 내용이 그대로면 손대지 않는다(다시 열 때 지난 리포트가 그대로 오는 경우 — 목록 연출이 또 돌지 않게)
   let shownAi = '';
@@ -344,7 +346,7 @@
       if (p.textContent !== t) p.textContent = t;
     });
     // 배너의 'AI 코치는 당신을 … 라고 불러요' 한 줄도 같이(hero)
-    const more = document.querySelector('#ur-body .ur-hb-more'), n = ai.last?.report?.persona?.name;
+    const more = document.querySelector('#ur-body .ur-hb-more'), n = lastAi()?.report?.persona?.name;
     if (!more) return;
     let hb = more.parentElement.querySelector('.ur-hb-ai');
     if (!n) return hb?.remove();
@@ -358,7 +360,7 @@
       const r = await fetch('/api/user-profile/llm', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ days: range, lang: document.documentElement.lang === 'en' ? 'en' : 'ko' }) });
       const j = await r.json();
       if (!r.ok || j.error) ai.err = j.error === 'empty' ? T('이 기간에 분석할 요청이 없어요') : T('분석 결과를 읽지 못했어요 — 잠시 뒤 다시 시도해 주세요');
-      else ai.last = j;
+      else ai.byDays = { ...ai.byDays, [j.days]: j };
     } catch { ai.err = T('서버에 연결할 수 없습니다'); }
     ai.busy = false; renderAi(); renderAiNotes();
   }
