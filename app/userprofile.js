@@ -147,7 +147,7 @@ export function createUserProfile(dataDir) {
         + '"comments":{"<metric key>":"<그 지표를 샘플로 풀어 쓴 한 문장>"},'
         + '"strengths":[{"title":"","detail":"","metric":"<key>","evidence":"<숫자>"}x1-3],"improvements":[{"title":"","detail":"","metric":"<key>","evidence":"<숫자>"}x1-3],'
         + '"rewrites":[{"before":"<샘플의 실제 요청 그대로>","after":"<더 나은 요청>","why":"<한 문장>"}x2],'
-        + '"patterns":["<반복해서 보이는 습관>"x3-5],"next":"<가장 낮은 지표를 올리는, 다음 일주일 동안 해 볼 한 가지>"}',
+        + '"patterns":[{"text":"<반복해서 보이는 습관 — strengths·improvements 에 이미 쓴 이야기는 빼라>","tone":"good|tip|info (좋은 습관|고칠 습관|그냥 특징)"}x3-5],"next":"<가장 낮은 지표를 올리는, 다음 일주일 동안 해 볼 한 가지>"}',
       en ? 'Kinds: feature=work order, bug=fix, ask=question, ops=commit/build, review=refactor, reply=short reply, etc=other.' : '유형: feature=작업 지시, bug=버그·문제, ask=조사·질문, ops=커밋·빌드, review=리뷰·정리, reply=짧은 답, etc=기타.',
       '', 'METRICS', ...mlines, '', 'STATS ' + JSON.stringify(stats), '', 'SAMPLE',
       ...sample.map((r) => `[${r.role}|${r.kind}] ${r.p}`),
@@ -177,6 +177,8 @@ export function createUserProfile(dataDir) {
         const backed = (arr) => (Array.isArray(arr) ? arr : []).filter((x) => x && keys.has(x.metric) && String(x.evidence || '').trim());
         const dropped = (rep.strengths?.length || 0) + (rep.improvements?.length || 0);
         rep.strengths = backed(rep.strengths); rep.improvements = backed(rep.improvements);
+        // 습관: { text, tone } — 모델이 문자열만 주거나 tone 을 빼먹으면 중립(info)
+        rep.patterns = (Array.isArray(rep.patterns) ? rep.patterns : []).map((x) => (typeof x === 'string' ? { text: x, tone: 'info' } : { text: String(x?.text || ''), tone: ['good', 'tip', 'info'].includes(x?.tone) ? x.tone : 'info' })).filter((x) => x.text.trim());
         delete rep.scores;
         const doc = { at: Date.now(), days, n: input.sample.length, total: input.stats.requests, model: Object.keys(res.modelUsage || {})[0] || LLM_MODEL, cost: res.total_cost_usd ?? null,
           dropped: dropped - rep.strengths.length - rep.improvements.length, metrics: input.metrics.list.map(({ examples, ...x }) => x), report: rep };

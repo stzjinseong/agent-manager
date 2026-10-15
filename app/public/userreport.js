@@ -295,6 +295,8 @@
     try { ai = { ...ai, ...(await (await fetch(`/api/user-profile/llm?days=${range}`)).json()) }; } catch {}
     renderAi(); renderAiNotes(); // 지표 카드의 AI 해설도 같이
   }
+  // 자주 보이는 습관의 성격 — 예전 리포트(문자열만 있음)는 중립
+  const PAT_TONE = { good: ['✓', '좋은 습관'], tip: ['➜', '바꿔 보면 좋은 습관'], info: ['·', '특징'] };
   function aiBody() {
     const note = T('요청 글 최근 {n}개와 통계를 이 PC 의 Claude(sonnet)로 보내 분석해요 · 구독 사용량을 써요 · 1분 안팎', { n: ai.count || 0 });
     if (ai.busy) return `<div class="ur-ai-busy"><div class="ur-orb"><i></i><i></i><i></i></div><b>${E(T('Claude 가 요청 {n}개를 읽고 있어요…', { n: ai.count || 0 }))}</b><small>${E(T('창을 닫아도 계속 돌아요'))}</small><div class="ur-skel"><span></span><span></span><span></span></div></div>`;
@@ -309,7 +311,7 @@
         <div class="ur-ai-persona"><span class="ur-badge" style="--k:var(--ur-ai)">${E(R.persona?.name || '')}</span><p>${E(R.persona?.desc || '')}</p></div></div></div>
       <div class="ur-ai-cols"><div><h5 class="ur-ai-h is-good">${E(T('잘하고 있는 점'))}</h5>${list(R.strengths, 'is-good', '✓')}</div><div><h5 class="ur-ai-h is-tip">${E(T('바꿔 보면 좋은 점'))}</h5>${list(R.improvements, 'is-tip', '➜')}</div></div>
       ${R.next ? `<div class="ur-next"><span>${E(T('다음 일주일 실천 과제'))}</span><b>${E(R.next)}</b></div>` : ''}
-      ${(R.rewrites || []).length || (R.patterns || []).length ? `<details class="ur-more"><summary>${E(T('자세히 — 고쳐 쓰기 예시 {a}개 · 반복 패턴 {b}개', { a: (R.rewrites || []).length, b: (R.patterns || []).length }))}</summary>${(R.rewrites || []).map((w) => `<div class="ur-rw"><div class="ur-rw-b">${E(w.before || '')}</div><div class="ur-rw-a"><span>➜</span>${E(w.after || '')}</div>${w.why ? `<small>${E(w.why)}</small>` : ''}</div>`).join('')}${(R.patterns || []).length ? `<ul class="ur-pat">${R.patterns.map((p) => `<li>${E(p)}</li>`).join('')}</ul>` : ''}</details>` : ''}
+      ${(R.rewrites || []).length || (R.patterns || []).length ? `<details class="ur-more"><summary>${E(T('자세히 — 고쳐 쓰기 예시 {a}개 · 자주 보이는 습관 {b}개', { a: (R.rewrites || []).length, b: (R.patterns || []).length }))}</summary>${(R.rewrites || []).map((w) => `<div class="ur-rw"><div class="ur-rw-b">${E(w.before || '')}</div><div class="ur-rw-a"><span>➜</span>${E(w.after || '')}</div>${w.why ? `<small>${E(w.why)}</small>` : ''}</div>`).join('')}${(R.patterns || []).length ? `<h6 class="ur-pat-h">${E(T('자주 보이는 습관'))}</h6><ul class="ur-pat">${R.patterns.map((p) => { const x = typeof p === 'string' ? { text: p, tone: 'info' } : p; return `<li class="is-${E(x.tone)}" title="${E(T(PAT_TONE[x.tone]?.[1] || ''))}"><span>${PAT_TONE[x.tone]?.[0] || '·'}</span>${E(x.text)}</li>`; }).join('')}</ul>` : ''}</details>` : ''}
       <div class="ur-ai-foot"><small>${E(T('{when} · {range} · 요청 {n}개 분석 · {model}', { when: new Date(L.at).toLocaleString(), range: T(RANGE_LABEL[L.days] || '전체 기간'), n: L.n, model: L.model || '' }))}</small>${btn('다시 분석')}</div>${err}
     </div>`;
   }

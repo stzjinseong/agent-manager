@@ -2159,7 +2159,10 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 .ur-rw-a { margin-top: 4px; font-size: 13px; line-height: 1.5; }
 .ur-rw-a span { margin-right: 6px; color: #4fd1a5; font-weight: 800; }
 .ur-rw small { display: block; margin-top: 4px; color: var(--dim); font-size: 11.5px; }
-.ur-pat { margin: 4px 12px 6px; padding-left: 18px; font-size: 12.5px; color: var(--text-2); line-height: 1.7; }
+.ur-pat-h { margin: 12px 12px 4px; font-size: 12px; font-weight: 700; color: var(--text-2); }
+.ur-pat { list-style: none; margin: 0 12px 6px; padding: 0; font-size: 12.5px; color: var(--text-2); line-height: 1.7; }
+.ur-pat li { display: flex; gap: 8px; } .ur-pat li > span { flex: none; width: 14px; text-align: center; font-weight: 800; color: var(--dim); }
+.ur-pat li.is-good > span { color: var(--ur-good); } .ur-pat li.is-tip > span { color: var(--ur-req-hi); }
 .ur-next { display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-radius: 12px; background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .ur-next span { flex: none; font-size: 11.5px; font-weight: 700; color: var(--accent-hi); padding: 3px 9px; border-radius: 6px; background: color-mix(in srgb, var(--accent) 18%, transparent); }
 .ur-next b { font-size: 13.5px; font-weight: 600; line-height: 1.5; }
