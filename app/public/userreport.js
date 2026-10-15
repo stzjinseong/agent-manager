@@ -203,9 +203,10 @@
   // 선으로 이으면 요청이 없던 날을 지나며 0 으로 꺾여 큰 삼각형이 생겼다
   function timeline(d) {
     const W = 760, padL = 40, padR = 8, n = d.days.length, bw = (W - padL - padR) / n, x = (i) => padL + i * bw;
+    const barW = Math.max(1, Math.min(bw * 0.68, 28)); // 7일처럼 날이 적으면 막대가 뭉툭해지지 않게 상한
     const plot = (top, h, vals, fmt, cls, label) => {
       const max = Math.max(...vals, 0), y = (v) => top + h - (max ? (v / max) * h : 0);
-      const bars = vals.map((v, i) => (v ? `<rect class="ur-bar ${cls}" x="${(x(i) + bw * 0.16).toFixed(1)}" y="${y(v).toFixed(1)}" width="${Math.max(1, bw * 0.68).toFixed(1)}" height="${(top + h - y(v)).toFixed(1)}" rx="${Math.min(3, bw * 0.3).toFixed(1)}"><title>${d.days[i].key} · ${T('요청 {n}건', { n: d.days[i].req })} · ${money(d.days[i].cost)}</title></rect>` : '')).join('');
+      const bars = vals.map((v, i) => (v ? `<rect class="ur-bar ${cls}" x="${(x(i) + (bw - barW) / 2).toFixed(1)}" y="${y(v).toFixed(1)}" width="${barW.toFixed(1)}" height="${(top + h - y(v)).toFixed(1)}" rx="${Math.min(3, bw * 0.3).toFixed(1)}"><title>${d.days[i].key} · ${T('요청 {n}건', { n: d.days[i].req })} · ${money(d.days[i].cost)}</title></rect>` : '')).join('');
       return `<text class="ur-plot-h" x="${padL}" y="${top - 8}">${E(T(label))}</text>`
         + [0, 1].map((g) => `<line class="ur-gline${g ? '' : ' base'}" x1="${padL}" x2="${W - padR}" y1="${y(max * g)}" y2="${y(max * g)}"/><text class="ur-tick" x="${padL - 6}" y="${y(max * g) + 3}" text-anchor="end">${g && max ? fmt(max) : 0}</text>`).join('')
         + bars;
