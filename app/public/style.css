@@ -244,7 +244,8 @@ body.card-drag > :is(.topbar, section:not(.floor)), body.card-drag .floor > :not
   grid-column: 1 / -1; position: relative; display: flex; align-items: center; gap: 8px; margin: 0 0 -18px; padding: 0;
   color: var(--text-2); font-size: 12.5px;
 }
-.repo-head::after { content: ""; flex: 1; height: 1px; background: rgb(var(--ink) / .1); }
+/* 머리줄 선·개수는 repo 색으로 — 흐린 회색이라 바탕 격자·회로선에 묻혀 안 보였다 */
+.repo-head::after { content: ""; flex: 1; height: 2px; border-radius: 1px; background: color-mix(in srgb, var(--repo) 75%, transparent); }
 .repo-head > * { background: var(--floor); }
 /* repo 색 네모 — 둥근 상태 LED 와 헷갈리지 않게 각진 네모. 색은 user-report 의 범주색(--k-feature·bug·ops·review)과 같은 값 */
 :root { --repo-0: #4f8fe6; --repo-1: #d65f8c; --repo-2: #16a0b2; --repo-3: #869a2c; }
@@ -254,8 +255,8 @@ body.card-drag > :is(.topbar, section:not(.floor)), body.card-drag .floor > :not
 .dchip .repo-sw { width: 7px; height: 7px; }
 .repo-head b { font: 600 12.5px/1.6 var(--mono); color: var(--text); padding-right: 2px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .repo-head > :not(b) { flex: none; }
-.repo-head::after { min-width: 12px; }
-.repo-head .rh-n { font-size: 11px; padding: 0 7px; border-radius: 999px; color: var(--dim); border: 1px solid rgb(var(--ink) / .14); }
+.repo-head::after { min-width: 28px; } /* 칸 하나짜리 묶음도 선이 보이게 — 모자라면 이름을 … 로 줄인다 */
+.repo-head .rh-n { font: 600 11px/1.5 var(--mono); padding: 0 7px; border-radius: 999px; color: var(--text); background: color-mix(in srgb, var(--repo) 28%, var(--floor)); border: 1px solid color-mix(in srgb, var(--repo) 70%, transparent); }
 body.card-drag .repo-head { opacity: .25; transition: opacity .2s; }
 .empty { grid-column: 1 / -1; text-align: center; color: var(--dim); padding: 18px 0 6px; }
 /* 워커 추가 카드 — 마지막 워커 다음 자리. 대기실 슬롯(.node.socket)처럼 점선 빈 칸, 누르면 워커 추가 창 */
