@@ -8,7 +8,7 @@ import os from 'node:os';
 import { spawn } from 'node:child_process';
 import { createProfile, readProfile, profileSummary } from './profile.js';
 
-const VERSION = 3; // 요약 형식이 바뀌면 올린다 — 다른 값이면 모두 다시 읽는다
+const VERSION = 4; // 요약 형식이 바뀌면 올린다 — 다른 값이면 모두 다시 읽는다
 const PROMPT_KEEP = 160;
 
 // 요청 유형 — 키워드 규칙(한·영). 앞에 있는 규칙이 우선: 운영(커밋·빌드) → 버그 → 리뷰·정리 → 기능 → 조사·질문
@@ -124,7 +124,7 @@ export function createUserProfile(dataDir) {
       for (const t of ts) {
         if (t.kind === 'auto' || t.kind === 'cmd') continue;
         kinds[t.kind] = (kinds[t.kind] || 0) + 1; hours[new Date(t.t).getHours()]++;
-        reqs.push({ t: t.t, role: s.role, kind: t.kind === 'reply' && t.aq ? 'reply←Claude질문' : t.kind, p: t.p.replace(/\s+/g, ' ').trim() });
+        reqs.push({ t: t.t, role: s.role, kind: t.kind === 'reply' && t.aq ? 'reply←Claude질문' : approval(t) ? `${t.kind}←Claude제안` : t.kind, p: t.p.replace(/\s+/g, ' ').trim() });
       }
     }
     reqs.sort((a, b) => a.t - b.t);
@@ -139,8 +139,8 @@ export function createUserProfile(dataDir) {
     const mlines = metrics.list.map((x) => `- ${x.key} ${x.name}: ${x.score ?? '-'}점 (${x.desc}) · 공식: ${x.formula}${x.examples.length ? ` · 낮은 쪽 예: ${x.examples.map((e) => `"${e}"`).join(' / ')}` : ''}`);
     return [
       en ? 'You are a coach who analyzes how a developer uses an AI coding agent (Claude Code).' : '너는 개발자가 AI 코딩 에이전트(Claude Code)를 어떻게 쓰는지 분석하는 코치다.',
-      en ? 'You get (1) METRICS already computed by fixed formulas, (2) STATS, (3) a SAMPLE of recent requests (oldest first, [role|kind] prefix, ≤160 chars). "reply←Claude질문" means a short reply that answered Claude\'s question — that is normal, not vague.'
-        : '아래에 (1) 정해진 공식으로 이미 센 지표 METRICS, (2) 통계 STATS, (3) 최근 요청 글 샘플 SAMPLE(오래된 것부터, [역할|유형] 머리, 160자까지)이 있다. "reply←Claude질문" 은 Claude 가 물어서 짧게 답한 것이라 정상이다 — 모호한 지시로 보지 마라.',
+      en ? 'You get (1) METRICS already computed by fixed formulas, (2) STATS, (3) a SAMPLE of recent requests (oldest first, [role|kind] prefix, ≤160 chars). "reply←Claude질문" means a short reply that answered Claude\'s question, and "<kind>←Claude제안" a short go-ahead right after Claude proposed a plan and asked (e.g. "fix both") — both are normal, not vague; never cite them as lacking a target or done criteria.'
+        : '아래에 (1) 정해진 공식으로 이미 센 지표 METRICS, (2) 통계 STATS, (3) 최근 요청 글 샘플 SAMPLE(오래된 것부터, [역할|유형] 머리, 160자까지)이 있다. "reply←Claude질문" 은 Claude 가 물어서 짧게 답한 것, "<유형>←Claude제안" 은 Claude 가 범위를 내놓고 물은 바로 뒤의 짧은 승인(예: "둘 다 고쳐")이라 둘 다 정상이다 — 모호한 지시나 완료 기준이 없는 예로 들지 마라.',
       en ? 'Rules: do NOT invent scores. Every strength/improvement MUST cite one metric key in "metric" and its numbers in "evidence" (e.g. "done 41% — 112 of 273"). If no metric supports a point, leave it out (fewer items is fine). Quote real sample requests. Do not use tools. Output ONLY one JSON object, no code fence, in English:'
         : '규칙: 점수를 새로 매기지 마라. 강점·개선점마다 근거 지표 key 를 "metric" 에, 그 숫자를 "evidence" 에 반드시 적어라(예: "done 41% — 273건 중 112건"). 지표로 뒷받침되지 않는 일반론은 빼라(항목이 적어도 된다). 샘플의 실제 요청을 인용해라. 도구는 쓰지 말고 JSON 객체 하나만 출력해(코드 펜스 없이, 한국어로):',
       '{"headline":"<≤40자 한 줄 요약>","persona":{"name":"<성향 이름>","desc":"<2문장>"},'
@@ -189,7 +189,7 @@ export function createUserProfile(dataDir) {
   }
   return { note, report, lastLlm, llmRun, llmBusy: () => Boolean(llmRunning), llmCount: (days) => Math.min(LLM_SAMPLE, llmInput(days).stats.requests) };
 }
-const ASKED_RE = /\?\s*$|\?\s*[\n)]|까요\s*[?.]?\s*$|할까요|될까요|드릴까요|진행할까|하시겠|원하시면|알려\s?주세요|골라\s?주세요|정해\s?주세요|should I|shall I|do you want|would you like|let me know/i;
+const ASKED_RE = /\?\s*$|\?\s*[\n)]|까요\s*[?.]?\s*$|할까요|될까요|드릴까요|진행할까|하시겠|원하시면|알려\s?주세요|말해\s?주세요|골라\s?주세요|정해\s?주세요|should I|shall I|do you want|would you like|let me know/i;
 
 // ---------- 요청 습관 지표 — 정해진 공식으로 센다(돌릴 때마다 같은 값). AI 코치는 이 숫자를 근거로만 말한다 ----------
 const M_RE = {
@@ -203,6 +203,8 @@ const M_RE = {
   rework: /다시|아직|여전히|안\s?돼|안\s?되|안됨|그대로|또\s|왜 안|틀렸|아니야|아니라|잘못|안 바뀌|안 나와|안 떠|안 보여|이상해|still|again|not working|wrong/i,
 };
 const WORK = new Set(['feature', 'bug', 'ask', 'ops', 'review', 'etc']);
+// Claude 가 묻거나 제안하고 끝낸 바로 뒤의 짧은 작업 지시('둘 다 고쳐'·'진행해줘'·CLI 가 추천한 '커밋 푸시해'). 짧은 답(reply)은 flow 에서 따로 센다
+const approval = (t) => t.aq && t.kind !== 'reply' && t.len < 30;
 export function metricsOf(sessions, since = 0) {
   const all = [], ordered = [];
   let interrupts = 0;
@@ -216,9 +218,13 @@ export function metricsOf(sessions, since = 0) {
   const work = all.filter((t) => WORK.has(t.kind)), orders = all.filter((t) => t.kind === 'feature' || t.kind === 'bug');
   const ex = (arr) => arr.slice(-3).map((t) => t.p.replace(/\s+/g, ' ').slice(0, 90));
   const ratio = (n, d) => (d ? n / d : null);
-  const clearN = work.filter((t) => t.len >= 15 || M_RE.target.test(t.p)), unclear = work.filter((t) => !(t.len >= 15 || M_RE.target.test(t.p)));
-  const ctxPool = work.filter((t) => t.kind !== 'ops'), ctxN = ctxPool.filter((t) => t.len >= 80 || M_RE.context.test(t.p));
-  const doneN = orders.filter((t) => M_RE.done.test(t.p)), noDone = orders.filter((t) => !M_RE.done.test(t.p));
+  // 명확성·맥락·완료 기준은 Claude 가 범위를 내놓고 물은 바로 뒤의 짧은 승인('둘 다 고쳐'·'진행해줘')을 뺀다 — 대상·이유·완료 조건이 그 제안에 이미 있다
+  const own = (arr) => arr.filter((t) => !approval(t)), workOwn = own(work), ordersOwn = own(orders);
+  const ctxPool = workOwn.filter((t) => t.kind !== 'ops'), ctxN = ctxPool.filter((t) => t.len >= 80 || M_RE.context.test(t.p));
+  // 커밋·빌드·푸시 지시('커밋 푸시해')는 짧아도 대상이 분명하다 — 지금 바뀐 것
+  const isClear = (t) => t.kind === 'ops' || t.len >= 15 || M_RE.target.test(t.p);
+  const clearN = workOwn.filter(isClear), unclear = workOwn.filter((t) => !isClear(t));
+  const doneN = ordersOwn.filter((t) => M_RE.done.test(t.p)), noDone = ordersOwn.filter((t) => !M_RE.done.test(t.p));
   // 재요청: 앞 턴이 끝나고 30분 안에, 앞 결과를 고쳐 달라는 말로 시작한 요청(질문형 조사는 뺌)
   const rework = all.filter((t) => t.gap != null && t.gap < 30 * 60_000 && t.kind !== 'ask' && M_RE.rework.test(t.p.slice(0, 40))); // 앞 40자 — 새 요청 중간의 '안 되어 있으면' 같은 말은 빼려고
   const replies = all.filter((t) => t.kind === 'reply'), replyToQ = replies.filter((t) => t.aq), bareReply = replies.filter((t) => !t.aq);
@@ -230,9 +236,9 @@ export function metricsOf(sessions, since = 0) {
   return {
     requests: all.length, work: work.length, orders: orders.length, interrupts, replies: replies.length, replyToQ: replyToQ.length,
     list: [
-      m('clarity', '명확성', clearN.length, work.length, `작업 요청 ${work.length}건 중 ${clearN.length}건이 대상이 분명함`, '15자 이상이거나 파일·코드·경로·번호를 담은 작업 요청 비율', ex(unclear)),
-      m('context', '맥락 제공', ctxN.length, ctxPool.length, `요청 ${ctxPool.length}건 중 ${ctxN.length}건에 이유·상황·첨부를 붙임`, '80자 이상이거나 이유·상황·예시·이미지·붙여넣기를 담은 요청 비율(커밋·빌드 제외)', ex(ctxPool.filter((t) => !(t.len >= 80 || M_RE.context.test(t.p))))),
-      m('done', '완료 기준', doneN.length, orders.length, `작업 지시·버그 ${orders.length}건 중 ${doneN.length}건에 검증·결과 형태를 적음`, '작업 지시·버그 요청 중 검증·확인·재현·결과 형태를 적은 비율', ex(noDone)),
+      m('clarity', '명확성', clearN.length, workOwn.length, `작업 요청 ${workOwn.length}건 중 ${clearN.length}건이 대상이 분명함(Claude 제안에 답한 ${work.length - workOwn.length}건은 제외)`, '15자 이상이거나 파일·코드·경로·번호를 담은 작업 요청 비율(커밋·빌드 지시는 분명한 것으로) — Claude 가 묻거나 제안한 바로 뒤의 30자 미만 승인은 뺌', ex(unclear)),
+      m('context', '맥락 제공', ctxN.length, ctxPool.length, `요청 ${ctxPool.length}건 중 ${ctxN.length}건에 이유·상황·첨부를 붙임(Claude 제안에 답한 건은 제외)`, '80자 이상이거나 이유·상황·예시·이미지·붙여넣기를 담은 요청 비율(커밋·빌드 제외) — Claude 가 묻거나 제안한 바로 뒤의 30자 미만 승인은 뺌', ex(ctxPool.filter((t) => !(t.len >= 80 || M_RE.context.test(t.p))))),
+      m('done', '완료 기준', doneN.length, ordersOwn.length, `작업 지시·버그 ${ordersOwn.length}건 중 ${doneN.length}건에 검증·결과 형태를 적음(Claude 제안에 답한 ${orders.length - ordersOwn.length}건은 제외)`, '작업 지시·버그 요청 중 검증·확인·재현·결과 형태를 적은 비율 — Claude 가 묻거나 제안한 바로 뒤의 30자 미만 승인은 뺌', ex(noDone)),
       { ...m('firstpass', '한 번에 끝냄', Math.max(0, orders.length - rework.length), orders.length, `작업 지시·버그 ${orders.length}건 뒤 고쳐 달라는 재요청 ${rework.length}건(${rw == null ? '-' : Math.round(rw * 100)}%)`, '1 − (앞 작업 30분 안에 다시·아직·안 돼 등으로 시작한 재요청 ÷ 작업 지시·버그)', ex(rework)), rework: rework.length },
       m('flow', '한 번에 맡기기', all.length - bareReply.length, all.length, `요청 ${all.length}건 중 질문 없이 보낸 '응·진행해' 같은 짧은 답 ${bareReply.length}건(Claude 질문에 답한 ${replyToQ.length}건은 제외)`, '1 − (Claude 가 묻지 않았는데 보낸 짧은 답 ÷ 전체 요청)', ex(bareReply)),
     ],
