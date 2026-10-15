@@ -384,22 +384,6 @@ body.card-drag .node-add { opacity: .25; transition: opacity .2s; }
 @keyframes pop { 50% { transform: scale(1.12); } }
 @keyframes zz { 0% { opacity: 0; transform: translate(0, 6px); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(10px, -12px); } }
 
-/* 말풍선 */
-.bubble {
-  position: relative; font: 12px/1.45 var(--mono); color: var(--text-2); background: var(--bg);
-  border: 1px solid var(--line); border-radius: 9px; padding: 7px 9px; min-height: 34px;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-all;
-}
-.bubble:empty::before { content: "—"; color: var(--dim); }
-.bubble b { color: var(--text); font-weight: 600; }
-
-/* 퀘스트 바 */
-.quest { display: flex; flex-direction: column; gap: 4px; }
-.quest-top { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--dim); }
-.quest-top b { color: var(--text-2); font-weight: 600; }
-.qbar { position: relative; height: 7px; border-radius: 4px; background: var(--bg); overflow: hidden; border: 1px solid var(--line); }
-.qbar i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, color-mix(in srgb, var(--c) 70%, #fff 0%), var(--c)); transition: width .4s; }
-.qbar::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 9px, var(--bg) 9px 11px); }
 
 .meta { display: flex; gap: 12px; font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; }
 .meta span { display: inline-flex; align-items: center; gap: 4px; }
@@ -890,7 +874,7 @@ body.term-full .side-grip { left: -6px; }
 .node[draggable="true"]:active { cursor: grabbing; }
 .node.dragging { opacity: .35; transform: scale(.97); border-style: dashed; }
 .node.dragging * { pointer-events: none; }
-.node .bubble, .node .path { user-select: none; }
+.node .path { user-select: none; }
 
 /* ---------- 역할 이름 변경 ---------- */
 .node .nname { cursor: text; }

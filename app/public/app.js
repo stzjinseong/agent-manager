@@ -923,8 +923,6 @@ function nodeTemplate() {
     <div class="node">
       <div class="node-head"><span class="led"></span><span class="repo-sw" hidden></span><span class="nid"></span><span class="nname" title="${_t('더블클릭해 이름 변경 · 칩을 끌어 순서 변경')}"></span><span class="pill"></span><button class="node-more" data-act="more" aria-label="${_t('메뉴')}">⋯</button></div>
       <div class="stage"><div class="avatar">${clawdSVG()}</div><div class="fx"><span></span><span></span><span></span><span class="mark"></span></div></div>
-      <div class="bubble"></div>
-      <div class="quest"><div class="quest-top"><span>${_t('할 일')}</span><b class="qn"></b></div><div class="qbar"><i></i></div></div>
       <div class="meta"></div>
       <div class="path-row"><span class="branch" hidden></span><div class="path"></div></div>
     </div>`);
@@ -945,27 +943,6 @@ function socketTemplate() {
     </div>`);
 }
 
-function bubbleOf(w) {
-  const pend = state.decisions.find((d) => d.workerId === w.id);
-  switch (viewStatus(w)) {
-    case 'working': return w.currentTool ? `⚙ <b>${esc(w.currentTool)}</b>` : `💭 ${esc(w.lastPrompt)}`;
-    case 'decision': return pend ? `🔐 <b>${esc(pend.summary)}</b>` : `❓ ${esc(srvText(w.notice) || _t('응답이 필요합니다 — 터미널을 확인하세요'))}`;
-    case 'waiting': {
-      // 턴은 끝났지만 백그라운드에서 도는 것: 서브에이전트 · Monitor 감시 · 백그라운드 명령
-      const p = w.profile, subs = p.subagents.filter((s) => s.running), tasks = p.bgTasks || [];
-      const mons = tasks.filter((t) => t.kind === 'monitor'), shells = tasks.filter((t) => t.kind === 'shell');
-      const parts = [subs.length && _t('서브에이전트 {n}', { n: subs.length }), mons.length && _t('감시 {n}', { n: mons.length }), shells.length && _t('명령 {n}', { n: shells.length })].filter(Boolean).join(' · ');
-      const what = subs.length ? (w.subTool || `${subs[0].type}: ${subs[0].description}`) : (mons[0] || shells[0])?.desc || '';
-      return _t('⏳ 백그라운드 {parts} · <b>{what}</b>', { parts, what: esc(what) });
-    }
-    case 'done': case 'checked': return esc(w.lastMessage || _t('완료'));
-    case 'idle': return w.lastMessage ? esc(w.lastMessage) : _t('지시를 기다리는 중');
-    case 'interrupted': return _t('⏸ 중단됨 — 처리 중인 작업 없음');
-    case 'starting': return _t('부팅 중… (처음 여는 폴더면 터미널에서 신뢰 여부를 선택하세요)');
-    case 'exited': return _t('프로세스 종료됨');
-  }
-  return '';
-}
 
 // ---------- 확인 안 한 완료 ----------
 // 턴이 끝났는데(서버의 doneAt) 그 뒤로 카드를 눌러 보지 않았으면 초록 빛으로 깜빡인다.
@@ -1050,13 +1027,6 @@ function updateNode(node, w) {
   $('.nid', node).textContent = w.id;
   if (!node.classList.contains('renaming')) $('.nname', node).textContent = w.name;
   $('.pill', node).textContent = statusLabel(viewStatus(w));
-  const b = bubbleOf(w);
-  if ($('.bubble', node).innerHTML !== b) $('.bubble', node).innerHTML = b;
-  const todos = w.todos || [];
-  const doneN = todos.filter((t) => t.status === 'completed').length;
-  const active = todos.find((t) => t.status === 'in_progress');
-  $('.qn', node).textContent = todos.length ? `${doneN}/${todos.length}${active ? ` · ${active.activeForm || active.content}` : ''}` : '—';
-  $('.qbar i', node).style.width = todos.length ? `${(doneN / todos.length) * 100}%` : '0%';
   const running = w.status === 'working' || w.status === 'decision';
   $('.meta', node).innerHTML =
     `<span title="${_t(running ? '이번 턴 경과' : '마지막 갱신')}">⏱ <em data-since="${running ? w.turnStartedAt : w.updatedAt}"></em></span>` +
