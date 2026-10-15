@@ -147,8 +147,6 @@ const EN = {
   '+ 워커 추가': '+ Add worker',
   '역할 이름과 작업 폴더를 정해 투입': 'Pick a role name and folder, then launch',
   '폴더 없음': 'No folder',
-  '{n} 작업 중': '{n} working',
-  '눌러서 접기 · 펼치기': 'Click to fold / unfold',
   '▦ repo별 묶음': '▦ By repo',
   '☰ 저장 순서': '☰ Saved order',
   '지금: 작업 폴더(repo)별로 묶어 보기 · 누르면 저장한 순서 그대로': 'Now: grouped by folder (repo) · click for saved order',

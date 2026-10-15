@@ -1070,10 +1070,8 @@ function setBranch(elx, b) {
 // 워커 추가 + 아이콘 — 글자 '+' 는 글꼴마다 기준선이 달라 동그라미 가운데에 맞지 않았다
 const PLUS_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
 // 카드를 작업 폴더(repo)별로 묶는다 — 워커가 여러 repo 에 섞이면 순서만으로는 어느 repo 워커인지 안 보였다.
-// 폴더가 둘 이상일 때만 묶고, 묶음마다 머리줄(이름 · 개수, 누르면 접기). 접힘은 이 브라우저에만(am.repoFold.<키>)
+// 폴더가 둘 이상일 때만 묶고, 묶음마다 머리줄(이름 · 개수)
 const repoKey = (cwd) => (cwd || '').replace(/[\\/]+$/, '').replace(/\//g, '\\').toLowerCase();
-const REPO_FOLD_KEY = (k) => `am.repoFold.${k}`;
-const repoFolded = (k) => { try { return localStorage.getItem(REPO_FOLD_KEY(k)) === '1'; } catch { return false; } };
 // 머리줄 이름: 폴더 끝 이름이 같은 clone 이 여럿(Merge·Merge-bundle 의 anipang-next-client)이라 다른 묶음과 겹치지 않을 때까지 뒤에서부터 마디를 늘린다.
 // 같은 이름이 연달아 겹친 폴더(Merge-sub\anipang-next-client\anipang-next-client)는 한 마디로 친다 — 안 그러면
 // 'anipang-next-client/anipang-next-client' 로 끝나 정작 구분되는 Merge-sub 가 빠졌다.
@@ -1147,23 +1145,18 @@ function renderFloor() {
     prev = x;
   };
   for (const it of items) {
-    const folded = grouped && repoFolded(it.repo);
     if (grouped && it.repo !== prevRepo) {
       let h = repoHeadEls.get(it.repo);
       if (!h) {
-        h = el(`<button type="button" class="repo-head"><span class="rh-chev" aria-hidden="true">▾</span><span class="repo-sw"></span><b></b><span class="rh-n"></span><span class="rh-busy"></span></button>`);
+        h = el(`<div class="repo-head"><span class="repo-sw"></span><b></b><span class="rh-n"></span></div>`);
         h.dataset.repo = it.repo;
         repoHeadEls.set(it.repo, h);
       }
       const mine = items.filter((i) => i.repo === it.repo);
-      const busy = mine.filter((i) => i.w && viewStatus(i.w) === 'working').length;
       $('b', h).textContent = labels.get(it.repo);
       $('.rh-n', h).textContent = mine.length;
-      // 접어 둔 묶음에서도 일하는 워커가 있는지는 보이게
-      $('.rh-busy', h).textContent = folded && busy ? _t('{n} 작업 중', { n: busy }) : '';
-      h.classList.toggle('folded', folded);
       h.style.setProperty('--repo', colorOf.get(it.repo));
-      h.title = `${it.cwd || ''}\n${_t('눌러서 접기 · 펼치기')}`;
+      h.title = it.cwd || '';
       place(h);
       prevRepo = it.repo;
     }
@@ -1182,8 +1175,6 @@ function renderFloor() {
       const at = state.resumable?.[it.p.name], lb = $('[data-act="launch"]', n);
       lb.title = at ? _t('마지막 세션({t})을 이어서 시작 · Shift+클릭: 새 세션으로', { t: fmtAgo(at) }) : _t('새 세션으로 시작');
     }
-    // updateNode 가 className 을 통째로 다시 써서 접힘 표시는 그 뒤에 붙인다 — 앞에 두면 실행 중 카드가 접히지 않았다
-    n.classList.toggle('repo-folded', folded);
     place(n);
   }
   let empty = $('.empty', nodes);
@@ -1211,7 +1202,10 @@ function layoutRepoGroups() {
     for (const k of kids) k.style.gridRow = k.style.gridColumn = '';
     return;
   }
-  const cols = Math.max(1, getComputedStyle(nodes).gridTemplateColumns.split(' ').filter(Boolean).length);
+  // 열 수는 폭으로 직접 센다(.nodes 의 repeat(auto-fill, minmax(236px, 1fr)) 와 같은 계산). gridTemplateColumns 개수로 세면
+  // 지정한 칸이 열 수를 넘었을 때 브라우저가 붙인 암묵 열까지 세어져, 한 번 넘친 배치가 그대로 굳어 기판 밖으로 나갔다
+  const gap = parseFloat(getComputedStyle(nodes).columnGap) || 0;
+  const cols = Math.max(1, Math.floor((nodes.clientWidth + gap) / (236 + gap)));
   const groups = [];
   for (const k of kids) {
     if (k.classList.contains('repo-head')) groups.push({ head: k, cards: [] });
@@ -1221,7 +1215,7 @@ function layoutRepoGroups() {
   // 카드가 열 수보다 많은 묶음은 선반 하나를 혼자 쓰고 여러 줄로 내려간다
   const shelves = [];
   for (const g of groups) {
-    g.shown = g.head.classList.contains('folded') ? 0 : g.cards.length; // 접은 묶음은 머리줄 한 칸만
+    g.shown = g.cards.length;
     g.w = Math.max(1, Math.min(g.shown, cols));
     let sh = shelves.find((x) => x.used + g.w <= cols);
     if (!sh) shelves.push(sh = { used: 0, deep: 0, groups: [] });
@@ -2517,13 +2511,6 @@ nodesEl.addEventListener('dragleave', (e) => {
   if (n && !n.contains(e.relatedTarget)) n.classList.remove('dropping');
 });
 nodesEl.addEventListener('dragend', () => endNodeDrag());
-// repo 머리줄 누르면 그 묶음 접기·펼치기
-nodesEl.addEventListener('click', (e) => {
-  const h = e.target.closest('.repo-head');
-  if (!h) return;
-  try { if (repoFolded(h.dataset.repo)) localStorage.removeItem(REPO_FOLD_KEY(h.dataset.repo)); else localStorage.setItem(REPO_FOLD_KEY(h.dataset.repo), '1'); } catch {}
-  renderFloor();
-});
 function endNodeDrag() {
   trashEl.classList.remove('show', 'over');
   document.body.classList.remove('card-drag');
