@@ -1104,15 +1104,20 @@ const PLUS_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M
 const repoKey = (cwd) => (cwd || '').replace(/[\\/]+$/, '').replace(/\//g, '\\').toLowerCase();
 const REPO_FOLD_KEY = (k) => `am.repoFold.${k}`;
 const repoFolded = (k) => { try { return localStorage.getItem(REPO_FOLD_KEY(k)) === '1'; } catch { return false; } };
-// 머리줄 이름: 폴더 끝 이름이 같은 clone 이 여럿(Merge·Merge-bundle 의 anipang-next-client)이라 다른 묶음과 겹치지 않을 때까지 뒤에서부터 마디를 늘린다
+// 머리줄 이름: 폴더 끝 이름이 같은 clone 이 여럿(Merge·Merge-bundle 의 anipang-next-client)이라 다른 묶음과 겹치지 않을 때까지 뒤에서부터 마디를 늘린다.
+// 같은 이름이 연달아 겹친 폴더(Merge-sub\anipang-next-client\anipang-next-client)는 한 마디로 친다 — 안 그러면
+// 'anipang-next-client/anipang-next-client' 로 끝나 정작 구분되는 Merge-sub 가 빠졌다.
+// 셋 이상 마디가 필요하면 가운데는 … 로 줄여 '구분되는 마디/…/끝 이름'만 보인다(전체 경로는 머리줄 title)
 function repoLabels(cwds) {
-  const segs = new Map(cwds.map((c) => [repoKey(c), (c || '').replace(/[\\/]+$/, '').split(/[\\/]/)]));
-  const tail = (k, n) => segs.get(k).slice(-n).join('/');
+  const segs = new Map(cwds.map((c) => [repoKey(c), (c || '').replace(/[\\/]+$/, '').split(/[\\/]/)
+    .filter((s, i, a) => !i || s.toLowerCase() !== a[i - 1].toLowerCase())]));
+  const tail = (k, n) => segs.get(k).slice(-n).join('/').toLowerCase();
   const out = new Map();
   for (const k of segs.keys()) {
+    const s = segs.get(k);
     let n = 1;
-    while (n < segs.get(k).length && [...segs.keys()].some((o) => o !== k && tail(o, n).toLowerCase() === tail(k, n).toLowerCase())) n++;
-    out.set(k, tail(k, n) || _t('폴더 없음'));
+    while (n < s.length && [...segs.keys()].some((o) => o !== k && tail(o, n) === tail(k, n))) n++;
+    out.set(k, (n > 2 ? `${s.at(-n)}/…/${s.at(-1)}` : s.slice(-n).join('/')) || _t('폴더 없음'));
   }
   return out;
 }
