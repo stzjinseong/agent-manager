@@ -1099,6 +1099,24 @@ function setBranch(elx, b) {
 
 // 워커 추가 + 아이콘 — 글자 '+' 는 글꼴마다 기준선이 달라 동그라미 가운데에 맞지 않았다
 const PLUS_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
+// 카드를 작업 폴더(repo)별로 묶는다 — 워커가 여러 repo 에 섞이면 순서만으로는 어느 repo 워커인지 안 보였다.
+// 폴더가 둘 이상일 때만 묶고, 묶음마다 머리줄(이름 · 개수, 누르면 접기). 접힘은 이 브라우저에만(am.repoFold.<키>)
+const repoKey = (cwd) => (cwd || '').replace(/[\\/]+$/, '').replace(/\//g, '\\').toLowerCase();
+const REPO_FOLD_KEY = (k) => `am.repoFold.${k}`;
+const repoFolded = (k) => { try { return localStorage.getItem(REPO_FOLD_KEY(k)) === '1'; } catch { return false; } };
+// 머리줄 이름: 폴더 끝 이름이 같은 clone 이 여럿(Merge·Merge-bundle 의 anipang-next-client)이라 다른 묶음과 겹치지 않을 때까지 뒤에서부터 마디를 늘린다
+function repoLabels(cwds) {
+  const segs = new Map(cwds.map((c) => [repoKey(c), (c || '').replace(/[\\/]+$/, '').split(/[\\/]/)]));
+  const tail = (k, n) => segs.get(k).slice(-n).join('/');
+  const out = new Map();
+  for (const k of segs.keys()) {
+    let n = 1;
+    while (n < segs.get(k).length && [...segs.keys()].some((o) => o !== k && tail(o, n).toLowerCase() === tail(k, n).toLowerCase())) n++;
+    out.set(k, tail(k, n) || _t('폴더 없음'));
+  }
+  return out;
+}
+const repoHeadEls = new Map();
 function renderFloor() {
   const nodes = $('#nodes');
   const liveNames = new Set(state.workers.filter((w) => w.status !== 'exited').map((w) => w.name));
@@ -1112,16 +1130,52 @@ function renderFloor() {
   // 저장된 순서(역할 이름) 우선, 없는 항목은 원래 순서대로 뒤에 (stable sort)
   const rank = (name) => { const i = (state.order || []).indexOf(name); return i < 0 ? Infinity : i; };
   items.sort((a, b) => rank(a.name) - rank(b.name));
+  // repo 묶음: 묶음 순서는 그 묶음의 첫 카드 자리(저장된 순서), 묶음 안은 저장된 순서 그대로
+  for (const it of items) { it.cwd = it.w ? it.w.cwd : it.p.cwd; it.repo = repoKey(it.cwd); }
+  const repos = [...new Set(items.map((i) => i.repo))];
+  const grouped = repos.length > 1;
+  if (grouped) items.sort((a, b) => repos.indexOf(a.repo) - repos.indexOf(b.repo));
+  const labels = grouped ? repoLabels(repos.map((r) => items.find((i) => i.repo === r).cwd)) : new Map();
+  for (const [k, h] of repoHeadEls) if (!labels.has(k)) { h.remove(); repoHeadEls.delete(k); }
   // 워커마다 가로 차선을 하나씩 쓰므로, 많아지면 코어와 칩 사이 간격을 넓혀 차선 간격을 확보
   $('.core').style.marginBottom = `${Math.max(44, 28 + items.length * 7)}px`;
   const keep = new Set(items.map((i) => i.key));
   for (const [k, n] of nodeEls) if (!keep.has(k)) { n.remove(); nodeEls.delete(k); }
 
-  let prev = null;
+  let prev = null, prevRepo = null;
+  const place = (x) => {
+    // 순서 유지 (이미 제자리면 옮기지 않아 애니메이션이 끊기지 않음). 드래그 중엔 사용자가 옮긴 자리를 존중
+    if (!dragEl) {
+      const want = prev ? prev.nextSibling : nodes.firstChild;
+      if (want !== x) nodes.insertBefore(x, want);
+    }
+    prev = x;
+  };
   for (const it of items) {
+    const folded = grouped && repoFolded(it.repo);
+    if (grouped && it.repo !== prevRepo) {
+      let h = repoHeadEls.get(it.repo);
+      if (!h) {
+        h = el(`<button type="button" class="repo-head"><span class="rh-chev" aria-hidden="true">▾</span><b></b><span class="rh-n"></span><span class="rh-busy"></span></button>`);
+        h.dataset.repo = it.repo;
+        repoHeadEls.set(it.repo, h);
+      }
+      const mine = items.filter((i) => i.repo === it.repo);
+      const busy = mine.filter((i) => i.w && viewStatus(i.w) === 'working').length;
+      $('b', h).textContent = labels.get(it.repo);
+      $('.rh-n', h).textContent = mine.length;
+      // 접어 둔 묶음에서도 일하는 워커가 있는지는 보이게
+      $('.rh-busy', h).textContent = folded && busy ? _t('{n} 작업 중', { n: busy }) : '';
+      h.classList.toggle('folded', folded);
+      h.title = `${it.cwd || ''}\n${_t('눌러서 접기 · 펼치기')}`;
+      place(h);
+      prevRepo = it.repo;
+    }
     let n = nodeEls.get(it.key);
     if (!n) { n = it.w ? nodeTemplate() : socketTemplate(); n.draggable = true; nodeEls.set(it.key, n); }
     n.dataset.name = it.name;
+    n.dataset.repo = it.repo;
+    n.classList.toggle('repo-folded', folded);
     if (it.w) updateNode(n, it.w);
     else {
       n.dataset.profile = it.p.name;
@@ -1132,12 +1186,7 @@ function renderFloor() {
       const at = state.resumable?.[it.p.name], lb = $('[data-act="launch"]', n);
       lb.title = at ? _t('마지막 세션({t})을 이어서 시작 · Shift+클릭: 새 세션으로', { t: fmtAgo(at) }) : _t('새 세션으로 시작');
     }
-    // 순서 유지 (이미 제자리면 옮기지 않아 애니메이션이 끊기지 않음). 드래그 중엔 사용자가 옮긴 자리를 존중
-    if (!dragEl) {
-      const want = prev ? prev.nextSibling : nodes.firstChild;
-      if (want !== n) nodes.insertBefore(n, want);
-    }
-    prev = n;
+    place(n);
   }
   let empty = $('.empty', nodes);
   if (!items.length && !empty) nodes.append(empty = el(`<div class="empty">${_t('아직 워커가 없습니다. <b>+ 워커 추가</b>로 첫 Claude 를 투입하세요.')}</div>`));
@@ -1326,7 +1375,7 @@ function drawTraces() {
   // 칩 위치는 레이아웃 좌표(offsetTop/Left)로 잰다. getBoundingClientRect 는 호버·선택 시 떠오르는
   // translateY(-2px) 까지 반영해서, 떠오를 때마다 선 끝이 흔들리고 다시 그려졌다.
   const nr = $('#nodes').getBoundingClientRect();
-  const list = [...nodeEls.values()].filter((n) => n.isConnected).map((n) => {
+  const list = [...nodeEls.values()].filter((n) => n.isConnected && n.offsetParent).map((n) => {
     const w = state.workers.find((x) => x.id === n.dataset.id);
     return {
       x: Math.round(nr.left - fr.left + n.offsetLeft), y: Math.round(nr.top - fr.top + n.offsetTop),
@@ -2390,7 +2439,8 @@ nodesEl.addEventListener('dragover', (e) => {
   if (!dragEl) return;
   e.preventDefault();
   const over = e.target.closest('.node');
-  if (!over || over === dragEl) return;
+  // repo 별로 묶여 있으면 다른 묶음으로는 옮기지 않는다 — 놓아도 다시 그릴 때 제 묶음으로 돌아간다
+  if (!over || over === dragEl || over.dataset.repo !== dragEl.dataset.repo) return;
   const r = over.getBoundingClientRect();
   // 같은 줄이면 좌우 절반, 줄이 다르면 위아래 절반으로 앞/뒤 판정
   const sameRow = Math.abs(r.top - dragEl.getBoundingClientRect().top) < r.height / 2;
@@ -2407,6 +2457,13 @@ nodesEl.addEventListener('dragleave', (e) => {
   if (n && !n.contains(e.relatedTarget)) n.classList.remove('dropping');
 });
 nodesEl.addEventListener('dragend', () => endNodeDrag());
+// repo 머리줄 누르면 그 묶음 접기·펼치기
+nodesEl.addEventListener('click', (e) => {
+  const h = e.target.closest('.repo-head');
+  if (!h) return;
+  try { if (repoFolded(h.dataset.repo)) localStorage.removeItem(REPO_FOLD_KEY(h.dataset.repo)); else localStorage.setItem(REPO_FOLD_KEY(h.dataset.repo), '1'); } catch {}
+  renderFloor();
+});
 function endNodeDrag() {
   trashEl.classList.remove('show', 'over');
   document.body.classList.remove('card-drag');

@@ -146,6 +146,9 @@ const EN = {
   '워커 추가': 'Add worker',
   '+ 워커 추가': '+ Add worker',
   '역할 이름과 작업 폴더를 정해 투입': 'Pick a role name and folder, then launch',
+  '폴더 없음': 'No folder',
+  '{n} 작업 중': '{n} working',
+  '눌러서 접기 · 펼치기': 'Click to fold / unfold',
   // 최소화
   '▴ 최소화': '▴ Minimize',
   '매니저·워커 카드를 헤더 아래 한 줄로 최소화': 'Collapse the manager and worker cards into one row under the header',

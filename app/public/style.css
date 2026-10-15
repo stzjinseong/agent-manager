@@ -239,6 +239,24 @@ main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24p
 body.card-drag > :is(.topbar, section:not(.floor)), body.card-drag .floor > :not(#nodes), body.card-drag :is(.dock-expand, .dthumbs) { opacity: .25; transition: opacity .2s; }
 .trash.over .bin { border-style: solid; border-color: #e0655a; background: color-mix(in srgb, #e0655a 30%, var(--surface-3)); color: var(--text); transform: scale(1.08); }
 .nodes { position: relative; display: grid; grid-template-columns: repeat(auto-fill, minmax(236px, 1fr)); gap: 34px 22px; }
+/* repo 묶음 머리줄 — 줄 전체 폭. 회로선이 뒤로 지나가도 글자가 묻히지 않게 이름 칸에 바닥색 */
+.repo-head {
+  grid-column: 1 / -1; position: relative; display: flex; align-items: center; gap: 8px; margin: 0 0 -18px; padding: 0;
+  border: 0; background: none; color: var(--text-2); font: inherit; font-size: 12.5px; cursor: pointer; text-align: left;
+}
+.repo-head ~ .repo-head { margin-top: 6px; }
+.repo-head::after { content: ""; flex: 1; height: 1px; background: rgb(var(--ink) / .1); }
+.repo-head > * { background: var(--floor); }
+.repo-head b { font: 600 12.5px/1.6 var(--mono); color: var(--text); padding-right: 2px; }
+.repo-head .rh-chev { width: 14px; text-align: center; color: var(--dim); transition: transform .15s; }
+.repo-head.folded .rh-chev { transform: rotate(-90deg); }
+.repo-head .rh-n { font-size: 11px; padding: 0 7px; border-radius: 999px; color: var(--dim); border: 1px solid rgb(var(--ink) / .14); }
+.repo-head .rh-busy:empty { display: none; }
+.repo-head .rh-busy { font-size: 11px; color: var(--working); }
+.repo-head:hover b, .repo-head:focus-visible b { color: var(--accent-hi); }
+.repo-head.folded + .repo-head, .repo-head.folded { margin-bottom: 0; }
+.node.repo-folded { display: none; }
+body.card-drag .repo-head { opacity: .25; transition: opacity .2s; }
 .empty { grid-column: 1 / -1; text-align: center; color: var(--dim); padding: 18px 0 6px; }
 /* 워커 추가 카드 — 마지막 워커 다음 자리. 대기실 슬롯(.node.socket)처럼 점선 빈 칸, 누르면 워커 추가 창 */
 .node-add {
