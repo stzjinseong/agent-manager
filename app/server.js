@@ -16,6 +16,7 @@ import { snapshot, changedSince, readBlob } from './shelldiff.js';
 import { createProgress, isCommit } from './progress.js';
 import { createUserProfile } from './userprofile.js';
 import { createRoleStats } from './rolestats.js';
+import { createScheduler, cleanSchedule, nextRunOf } from './schedule.js';
 import { L } from './cli-lang.js';
 import { createUpdates } from './updates.js';
 import { gitBranch } from './branch.js';
@@ -165,8 +166,8 @@ function usageReporters() {
 function loadConfig() {
   try {
     const c = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
-    return { profiles: c.profiles || [], recentCwds: c.recentCwds || [], order: c.order || [], memos: c.memos || {}, colors: c.colors || {}, sessions: c.sessions || {}, diffCleared: c.diffCleared || {}, manualQueue: c.manualQueue || {} };
-  } catch { return { profiles: [], recentCwds: [], order: [], memos: {}, colors: {}, sessions: {}, diffCleared: {}, manualQueue: {} }; }
+    return { profiles: c.profiles || [], recentCwds: c.recentCwds || [], order: c.order || [], memos: c.memos || {}, colors: c.colors || {}, sessions: c.sessions || {}, diffCleared: c.diffCleared || {}, manualQueue: c.manualQueue || {}, schedules: c.schedules || [] };
+  } catch { return { profiles: [], recentCwds: [], order: [], memos: {}, colors: {}, sessions: {}, diffCleared: {}, manualQueue: {}, schedules: [] }; }
 }
 
 function saveConfig() {
@@ -251,6 +252,7 @@ function renameRole(from, to, worker) {
   if (config.memos?.[from]) { config.memos[to] = [...(config.memos[to] || []), ...config.memos[from]]; delete config.memos[from]; }
   roleStats.rename(from, to);
   if (config.manualQueue?.[from]) { config.manualQueue[to] = true; delete config.manualQueue[from]; }
+  for (const x of config.schedules || []) if (x.role === from) x.role = to;
   saveConfig(); // emitState 포함
   return { ok: true };
 }
@@ -371,7 +373,7 @@ function checkInterrupted(w) {
 
 // 서버 코드가 켜진 뒤 바뀌었는지 — 화면은 새로고침마다 새 코드를 받지만 서버는 재시작해야 바뀐다.
 // 어긋나면 새 화면이 모르는 API 를 부르다 404 가 나므로, 화면에 "서버 재시작 필요"를 띄우게 알려 준다
-const SERVER_FILES = ['server.js', 'profile.js', 'pricing.js', 'progress.js', 'userprofile.js', 'rolestats.js'].map((f) => path.join(APP_DIR, f));
+const SERVER_FILES = ['server.js', 'profile.js', 'pricing.js', 'progress.js', 'userprofile.js', 'rolestats.js', 'schedule.js'].map((f) => path.join(APP_DIR, f));
 const mtimeOf = (f) => { try { return fs.statSync(f).mtimeMs; } catch { return 0; } };
 const BOOT_MTIMES = SERVER_FILES.map(mtimeOf);
 let staleCache = { at: 0, value: false };
@@ -1113,7 +1115,8 @@ function publicState() {
     recentCwds: recentCwdList(),
     progress: progress.public(),
     roles: roleStats.public(), // 역할별 레벨·칭호·배지 (이름 → 카드)
-    daily: roleStats.publicDaily(), // 마지막 하루 요약 카드 머리말 { date, at, seen, dates }
+    daily: roleStats.publicDaily(),
+    schedules: config.schedules, // 예약 · 반복 실행 (schedule.js) // 마지막 하루 요약 카드 머리말 { date, at, seen, dates }
     shotKeep: SHOT_KEEP, // 화면 안내 문구용 (워커당 캡처 보관 장수)
     usage, // 계정 사용량 { fiveHour: { pct, resetsAt, at, from }, sevenDay, at, from }
     usageReporters: usageReporters(), // { ok: [보낼 수 있는 워커 id], missing: [상태줄 없이 뜬 워커 id] }
@@ -1643,6 +1646,7 @@ const STATIC = {
   '/characters.js': ['public/characters.js', 'text/javascript; charset=utf-8'],
   '/userreport.js': ['public/userreport.js', 'text/javascript; charset=utf-8'],
   '/growth.js': ['public/growth.js', 'text/javascript; charset=utf-8'],
+  '/schedule.js': ['public/schedule.js', 'text/javascript; charset=utf-8'],
   '/style.css': ['public/style.css', 'text/css; charset=utf-8'],
   '/vendor/xterm.js': ['node_modules/@xterm/xterm/lib/xterm.js', 'text/javascript'],
   '/vendor/xterm.css': ['node_modules/@xterm/xterm/css/xterm.css', 'text/css'],
@@ -1888,6 +1892,31 @@ const server = http.createServer(async (req, res) => {
     return json(res, 200, { ok: true });
   }
   if (req.method === 'POST' && p === '/api/daily/build') return json(res, 200, tickDaily(true));
+  // 예약 · 반복 실행 — op: add | edit | remove | toggle | run(지금 한 번)
+  if (req.method === 'POST' && p === '/api/schedules') {
+    const body = await readBody(req);
+    const list = config.schedules;
+    const i = list.findIndex((x) => x.id === body.id);
+    if (body.op === 'add' || body.op === 'edit') {
+      if (body.op === 'edit' && i < 0) return json(res, 404, { error: '없는 예약입니다' });
+      const r = cleanSchedule(body, body.op === 'edit' ? list[i] : undefined);
+      if (r.error) return json(res, 400, { error: r.error });
+      if (body.op === 'edit') list[i] = r.s; else list.push(r.s);
+      saveConfig();
+      return json(res, 200, { ok: true, id: r.s.id });
+    }
+    if (i < 0) return json(res, 404, { error: '없는 예약입니다' });
+    const x = list[i];
+    if (body.op === 'remove') list.splice(i, 1);
+    else if (body.op === 'toggle') {
+      x.enabled = !x.enabled; x.retries = 0;
+      x.nextRun = x.enabled ? nextRunOf(x) : null;
+      if (x.enabled && !x.nextRun) { x.enabled = false; saveConfig(); return json(res, 400, { error: '지난 시각입니다 — 시각을 고쳐 주세요' }); }
+    } else if (body.op === 'run') return json(res, 200, { ok: true, result: await scheduler.fire(x, true) });
+    else return json(res, 400, { error: 'op' });
+    saveConfig();
+    return json(res, 200, { ok: true });
+  }
   if (req.method === 'GET' && p === '/api/user-profile') return json(res, 200, userProfile.report());
   // AI 코치 리포트 — GET: 기간별 마지막 결과 + 지금 돌고 있는지 + 보낼 요청 글 수, POST: 새로 분석(1분 안팎, 끝날 때 응답)
   if (req.method === 'GET' && p === '/api/user-profile/llm') {
@@ -2072,6 +2101,24 @@ wss.on('connection', (ws) => {
 });
 
 await connectHost();
+// ---------- 예약 · 반복 실행 (schedule.js) ----------
+// 정한 시각에 그 역할의 살아 있는 워커에 지시를 넣는다(업무 지시와 같은 assignTask — 작업 중이면 대기열로).
+// 워커가 꺼져 있거나 5시간 한도가 거의 찼으면 건너뛰고, 입력창이 막혀 있으면(쓰던 글 · 선택창) 1분 뒤 다시
+const SCHEDULE_LIMIT_PCT = 90;
+async function runSchedule(s) {
+  const w = [...workers.values()].find((x) => x.name === s.role && x.status !== 'exited');
+  if (!w) return { skip: '워커가 꺼져 있음' };
+  const h5 = usage?.fiveHour;
+  if (h5?.pct >= SCHEDULE_LIMIT_PCT && !(h5.resetsAt && h5.resetsAt < Date.now())) return { skip: `5시간 한도 ${Math.round(h5.pct)}% — 아껴 둠` };
+  if (w.queue.includes(s.text)) return { skip: '같은 지시가 아직 대기열에 있음' };
+  const r = await assignTask(w, s.text);
+  if (r.rejected) return { retry: r.rejected === 'draft' ? 'CLI 입력창에 쓰던 글이 있음' : r.rejected === 'starting' ? '워커가 시작 중' : 'CLI 가 입력창이 아닌 화면' };
+  pushLog(w, 'notice', `⏰ 예약 실행: ${s.text}`);
+  emitState();
+  return { ok: true };
+}
+const scheduler = createScheduler({ list: () => config.schedules, save: saveConfig, run: runSchedule });
+
 server.listen(PORT, HOST, () => {
   console.log(`${L('클로드 키우기', 'Clawdgotchi')} http://${HOST}:${PORT}  (claude: ${CLAUDE_BIN})`);
   setTimeout(cleanupLegacyHook, 5000);

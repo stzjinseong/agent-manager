@@ -603,11 +603,28 @@ const EN = {
   '일한 워커': 'Active workers', '작업 {d}': '{d} tasks', '중단 {n}': '{n} interrupted', '오류 {n}': '{n} errors',
   '커밋 {n}': '{n} commits', '결정 대기 {t}': 'waited on you {t}', '보낸 요청 기록 없음': 'No requests recorded',
   '매일 오후 5시(한국 시간)에 그날 기록을 묶어 보내요 · 금액은 API 가격 환산': 'Delivered daily at 5 PM KST · costs at API prices',
+  // 예약 · 반복 실행 (schedule.js)
+  '일': 'Sun', '월': 'Mon', '화': 'Tue', '수': 'Wed', '목': 'Thu', '금': 'Fri', '토': 'Sat',
+  '오늘 {t}': 'today {t}', '내일 {t}': 'tomorrow {t}', '한 번 · {t}': 'once · {t}', '{n}분마다': 'every {n} min', '{n}시간마다': 'every {n}h', '매일': 'Daily',
+  '{t} 넣음': 'sent {t}', '건너뜀': 'Skipped', '역할': 'Role', '지시': 'Task', '언제': 'When', '매일·요일': 'Daily / weekdays', '반복': 'Repeat', '한 번': 'Once',
+  '요일을 안 고르면 매일': 'No weekday selected = every day', '분마다': 'min interval', '고치기 저장': 'Save changes', '예약 추가': 'Add schedule',
+  '예약을 고쳤어요': 'Schedule updated', '예약을 추가했어요': 'Schedule added', '끄기': 'Turn off', '켜기': 'Turn on', '다음 {t}': 'next {t}', '끝남': 'done', '꺼짐': 'off',
+  '지금 한 번 넣기 (다음 예약은 그대로)': 'Send once now (next run unchanged)',
+  '아직 예약이 없어요 — 위에서 역할 · 지시 · 시각을 정해 추가하세요': 'No schedules yet — pick a role, task and time above',
+  '이 예약을 지울까요?': 'Delete this schedule?', '{role} 에 넣었어요': 'Sent to {role}', '예약 실행': 'Scheduled tasks', '켜진 예약 {n}개': '{n} active',
+  '정해 둔 시각에 이 역할의 워커에 보낼 지시': 'Task to send to this role at the set time',
+  '이 PC 시각 기준 · 클로드 키우기가 켜져 있을 때만 돌아요 · 작업 중이면 대기열로 · 워커가 꺼져 있거나 5시간 한도 90% 이상이면 건너뜀 · CLI 입력창이 막혀 있으면 1분마다 다시(10번)': "This PC's clock · runs only while the dashboard is on · queued if the worker is busy · skipped if the worker is off or 5-hour usage is 90%+ · retried every minute (10×) if the CLI input is blocked",
+  '예약 실행 · 켜진 예약 {n}개': 'Scheduled tasks · {n} active', '예약': 'Schedule', '업무 지시 칸에 쓴 글로 예약 만들기': 'Schedule the text in the task box',
 };
 const DICTS = { en: EN };
 // 서버가 만든 한국어 문구(타임라인 기록·알림·오류) — 서버는 언어를 모르니 화면에서 바꾼다. 이미 저장된 예전 기록에도 그대로 통한다.
 // 문장 일부만 맞아도 그 부분을 바꾼다(상태 기록은 'done: 턴 완료' 처럼 앞에 상태 코드가 붙는다). 긴 문장을 먼저 둔다
 const SERVER_EN = [
+  // 예약 실행 결과·오류 (schedule.js · server.js runSchedule)
+  [/^워커가 꺼져 있음$/, 'worker is off'], [/^같은 지시가 아직 대기열에 있음$/, 'same task still in the queue'],
+  [/^5시간 한도 (\d+)% — 아껴 둠$/, (m, p) => `5-hour usage ${p}% — holding off`], [/^서버가 꺼져 있어 놓침$/, 'missed while the server was off'],
+  [/^(CLI 입력창에 쓰던 글이 있음|워커가 시작 중|CLI 가 입력창이 아닌 화면)( — 1분 뒤 다시 \((\d+)\/(\d+)\))?$/, (m, r, t, a, b) => ({ 'CLI 입력창에 쓰던 글이 있음': 'unsent text in the CLI input', '워커가 시작 중': 'worker is starting', 'CLI 가 입력창이 아닌 화면': 'CLI is not at its input' }[r] + (t ? ` — retrying in 1 min (${a}/${b})` : ''))],
+  [/^역할을 고르세요$/, 'Pick a role'], [/^지시 내용이 비어 있습니다$/, 'The task is empty'], [/^지난 시각입니다( — 시각을 고쳐 주세요)?$/, 'That time has passed'], [/^없는 예약입니다$/, 'No such schedule'],
   [/업무 지시가 CLI 에 들어가지 않은 것 같습니다(\(입력 대기 화면이 아님\))? — 대기열 맨 앞에 되돌려 다시 투입합니다/, (m, b) => `The task doesn't seem to have reached the CLI${b ? ' (not at the input screen)' : ''} — put back at the front of the queue and sending again`],
   [/업무 지시가 CLI 에 들어가지 않은 것 같습니다(\(입력 대기 화면이 아님\))? — 대기열 맨 앞에 두었습니다\. 터미널을 확인하세요/, (m, b) => `The task doesn't seem to have reached the CLI${b ? ' (not at the input screen)' : ''} — left at the front of the queue. Check the terminal`],
   [/업무 지시가 CLI 에 들어가지 않은 것 같습니다(\(입력 대기 화면이 아님\))? — 대기열 맨 앞에 보류했습니다\. 터미널을 확인하고 ▶ 재개하거나 새 지시를 보내세요/, (m, b) => `The task doesn't seem to have reached the CLI${b ? ' (not at the input screen)' : ''} — it is on hold at the front of the queue. Check the terminal, then ▶ Resume or send a new task`],
