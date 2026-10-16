@@ -859,7 +859,9 @@ function pendingCount() {
 }
 
 function renderStale() {
-  $('#stale-bar').hidden = !(state.serverStale || !('serverStale' in state));
+  const stale = $('#stale-bar');
+  stale.hidden = !(state.serverStale || !('serverStale' in state));
+  if (!stale.hidden) stale.style.top = `${Math.round($('.topbar').getBoundingClientRect().bottom) + 12}px`; // 헤더 바로 아래에 겹쳐서
 }
 $('#btn-restart').onclick = () => restartServer();
 
