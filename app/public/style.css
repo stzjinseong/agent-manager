@@ -2389,7 +2389,8 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
   color: var(--bg); background: var(--accent); }
 .sched-n[hidden] { display: none; }
 .sched-n:not([hidden]) ~ .new-dot { display: none; } /* 켜진 예약 수가 같은 자리에 뜨면 — 예약이 있으면 이미 써 본 기능 */
-.sc-back { z-index: 190; } /* 지우기 확인(ask) 창이 위로 오게 */
+.sc-back { z-index: 190; }
+.sc-modal .gr-head > div:first-child { flex: 1; min-width: 0; } /* 아이콘 칸이 없어 제목이 첫 칸 — 닫기 버튼을 오른쪽 끝으로 */ /* 지우기 확인(ask) 창이 위로 오게 */
 .modal.sc-modal { width: min(680px, calc(100% - 32px)); max-height: calc(100dvh - 40px); overflow-y: auto; overscroll-behavior: contain; padding: 18px 22px 16px; outline: none; }
 .sc-form { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 10px; border: 1px solid var(--line); background: rgb(var(--ink) / .025); }
 .sc-form.editing { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
