@@ -2645,14 +2645,24 @@ const newForm = $('#new-form');
 function toggleNewPanel(open = $('#new-panel').hidden) {
   const panel = $('#new-panel');
   panel.hidden = !open;
+  $('#new-back').hidden = !open;
   for (const b of document.querySelectorAll('[data-new]')) b.classList.toggle('on', open);
   if (!open) return;
   if (!newForm.cwd.value && state.recentCwds[0]) newForm.cwd.value = state.recentCwds[0];
-  panel.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); // 창은 회로 기판 위에 열린다 — 아래쪽 카드를 눌렀으면 보이게
+  // 헤더 바로 아래에 겹쳐 띄운다 — 헤더 높이는 폭(버튼 줄바꿈)에 따라 달라서 열 때마다 잰다
+  const top = Math.round($('.topbar').getBoundingClientRect().bottom) + 12;
+  panel.style.top = `${top}px`;
+  panel.style.setProperty('--np-top', `${top}px`);
   newForm.name.focus({ preventScroll: true });
 }
 document.addEventListener('click', (e) => { if (e.target.closest?.('[data-new]')) toggleNewPanel(); });
 $('#btn-cancel').onclick = () => toggleNewPanel(false);
+// 어둡게 덮은 바깥을 누르거나 Esc 로 닫기 (최근 폴더 목록이 열려 있으면 Esc 는 그 목록부터 — 목록 쪽 처리에 맡김)
+$('#new-back').addEventListener('click', () => toggleNewPanel(false));
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape' || $('#new-panel').hidden || !recentPop.hidden || e.defaultPrevented) return;
+  toggleNewPanel(false);
+});
 // 최근 작업 폴더 목록(최근 10개 — server.js recentCwdList). 브라우저 자동완성(datalist)은 입력칸에 채워 둔 경로와 맞는 것만
 // 보여 줘서 사실상 하나만 떴고 Safari 는 잘 띄우지도 않았다 → ▾ 로 여는 목록. 입력칸에서 ↓ 로도 연다
 const recentPop = $('#recent-pop'), recentBtn = $('#btn-recent');

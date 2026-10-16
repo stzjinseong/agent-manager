@@ -98,8 +98,16 @@ textarea { resize: vertical; }
 main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24px; }
 
 /* ---------- 워커 추가 ---------- */
-/* 폭은 워커 카드(.floor)와 같은 규칙: 화면 폭 - 좌우 24px, 최대 1480px 가운데 정렬 */
-.new-panel { width: calc(100% - 48px); max-width: 1480px; margin: 16px auto 0 !important; padding: 16px; }
+/* 폭은 워커 카드(.floor)와 같은 규칙: 화면 폭 - 좌우 24px, 최대 1480px 가운데 정렬.
+   헤더 바로 아래에 겹쳐 띄운다(fixed, top 은 app.js toggleNewPanel 이 헤더 높이로) — 문서 흐름에 두면 열 때마다 기판·카드가 아래로 밀렸다 */
+.new-panel {
+  position: fixed; top: 76px; left: 0; right: 0; z-index: 81;
+  width: calc(100% - 48px); max-width: 1480px; margin: 0 auto !important; padding: 16px;
+  box-shadow: 0 18px 48px rgb(0 0 0 / .45);
+}
+/* 창 밖 어둡게 — 헤더까지 덮는다(헤더 z 10). 확인 창(.modal-back 200)·툴팁 확대 등은 그 위 */
+.new-back { position: fixed; inset: 0; z-index: 80; background: rgba(0, 0, 0, .55); }
+.new-back[hidden] { display: none; }
 #new-form { display: grid; grid-template-columns: 1.1fr 2.4fr 1fr 1fr auto auto; gap: 12px; align-items: end; }
 #new-form label > span:first-child { display: block; font-size: 12px; color: var(--dim); margin-bottom: 5px; }
 .with-btn { display: flex; gap: 6px; }
@@ -597,6 +605,7 @@ body.term-full .side-grip { left: -6px; }
   .topbar { padding: 10px 12px; gap: 12px; }
   .detail, .floor, .new-panel { width: calc(100% - 24px); }
   #new-form { grid-template-columns: 1fr; }
+  .new-panel { max-height: calc(100dvh - var(--np-top, 76px) - 12px); overflow-y: auto; } /* 한 줄씩 쌓여 길어지면 창 안에서 스크롤 */
   .decision { flex-wrap: wrap; }
 }
 @media (max-width: 400px) { .topbar { gap: 6px; padding-left: 10px; padding-right: 10px; } }
