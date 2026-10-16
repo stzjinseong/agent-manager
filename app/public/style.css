@@ -1558,10 +1558,9 @@ html[data-char="clawd-white"] :is(.node, .dchip, .detail-avatar, .term-wrap) { -
 
 /* ---------- 최소화한 회로 기판: 헤더 바로 아래 한 줄 (매니저 + 워커 칩) ---------- */
 .floor-tools { position: absolute; top: 12px; right: 14px; z-index: 2; display: flex; gap: 4px; }
-.floor-tools .btn { padding: 4px 10px; font-size: 12px; color: var(--dim); }
+.floor-tools .btn { padding: 4px 10px; font-size: 12px; color: var(--text); font-weight: 700; } /* 흐린 dim 글자라 눈에 안 띄었다 — 본문색(다크 흰색 · 라이트 진한 글자) 굵게 */
 .floor-tools .btn:hover { color: var(--text); }
 .floor-tools [hidden], .node-add[hidden] { display: none; } /* .btn·.node-add 의 display 가 hidden 속성을 덮어써서 */
-.floor-tools .floor-add { color: var(--text); font-weight: 700; } /* 흐린 dim 글자라 눈에 안 띄었다 — 본문색(다크 흰색 · 라이트 진한 글자) 굵게 */
 .floor-tools .floor-add.on { color: var(--accent-hi); }
 .floor-group[aria-pressed="true"] { color: var(--accent-hi); }
 .dock {
