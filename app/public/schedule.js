@@ -25,6 +25,7 @@
     if (!r) return '';
     if (r.ok) return `<span class="sc-ok">✓ ${esc(T('{t} 넣음', { t: when(r.t) }))}</span>`;
     if (r.retry) return `<span class="sc-retry">↻ ${esc(srvText(r.retry))}</span>`;
+    if (r.wait) return `<span class="sc-wait" title="${esc(when(r.t))}">⏳ ${esc(srvText(r.wait))}</span>`;
     return `<span class="sc-skip" title="${esc(when(r.t))}">⚠ ${esc(T('건너뜀'))}: ${esc(srvText(r.skip))}</span>`;
   };
   const list = () => (state.schedules || []).slice().sort((a, b) => (b.enabled - a.enabled) || ((a.nextRun || Infinity) - (b.nextRun || Infinity)));
@@ -49,6 +50,9 @@
           <input type="number" name="everyMin" min="5" step="5" value="60"> <span data-k="분마다"></span>
           <span class="sc-presets">${[30, 60, 120, 240].map((m) => `<button type="button" data-min="${m}">${m < 60 ? `${m}m` : `${m / 60}h`}</button>`).join('')}</span></div></div>
         <div class="sc-row sc-k once"><span class="sc-l"></span><div class="sc-when"><input type="datetime-local" name="at"></div></div>
+        <div class="sc-row"><label class="sc-l" data-k="놓치면"></label><div class="sc-when">
+          <div class="sc-kinds"><button type="button" data-off="wait" data-k="미뤘다 실행"></button><button type="button" data-off="skip" data-k="건너뛰기"></button></div>
+          <small class="sc-hint sc-off-hint"></small></div></div>
         <div class="sc-acts"><span class="sc-err"></span><button type="button" class="btn ghost sc-cancel" data-k="취소"></button><button type="submit" class="btn primary sc-save"></button></div>
       </form>
       <ol class="sc-list"></ol>
@@ -58,6 +62,7 @@
   const box = back.firstElementChild, form = $('.sc-form', box);
   let editing = null; // 고치는 예약 id
   let kind = 'daily';
+  let whenOff = 'wait'; // 그 시각에 워커·서버가 꺼져 있었으면: 'wait' 돌아오면 넣기 · 'skip' 넘어가기
   const days = new Set();
 
   const close = () => { back.hidden = true; };
@@ -70,6 +75,12 @@
     box.querySelectorAll('.sc-k').forEach((r) => { r.hidden = !r.classList.contains(k); });
   }
   box.querySelectorAll('[data-kind]').forEach((b) => { b.onclick = () => setKind(b.dataset.kind); });
+  function setOff(v) {
+    whenOff = v;
+    box.querySelectorAll('[data-off]').forEach((b) => b.classList.toggle('on', b.dataset.off === v));
+    $('.sc-off-hint', box).textContent = T(v === 'wait' ? '그 시각에 워커나 서버가 꺼져 있었으면 워커가 다시 뜰 때 넣어요 (24시간까지)' : '그 시각에 워커나 서버가 꺼져 있었으면 그 회차는 넘어가요');
+  }
+  box.querySelectorAll('[data-off]').forEach((b) => { b.onclick = () => setOff(b.dataset.off); });
   box.querySelectorAll('[data-day]').forEach((b) => {
     b.onclick = () => { const d = Number(b.dataset.day); days.has(d) ? days.delete(d) : days.add(d); b.classList.toggle('on', days.has(d)); };
   });
@@ -91,6 +102,7 @@
     days.clear(); (s.days || []).forEach((d) => days.add(d));
     box.querySelectorAll('[data-day]').forEach((b) => b.classList.toggle('on', days.has(Number(b.dataset.day))));
     setKind(s.kind || 'daily');
+    setOff(s.whenOff || 'wait');
     $('.sc-err', box).textContent = '';
     $('.sc-save', box).textContent = T(isEdit ? '고치기 저장' : '예약 추가');
     $('.sc-cancel', box).hidden = !isEdit;
@@ -99,7 +111,7 @@
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const body = { op: editing ? 'edit' : 'add', id: editing, role: form.role.value, text: form.text.value, kind };
+    const body = { op: editing ? 'edit' : 'add', id: editing, role: form.role.value, text: form.text.value, kind, whenOff };
     if (kind === 'daily') { body.time = form.time.value; body.days = [...days]; }
     if (kind === 'interval') body.everyMin = Number(form.everyMin.value);
     if (kind === 'once') body.at = new Date(form.at.value).getTime();
@@ -118,7 +130,8 @@
         <label class="sc-switch" title="${esc(T(s.enabled ? '끄기' : '켜기'))}"><input type="checkbox" data-act="toggle"${s.enabled ? ' checked' : ''}><i></i></label>
         <div class="sc-main">
           <div class="sc-top"><b class="sc-rule">${esc(rule(s))}</b><span class="sc-role">${esc(s.role)}</span>
-            <span class="sc-next">${s.enabled && s.nextRun ? esc(T('다음 {t}', { t: when(s.nextRun) })) : esc(T(s.kind === 'once' && s.lastRun ? '끝남' : '꺼짐'))}</span></div>
+            <span class="sc-mode">${esc(T(s.whenOff === 'skip' ? '놓치면 건너뜀' : '놓치면 미룸'))}</span>
+            <span class="sc-next">${s.enabled && s.pendingSince ? `<i class="sc-pend">⏳ ${esc(T('워커 기다리는 중'))}</i>` : ''}${s.enabled && s.nextRun ? esc(T('다음 {t}', { t: when(s.nextRun) })) : s.enabled && s.pendingSince ? '' : esc(T(s.kind === 'once' && s.lastRun ? '끝남' : '꺼짐'))}</span></div>
           <div class="sc-text" title="${esc(s.text)}">${esc(s.text)}</div>
           ${s.lastResult ? `<div class="sc-res">${result(s.lastResult)}</div>` : ''}
         </div>
@@ -158,7 +171,7 @@
     box.querySelectorAll('[data-k]').forEach((x) => { x.textContent = T(x.dataset.k); });
     $('.gr-x', box).setAttribute('aria-label', T('닫기'));
     form.text.placeholder = T('정해 둔 시각에 이 역할의 워커에 보낼 지시');
-    $('.sc-foot', box).textContent = T('이 PC 시각 기준 · 클로드 키우기가 켜져 있을 때만 돌아요 · 작업 중이면 대기열로 · 워커가 꺼져 있거나 5시간 한도 90% 이상이면 건너뜀 · CLI 입력창이 막혀 있으면 1분마다 다시(10번)');
+    $('.sc-foot', box).textContent = T('이 PC 시각 기준 · 클로드 키우기가 켜져 있을 때만 돌아요 · 작업 중이면 대기열로 · 5시간 한도 90% 이상이면 건너뜀 · CLI 입력창이 막혀 있으면 1분마다 다시(10번)');
   }
 
   window.openSchedules = (preset) => {
@@ -195,7 +208,7 @@
     const n = $('.sched-n', btn); n.hidden = !on; n.textContent = on;
     const w = state.workers.find((x) => x.id === selected);
     const mine = w ? all.filter((s) => s.role === w.name).sort((a, b) => (b.enabled - a.enabled) || ((a.nextRun || Infinity) - (b.nextRun || Infinity))) : [];
-    $('.sc-mini-list', mini).innerHTML = mine.map((s) => `<div class="sc-mini-item${s.enabled ? '' : ' off'}" title="${esc(s.text)}">⏰ <b>${esc(rule(s))}</b> <span>${esc(s.text)}</span>${s.enabled && s.nextRun ? `<em>${esc(when(s.nextRun))}</em>` : ''}</div>`).join('');
+    $('.sc-mini-list', mini).innerHTML = mine.map((s) => `<div class="sc-mini-item${s.enabled ? '' : ' off'}" title="${esc(s.text)}">${s.enabled && s.pendingSince ? '⏳' : '⏰'} <b>${esc(rule(s))}</b> <span>${esc(s.text)}</span>${s.enabled && s.nextRun ? `<em>${esc(when(s.nextRun))}</em>` : ''}</div>`).join('');
     $('.sc-mini-add', mini).textContent = `⏰ ${T('예약')}`;
     $('.sc-mini-add', mini).title = T('업무 지시 칸에 쓴 글로 예약 만들기');
     if (!back.hidden) { texts(); renderList(); }

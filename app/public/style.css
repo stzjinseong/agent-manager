@@ -2415,6 +2415,9 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 .sc-ok { color: var(--done); }
 .sc-skip { color: var(--decision); }
 .sc-retry { color: var(--dim); }
+.sc-wait { color: var(--waiting, #9085e9); }
+.sc-mode { font-size: 11px; color: var(--dim); }
+.sc-pend { font-style: normal; color: var(--waiting, #9085e9); margin-right: 6px; }
 .sc-btns { display: flex; gap: 2px; }
 .sc-btns .btn { padding: 3px 7px; font-size: 13px; }
 .sc-empty { padding: 18px; text-align: center; color: var(--dim); font-size: 12.5px; border: 1px dashed rgb(var(--ink) / .14); border-radius: 10px; }

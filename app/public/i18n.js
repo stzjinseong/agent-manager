@@ -614,14 +614,19 @@ const EN = {
   '이 예약을 지울까요?': 'Delete this schedule?', '{role} 에 넣었어요': 'Sent to {role}', '예약 실행': 'Scheduled tasks', '켜진 예약 {n}개': '{n} active',
   '정해 둔 시각에 이 역할의 워커에 보낼 지시': 'Task to send to this role at the set time',
   '이 PC 시각 기준 · 클로드 키우기가 켜져 있을 때만 돌아요 · 작업 중이면 대기열로 · 워커가 꺼져 있거나 5시간 한도 90% 이상이면 건너뜀 · CLI 입력창이 막혀 있으면 1분마다 다시(10번)': "This PC's clock · runs only while the dashboard is on · queued if the worker is busy · skipped if the worker is off or 5-hour usage is 90%+ · retried every minute (10×) if the CLI input is blocked",
-  '예약 실행 · 켜진 예약 {n}개': 'Scheduled tasks · {n} active', '예약': 'Schedule', '업무 지시 칸에 쓴 글로 예약 만들기': 'Schedule the text in the task box',
+  '예약 실행 · 켜진 예약 {n}개': 'Scheduled tasks · {n} active',
+  '놓치면': 'If missed', '미뤘다 실행': 'Run later', '건너뛰기': 'Skip', '놓치면 건너뜀': 'skip if missed', '놓치면 미룸': 'run later if missed', '워커 기다리는 중': 'waiting for worker',
+  '그 시각에 워커나 서버가 꺼져 있었으면 워커가 다시 뜰 때 넣어요 (24시간까지)': 'If the worker or server was off at that time, it runs when the worker is back (up to 24h)',
+  '그 시각에 워커나 서버가 꺼져 있었으면 그 회차는 넘어가요': 'If the worker or server was off at that time, that run is skipped',
+  '이 PC 시각 기준 · 클로드 키우기가 켜져 있을 때만 돌아요 · 작업 중이면 대기열로 · 5시간 한도 90% 이상이면 건너뜀 · CLI 입력창이 막혀 있으면 1분마다 다시(10번)': "This PC's clock · runs only while the dashboard is on · queued if the worker is busy · skipped at 90%+ 5-hour usage · retried every minute (10×) if the CLI input is blocked", '예약': 'Schedule', '업무 지시 칸에 쓴 글로 예약 만들기': 'Schedule the text in the task box',
 };
 const DICTS = { en: EN };
 // 서버가 만든 한국어 문구(타임라인 기록·알림·오류) — 서버는 언어를 모르니 화면에서 바꾼다. 이미 저장된 예전 기록에도 그대로 통한다.
 // 문장 일부만 맞아도 그 부분을 바꾼다(상태 기록은 'done: 턴 완료' 처럼 앞에 상태 코드가 붙는다). 긴 문장을 먼저 둔다
 const SERVER_EN = [
   // 예약 실행 결과·오류 (schedule.js · server.js runSchedule)
-  [/^워커가 꺼져 있음$/, 'worker is off'], [/^같은 지시가 아직 대기열에 있음$/, 'same task still in the queue'],
+  [/^워커가 꺼져 있음$/, 'worker is off'], [/^워커가 꺼져 있음 — 돌아오면 넣음$/, 'worker is off — runs when it is back'],
+  [/^서버가 꺼져 있어 놓침 — 워커가 있으면 곧 넣음$/, 'missed while the server was off — runs soon if the worker is up'], [/^워커가 24시간 안에 돌아오지 않아 넘어감$/, 'worker did not come back within 24h — skipped'], [/^같은 지시가 아직 대기열에 있음$/, 'same task still in the queue'],
   [/^5시간 한도 (\d+)% — 아껴 둠$/, (m, p) => `5-hour usage ${p}% — holding off`], [/^서버가 꺼져 있어 놓침$/, 'missed while the server was off'],
   [/^(CLI 입력창에 쓰던 글이 있음|워커가 시작 중|CLI 가 입력창이 아닌 화면)( — 1분 뒤 다시 \((\d+)\/(\d+)\))?$/, (m, r, t, a, b) => ({ 'CLI 입력창에 쓰던 글이 있음': 'unsent text in the CLI input', '워커가 시작 중': 'worker is starting', 'CLI 가 입력창이 아닌 화면': 'CLI is not at its input' }[r] + (t ? ` — retrying in 1 min (${a}/${b})` : ''))],
   [/^역할을 고르세요$/, 'Pick a role'], [/^지시 내용이 비어 있습니다$/, 'The task is empty'], [/^지난 시각입니다( — 시각을 고쳐 주세요)?$/, 'That time has passed'], [/^없는 예약입니다$/, 'No such schedule'],

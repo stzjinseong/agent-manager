@@ -1909,7 +1909,7 @@ const server = http.createServer(async (req, res) => {
     const x = list[i];
     if (body.op === 'remove') list.splice(i, 1);
     else if (body.op === 'toggle') {
-      x.enabled = !x.enabled; x.retries = 0;
+      x.enabled = !x.enabled; x.retries = 0; x.pendingSince = null; // 끄면 미뤄 둔 회차도 버린다
       x.nextRun = x.enabled ? nextRunOf(x) : null;
       if (x.enabled && !x.nextRun) { x.enabled = false; saveConfig(); return json(res, 400, { error: '지난 시각입니다 — 시각을 고쳐 주세요' }); }
     } else if (body.op === 'run') return json(res, 200, { ok: true, result: await scheduler.fire(x, true) });
@@ -2103,11 +2103,12 @@ wss.on('connection', (ws) => {
 await connectHost();
 // ---------- 예약 · 반복 실행 (schedule.js) ----------
 // 정한 시각에 그 역할의 살아 있는 워커에 지시를 넣는다(업무 지시와 같은 assignTask — 작업 중이면 대기열로).
-// 워커가 꺼져 있거나 5시간 한도가 거의 찼으면 건너뛰고, 입력창이 막혀 있으면(쓰던 글 · 선택창) 1분 뒤 다시
+// 워커가 꺼져 있으면 예약마다 고른 대로(돌아오면 넣기 · 건너뛰기 — schedule.js whenOff), 5시간 한도가 거의 찼으면 건너뛰고,
+// 입력창이 막혀 있으면(쓰던 글 · 선택창 · 시작 중) 1분 뒤 다시
 const SCHEDULE_LIMIT_PCT = 90;
 async function runSchedule(s) {
   const w = [...workers.values()].find((x) => x.name === s.role && x.status !== 'exited');
-  if (!w) return { skip: '워커가 꺼져 있음' };
+  if (!w) return { off: '워커가 꺼져 있음' };
   const h5 = usage?.fiveHour;
   if (h5?.pct >= SCHEDULE_LIMIT_PCT && !(h5.resetsAt && h5.resetsAt < Date.now())) return { skip: `5시간 한도 ${Math.round(h5.pct)}% — 아껴 둠` };
   if (w.queue.includes(s.text)) return { skip: '같은 지시가 아직 대기열에 있음' };
@@ -2117,7 +2118,10 @@ async function runSchedule(s) {
   emitState();
   return { ok: true };
 }
-const scheduler = createScheduler({ list: () => config.schedules, save: saveConfig, run: runSchedule });
+const scheduler = createScheduler({
+  list: () => config.schedules, save: saveConfig, run: runSchedule,
+  isLive: (role) => [...workers.values()].some((x) => x.name === role && x.status !== 'exited'),
+});
 
 server.listen(PORT, HOST, () => {
   console.log(`${L('클로드 키우기', 'Clawdgotchi')} http://${HOST}:${PORT}  (claude: ${CLAUDE_BIN})`);
