@@ -1748,6 +1748,7 @@ function docCard(d) {
 // (시각-난수.확장자 / 시각-난수-원래이름). 이미 정리됐으면(7일) 서버가 404 → 썸네일은 숨긴다
 // size: 'md' = 타임라인, 'sm' = 입력칸 아래·대기열·나중에 할 작업(칸이 좁아 더 작게)
 const UPLOAD_PATH_RE = /[\\/]uploads[\\/](\d{14}-[a-z0-9]{1,8}(?:\.[a-z0-9]+|-[\p{L}\p{N}._-]*[\p{L}\p{N}_-]))/giu;
+const SHOT_PATH_RE = /[\\/]shots[\\/]([\w-]+)[\\/]([\w-]+\.(?:png|jpe?g|gif|webp))/gi; // 서버 SHOT_DIR · /shots/ GET 과 같은 이름 규칙
 const IMG_EXT = /^(png|jpe?g|gif|webp|bmp)$/i;
 const VIDEO_EXT = /^(mp4|m4v|mov|webm|ogv)$/i; // 서버 VIDEO_TYPES 와 같게 — 누르면 동영상 뷰어(openVideo)
 // 타임라인 글은 서버가 300자로 자른다(pushLog) — 잘린 끝에 걸친 경로는 이름이 잘려 있어 빼야 깨진 타일이 안 생긴다
@@ -1756,11 +1757,22 @@ function uploadsIn(text, clipped = false) {
   text = String(text);
   const cut = clipped && text.length >= LOG_CLIP;
   const names = [...new Set([...text.matchAll(UPLOAD_PATH_RE)].filter((m) => !(cut && m.index + m[0].length >= text.length)).map((m) => m[1]))];
-  return names.map((name) => {
-    const label = name.replace(/^\d{14}-[a-z0-9]{1,8}-/i, '');
+  const file = (name, label, url) => {
     const ext = name.includes('.') ? name.split('.').pop().toLowerCase() : '';
-    return { name, label, ext, url: `/uploads/${encodeURIComponent(name)}`, image: IMG_EXT.test(ext), video: VIDEO_EXT.test(ext) };
-  });
+    return { name, label, ext, url, image: IMG_EXT.test(ext), video: VIDEO_EXT.test(ext) };
+  };
+  const list = names.map((name) => file(name, name.replace(/^\d{14}-[a-z0-9]{1,8}-/i, ''), `/uploads/${encodeURIComponent(name)}`));
+  // 타임라인 썸네일을 끌어 넣은 경로도(dropZone → /api/file-path): 캡처(data/shots/<id>/<이름>) · 워커가 만든 결과물(w.docs 의 path)
+  for (const m of text.matchAll(SHOT_PATH_RE)) {
+    if (cut && m.index + m[0].length >= text.length) continue;
+    list.push(file(m[2], m[2], `/shots/${encodeURIComponent(m[1])}/${encodeURIComponent(m[2])}`));
+  }
+  for (const w of state.workers) for (const d of w.docs || []) {
+    const at = d.path ? text.indexOf(d.path) : -1;
+    if (at < 0 || (cut && at + d.path.length >= text.length)) continue;
+    list.push(file(d.name, d.name, d.url));
+  }
+  return list.filter((f, i) => list.findIndex((g) => g.url === f.url) === i);
 }
 function attachChips(text, size = 'sm') {
   const list = uploadsIn(text, size === 'md');
