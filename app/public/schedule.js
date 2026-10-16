@@ -33,7 +33,7 @@
 
   // ---------- 창 ----------
   const back = el(`<div class="modal-back sc-back" hidden><div class="modal panel sc-modal" role="dialog" aria-modal="true" tabindex="-1">
-      <div class="gr-head"><div class="gr-lv">⏰</div><div><h3 class="sc-title"></h3><small class="gr-sub sc-sub"></small></div>
+      <div class="gr-head"><div><h3 class="sc-title"></h3><small class="gr-sub sc-sub"></small></div>
         <button class="btn ghost gr-x" data-sc="close">✕</button></div>
       <form class="sc-form" autocomplete="off">
         <div class="sc-row"><label class="sc-l" data-k="역할"></label><select name="role"></select></div>
