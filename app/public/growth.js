@@ -51,17 +51,31 @@
           <small class="gr-sub">${esc(T('배지 {n}/{of}개 획득', { n: c.badges.length, of: c.of }))}</small></div>
         <button class="btn ghost gr-x" data-gr="close" aria-label="${esc(T('닫기'))}">✕</button>
       </div>
-      <div class="gr-badges">${BADGE_ALL.map((b) => { const got = c.badges.some((x) => x.id === b.id); return `<div class="gr-badge${got ? ' got' : ''}" title="${esc(T(b.desc))}"><i>${b.icon}</i><span>${esc(T(b.name))}</span><small>${esc(T(b.desc))}</small></div>`; }).join('')}</div>`, 'gr-role');
+      <div class="gr-badges">${BADGE_ALL.map((b) => {
+        const got = c.badges.some((x) => x.id === b.id);
+        const p = c.stats ? b.prog(c.stats) : null;
+        const pct = got ? 1 : Math.min(0.99, p?.pct || 0); // 조건을 다 못 채웠으면 꽉 채우지 않는다
+        return `<div class="gr-badge${got ? ' got' : ''}" title="${esc(T(b.desc))}"><i>${b.icon}</i><span>${esc(T(b.name))}</span><small>${esc(T(b.desc))}</small>
+          ${p ? `<div class="gr-prog"><b><i style="width:${(pct * 100).toFixed(1)}%"></i></b><em>${got ? `✓ ${esc(T('달성'))}` : esc(p.text)}</em></div>` : ''}</div>`;
+      }).join('')}</div>`, 'gr-role');
   }
   const tile = (label, value, sub = '') => `<div class="gr-tile"><small>${esc(label)}</small><b>${esc(value)}</b>${sub ? `<em>${esc(sub)}</em>` : ''}</div>`;
-  // 아직 못 딴 배지도 흐리게 보여 준다(목표가 보이게) — 조건은 서버(rolestats.js BADGES)와 같은 순서·문구
+  // 아직 못 딴 배지도 흐리게 보여 준다(목표가 보이게) — 조건은 서버(rolestats.js BADGES)와 같은 순서·문구.
+  // prog(stats): 진행도 { pct 0~1, text } — 두 조건짜리(완주왕 · 알뜰)는 작업 수를 먼저 채우고, 다 채우면 두 번째 조건(완료율 · 평균 비용)으로 잰다
+  const count = (now, goal, unit) => ({ pct: now / goal, text: T(`{now}/{goal}${unit}`, { now: Math.min(now, goal), goal }) });
   const BADGE_ALL = [
-    { id: 'finisher', icon: '🏁', name: '완주왕', desc: '작업 20개 이상 · 완료율 90% 이상' },
-    { id: 'committer', icon: '📦', name: '커밋 장인', desc: '커밋 50번' },
-    { id: 'veteran', icon: '📅', name: '개근', desc: '일한 날 10일' },
-    { id: 'saver', icon: '💰', name: '알뜰', desc: '작업 20개 이상 · 작업당 평균 $0.30 이하' },
-    { id: 'crew', icon: '🤝', name: '팀장', desc: '서브에이전트 30번' },
-    { id: 'century', icon: '💯', name: '백전노장', desc: '작업 완료 100개' },
+    { id: 'finisher', icon: '🏁', name: '완주왕', desc: '작업 20개 이상 · 완료율 90% 이상', prog: (s) => {
+      const rate = s.ends ? s.done / s.ends : 0;
+      return s.done < 20 ? { pct: s.done / 20, text: T('작업 {n}/20 · 완료율 {p}%', { n: s.done, p: Math.round(rate * 100) }) } : { pct: rate / 0.9, text: T('완료율 {p}% / 90%', { p: Math.round(rate * 100) }) };
+    } },
+    { id: 'committer', icon: '📦', name: '커밋 장인', desc: '커밋 50번', prog: (s) => count(s.commits, 50, '번') },
+    { id: 'veteran', icon: '📅', name: '개근', desc: '일한 날 10일', prog: (s) => count(s.activeDays, 10, '일') },
+    { id: 'saver', icon: '💰', name: '알뜰', desc: '작업 20개 이상 · 작업당 평균 $0.30 이하', prog: (s) => {
+      const avg = s.done ? s.cost / s.done : 0;
+      return s.done < 20 ? { pct: s.done / 20, text: T('작업 {n}/20 · 평균 {v}', { n: s.done, v: money(avg) }) } : { pct: avg ? 0.3 / avg : 1, text: T('평균 {v} / $0.30', { v: money(avg) }) };
+    } },
+    { id: 'crew', icon: '🤝', name: '팀장', desc: '서브에이전트 30번', prog: (s) => count(s.subagents, 30, '번') },
+    { id: 'century', icon: '💯', name: '백전노장', desc: '작업 완료 100개', prog: (s) => count(s.done, 100, '개') },
   ];
 
   // ---------- 하루 요약 카드 ----------

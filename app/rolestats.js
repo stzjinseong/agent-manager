@@ -156,7 +156,11 @@ export function createRoleStats(dataDir) {
 
   // 화면용: 딴 배지 · 전체 배지 수
   const badgesOf = (r) => BADGES.filter((b) => b.ok(r)).map(({ id, icon, name, desc }) => ({ id, icon, name, desc }));
-  const publicRoles = () => Object.fromEntries(Object.entries(s.roles).map(([n, r]) => [n, { badges: badgesOf(r), of: BADGES.length }]));
+  // stats: 화면이 배지마다 진행도(작업 12/20 등)를 그리는 데 쓰는 누적값
+  const publicRoles = () => Object.fromEntries(Object.entries(s.roles).map(([n, r]) => [n, {
+    badges: badgesOf(r), of: BADGES.length,
+    stats: { done: r.done, ends: r.done + r.interrupted + r.failed, commits: r.commits, subagents: r.subagents, activeDays: r.activeDays, cost: r.cost },
+  }]));
 
   // ---------- 하루 요약 카드 ----------
   // 오늘 일한 역할마다: 끝낸 작업 · 커밋 · 비용 · 결정 대기 · 요청 목록 · 지금 딴 배지

@@ -615,6 +615,8 @@ const EN = {
   '정해 둔 시각에 이 역할의 워커에 보낼 지시': 'Task to send to this role at the set time',
   '이 PC 시각 기준 · 클로드 키우기가 켜져 있을 때만 돌아요 · 작업 중이면 대기열로 · 워커가 꺼져 있거나 5시간 한도 90% 이상이면 건너뜀 · CLI 입력창이 막혀 있으면 1분마다 다시(10번)': "This PC's clock · runs only while the dashboard is on · queued if the worker is busy · skipped if the worker is off or 5-hour usage is 90%+ · retried every minute (10×) if the CLI input is blocked",
   '예약 실행 · 켜진 예약 {n}개': 'Scheduled tasks · {n} active',
+  '달성': 'Earned', '{now}/{goal}번': '{now}/{goal}', '{now}/{goal}일': '{now}/{goal} days', '{now}/{goal}개': '{now}/{goal}',
+  '작업 {n}/20 · 완료율 {p}%': 'tasks {n}/20 · {p}% done', '완료율 {p}% / 90%': '{p}% / 90% done', '작업 {n}/20 · 평균 {v}': 'tasks {n}/20 · avg {v}', '평균 {v} / $0.30': 'avg {v} / $0.30',
   '놓치면': 'If missed', '미뤘다 실행': 'Run later', '건너뛰기': 'Skip', '놓치면 건너뜀': 'skip if missed', '놓치면 미룸': 'run later if missed', '워커 기다리는 중': 'waiting for worker',
   '그 시각에 워커나 서버가 꺼져 있었으면 워커가 다시 뜰 때 넣어요 (24시간까지)': 'If the worker or server was off at that time, it runs when the worker is back (up to 24h)',
   '그 시각에 워커나 서버가 꺼져 있었으면 그 회차는 넘어가요': 'If the worker or server was off at that time, that run is skipped',
