@@ -90,7 +90,7 @@
       <button class="btn db-open"></button>
       <button class="btn ghost db-x" aria-label=""></button>
     </div>`);
-  document.body.append(bar);
+  document.querySelector('#top-stack').append(bar); // 상단 알림 띠 묶음 — 재시작 안내 띠 등과 차례로 쌓인다
   let dismissed = null; // 띠만 닫은 카드 날짜 — 헤더 버튼의 점은 읽을 때까지 남는다
 
   // 헤더의 우편함 버튼 — 나의 사용 리포트 버튼 옆
@@ -110,12 +110,8 @@
     btn.title = label; btn.setAttribute('aria-label', label);
     btn.querySelector('.upd-dot').hidden = !d || d.seen;
     const show = Boolean(d && !d.seen && dismissed !== d.date);
-    if (show && bar.hidden) bar.classList.remove('in'), requestAnimationFrame(() => bar.classList.add('in'));
     bar.hidden = !show;
     if (!show) return;
-    // 서버 재시작 안내 띠가 떠 있으면 그 아래로 — 같은 자리에 겹치지 않게
-    const stale = document.querySelector('#stale-bar');
-    bar.style.top = `${Math.round(stale && !stale.hidden ? stale.getBoundingClientRect().bottom + 8 : document.querySelector('.topbar').getBoundingClientRect().bottom + 12)}px`;
     bar.querySelector('.db-text').innerHTML = `<b>${esc(T('하루 요약 카드가 도착했어요'))}</b> <small>${esc(dateLabel(d.date))} · ${esc(T('오후 5시 기준'))}</small>`;
     bar.querySelector('.db-open').textContent = T('열어 보기');
     bar.querySelector('.db-x').textContent = '✕';

@@ -862,8 +862,24 @@ function pendingCount() {
 function renderStale() {
   const stale = $('#stale-bar');
   stale.hidden = !(state.serverStale || !('serverStale' in state));
-  if (!stale.hidden) stale.style.top = `${Math.round($('.topbar').getBoundingClientRect().bottom) + 12}px`; // 헤더 바로 아래에 겹쳐서
 }
+// 상단 알림 띠 묶음(#top-stack): 헤더 바로 아래에 겹쳐서. 띠가 새로 뜨거나 사라지면 다른 띠는 자리를 밀거나 당기며 미끄러지고(FLIP),
+// 새 띠는 위에서 내려오며 나타난다 — 띠를 숨기고 보이는 곳이 여럿이라(renderStale · growth.js renderDaily) hidden 속성 변화를 지켜본다
+const topStack = $('#top-stack');
+const stackTops = new Map(); // 띠 → 지난번 offsetTop
+function renderTopStack() {
+  topStack.style.top = `${Math.round($('.topbar').getBoundingClientRect().bottom) + 12}px`;
+  for (const bar of topStack.children) {
+    if (bar.hidden) { stackTops.delete(bar); continue; }
+    const now = bar.offsetTop, before = stackTops.get(bar);
+    stackTops.set(bar, now);
+    if (before == null) bar.animate([{ opacity: 0, transform: 'translateY(-12px)' }, { opacity: 1, transform: 'none' }], { duration: 320, easing: 'cubic-bezier(.3, 1.4, .5, 1)' });
+    else if (before !== now) bar.animate([{ transform: `translateY(${before - now}px)` }, { transform: 'none' }], { duration: 280, easing: 'cubic-bezier(.2, .9, .3, 1)' });
+  }
+}
+new MutationObserver(renderTopStack).observe(topStack, { subtree: true, childList: true, attributes: true, attributeFilter: ['hidden'] });
+addEventListener('resize', renderTopStack);
+renderTopStack();
 $('#btn-restart').onclick = () => restartServer();
 
 // 매니저 머리 위 경험치 바: 지금 단계 구간에서 얼마나 찼는지. 진화 연출을 아직 안 본 상태(보이는 단계 < 실제 단계)면

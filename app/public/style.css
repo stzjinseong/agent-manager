@@ -1143,15 +1143,22 @@ body.thumb-drag :is(#term-wrap, .task-form textarea, .memo-form textarea):not(.d
 /* ---------- 서버 재시작 필요 띠 ---------- */
 /* 워커 추가 창처럼 헤더 바로 아래에 겹쳐 띄운다(top 은 app.js 가 헤더 높이로) — 문서 흐름에 두면 뜰 때마다 기판이 아래로 밀렸다.
    어둡게 덮지는 않는다(알림이라 다른 조작을 막지 않음). 워커 추가 창(z 80~81)이 열리면 그 아래 */
-.stale-bar {
+/* 상단 알림 띠 묶음: 헤더 아래(top 은 app.js 가 헤더 높이로 맞춤)에 겹쳐 뜨고, 띠끼리는 세로로 쌓인다. 빈 곳은 아래 기판을 누를 수 있게 */
+.top-stack {
   position: fixed; top: 72px; left: 0; right: 0; z-index: 70; width: calc(100% - 48px); max-width: 1480px; margin: 0 auto;
+  display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none;
+}
+.top-stack > * { pointer-events: auto; }
+@media (max-width: 640px) { .top-stack { width: calc(100% - 24px); } }
+.stale-bar {
+  align-self: stretch;
   box-shadow: 0 12px 32px rgb(0 0 0 / .4);
   padding: 9px 14px; border-radius: 10px; display: flex; align-items: center; gap: 12px; font-size: 13px;
   background: color-mix(in srgb, var(--decision) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--decision) 35%, transparent); color: var(--text);
 }
 .stale-bar span { flex: 1; }
 .stale-bar[hidden] { display: none; }
-@media (max-width: 640px) { .stale-bar { width: calc(100% - 24px); flex-wrap: wrap; } }
+@media (max-width: 640px) { .stale-bar { flex-wrap: wrap; } }
 
 /* ---------- 터미널 높이 조절 손잡이 (CLI 아래 가로선) ---------- */
 .term-resizer { height: 14px; margin: 2px 0 -4px; cursor: row-resize; display: grid; place-items: center; touch-action: none; }
@@ -2311,15 +2318,13 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 :root[data-theme="light"] .lv-chip { color: #9a6b00; }
 .daily-btn { position: relative; }
 
-/* 도착 띠 — 헤더 아래에 겹쳐 뜬다(서버 재시작 안내 띠와 같은 자리 규칙, 가운데 작은 띠) */
+/* 도착 띠 — 상단 알림 띠 묶음(.top-stack) 안, 가운데 작은 띠 */
 .daily-bar {
-  position: fixed; top: 72px; left: 50%; z-index: 72; width: min(560px, calc(100% - 32px)); transform: translate(-50%, -14px); opacity: 0;
+  width: min(560px, 100%);
   display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 14px; border-radius: 12px; font-size: 13px; color: var(--text);
   background: color-mix(in srgb, var(--gold) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--gold) 40%, transparent);
   box-shadow: 0 14px 36px rgb(0 0 0 / .4), 0 0 24px color-mix(in srgb, var(--gold) 18%, transparent);
-  transition: transform .35s cubic-bezier(.3, 1.4, .5, 1), opacity .25s;
 }
-.daily-bar.in { transform: translate(-50%, 0); opacity: 1; }
 .daily-bar[hidden] { display: none; }
 .daily-bar .db-ico { font-size: 20px; animation: db-bob 1.6s ease-in-out 3; }
 .daily-bar .db-text { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }

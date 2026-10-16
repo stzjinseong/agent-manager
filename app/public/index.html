@@ -136,9 +136,12 @@
     </form>
   </section>
 
-  <div class="stale-bar" id="stale-bar" hidden>
-    <span data-i18n>서버 코드가 바뀌었습니다 — 새 기능을 쓰려면 서버를 재시작하세요 (워커는 그대로 유지)</span>
-    <button class="btn" id="btn-restart" data-i18n>↻ 지금 재시작</button>
+  <!-- 상단 알림 띠 묶음 — 헤더 아래에 겹쳐 뜨고, 여러 개면 위에서부터 차례로 쌓여 서로 가리지 않는다(app.js renderTopStack) -->
+  <div class="top-stack" id="top-stack">
+    <div class="stale-bar" id="stale-bar" hidden>
+      <span data-i18n>서버 코드가 바뀌었습니다 — 새 기능을 쓰려면 서버를 재시작하세요 (워커는 그대로 유지)</span>
+      <button class="btn" id="btn-restart" data-i18n>↻ 지금 재시작</button>
+    </div>
   </div>
 
   <section id="inbox"></section>
