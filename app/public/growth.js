@@ -95,6 +95,7 @@
     </button>`);
   document.querySelector('#btn-ureport')?.after(btn);
   btn.onclick = () => openDaily(state.daily?.date);
+  newDot(btn, 'daily'); // 새 기능 점 (app.js) — 안 읽은 카드 점과 같은 자리
   bar.querySelector('.db-open').onclick = () => openDaily(state.daily?.date);
   bar.querySelector('.db-x').onclick = () => { dismissed = state.daily?.date; renderDaily(); };
 

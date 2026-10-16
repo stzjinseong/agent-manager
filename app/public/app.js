@@ -838,6 +838,20 @@ function dur(t) {
   return _t('{h}시간 {m}분', { h: Math.floor(s / 3600), m: Math.floor((s % 3600) / 60) });
 }
 const el = (html) => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstElementChild; };
+// 새 기능 점: 새로 생긴 버튼에 처음 누를 때까지 업데이트 버튼과 같은 주황 점을 띄운다. 누른 기능 키는 이 브라우저에 기억(localStorage).
+// 새 기능을 넣을 때 newDot(버튼, '키') 한 줄 — 키는 기능마다 한 번 정하면 바꾸지 않는다(바꾸면 다시 뜬다)
+const NEW_SEEN_KEY = 'am.newSeen';
+const newSeen = (() => { try { return new Set(JSON.parse(localStorage.getItem(NEW_SEEN_KEY) || '[]')); } catch { return new Set(); } })();
+function newDot(btn, key) {
+  if (!btn || newSeen.has(key)) return;
+  const dot = el('<i class="upd-dot new-dot" aria-hidden="true"></i>');
+  btn.append(dot);
+  btn.addEventListener('click', () => {
+    newSeen.add(key);
+    try { localStorage.setItem(NEW_SEEN_KEY, JSON.stringify([...newSeen])); } catch {}
+    dot.remove();
+  }, { once: true, capture: true });
+}
 
 // ---------- 렌더 ----------
 function render() {

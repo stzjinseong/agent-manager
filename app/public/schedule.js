@@ -189,6 +189,7 @@
     </button>`);
   (document.querySelector('#btn-daily') || document.querySelector('#btn-ureport'))?.after(btn);
   btn.onclick = () => window.openSchedules();
+  newDot(btn, 'schedules'); // 새 기능 점 (app.js)
 
   // ---------- 상세 패널: 이 역할의 예약 ----------
   const mini = el(`<div class="sc-mini"><div class="sc-mini-list"></div><button type="button" class="btn ghost sc-mini-add"></button></div>`);
