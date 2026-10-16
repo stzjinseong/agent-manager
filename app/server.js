@@ -15,6 +15,7 @@ import { createProfile, readProfile, profileSummary, runningSubagents, editLog, 
 import { snapshot, changedSince, readBlob } from './shelldiff.js';
 import { createProgress, isCommit } from './progress.js';
 import { createUserProfile } from './userprofile.js';
+import { createRoleStats } from './rolestats.js';
 import { L } from './cli-lang.js';
 import { createUpdates } from './updates.js';
 import { gitBranch } from './branch.js';
@@ -86,6 +87,17 @@ function judgeCache(w) {
   if (award(w, progress.cache(hit), 'cache', Math.round(hit * 100))) emitState();
 }
 setInterval(() => progress.sample(workers.values()), progress.SAMPLE_MS);
+// 역할별 성장 기록 · 하루 요약 카드 (rolestats.js). 카드는 매일 오후 5시(KST)에 — 30초마다 시각을 본다
+const roleStats = createRoleStats(DATA_DIR);
+function tickDaily(force) {
+  const c = roleStats.tickDaily(force);
+  if (c) { broadcast({ type: 'fx', kind: 'daily', date: c.date }); emitState(); }
+  return c;
+}
+setInterval(() => tickDaily(), 30_000);
+setTimeout(() => tickDaily(), 3000);
+// 세션 비용 = 메인 대화 + 서브에이전트 (세션 프로파일의 합계와 같은 셈)
+const txCost = (tx) => { let c = tx.sess?.cost || 0; for (const x of tx.subs?.values() || []) c += x.cost || 0; return c; };
 const config = loadConfig();
 // 사용자 프로파일(나의 사용 리포트) — 워커가 쓴 트랜스크립트를 모아 둔다. 역할마다 기억된 마지막 세션도 넣어 처음부터 조금은 보이게
 const userProfile = createUserProfile(DATA_DIR);
@@ -237,6 +249,7 @@ function renameRole(from, to, worker) {
   if (config.colors?.[from] != null && config.colors[to] == null) { config.colors[to] = config.colors[from]; delete config.colors[from]; }
   if (config.sessions?.[from]) { config.sessions[to] = config.sessions[from]; delete config.sessions[from]; }
   if (config.memos?.[from]) { config.memos[to] = [...(config.memos[to] || []), ...config.memos[from]]; delete config.memos[from]; }
+  roleStats.rename(from, to);
   if (config.manualQueue?.[from]) { config.manualQueue[to] = true; delete config.manualQueue[from]; }
   saveConfig(); // emitState 포함
   return { ok: true };
@@ -341,6 +354,7 @@ function checkInterrupted(w) {
     w.currentTool = null;
     w.doneAt = Date.now(); // 화면의 '확인 안 한 완료' 표시 기준
     payout(w);
+    roleStats.end(w, 'done');
     setStatus(w, 'done', '턴 완료 (기록으로 확인)');
     afterTurn(w);
     return;
@@ -350,13 +364,14 @@ function checkInterrupted(w) {
   w.currentTool = null;
   for (const [did, d] of decisions) if (d.workerId === w.id) resolveDecision(did, null);
   progress.drop(w); // 중단된 작업은 점수 없음
+  roleStats.end(w, 'interrupted');
   setStatus(w, 'interrupted', '사용자 중단');
   afterTurn(w);
 }
 
 // 서버 코드가 켜진 뒤 바뀌었는지 — 화면은 새로고침마다 새 코드를 받지만 서버는 재시작해야 바뀐다.
 // 어긋나면 새 화면이 모르는 API 를 부르다 404 가 나므로, 화면에 "서버 재시작 필요"를 띄우게 알려 준다
-const SERVER_FILES = ['server.js', 'profile.js', 'pricing.js', 'progress.js', 'userprofile.js'].map((f) => path.join(APP_DIR, f));
+const SERVER_FILES = ['server.js', 'profile.js', 'pricing.js', 'progress.js', 'userprofile.js', 'rolestats.js'].map((f) => path.join(APP_DIR, f));
 const mtimeOf = (f) => { try { return fs.statSync(f).mtimeMs; } catch { return 0; } };
 const BOOT_MTIMES = SERVER_FILES.map(mtimeOf);
 let staleCache = { at: 0, value: false };
@@ -897,6 +912,7 @@ function onHook(w, ev, res) {
       retryText.delete(w.id);
       cancelDispatch(w); // 투입 대기 중에 사람이 CLI 로 먼저 보냈다
       progress.open(w);
+      roleStats.prompt(w, w.lastPrompt);
       setStatus(w, 'working', w.lastPrompt);
       break;
     case 'PreToolUse':
@@ -910,6 +926,7 @@ function onHook(w, ev, res) {
       w.currentTool = summarizeTool(ev.tool_name, ev.tool_input);
       w.toolCount++;
       progress.tool(w);
+      roleStats.tool(w, ev.tool_name);
       if (w.status !== 'decision') w.status = 'working';
       pushLog(w, 'tool', w.currentTool);
       emitState();
@@ -920,7 +937,7 @@ function onHook(w, ev, res) {
       trackDoc(w, ev);
       trackShellDocs(w, ev);
       trackTasks(w, ev);
-      if (isCommit(ev)) { progress.commit(w); broadcast({ type: 'fx', kind: 'commit', id: w.id }); }
+      if (isCommit(ev)) { progress.commit(w); roleStats.commit(w); broadcast({ type: 'fx', kind: 'commit', id: w.id }); }
       // 터미널에서 직접 승인한 경우 등, 도구가 실행됐으면 해당 도구의 대기 결정은 무효
       for (const [did, d] of decisions) if (d.workerId === w.id && (d.toolUseId ? d.toolUseId === ev.tool_use_id : d.tool === ev.tool_name)) resolveDecision(did, null);
       if (w.status === 'decision' && !hasPending(w.id)) w.status = 'working';
@@ -961,6 +978,7 @@ function onHook(w, ev, res) {
       w.lastMessage = ev.last_assistant_message || w.lastMessage;
       w.currentTool = null;
       progress.drop(w);
+      roleStats.end(w, 'failed');
       setStatus(w, 'idle', `API 오류로 턴이 끝남 (${err})`);
       if (RETRYABLE_STOP.has(err)) afterTurn(w);
       else if (w.queue.length) pushLog(w, 'notice', `API 오류(${err})라 대기열을 바로 잇지 않았습니다 — 해결된 뒤 지시를 보내면 이어서 투입`);
@@ -973,12 +991,14 @@ function onHook(w, ev, res) {
       w.currentTool = null;
       w.doneAt = Date.now(); // 화면의 '확인 안 한 완료' 표시 기준
       payout(w);
+      roleStats.end(w, 'done');
       setTimeout(() => judgeCache(w), 1500); // 마지막 응답이 트랜스크립트에 다 쓰일 시간을 준다
       setStatus(w, 'done', '턴 완료');
       afterTurn(w);
       break;
     case 'SubagentStop':
       if (ev.agent_id && w.tx) w.tx.doneAgents.add(ev.agent_id);
+      roleStats.subagent(w);
       progress.subagent(w); // 작업(턴) 도중 끝난 것만 — 턴이 끝난 뒤의 백그라운드 완료는 주머니가 없어 무시
       pushLog(w, 'status', `서브에이전트 종료 (${ev.agent_type || ev.agent_id || ''})`);
       emitState();
@@ -1011,7 +1031,7 @@ function scheduleProfile(w) {
   if (!w.tx || w.tx.timer) return;
   w.tx.timer = setTimeout(() => {
     w.tx.timer = null;
-    if (readProfile(w.tx)) { setModel(w, w.tx.model, w.tx.modelAt); drainShots(w); emitState(); }
+    if (readProfile(w.tx)) { setModel(w, w.tx.model, w.tx.modelAt); drainShots(w); roleStats.cost(w, w.tx.path, txCost(w.tx), w.tx.turns[0]?.start); emitState(); }
     // 기록이 그대로여도 본다 — Stop 훅을 놓친 턴(서버 재시작 중에 끝남 등)은 끝난 뒤 기록이 더 늘지 않아,
     // 바뀔 때만 보면 '기록으로 완료 확인'(5초 조용)이 영영 돌지 않고 '작업 중'에 남아 대기열이 멈췄다
     checkInterrupted(w);
@@ -1092,6 +1112,8 @@ function publicState() {
     serverStale: serverStale(),
     recentCwds: recentCwdList(),
     progress: progress.public(),
+    roles: roleStats.public(), // 역할별 레벨·칭호·배지 (이름 → 카드)
+    daily: roleStats.publicDaily(), // 마지막 하루 요약 카드 머리말 { date, at, seen, dates }
     shotKeep: SHOT_KEEP, // 화면 안내 문구용 (워커당 캡처 보관 장수)
     usage, // 계정 사용량 { fiveHour: { pct, resetsAt, at, from }, sevenDay, at, from }
     usageReporters: usageReporters(), // { ok: [보낼 수 있는 워커 id], missing: [상태줄 없이 뜬 워커 id] }
@@ -1104,7 +1126,7 @@ let stateTimer = null;
 function emitState() {
   saveWorkersSoon();
   if (stateTimer) return;
-  stateTimer = setTimeout(() => { stateTimer = null; broadcast({ type: 'state', state: publicState() }); }, 50);
+  stateTimer = setTimeout(() => { stateTimer = null; roleStats.watch(workers.values()); broadcast({ type: 'state', state: publicState() }); }, 50);
 }
 
 const sockets = new Set();
@@ -1620,6 +1642,7 @@ const STATIC = {
   '/info-en.js': ['public/info-en.js', 'text/javascript; charset=utf-8'],
   '/characters.js': ['public/characters.js', 'text/javascript; charset=utf-8'],
   '/userreport.js': ['public/userreport.js', 'text/javascript; charset=utf-8'],
+  '/growth.js': ['public/growth.js', 'text/javascript; charset=utf-8'],
   '/style.css': ['public/style.css', 'text/css; charset=utf-8'],
   '/vendor/xterm.js': ['node_modules/@xterm/xterm/lib/xterm.js', 'text/javascript'],
   '/vendor/xterm.css': ['node_modules/@xterm/xterm/css/xterm.css', 'text/css'],
@@ -1857,6 +1880,14 @@ const server = http.createServer(async (req, res) => {
   // 사용자 테마 — 목록, 테마 폴더 안 파일(theme.css · 그림 · 글꼴)
   if (req.method === 'GET' && p === '/api/themes') return json(res, 200, { themes: listThemes(), dir: THEME_DIR });
   if (req.method === 'GET' && p === '/api/term-schemes') return json(res, 200, wtSchemes());
+  // 하루 요약 카드 — GET: 내용(?date= 없으면 마지막), POST seen: 읽음 표시, POST build: 지금 만들기(오늘 것을 다시 만든다)
+  if (req.method === 'GET' && p === '/api/daily') return json(res, 200, roleStats.getDaily(url.searchParams.get('date')) || { none: true });
+  if (req.method === 'POST' && p === '/api/daily/seen') {
+    const body = await readBody(req);
+    if (roleStats.seenDaily(String(body.date || ''))) emitState();
+    return json(res, 200, { ok: true });
+  }
+  if (req.method === 'POST' && p === '/api/daily/build') return json(res, 200, tickDaily(true));
   if (req.method === 'GET' && p === '/api/user-profile') return json(res, 200, userProfile.report());
   // AI 코치 리포트 — GET: 기간별 마지막 결과 + 지금 돌고 있는지 + 보낼 요청 글 수, POST: 새로 분석(1분 안팎, 끝날 때 응답)
   if (req.method === 'GET' && p === '/api/user-profile/llm') {

@@ -844,6 +844,7 @@ function render() {
   renderStats();
   renderStale();
   renderUpd();
+  window.renderDaily?.(); // 하루 요약 카드 도착 띠 · 우편함 버튼 (growth.js)
   renderInbox();
   renderFloor();
   renderDock();
@@ -1052,6 +1053,7 @@ function updateNode(node, w) {
   $('.pill', node).textContent = statusLabel(viewStatus(w));
   const running = w.status === 'working' || w.status === 'decision';
   $('.meta', node).innerHTML =
+    (window.roleLevelChip?.(w.name) || '') + // 역할 레벨 (growth.js) — 누르면 성장 기록
     `<span title="${_t(running ? '이번 턴 경과' : '마지막 갱신')}">⏱ <em data-since="${running ? w.turnStartedAt : w.updatedAt}"></em></span>` +
     `<span title="${_t('도구 사용 횟수')}">⚙ ${w.toolCount}</span>` +
     (w.queue.length ? `<span class="q" title="${_t(w.dispatchAt ? '곧 다음 지시 투입' : '대기 중인 지시')}">${w.dispatchAt ? '⏳' : ''}📥 ${w.queue.length}</span>` : '') +
