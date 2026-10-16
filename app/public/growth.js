@@ -1,14 +1,11 @@
 // ---------- 역할 성장 카드 · 하루 요약 카드 ----------
 // 서버(rolestats.js)가 역할 이름마다 쌓은 기록을 state.roles 로, 마지막 하루 요약 카드의 머리말을 state.daily 로 보낸다.
-// - 워커 카드의 'Lv.N' 을 누르면 그 역할의 성장 카드(레벨 · 다음 레벨까지 · 칭호 · 배지 · 누적 기록)
+// - 워커 카드의 배지 칩(딴 배지 아이콘)을 누르면 그 역할의 배지 목록(못 딴 것은 흐리게 · 조건 설명)
 // - 매일 오후 5시(KST)에 카드가 만들어지면 헤더 아래에 '도착' 띠가 겹쳐 뜨고, 누르면 그날의 요약을 연다.
 //   헤더의 우편함 버튼은 언제든 다시 열기(안 읽은 카드가 있으면 점)
 (() => {
   const T = (s, v) => _t(s, v);
-  const TITLE = { edit: '구현가', run: '운영가', read: '탐정', web: '리서처', agent: '지휘관' };
-  const KIND = { edit: '편집', run: '명령 실행', read: '읽기·검색', web: '웹', agent: '서브에이전트' };
   const money = (v) => fmtUsd(v || 0);
-  const pct = (v) => `${Math.round((v || 0) * 100)}%`;
   const dur = (ms) => {
     const m = Math.round((ms || 0) / 60_000);
     if (m < 1) return ms > 0 ? T('1분 미만') : T('없음');
@@ -16,15 +13,15 @@
   };
   const hhmm = (t) => new Date(t).toLocaleTimeString(uiLocale(), { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Seoul' });
   const dateLabel = (d) => new Date(`${d}T12:00:00+09:00`).toLocaleDateString(uiLocale(), { month: 'long', day: 'numeric', weekday: 'short', timeZone: 'Asia/Seoul' });
-  const roleTitle = (c) => (c?.title ? T(TITLE[c.title] || c.title) : '');
 
-  // ---------- 워커 카드의 레벨 칩 (app.js updateNode 가 부른다) ----------
+  // ---------- 워커 카드의 배지 칩 (app.js updateNode 가 부른다) — 딴 배지 아이콘(2개까지, 넘치면 +N), 없으면 흐린 🏅 ----------
   window.roleLevelChip = (name) => {
     const c = state.roles?.[name];
     if (!c) return '';
-    const t = roleTitle(c);
-    const tip = T('{name} · Lv.{lv}{title} — 눌러서 성장 기록 보기', { name, lv: c.level, title: t ? ` ${t}` : '' });
-    return `<button type="button" class="lv-chip" data-role="${esc(name)}" title="${esc(tip)}">Lv.${c.level}</button>`;
+    const n = c.badges.length;
+    const tip = T('{name} · 배지 {n}/{of} — 눌러서 보기', { name, n, of: c.of });
+    const face = n ? c.badges.slice(0, 2).map((b) => b.icon).join('') + (n > 2 ? `<small>+${n - 2}</small>` : '') : '🏅';
+    return `<button type="button" class="lv-chip${n ? '' : ' none'}" data-role="${esc(name)}" title="${esc(tip)}" aria-label="${esc(tip)}">${face}</button>`;
   };
   // 카드를 누르면 선택되므로 칩은 따로 받는다(캡처 단계에서 가로채 카드 선택을 막는다)
   document.addEventListener('click', (e) => {
@@ -47,30 +44,14 @@
   function openRole(name) {
     const c = state.roles?.[name];
     if (!c) return;
-    const span = Math.max(1, c.nextMin - c.levelMin), fill = Math.min(1, (c.xp - c.levelMin) / span);
-    const kinds = Object.entries(c.kinds || {}).sort((a, b) => b[1] - a[1]);
-    const kTotal = kinds.reduce((a, [, n]) => a + n, 0) || 1;
-    const ends = c.done + c.interrupted + c.failed;
-    const t = roleTitle(c);
     show(`
       <div class="gr-head">
-        <div class="gr-lv">Lv.${c.level}</div>
-        <div><h3>${esc(name)}${t ? ` <small>${esc(t)}</small>` : ''}</h3>
-          <small class="gr-sub">${esc(T('{days}일 일함 · {since}부터 기록', { days: c.activeDays, since: new Date(c.firstAt).toLocaleDateString(uiLocale()) }))}</small></div>
+        <div class="gr-lv">🏅</div>
+        <div><h3>${esc(name)}</h3>
+          <small class="gr-sub">${esc(T('배지 {n}/{of}개 획득', { n: c.badges.length, of: c.of }))}</small></div>
         <button class="btn ghost gr-x" data-gr="close" aria-label="${esc(T('닫기'))}">✕</button>
       </div>
-      <div class="gr-xp"><div class="gr-xp-bar"><i style="width:${(fill * 100).toFixed(1)}%"></i></div>
-        <small>${esc(T('다음 레벨까지 {n} XP', { n: Math.max(0, c.nextMin - c.xp).toLocaleString() }))} · ${esc(T('완료 10 · 커밋 5 · 서브에이전트 3'))}</small></div>
-      <div class="gr-tiles">
-        ${tile(T('완료한 작업'), c.done.toLocaleString(), ends ? T('완료율 {p}', { p: pct(c.rate) }) : '')}
-        ${tile(T('커밋'), c.commits.toLocaleString())}
-        ${tile(T('누적 비용'), money(c.cost), c.done ? T('작업당 {v}', { v: money(c.cost / c.done) }) : '')}
-        ${tile(T('결정 대기 시간'), dur(c.decisionMs))}
-      </div>
-      ${kinds.length ? `<h4>${esc(T('주로 하는 일'))}</h4><div class="gr-kinds">${kinds.map(([k, n]) => `<div><span>${esc(T(KIND[k] || k))}</span><b><i style="width:${(n / kTotal * 100).toFixed(1)}%"></i></b><em>${n.toLocaleString()}</em></div>`).join('')}</div>` : ''}
-      <h4>${esc(T('배지'))}</h4>
-      <div class="gr-badges">${BADGE_ALL.map((b) => { const got = c.badges.some((x) => x.id === b.id); return `<div class="gr-badge${got ? ' got' : ''}" title="${esc(T(b.desc))}"><i>${b.icon}</i><span>${esc(T(b.name))}</span><small>${esc(T(b.desc))}</small></div>`; }).join('')}</div>
-      <p class="gr-foot">${esc(T('중단 {i} · 오류 {f} · 도구 {t}회 · 서브에이전트 {s}회', { i: c.interrupted, f: c.failed, t: c.tools.toLocaleString(), s: c.subagents }))}</p>`, 'gr-role');
+      <div class="gr-badges">${BADGE_ALL.map((b) => { const got = c.badges.some((x) => x.id === b.id); return `<div class="gr-badge${got ? ' got' : ''}" title="${esc(T(b.desc))}"><i>${b.icon}</i><span>${esc(T(b.name))}</span><small>${esc(T(b.desc))}</small></div>`; }).join('')}</div>`, 'gr-role');
   }
   const tile = (label, value, sub = '') => `<div class="gr-tile"><small>${esc(label)}</small><b>${esc(value)}</b>${sub ? `<em>${esc(sub)}</em>` : ''}</div>`;
   // 아직 못 딴 배지도 흐리게 보여 준다(목표가 보이게) — 조건은 서버(rolestats.js BADGES)와 같은 순서·문구
@@ -153,7 +134,7 @@
       </div>
       <div class="gr-roles">${c.roles.map((r) => `
         <section class="gr-rrow">
-          <header><b>${esc(r.name)}</b><span class="gr-rlv">Lv.${r.level}${r.levelUp ? ` <em>▲ ${esc(T('레벨 업'))}</em>` : ''}</span>
+          <header><b>${esc(r.name)}</b>${r.badges.length ? `<span class="gr-rlv" title="${esc(r.badges.map((b) => T(b.name)).join(' · '))}">${r.badges.map((b) => b.icon).join('')}</span>` : ''}
             ${r.name === c.mvp ? '<span class="gr-mvp">MVP</span>' : ''}
             <small>${esc(T('작업 {d}', { d: r.done }))}${r.interrupted ? ` · ${esc(T('중단 {n}', { n: r.interrupted }))}` : ''}${r.failed ? ` · ${esc(T('오류 {n}', { n: r.failed }))}` : ''} · ${esc(T('커밋 {n}', { n: r.commits }))} · ${esc(money(r.cost))}${r.decisionMs > 60_000 ? ` · ${esc(T('결정 대기 {t}', { t: dur(r.decisionMs) }))}` : ''}</small></header>
           ${r.prompts.length ? `<ol>${r.prompts.map((p) => `<li><time>${hhmm(p.t)}</time><span>${esc(p.text)}</span></li>`).join('')}</ol>` : `<p class="gr-none">${esc(T('보낸 요청 기록 없음'))}</p>`}

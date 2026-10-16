@@ -1,6 +1,6 @@
 // ---------- 역할(워커)별 성장 기록 · 하루 요약 카드 ----------
 // 매니저 XP(progress.js)는 한 사람 몫이라, 어느 역할이 얼마나 일했는지는 남지 않았다. 역할 이름마다
-// 끝낸 작업 수(완료·중단·오류), 커밋, 도구 종류, 비용, 결정 대기 시간을 쌓고 레벨·칭호·배지로 보여 준다.
+// 끝낸 작업 수(완료·중단·오류), 커밋, 도구 종류, 비용, 결정 대기 시간을 쌓고 배지로 보여 준다.
 // 같은 기록을 날짜(한국 시간)별로도 쌓아 두고, 매일 오후 5시(KST)에 그날 것을 '하루 요약 카드'로 묶어 화면에 보낸다.
 // 저장: data/roles.json (역할 누적 · 최근 14일 · 세션별 본 비용) · data/daily.json (최근 14장 카드)
 import fs from 'node:fs';
@@ -14,13 +14,7 @@ const KEEP_DAYS = 14;
 const PROMPTS_PER_DAY = 30; // 역할·날짜마다 남기는 요청 글 수
 const SEEN_MAX = 80;        // 세션 파일별 '이미 센 비용' 기억 수
 
-// 역할 경험치: 완료 10 · 커밋 5 · 서브에이전트 3. 레벨 n 의 문턱은 25·(n-1)² — Lv2 25 · Lv3 100 · Lv5 400 · Lv10 2,025
-const RXP = { done: 10, commit: 5, subagent: 3 };
-const xpOf = (r) => r.done * RXP.done + r.commits * RXP.commit + r.subagents * RXP.subagent;
-const levelOf = (xp) => Math.floor(Math.sqrt(xp / 25)) + 1;
-const levelMin = (lv) => 25 * (lv - 1) ** 2;
-
-// 도구 → 일 종류. 가장 많이 쓴 종류(30회 이상)가 칭호가 된다
+// 도구 → 일 종류 (기록만 — 화면에는 아직 쓰지 않는다)
 const TOOL_KIND = {
   Edit: 'edit', Write: 'edit', MultiEdit: 'edit', NotebookEdit: 'edit',
   Bash: 'run', PowerShell: 'run',
@@ -28,8 +22,6 @@ const TOOL_KIND = {
   WebFetch: 'web', WebSearch: 'web',
   Agent: 'agent', Task: 'agent',
 };
-export const TITLES = { edit: '구현가', run: '운영가', read: '탐정', web: '리서처', agent: '지휘관' };
-const TITLE_MIN = 30;
 
 // 배지: 조건과 이름. 화면은 아이콘 + 이름 + 조건 설명을 보여 준다
 const BADGES = [
@@ -162,31 +154,15 @@ export function createRoleStats(dataDir) {
     return out;
   };
 
-  // 화면용: 레벨 · 다음 레벨까지 · 칭호 · 배지
-  function card(r) {
-    const xp = xpOf(r), level = levelOf(xp);
-    const top = Object.entries(r.kinds || {}).sort((a, b) => b[1] - a[1])[0];
-    return {
-      level, xp, levelMin: levelMin(level), nextMin: levelMin(level + 1),
-      title: top && top[1] >= TITLE_MIN ? top[0] : null,
-      badges: BADGES.filter((b) => b.ok(r)).map(({ id, icon, name, desc }) => ({ id, icon, name, desc })),
-      done: r.done, interrupted: r.interrupted, failed: r.failed, rate: r.done / ends(r),
-      commits: r.commits, subagents: r.subagents, tools: r.tools, kinds: r.kinds, cost: r.cost, decisionMs: r.decisionMs,
-      activeDays: r.activeDays, firstAt: r.firstAt,
-    };
-  }
-  const publicRoles = () => Object.fromEntries(Object.entries(s.roles).map(([n, r]) => [n, card(r)]));
+  // 화면용: 딴 배지 · 전체 배지 수
+  const badgesOf = (r) => BADGES.filter((b) => b.ok(r)).map(({ id, icon, name, desc }) => ({ id, icon, name, desc }));
+  const publicRoles = () => Object.fromEntries(Object.entries(s.roles).map(([n, r]) => [n, { badges: badgesOf(r), of: BADGES.length }]));
 
   // ---------- 하루 요약 카드 ----------
-  // 오늘 일한 역할마다: 끝낸 작업 · 커밋 · 비용 · 결정 대기 · 요청 목록 · 지금 레벨. 오늘 레벨이 올랐으면 표시(오늘 몫을 뺀 경험치로 비교)
+  // 오늘 일한 역할마다: 끝낸 작업 · 커밋 · 비용 · 결정 대기 · 요청 목록 · 지금 딴 배지
   function build(day = kstDay()) {
     const today = s.days[day] || {};
-    const roles = Object.entries(today).map(([name, d]) => {
-      const r = s.roles[name] || freshRole();
-      const before = levelOf(Math.max(0, xpOf(r) - d.done * RXP.done - d.commits * RXP.commit));
-      const c = card(r);
-      return { name, ...d, level: c.level, levelUp: c.level > before, title: c.title, badges: c.badges };
-    }).sort((a, b) => b.done - a.done || b.prompts.length - a.prompts.length);
+    const roles = Object.entries(today).map(([name, d]) => ({ name, ...d, badges: badgesOf(s.roles[name] || freshRole()) })).sort((a, b) => b.done - a.done || b.prompts.length - a.prompts.length);
     const sum = (k) => roles.reduce((a, r) => a + (r[k] || 0), 0);
     const total = { roles: roles.length, done: sum('done'), interrupted: sum('interrupted'), failed: sum('failed'), commits: sum('commits'), tools: sum('tools'), cost: sum('cost'), decisionMs: sum('decisionMs'), prompts: roles.reduce((a, r) => a + r.prompts.length, 0) };
     const mvp = roles.find((r) => r.done > 0)?.name || null;
