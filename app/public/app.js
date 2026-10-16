@@ -1197,15 +1197,23 @@ function renderFloor() {
 // 칸만 지정해서 끌기·회로선·최소화 칩은 그대로 쓴다. 자리는 DOM 순서(머리줄 → 그 묶음 카드)로 매번 다시 계산 —
 // 끄는 도중 옮긴 자리, 창 폭이 바뀌어 달라진 열 수도 그대로 반영된다
 function layoutRepoGroups() {
-  const nodes = $('#nodes'), kids = [...nodes.children];
-  if (!kids.some((k) => k.classList.contains('repo-head'))) {
-    for (const k of kids) k.style.gridRow = k.style.gridColumn = '';
-    return;
-  }
+  const nodes = $('#nodes'), kids = [...nodes.children], add = $('.node-add', nodes);
   // 열 수는 폭으로 직접 센다(.nodes 의 repeat(auto-fill, minmax(236px, 1fr)) 와 같은 계산). gridTemplateColumns 개수로 세면
   // 지정한 칸이 열 수를 넘었을 때 브라우저가 붙인 암묵 열까지 세어져, 한 번 넘친 배치가 그대로 굳어 기판 밖으로 나갔다
   const gap = parseFloat(getComputedStyle(nodes).columnGap) || 0;
   const cols = Math.max(1, Math.floor((nodes.clientWidth + gap) / (236 + gap)));
+  // '워커 추가' 카드는 남는 칸이 있을 때만 — 칸이 꽉 찬 줄 다음에 카드 하나 때문에 한 줄을 통째로 더 쓰게 되면
+  // 카드 대신 오른쪽 위 도구 줄의 작은 '+ 워커 추가' 버튼을 띄운다
+  const showAdd = (fits) => {
+    if (add) add.hidden = !fits;
+    $('#btn-floor-add').hidden = fits;
+  };
+  if (!kids.some((k) => k.classList.contains('repo-head'))) {
+    for (const k of kids) k.style.gridRow = k.style.gridColumn = '';
+    const n = kids.filter((k) => k.classList.contains('node')).length;
+    showAdd(n === 0 || n % cols !== 0);
+    return;
+  }
   const groups = [];
   for (const k of kids) {
     if (k.classList.contains('repo-head')) groups.push({ head: k, cards: [] });
@@ -1237,12 +1245,12 @@ function layoutRepoGroups() {
     }
     row += 1 + Math.max(1, sh.deep);
   }
-  // '워커 추가' 카드: 칸이 남는 첫 선반의 카드 줄 끝, 없으면 맨 아래 줄 맨 앞
-  const add = $('.node-add', nodes);
-  if (add) {
-    const sh = shelves.find((x) => x.used < cols && x.deep <= 1);
-    add.style.gridRow = String(sh ? sh.row + 1 : row);
-    add.style.gridColumn = String(sh ? sh.used + 1 : 1);
+  // '워커 추가' 카드: 칸이 남는 첫 선반의 카드 줄 끝. 남는 칸이 없으면 카드 대신 도구 줄 버튼
+  const sh = shelves.find((x) => x.used < cols && x.deep <= 1);
+  showAdd(!!sh);
+  if (add && sh) {
+    add.style.gridRow = String(sh.row + 1);
+    add.style.gridColumn = String(sh.used + 1);
   }
 }
 
