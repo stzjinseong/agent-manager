@@ -138,7 +138,7 @@
         <div class="sc-btns">
           <button class="btn ghost" data-act="run" title="${esc(T('지금 한 번 넣기 (다음 예약은 그대로)'))}">▶</button>
           <button class="btn ghost" data-act="edit" title="${esc(T('고치기'))}">✎</button>
-          <button class="btn ghost" data-act="remove" title="${esc(T('지우기'))}">🗑</button>
+          <button class="btn ghost" data-act="remove" title="${esc(T('지우기'))}" aria-label="${esc(T('지우기'))}">✕</button>
         </div>
       </li>`).join('') : `<li class="sc-empty">${esc(T('아직 예약이 없어요 — 위에서 역할 · 지시 · 시각을 정해 추가하세요'))}</li>`;
   }
