@@ -1951,6 +1951,14 @@ const server = http.createServer(async (req, res) => {
     return json(res, 200, { ok: folder ? revealPath(full) : openPath(full) });
   }
 
+  // 타임라인 썸네일을 터미널·업무 지시·나중에 할 작업에 끌어다 놓을 때 — 주소를 이 PC 의 파일 경로로(다시 올리지 않고 경로만 첨부)
+  if (req.method === 'POST' && p === '/api/file-path') {
+    const { url: u } = await readBody(req);
+    const full = localFileOf(String(u || ''));
+    if (!full) return json(res, 404, { error: '파일이 없습니다 (지워졌거나 옮겨짐)' });
+    return json(res, 200, { path: full });
+  }
+
   let m;
   // 결과물 문서를 이 PC 의 OS 기본 앱으로 (더블클릭과 같게). trackDoc 이 기록한 파일만
   if (req.method === 'POST' && (m = p.match(/^\/api\/docs\/(W\d+)\/([0-9a-f]{12})\/open$/))) {

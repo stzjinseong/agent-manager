@@ -610,27 +610,48 @@ async function attachFiles(files, insert) {
   }
 }
 const hasFiles = (e) => [...(e.dataTransfer?.types || [])].includes('Files');
-// 드롭 영역 공통: 파일이 끌려 오면 테두리 강조
-function dropZone(zone, onFiles) {
+// 타임라인 썸네일(캡처·결과물·첨부)을 끌 때 싣는 화면 주소. 놓으면 서버가 이 PC 의 파일 경로로 바꿔 경로만 넣는다(다시 올리지 않음)
+const THUMB_TYPE = 'application/x-am-file';
+const hasThumb = (e) => [...(e.dataTransfer?.types || [])].includes(THUMB_TYPE);
+// 드롭 영역 공통: 파일(OS)이나 타임라인 썸네일이 끌려 오면 테두리 강조. onPath: 썸네일을 놓았을 때 받은 경로
+function dropZone(zone, onFiles, onPath) {
+  const ok = (e) => hasFiles(e) || (onPath && hasThumb(e));
   zone.addEventListener('dragover', (e) => {
-    if (!hasFiles(e)) return;
+    if (!ok(e)) return;
     e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; zone.classList.add('dropping');
   });
   zone.addEventListener('dragleave', (e) => { if (!zone.contains(e.relatedTarget)) zone.classList.remove('dropping'); });
-  zone.addEventListener('drop', (e) => {
+  zone.addEventListener('drop', async (e) => {
     zone.classList.remove('dropping');
-    if (!hasFiles(e)) return;
+    if (!ok(e)) return;
     e.preventDefault();
+    if (hasThumb(e)) {
+      const r = await api('/api/file-path', { url: e.dataTransfer.getData(THUMB_TYPE) });
+      if (r.path) { onPath(r.path); toast(_t('파일 첨부됨')); }
+      return;
+    }
     const files = droppedFiles(e.dataTransfer);
     if (files.length) onFiles(files);
   });
 }
+// 타임라인 썸네일 끌기 시작 — 썸네일은 카드 끌기와 겹치지 않게 draggable=false 로 그려지므로, 누르는 순간 이 칸에서만 끌 수 있게 바꾼다
+const THUMB_SEL = '.tl-shot, .tl-doc, .att-img, .att-file, .att-vid';
+const thumbUrl = (t) => t.dataset.shot || t.dataset.video || t.getAttribute('href') || t.getAttribute('src') || '';
+$('#log').addEventListener('mousedown', (e) => { const t = e.target.closest(THUMB_SEL); if (t) t.draggable = true; }, true);
+$('#log').addEventListener('dragstart', (e) => {
+  const t = e.target.closest?.(THUMB_SEL);
+  if (!t || !thumbUrl(t)) return;
+  e.dataTransfer.setData(THUMB_TYPE, thumbUrl(t));
+  e.dataTransfer.effectAllowed = 'copy';
+  document.body.classList.add('thumb-drag');
+});
+$('#log').addEventListener('dragend', () => document.body.classList.remove('thumb-drag'));
 // 드롭 영역 밖에 파일을 놓으면 브라우저가 그 파일을 열어 화면이 바뀌어 버린다(html 등) → 막고 '놓을 수 없음' 표시
 document.addEventListener('dragover', (e) => { if (hasFiles(e) && !e.defaultPrevented) { e.preventDefault(); e.dataTransfer.dropEffect = 'none'; } });
 document.addEventListener('drop', (e) => { if (hasFiles(e)) e.preventDefault(); });
 // 터미널: 경로를 붙여넣기로 보낸다 (이미지는 Claude 입력칸에 [Image #N] 으로 붙고, 그 밖의 파일은 경로 그대로)
 const termInsert = (p) => selected && term.paste(`${p} `);
-dropZone($('#term-wrap'), (files) => attachFiles(files, termInsert));
+dropZone($('#term-wrap'), (files) => attachFiles(files, termInsert), termInsert);
 // 터미널에서 Ctrl+V 로 클립보드 파일 붙여넣기 — xterm 보다 먼저 가로챈다(텍스트 붙여넣기는 그대로 둔다)
 $('#term').addEventListener('paste', (e) => {
   const files = droppedFiles(e.clipboardData);
@@ -2749,7 +2770,7 @@ function insertAtCursor(ta, text) {
 }
 // 파일 드롭·Ctrl+V 붙여넣기 → 커서 위치에 경로 삽입 (업무 지시 · 나중에 할 작업 공통)
 function acceptFiles(ta) {
-  dropZone(ta, (files) => attachFiles(files, (p) => insertAtCursor(ta, p)));
+  dropZone(ta, (files) => attachFiles(files, (p) => insertAtCursor(ta, p)), (p) => insertAtCursor(ta, p));
   ta.addEventListener('paste', (e) => {
     const files = droppedFiles(e.clipboardData);
     if (!files.length) return;

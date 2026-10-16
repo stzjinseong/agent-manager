@@ -1045,6 +1045,9 @@ body.term-full::before {
 .down-mark svg { width: 90px; height: 50px; filter: grayscale(.6); }
 
 /* ---------- 파일 첨부 ---------- */
+/* 타임라인 썸네일을 끄는 동안 놓을 수 있는 곳(터미널 · 업무 지시 · 나중에 할 작업 입력칸)을 흐린 점선으로 미리 보여 준다 */
+body.thumb-drag :is(#term-wrap, .task-form textarea, .memo-form textarea):not(.dropping) { outline: 1px dashed color-mix(in srgb, var(--accent) 55%, transparent); outline-offset: -4px; }
+#log :is(.tl-shot, .tl-doc, .att-img, .att-file, .att-vid) { -webkit-user-drag: element; }
 .dropping { outline: 2px dashed var(--accent) !important; outline-offset: -4px; background-color: color-mix(in srgb, var(--accent) 8%, transparent) !important; }
 .toast {
   position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 400;
