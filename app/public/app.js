@@ -425,12 +425,14 @@ function cutText(s, e, start) {
 }
 // 키를 많이 한 번에 보내면 CLI 가 나눠 처리해 중간 화면에서 조용해질 수 있다 → 한 번 더 기다린다
 async function cutKeys(data) { send({ type: 'input', id: selected, data }); await cutSettle(); if (data.length > 60) await cutSettle(); return cutBox(); }
-async function cutSelection() {
+// del: Backspace/Delete 로 지우기 — 클립보드에 넣지 않는다. 입력칸 글을 지울 수 없는 선택이면 false 를 돌려줘
+// 키를 원래대로 CLI 에 보내게 한다(잘라내기는 그때 복사만 하고 true). 확인은 첫 await 전에 끝나 키 처리기가 바로 정한다
+function cutSelection(del = false) {
   const sel = term.getSelectionPosition(), text = term.getSelection();
-  if (!sel || !text) return;
+  if (!sel || !text) return false;
   const id = selected;
   // 클립보드는 키 이벤트 안에서(첫 await 전에) 쓴다 — Safari 는 사용자 동작 중에만 허용
-  const copyOnly = (why) => { copySelection(); toast(_t(why)); };
+  const copyOnly = (why) => { if (del) return false; copySelection(); toast(_t(why)); return true; };
   let box = cutBox();
   if (cutting || !box || termLocked() || !id) return copyOnly('입력칸 밖이라 복사만 했어요');
   // 선택을 입력칸 글자 범위로 줄인다 — 줄 앞 '❯ '·들여쓰기와 줄 끝 빈칸은 빼고, 두 칸 글자의 오른쪽 반에 걸치면 그 글자까지
@@ -445,10 +447,10 @@ async function cutSelection() {
     if (/\[(Pasted text|Image) #\d+/.test(line)) return copyOnly('붙여넣은 묶음이 있는 줄은 복사만 했어요');
   }
   if (box.cur.y <= box.top || box.cur.y >= box.bottom) return copyOnly('입력칸 밖이라 복사만 했어요');
-  try { navigator.clipboard.writeText(cutText(s, e, box.start)).catch(() => {}); } catch {}
+  if (!del) try { navigator.clipboard.writeText(cutText(s, e, box.start)).catch(() => {}); } catch {}
   term.clearSelection();
   cutting = true;
-  try {
+  (async () => { try {
     // 입력칸 맨 위 가로선 기준 상대 줄로 다룬다 — 도중에 위쪽 출력이 늘어 화면이 밀려도 맞도록
     const rel = (p, bx) => ({ y: p.y - bx.top, x: p.x });
     const key = (p) => p.y * 10000 + p.x;
@@ -509,8 +511,9 @@ async function cutSelection() {
       send({ type: 'input', id, data: '\x7f'.repeat(n) });
     }
   } catch {
-    toast(_t('커서를 옮기지 못해 복사만 했어요'));
-  } finally { cutting = false; }
+    toast(_t(del ? '커서를 옮기지 못해 지우지 못했어요' : '커서를 옮기지 못해 복사만 했어요'));
+  } finally { cutting = false; } })();
+  return true;
 }
 // ---------- 전체 선택 (Ctrl/⌘+A) ----------
 // 입력칸에 쓴 글을 화면에서 선택한다 — 그대로 Ctrl+C 복사 · Ctrl+X 잘라내기로 이어진다.
@@ -566,6 +569,12 @@ term.attachCustomKeyEventHandler((e) => {
   if (mod && e.code === 'KeyV') return false; // 기본 paste 이벤트로 넘김
   // Ctrl/⌘+X: 선택이 있으면 잘라내기(입력칸 밖이면 복사만), 없으면 그대로 CLI 로
   if (mod && e.code === 'KeyX' && term.hasSelection()) { e.preventDefault(); cutSelection(); return false; }
+  // Backspace/Delete: 입력칸 글을 선택해 두었으면(Ctrl+A 등) 그 글을 지운다 — 클립보드는 그대로.
+  // 입력칸 밖 선택이면 선택만 풀고 키는 원래대로 CLI 로(한 글자 지우기)
+  if (!mod && !e.altKey && (e.key === 'Backspace' || e.key === 'Delete') && term.hasSelection() && !e.isComposing && !imeComposing) {
+    if (cutSelection(true)) { e.preventDefault(); return false; }
+    term.clearSelection();
+  }
   if (mod && !e.shiftKey && !e.altKey && e.code === 'KeyA') {
     if (e.isComposing || imeComposing || e.keyCode === 229 || Date.now() - imeCompEndAt < 500) { e.preventDefault(); selectInputAfterIme(); return false; }
     if (selectInput()) { e.preventDefault(); return false; }

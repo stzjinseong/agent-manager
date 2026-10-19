@@ -193,6 +193,7 @@ const EN = {
   '입력칸 밖이라 복사만 했어요': 'Outside the input box — copied only',
   '붙여넣은 묶음이 있는 줄은 복사만 했어요': 'Line has a pasted block — copied only',
   '커서를 옮기지 못해 복사만 했어요': "Couldn't move the cursor — copied only",
+  '커서를 옮기지 못해 지우지 못했어요': "Couldn't move the cursor — nothing deleted",
   '서버가 이 기능을 모릅니다 — 서버를 재시작하세요': 'The server doesn\'t know this feature — restart the server',
   '요청 실패 ({status})': 'Request failed ({status})',
   '<b>{name}</b> 가 <b>{tool}</b> 권한을 요청합니다': '<b>{name}</b> is asking for permission to use <b>{tool}</b>',
