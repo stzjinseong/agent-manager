@@ -12,7 +12,29 @@
   const kindOf = (d) => (d.global ? 'all' : d.roles?.length ? 'pick' : 'keep');
   const presets = () => (state.directivePresets || []).filter((p) => !list().some((d) => d.preset === p.key));
   const cur = () => state.workers.find((x) => x.id === selected);
-  const post = async (body) => { const r = await api('/api/directives', body); if (r.error) toast(r.error, 3000); return r; };
+  // 누르는 즉시 화면에 반영하고(서버 상태가 오면 그걸로 덮인다) 실패하면 되돌린다 — 상태 방송이 무거우면(워커 많음 · 1MB 안팎)
+  // 응답이 늦어 눌러도 그대로인 것처럼 보였고, 다시 누른 만큼 추천이 겹쳐 들어갔다
+  function local(body) {
+    const xs = list(), d = xs.find((x) => x.id === body.id);
+    if (body.op === 'role' && d) {
+      const drop = (a) => (a || []).filter((x) => x !== body.role);
+      if (d.global) d.except = body.on ? drop(d.except) : [...drop(d.except), body.role];
+      else d.roles = body.on ? [...drop(d.roles), body.role] : drop(d.roles);
+    }
+    if (body.op === 'remove') state.directives = xs.filter((x) => x.id !== body.id);
+    if (body.op === 'edit' && d) Object.assign(d, { global: Boolean(body.global ?? d.global), roles: body.roles ?? d.roles, except: body.except ?? d.except });
+    if (body.op === 'add') state.directives = [...xs, { id: `tmp${Date.now()}`, title: body.title, text: body.text, preset: body.preset, global: Boolean(body.global), roles: body.roles || [], except: [] }];
+    const w = cur();
+    if (w && w.status !== 'exited') w.dirPending = true; // 바뀐 것은 다음 메시지에 — 서버 상태가 오면 정확한 값으로
+  }
+  const post = async (body) => {
+    const before = JSON.parse(JSON.stringify(list()));
+    local(body);
+    window.renderDirectives();
+    const r = await api('/api/directives', body);
+    if (r.error) { state.directives = before; window.renderDirectives(); toast(r.error, 3000); }
+    return r;
+  };
 
   // ---------- 창 ----------
   const back = el(`<div class="modal-back sc-back dv-back" hidden><div class="modal panel sc-modal dv-modal" role="dialog" aria-modal="true" tabindex="-1">
@@ -210,11 +232,10 @@
     if (!w) return;
     const t = e.target.closest('[data-id],[data-pre],[data-pop]');
     if (!t) return;
-    if (t.dataset.id) { await post({ op: 'role', id: t.dataset.id, role: w.name, on: true }); renderPop(); return; }
+    if (t.dataset.id) { post({ op: 'role', id: t.dataset.id, role: w.name, on: true }); return; }
     if (t.dataset.pre) {
       const p = (state.directivePresets || []).find((x) => x.key === t.dataset.pre);
-      if (p) await post({ op: 'add', title: T(p.title), text: T(p.text), preset: p.key, roles: [w.name] });
-      renderPop();
+      if (p) post({ op: 'add', title: T(p.title), text: T(p.text), preset: p.key, roles: [w.name] });
       return;
     }
     closePop();

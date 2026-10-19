@@ -1918,6 +1918,9 @@ const server = http.createServer(async (req, res) => {
     if (body.op === 'add' || body.op === 'edit') {
       if (body.op === 'edit' && i < 0) return json(res, 404, { error: '없는 헤더입니다' });
       if (body.op === 'add' && list.length >= directives.LIMIT) return json(res, 400, { error: '헤더가 너무 많습니다' });
+      // 같은 추천을 또 넣으면(응답이 늦어 여러 번 누름 등) 새로 만들지 않고 있는 항목에 역할만 더한다
+      const same = body.op === 'add' && body.preset && list.find((x) => x.preset === body.preset);
+      if (same) { for (const r of body.roles || []) directives.setRole(same, String(r), true); saveConfig(); return json(res, 200, { ok: true, id: same.id }); }
       const r = directives.cleanDirective(body, body.op === 'edit' ? list[i] : undefined);
       if (r.error) return json(res, 400, { error: r.error });
       if (body.op === 'edit') list[i] = r.d; else list.push(r.d);
