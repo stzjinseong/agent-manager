@@ -232,11 +232,10 @@
   const POP_SIZE_KEY = 'am.dirPopSize';
   try {
     const z = JSON.parse(localStorage.getItem(POP_SIZE_KEY) || 'null');
-    if (z?.w || z?.h) { pop.style.width = z.w || ''; pop.style.height = z.h || ''; pop.classList.add('sized'); }
+    if (z?.w || z?.h) { pop.style.width = z.w || ''; pop.style.height = z.h || ''; }
   } catch {}
   new ResizeObserver(() => {
     if (pop.hidden || !(pop.style.width || pop.style.height)) return; // 내용 때문에 바뀐 높이는 기억하지 않는다
-    pop.classList.add('sized');
     try { localStorage.setItem(POP_SIZE_KEY, JSON.stringify({ w: pop.style.width, h: pop.style.height })); } catch {}
   }).observe(pop);
   bar.addEventListener('click', (e) => {
