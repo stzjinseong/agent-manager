@@ -2496,9 +2496,9 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 .st-ico { overflow: visible; }
 .st-ico .st-lid { transform-box: fill-box; transform-origin: 0% 100%; transition: transform .22s cubic-bezier(.3, 1.4, .5, 1); }
 .stash-btn.st-open .st-lid { transform: translateY(-2px) rotate(-28deg); }
-.stash-btn.st-got { animation: st-got .42s cubic-bezier(.3, 1.6, .5, 1); }
+.stash-btn.st-got { animation: st-got .6s ease-out; }
 .stash-btn.st-got .sched-n { animation: st-pop .42s ease-out; }
-@keyframes st-got { 0% { transform: scale(1); } 35% { transform: scale(1.22, .86); } 65% { transform: scale(.94, 1.08); } 100% { transform: scale(1); } }
+@keyframes st-got { 0% { transform: scale(1); } 22% { transform: scale(1.3, .74) translateY(2px); } 46% { transform: scale(.88, 1.16) translateY(-2px); } 66% { transform: scale(1.07, .94); } 84% { transform: scale(.98, 1.02); } 100% { transform: scale(1); } } /* 꿀꺽 — 눌렸다 튀었다 잦아듦 */
 @keyframes st-pop { 0% { transform: scale(.4); } 60% { transform: scale(1.35); } 100% { transform: scale(1); } }
 .st-put { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; padding: 4px 9px; flex: none; }
 .st-put .st-ico { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.6; }
@@ -2506,8 +2506,7 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 .st-pop { position: fixed; z-index: 180; width: min(400px, calc(100vw - 16px)); max-height: min(480px, calc(100dvh - 80px)); overflow-y: auto; padding: 6px; display: flex; flex-direction: column; gap: 4px; box-shadow: 0 8px 28px rgb(0 0 0 / .25); }
 .st-pop[hidden] { display: none; }
 .st-h { padding: 6px 8px 4px; font-size: 12px; font-weight: 700; color: var(--text-2); }
-.st-item { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; padding: 9px 10px; border-radius: 9px; background: rgb(var(--ink) / .03); border: 1px solid var(--line); transition: opacity .2s, transform .2s; }
-.st-item.st-leave { opacity: 0; transform: translateY(-6px) scale(.97); }
+.st-item { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; padding: 9px 10px; border-radius: 9px; background: rgb(var(--ink) / .03); border: 1px solid var(--line); }
 .st-i { font-size: 15px; line-height: 1.3; }
 .st-main { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .st-main b { font-size: 12.5px; }

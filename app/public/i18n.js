@@ -614,7 +614,7 @@ const EN = {
   '이 예약을 지울까요?': 'Delete this schedule?', '{role} 에 넣었어요': 'Sent to {role}', '예약 실행': 'Scheduled tasks', '켜진 예약 {n}개': '{n} active',
   '정해 둔 시각에 이 역할의 워커에 보낼 지시': 'Task to send to this role at the set time',
   // 알림 보관함 (stash.js)
-  '서버 재시작 필요': 'Server restart needed', '꺼내기': 'Take out', '알림 보관함': 'Notice box', '알림 보관함 · {n}개': 'Notice box · {n}', '보관': 'Keep',
+  '서버 재시작 필요': 'Server restart needed', '알림 보관함': 'Notice box', '알림 보관함 · {n}개': 'Notice box · {n}', '보관': 'Keep',
   '방금 보관': 'kept just now', '{n}분 전 보관': 'kept {n} min ago', '{n}시간 전 보관': 'kept {n}h ago',
   "보관한 알림이 없어요 — 알림 띠의 '보관' 을 누르면 여기로 들어와요": "No kept notices — press 'Keep' on a notice bar to put it here",
   '나중에 처리 — 헤더의 보관함으로 넣어 두기': 'Deal with it later — put it in the notice box in the header',

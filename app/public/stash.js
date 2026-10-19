@@ -1,7 +1,7 @@
 // ---------- 알림 보관함 ----------
 // 상단 알림 띠(서버 재시작 안내 · 하루 요약 도착)에 '보관' 버튼을 달아, 지금 처리하지 않을 알림을 헤더의 보관함으로 넣어 둔다.
 // - 보관: 띠가 보관함 버튼으로 빨려 들어가고(뚜껑이 열렸다 닫힘), 띠는 숨는다
-// - 꺼내기: 보관함에서 띠가 튀어나와 원래 자리로 돌아간다. 보관함 안에서 바로 처리(재시작 · 열어 보기)도 된다
+// - 보관함 안에서 바로 처리한다(재시작 · 열어 보기) — 알림마다 처리 버튼이 있어 띠로 다시 꺼낼 일은 없다
 // - 알림이 끝나면(서버를 재시작함 · 요약을 읽음) 보관함에서도 저절로 빠진다
 // 보관 목록은 이 브라우저에만 기억한다(localStorage) — 띠를 그리는 곳(renderStale · renderDaily)이 window.isStashed 로 묻는다
 (() => {
@@ -28,6 +28,7 @@
     },
   };
   window.isStashed = (key) => items.some((x) => x.key === key);
+  let arriving = 0; // 날아가는 중인 알림 — 배지 숫자는 상자에 닿을 때 올린다
 
   // ---------- 헤더 버튼 · 목록 ----------
   const btn = el(`<button id="btn-stash" class="btn ghost lang-btn sched-btn stash-btn">${BOX}<i class="sched-n" hidden></i></button>`);
@@ -57,7 +58,7 @@
       return `<div class="st-item" data-key="${esc(x.key)}">
           <span class="st-i" aria-hidden="true">${k.ico}</span>
           <div class="st-main"><b>${esc(k.title())}</b><span>${esc(k.sub())}</span><small>${esc(ago(x.at))}</small></div>
-          <div class="st-acts"><button type="button" class="btn ghost" data-act="out">${esc(T('꺼내기'))}</button><button type="button" class="btn" data-act="run">${esc(k.act())}</button></div>
+          <div class="st-acts"><button type="button" class="btn" data-act="run">${esc(k.act())}</button></div>
         </div>`;
     }).join('') : `<div class="st-empty">${esc(T('보관한 알림이 없어요 — 알림 띠의 \'보관\' 을 누르면 여기로 들어와요'))}</div>`);
   }
@@ -65,7 +66,6 @@
     const b = e.target.closest('[data-act]'), key = e.target.closest('[data-key]')?.dataset.key;
     const x = items.find((i) => i.key === key);
     if (!b || !x) return;
-    if (b.dataset.act === 'out') { takeOut(x, e.target.closest('.st-item')); return; }
     closePop();
     KINDS[x.kind].run();
   });
@@ -84,6 +84,8 @@
   function lid(open) { btn.classList.toggle('st-open', open); }
   function bump() { btn.classList.remove('st-got'); void btn.offsetWidth; btn.classList.add('st-got'); }
 
+  // 보관 — 띠가 한 번 움찔(눌렸다 부풀고) 한 뒤, 가로가 확 줄어 말랑한 덩어리가 되어 상자로 빨려 들어간다.
+  // 크기는 scale 이 아니라 실제 너비 · 높이로 줄인다 — 가로로 긴 띠를 scale 로 줄이면 납작한 선이 돼 버렸다
   function putIn(kind) {
     const k = KINDS[kind], bar = k.bar(), key = k.now();
     if (!bar || !key || window.isStashed(key)) return;
@@ -92,50 +94,35 @@
     save();
     if (reduce() || !rect.width) { render(); bump(); return; }
     const g = ghost(bar, rect);
+    arriving++;
     render(); // 띠를 숨긴다 — 아래 띠는 renderTopStack 이 당겨 올린다
     lid(true);
     const [x0, y0] = center(rect), [x1, y1] = center(btn.getBoundingClientRect());
-    const dx = x1 - x0, dy = y1 - y0, s = Math.max(0.04, 22 / rect.width);
-    g.animate([
-      { transform: 'none', opacity: 1, borderRadius: '10px' },
-      { transform: 'scale(.94, .72)', opacity: 1, offset: 0.22 },
-      { transform: `translate(${dx * 0.55}px, ${dy * 0.35}px) scale(${Math.min(0.45, s * 6)}, ${Math.min(0.5, s * 7)})`, opacity: 0.9, offset: 0.62 },
-      { transform: `translate(${dx}px, ${dy}px) scale(${s}, ${s * 1.4})`, opacity: 0.2, borderRadius: '40px' },
-    ], { duration: 640, easing: 'cubic-bezier(.5, 0, .7, .45)' }).finished.then(() => {
+    const at = (cx, cy, w, h, r, extra = {}) => ({ left: `${cx - w / 2}px`, top: `${cy - h / 2}px`, width: `${w}px`, height: `${h}px`, borderRadius: `${r}px`, ...extra });
+    const W = rect.width, H = rect.height;
+    // 줄어들수록 띠 테두리 색으로 진해진다 — 작은 덩어리가 어두운 헤더에 묻히지 않게
+    const tint = getComputedStyle(bar).borderTopColor;
+    // 경로는 살짝 위로 휘게(가운데 지점을 끌어올림)
+    const mx = x0 + (x1 - x0) * 0.55, my = Math.max(22, Math.min(y0, y1) - 18); // 화면 위로 잘리지 않게
+    const fly = g.animate([
+      at(x0, y0, W, H, 10, { offset: 0, easing: 'cubic-bezier(.3, 0, .6, 1)' }),
+      at(x0, y0 + 2, W * 1.015, H * 0.82, 12, { offset: 0.13, easing: 'cubic-bezier(.2, .8, .3, 1.2)' }), // 꾹 눌림
+      at(x0, y0 - 2, W * 0.97, H * 1.12, 14, { offset: 0.26, easing: 'cubic-bezier(.6, 0, .9, .5)' }), // 통 부풂
+      at(x0 + (mx - x0) * 0.4, y0 - 4, Math.max(120, W * 0.28), H * 0.9, 22, { offset: 0.5, padding: '0px', easing: 'cubic-bezier(.4, 0, .6, 1)' }), // 가로가 확 줄어듦
+      at(mx, my, 64, 34, 18, { offset: 0.7, padding: '0px', background: tint, easing: 'cubic-bezier(.5, 0, .9, .6)' }), // 말랑한 덩어리
+      at(x1, y1 + 2, 26, 30, 14, { offset: 0.88, padding: '0px', background: tint }), // 상자 입구로 늘어나며
+      at(x1, y1 + 6, 8, 10, 5, { offset: 1, padding: '0px', background: tint, opacity: 0.5 }),
+    ], { duration: 820, fill: 'forwards' });
+    // 글자 · 버튼은 줄어들기 전에 먼저 사라진다(찌그러진 글자가 보이지 않게)
+    for (const c of g.children) c.animate([{ opacity: 1 }, { opacity: 1, offset: 0.2 }, { opacity: 0, offset: 0.42 }, { opacity: 0 }], { duration: 820, fill: 'forwards' });
+    const land = () => {
       g.remove();
+      arriving = Math.max(0, arriving - 1);
+      window.renderStash();
       lid(false);
       bump();
-    });
-  }
-
-  function takeOut(x, row) {
-    const k = KINDS[x.kind];
-    items = items.filter((i) => i.key !== x.key);
-    save();
-    if (row) row.classList.add('st-leave');
-    setTimeout(renderPop, reduce() ? 0 : 200);
-    render(); // 띠가 다시 보인다
-    const bar = k.bar();
-    if (reduce() || !bar || bar.hidden) return;
-    lid(true);
-    bar.style.visibility = 'hidden';
-    // renderTopStack 의 '내려오며 나타나기'(MutationObserver → 다음 마이크로태스크)를 지우고 이쪽 연출로 대신한다
-    requestAnimationFrame(() => {
-      bar.getAnimations().forEach((a) => a.cancel());
-      const rect = bar.getBoundingClientRect(), g = ghost(bar, rect);
-      const [x0, y0] = center(btn.getBoundingClientRect()), [x1, y1] = center(rect);
-      const dx = x0 - x1, dy = y0 - y1, s = Math.max(0.04, 22 / rect.width);
-      g.animate([
-        { transform: `translate(${dx}px, ${dy}px) scale(${s}, ${s * 1.4})`, opacity: 0.2, borderRadius: '40px' },
-        { transform: `translate(${dx * 0.45}px, ${dy * 0.5}px) scale(${Math.min(0.5, s * 7)}, ${Math.min(0.55, s * 8)})`, opacity: 0.95, offset: 0.4 },
-        { transform: 'translateY(6px) scale(1.02, .94)', opacity: 1, offset: 0.82, borderRadius: '10px' },
-        { transform: 'none', opacity: 1, borderRadius: '10px' },
-      ], { duration: 680, easing: 'cubic-bezier(.2, .7, .3, 1)' }).finished.then(() => {
-        g.remove();
-        bar.style.visibility = '';
-      });
-      setTimeout(() => lid(false), 260);
-    });
+    };
+    fly.finished.then(land, land);
   }
 
   // 띠마다 '보관' 버튼 — 서버 재시작 띠는 재시작 버튼 옆, 하루 요약 띠는 ✕ 앞
@@ -154,8 +141,8 @@
     // 끝난 알림(재시작함 · 읽음 · 다음 날 카드)은 보관함에서도 뺀다
     const live = items.filter((x) => KINDS[x.kind] && KINDS[x.kind].now() === x.key);
     if (live.length !== items.length) { items = live; save(); }
-    const n = $('.sched-n', btn);
-    n.hidden = !items.length; n.textContent = items.length;
+    const n = $('.sched-n', btn), shown = items.length - arriving;
+    n.hidden = shown <= 0; n.textContent = shown;
     btn.title = items.length ? T('알림 보관함 · {n}개', { n: items.length }) : T('알림 보관함');
     btn.setAttribute('aria-label', btn.title);
     for (const b of document.querySelectorAll('.st-put')) { b.lastElementChild.textContent = T('보관'); b.title = T('나중에 처리 — 헤더의 보관함으로 넣어 두기'); }
