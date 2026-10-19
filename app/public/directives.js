@@ -9,7 +9,6 @@
   const list = () => state.directives || [];
   const roles = () => [...new Set([...state.workers.filter((w) => w.status !== 'exited').map((w) => w.name), ...(state.profiles || []).map((p) => p.name)])];
   const applies = (d, r) => (d.global ? !(d.except || []).includes(r) : (d.roles || []).includes(r));
-  const kindOf = (d) => (d.global ? 'all' : d.roles?.length ? 'pick' : 'keep');
   const presets = () => (state.directivePresets || []).filter((p) => !list().some((d) => d.preset === p.key));
   const cur = () => state.workers.find((x) => x.id === selected);
   // 누르는 즉시 화면에 반영하고(서버 상태가 오면 그걸로 덮인다) 실패하면 되돌린다 — 상태 방송이 무거우면(워커 많음 · 1MB 안팎)
@@ -44,7 +43,6 @@
         <div class="sc-row"><label class="sc-l" data-k="제목"></label><input name="title" maxlength="40"></div>
         <div class="sc-row top"><label class="sc-l" data-k="내용"></label><textarea name="text" rows="3" maxlength="2000"></textarea></div>
         <div class="sc-row top"><label class="sc-l" data-k="붙일 곳"></label><div class="sc-when">
-          <div class="sc-kinds" role="radiogroup"><button type="button" data-kind="all" data-k="모든 워커"></button><button type="button" data-kind="pick" data-k="골라서"></button><button type="button" data-kind="keep" data-k="보관만"></button></div>
           <div class="dv-roles"></div>
           <small class="sc-hint dv-kind-hint"></small></div></div>
         <div class="sc-acts"><span class="sc-err"></span><button type="button" class="btn ghost sc-cancel" data-k="취소"></button><button type="submit" class="btn primary sc-save"></button></div>
@@ -55,35 +53,32 @@
     </div></div>`);
   document.body.append(back);
   const box = back.firstElementChild, form = $('.dv-form', box);
-  let editing = null, kind = 'all', preset = null;
-  const picked = new Set(); // 'pick' 이면 붙일 역할, 'all' 이면 뺄 역할
+  let editing = null, fGlobal = false, preset = null;
+  const picked = new Set(); // 모든 워커면 뺄 역할, 아니면 붙일 역할
 
   const close = () => { back.hidden = true; };
   back.addEventListener('click', (e) => { if (e.target === back || e.target.closest('[data-dv=close]')) close(); });
   back.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } });
 
-  // 역할 칩: 켜진 칩 = 이 지시를 받는 역할 (모든 워커면 기본으로 다 켜져 있고 끄면 빠진다)
+  // 붙일 곳 칩 줄 — 맨 앞 '모든 워커'(켜면 새로 띄우는 워커까지 전부), 뒤로 역할 칩. 켜진 칩 = 이 헤더를 받는 역할.
+  // 모든 워커가 켜져 있으면 역할 칩은 다 켜진 채로 보이고, 끄면 그 워커만 빠진다. 아무것도 안 켜면 보관만
+  function chipRow(global, on, names) {
+    return `<button type="button" class="dv-rc dv-rc-all${global ? ' on' : ''}" data-all title="${esc(T(global ? '모든 워커에서 떼기' : '모든 워커에 붙이기 (새로 띄우는 워커 포함)'))}">${GLOBE}${esc(T('모든 워커'))}</button>` +
+      names.map((r) => `<button type="button" class="dv-rc${on(r) ? ' on' : ''}" data-role="${esc(r)}" title="${esc(T(on(r) ? '{r} 에서 떼기' : '{r} 에 붙이기', { r }))}">${esc(r)}</button>`).join('');
+  }
   function renderFormRoles() {
     const names = roles();
     for (const r of picked) if (!names.includes(r)) names.push(r);
-    const on = (r) => (kind === 'all' ? !picked.has(r) : picked.has(r));
-    $('.dv-roles', box).hidden = kind === 'keep' || !names.length;
-    $('.dv-roles', box).innerHTML = names.map((r) => `<button type="button" class="dv-rc${on(r) ? ' on' : ''}" data-role="${esc(r)}">${esc(r)}</button>`).join('');
-    $('.dv-kind-hint', box).textContent = T(kind === 'all' ? '새로 띄우는 워커에도 붙어요 · 칩을 끄면 그 워커만 빠져요' : kind === 'pick' ? '켠 워커에만 붙어요' : "아무 워커에도 안 붙이고 보관만 해요 — 나중에 고치기에서 '모든 워커'나 '골라서'로 바꿔 붙여요");
+    $('.dv-roles', box).innerHTML = chipRow(fGlobal, (r) => (fGlobal ? !picked.has(r) : picked.has(r)), names);
+    $('.dv-kind-hint', box).textContent = T(fGlobal ? '새로 띄우는 워커에도 붙어요 · 워커 칩을 끄면 그 워커만 빠져요' : picked.size ? '켠 워커에만 붙어요' : '아무것도 안 켜면 보관만 해 둬요 — 나중에 목록에서 칩을 눌러 붙여요');
   }
   $('.dv-roles', box).addEventListener('click', (e) => {
+    if (e.target.closest('[data-all]')) { fGlobal = !fGlobal; picked.clear(); renderFormRoles(); return; }
     const r = e.target.closest('[data-role]')?.dataset.role;
     if (!r) return;
     picked.has(r) ? picked.delete(r) : picked.add(r);
     renderFormRoles();
   });
-  function setKind(k) {
-    if (k !== kind) picked.clear();
-    kind = k;
-    box.querySelectorAll('[data-kind]').forEach((b) => b.classList.toggle('on', b.dataset.kind === k));
-    renderFormRoles();
-  }
-  box.querySelectorAll('[data-kind]').forEach((b) => { b.onclick = () => setKind(b.dataset.kind); });
   $('.sc-cancel', box).onclick = () => { fill(); renderList(); };
 
   // 입력칸 채우기 — 새 지시({ role } 이면 그 역할만 골라 둔 채) 또는 고칠 지시
@@ -92,8 +87,8 @@
     preset = d.preset || null;
     form.title.value = d.title || '';
     form.text.value = d.text || '';
-    kind = null;
-    setKind(isEdit ? kindOf(d) : d.role ? 'pick' : 'all');
+    fGlobal = isEdit ? Boolean(d.global) : false;
+    picked.clear();
     (isEdit ? (d.global ? d.except : d.roles) || [] : d.role ? [d.role] : []).forEach((r) => picked.add(r));
     renderFormRoles();
     $('.sc-err', box).textContent = '';
@@ -104,7 +99,7 @@
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const body = { op: editing ? 'edit' : 'add', id: editing, title: form.title.value, text: form.text.value, preset, global: kind === 'all', roles: kind === 'pick' ? [...picked] : [], except: kind === 'all' ? [...picked] : [] };
+    const body = { op: editing ? 'edit' : 'add', id: editing, title: form.title.value, text: form.text.value, preset, global: fGlobal, roles: fGlobal ? [] : [...picked], except: fGlobal ? [...picked] : [] };
     const r = await api('/api/directives', body);
     if (r.error) { $('.sc-err', box).textContent = r.error; return; }
     toast(T(editing ? '헤더를 고쳤어요' : '헤더를 추가했어요'));
@@ -128,13 +123,11 @@
   function item(d) {
     const names = roles();
     for (const r of [...(d.roles || []), ...(d.except || [])]) if (!names.includes(r)) names.push(r);
-    const chips = names.map((r) => `<button type="button" class="dv-rc${applies(d, r) ? ' on' : ''}" data-act="role" data-role="${esc(r)}" title="${esc(T(applies(d, r) ? '{r} 에서 떼기' : '{r} 에 붙이기', { r }))}">${esc(r)}</button>`).join('');
-    return `<li class="sc-item dv-item${d.id === editing ? ' editing' : ''}" data-id="${d.id}">
-        <label class="sc-switch" title="${esc(T('모든 워커'))}"><input type="checkbox" data-act="global"${d.global ? ' checked' : ''}><i></i></label>
+    return `<li class="sc-item dv-item${d.id === editing ? ' editing' : ''}${d.global || d.roles?.length ? '' : ' off'}" data-id="${d.id}">
         <div class="sc-main">
-          <div class="sc-top"><b>${esc(d.title)}</b>${d.global ? `<span class="dv-all">${GLOBE}${esc(T('모든 워커'))}</span>` : ''}</div>
+          <div class="sc-top"><b>${esc(d.title)}</b></div>
           <div class="sc-text" title="${esc(d.text)}">${esc(d.text)}</div>
-          ${names.length ? `<div class="dv-roles">${chips}</div>` : ''}
+          <div class="dv-roles">${chipRow(d.global, (r) => applies(d, r), names)}</div>
         </div>
         <div class="sc-btns">
           <button class="btn ghost" data-act="edit" title="${esc(T('고치기'))}">✎</button>
@@ -142,23 +135,22 @@
         </div>
       </li>`;
   }
+  // 한 목록 — 공용 · 워커별 · 보관을 나누지 않고 칩으로 구분한다 (어디에도 안 붙은 것은 흐리게)
   function renderList() {
     const all = list();
-    const groups = [
-      ['all', T('공용 · 모든 워커'), all.filter((d) => d.global)],
-      ['pick', T('워커별'), all.filter((d) => !d.global && d.roles?.length)],
-      ['keep', T('보관함 · 아직 안 붙음'), all.filter((d) => !d.global && !d.roles?.length)],
-    ].filter(([, , xs]) => xs.length);
-    $('.dv-list', box).innerHTML = groups.length ? groups.map(([k, h, xs]) => `<h4 class="dv-gh">${esc(h)} <small>${xs.length}</small></h4><ol class="sc-list dv-ol" data-group="${k}">${xs.map(item).join('')}</ol>`).join('')
+    $('.dv-list', box).innerHTML = all.length ? `<ol class="sc-list dv-ol">${all.map(item).join('')}</ol>`
       : `<div class="sc-empty">${esc(T('아직 헤더가 없어요 — 위에 직접 쓰거나 추천에서 골라 보세요'))}</div>`;
     renderPresets();
   }
   $('.dv-list', box).addEventListener('click', async (e) => {
-    const b = e.target.closest('[data-act]'), id = e.target.closest('[data-id]')?.dataset.id;
-    if (!b || !id || b.dataset.act === 'global') return;
+    const b = e.target.closest('[data-act]'), id = e.target.closest('.dv-item')?.dataset.id;
+    if (!id) return;
     const d = list().find((x) => x.id === id);
     if (!d) return;
-    if (b.dataset.act === 'role') { const r = b.dataset.role; post({ op: 'role', id, role: r, on: !applies(d, r) }); return; }
+    // 모든 워커: 켜면 전부(뺀 워커 없이), 끄면 아무 데도 안 붙은 상태로
+    if (e.target.closest('[data-all]')) { post({ op: 'edit', id, global: !d.global, roles: [], except: [] }); return; }
+    if (e.target.closest('[data-role]')) { const r = e.target.closest('[data-role]').dataset.role; post({ op: 'role', id, role: r, on: !applies(d, r) }); return; }
+    if (!b) return;
     if (b.dataset.act === 'edit') { fill(d, true); renderList(); form.text.focus(); return; }
     if (b.dataset.act === 'remove') {
       if (!(await ask({ title: T('이 헤더를 지울까요?'), body: `${d.title}\n${d.text}`, ok: T('지우기'), danger: true }))) return;
@@ -166,18 +158,10 @@
       post({ op: 'remove', id });
     }
   });
-  // 스위치: 모든 워커 ↔ 골라서. 켜면 지금 붙은 역할 밖은 다 받게 되고, 끄면 지금 받던 역할만 남긴다
-  $('.dv-list', box).addEventListener('change', (e) => {
-    const id = e.target.closest('[data-id]')?.dataset.id, d = list().find((x) => x.id === id);
-    if (!d || e.target.dataset.act !== 'global') return;
-    const on = e.target.checked;
-    post({ op: 'edit', id, global: on, except: [], roles: on ? [] : roles().filter((r) => applies(d, r)) });
-  });
-
   function texts() {
     $('.dv-title', box).textContent = T('헤더');
     const all = list();
-    $('.dv-sub', box).textContent = T('공용 {g}개 · 워커별 {r}개 · 보관함 {k}개', { g: all.filter((d) => d.global).length, r: all.filter((d) => !d.global && d.roles?.length).length, k: all.filter((d) => !d.global && !d.roles?.length).length });
+    $('.dv-sub', box).textContent = T('전체 {n}개 · 모든 워커 {g}개', { n: all.length, g: all.filter((d) => d.global).length });
     box.querySelectorAll('[data-k]').forEach((x) => { x.textContent = T(x.dataset.k); });
     $('.gr-x', box).setAttribute('aria-label', T('닫기'));
     form.title.placeholder = T('짧은 이름 (예: 작업 끝나면 커밋)');

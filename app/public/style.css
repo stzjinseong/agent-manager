@@ -2467,12 +2467,13 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 .dv-ph { font-size: 11.5px; color: var(--dim); font-weight: 600; }
 .dv-pre { font: inherit; font-size: 12px; padding: 3px 10px; border-radius: 14px; cursor: pointer; color: var(--text-2); background: rgb(var(--ink) / .04); border: 1px solid rgb(var(--ink) / .1); }
 .dv-pre:hover { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
-.dv-gh { margin: 16px 0 0; font-size: 12px; color: var(--text-2); font-weight: 700; }
-.dv-gh small { color: var(--dim); font-weight: 400; margin-left: 4px; }
-.dv-ol { margin-top: 6px; }
 .dv-item .dv-roles { margin-top: 4px; }
-.dv-all { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; color: var(--accent); }
-.dv-all .dv-g { width: 12px; height: 12px; }
+.dv-ol { margin-top: 12px; }
+.sc-item.dv-item { grid-template-columns: 1fr auto; }
+.dv-item.off .sc-main > :not(.dv-roles) { opacity: .55; } /* 어디에도 안 붙은 헤더 */
+.dv-rc-all { display: inline-flex; align-items: center; gap: 3px; }
+.dv-rc-all .dv-g { width: 12px; height: 12px; }
+.dv-rc-all + .dv-rc { margin-left: 6px; } /* '모든 워커' 와 역할 칩 사이를 조금 띄워 구분 */
 .dv-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0 0 6px; }
 .dv-bar[hidden] { display: none; }
 .dv-chips { display: contents; }
