@@ -625,7 +625,7 @@ const EN = {
   '짧은 이름 (예: 작업 끝나면 커밋)': 'Short name (e.g. Commit when done)',
   '워커가 늘 따를 규칙 — 예: 작업 단위가 끝나면 묻지 말고 바로 커밋한다': 'A rule the worker always follows — e.g. commit each finished unit of work without asking',
   '세션마다 첫 메시지에 한 번 붙여 보내요 · 고치면 다음 메시지에 새 내용으로 · /compact 뒤에도 다시 · 메시지 원문은 그대로': 'Attached once per session with the first message · changes go with the next message · re-sent after /compact · your message text is unchanged',
-  '보관함 · 다른 워커': 'Library · other workers', '붙일 헤더가 더 없어요': 'Nothing more to attach', '새로 쓰기': 'Write new', '모두 관리': 'Manage all',
+  '보관함 · 다른 워커': 'Library · other workers', '붙일 헤더가 더 없어요': 'Nothing more to attach', '지금 붙어 있는 워커 수': 'Workers using it now', '워커 {n}': '{n} workers', '새로 쓰기': 'Write new', '모두 관리': 'Manage all',
   '공용 헤더에서 이 워커만 뺐어요': 'Excluded this worker from the shared directive', '헤더 · 공용 {g}개 · 전체 {n}개': 'Headers · {g} shared · {n} total',
   '이 워커에서 떼기': 'Detach from this worker', '공용 헤더 — 이 워커는 빠짐': 'Shared directive — this worker is excluded', '다시 넣기': 'Include again',
   '+ 헤더': '+ Header', '보관함 · 추천에서 이 워커에 헤더 붙이기': 'Attach a directive to this worker from the library or suggestions',

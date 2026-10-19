@@ -193,14 +193,17 @@
   function renderPop() {
     const w = cur();
     if (!w) return closePop();
-    const off = list().filter((d) => !applies(d, w.name));
+    // 지금 붙어 있는 워커 수 — 많이 쓰는 헤더가 위로(같으면 보관함 순서 그대로)
+    const rs = roles(), uses = (d) => rs.filter((r) => applies(d, r)).length;
+    const off = list().filter((d) => !applies(d, w.name)).map((d) => ({ d, n: uses(d) })).sort((a, b) => b.n - a.n);
     const ps = presets();
-    const row = (attrs, title, sub, extra = '') => `<button type="button" class="dv-pi" ${attrs}><b>${extra}${esc(title)}</b><span>${esc(sub)}</span></button>`;
+    const row = (attrs, title, sub, extra = '', n = null) => `<button type="button" class="dv-pi" ${attrs}><b>${extra}${esc(title)}${n ? `<em title="${esc(T('지금 붙어 있는 워커 수'))}">${esc(T('워커 {n}', { n }))}</em>` : ''}</b><span>${esc(sub)}</span></button>`;
+    // 새로 쓰기 · 모두 관리 줄은 맨 위에 고정 (목록을 내려도 남는다)
     pop.innerHTML = `
-      ${off.length ? `<div class="dv-ph">${esc(T('보관함 · 다른 워커'))}</div>${off.map((d) => row(`data-id="${d.id}"`, d.title, d.text, d.global ? GLOBE : '')).join('')}` : ''}
+      <div class="dv-pf"><button type="button" class="btn ghost" data-pop="new">✎ ${esc(T('새로 쓰기'))}</button><button type="button" class="btn ghost" data-pop="all">${esc(T('모두 관리'))}</button></div>
+      ${off.length ? `<div class="dv-ph">${esc(T('보관함 · 다른 워커'))}</div>${off.map(({ d, n }) => row(`data-id="${d.id}"`, d.title, d.text, d.global ? GLOBE : '', n)).join('')}` : ''}
       ${ps.length ? `<div class="dv-ph">${esc(T('추천'))}</div>${ps.map((p) => row(`data-pre="${p.key}"`, T(p.title), T(p.text))).join('')}` : ''}
-      ${!off.length && !ps.length ? `<div class="dv-pe">${esc(T('붙일 헤더가 더 없어요'))}</div>` : ''}
-      <div class="dv-pf"><button type="button" class="btn ghost" data-pop="new">✎ ${esc(T('새로 쓰기'))}</button><button type="button" class="btn ghost" data-pop="all">${esc(T('모두 관리'))}</button></div>`;
+      ${!off.length && !ps.length ? `<div class="dv-pe">${esc(T('붙일 헤더가 더 없어요'))}</div>` : ''}`;
   }
   pop.addEventListener('click', async (e) => {
     const w = cur();
