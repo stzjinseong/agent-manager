@@ -891,6 +891,7 @@ function render() {
   renderUpd();
   window.renderDaily?.(); // 하루 요약 카드 도착 띠 · 우편함 버튼 (growth.js)
   window.renderSchedules?.(); // 예약 실행 버튼 · 상세 패널의 이 역할 예약 (schedule.js)
+  window.renderDirectives?.(); // 작업 지시 버튼 · 상세 패널의 이 워커 지시 칩 (directives.js)
   renderInbox();
   renderFloor();
   renderDock();

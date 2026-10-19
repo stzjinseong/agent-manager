@@ -17,6 +17,7 @@ import { createProgress, isCommit } from './progress.js';
 import { createUserProfile } from './userprofile.js';
 import { createRoleStats } from './rolestats.js';
 import { createScheduler, cleanSchedule, nextRunOf } from './schedule.js';
+import * as directives from './directives.js';
 import { L } from './cli-lang.js';
 import { createUpdates } from './updates.js';
 import { gitBranch } from './branch.js';
@@ -166,8 +167,8 @@ function usageReporters() {
 function loadConfig() {
   try {
     const c = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
-    return { profiles: c.profiles || [], recentCwds: c.recentCwds || [], order: c.order || [], memos: c.memos || {}, colors: c.colors || {}, sessions: c.sessions || {}, diffCleared: c.diffCleared || {}, manualQueue: c.manualQueue || {}, schedules: c.schedules || [] };
-  } catch { return { profiles: [], recentCwds: [], order: [], memos: {}, colors: {}, sessions: {}, diffCleared: {}, manualQueue: {}, schedules: [] }; }
+    return { profiles: c.profiles || [], recentCwds: c.recentCwds || [], order: c.order || [], memos: c.memos || {}, colors: c.colors || {}, sessions: c.sessions || {}, diffCleared: c.diffCleared || {}, manualQueue: c.manualQueue || {}, schedules: c.schedules || [], directives: c.directives || [] };
+  } catch { return { profiles: [], recentCwds: [], order: [], memos: {}, colors: {}, sessions: {}, diffCleared: {}, manualQueue: {}, schedules: [], directives: [] }; }
 }
 
 function saveConfig() {
@@ -253,6 +254,7 @@ function renameRole(from, to, worker) {
   roleStats.rename(from, to);
   if (config.manualQueue?.[from]) { config.manualQueue[to] = true; delete config.manualQueue[from]; }
   for (const x of config.schedules || []) if (x.role === from) x.role = to;
+  directives.renameRole(config.directives, from, to);
   saveConfig(); // emitState 포함
   return { ok: true };
 }
@@ -897,6 +899,8 @@ function onHook(w, ev, res) {
       }
       // 압축(/compact · 자동 압축)도 Claude 가 화면을 지우고 머리말부터 새로 그린다 — /clear 와 같은 까닭으로 기록이 안 지워져
       // 예전 대화가 중간에 잘린 채(표 반쪽 등) 새 화면 바로 위에 붙어 꼬여 보였다. 타임라인은 같은 세션이라 그대로 둔다
+      // 압축하면 앞서 넣은 작업 지시가 요약에서 빠질 수 있다 — 다음 메시지에 다시 넣는다
+      if (ev.source === 'compact') w.dirSent = null;
       if (ev.source === 'compact') setTimeout(() => { hostSend({ op: 'clearScrollback', id: w.id }); broadcast({ type: 'clearScrollback', id: w.id }); }, 300);
       // 지난 세션을 이어 붙였으면(▶ 투입의 --resume · 터미널의 /resume) 트랜스크립트를 다 읽은 뒤 지난 요청을 타임라인에 채운다
       if (ev.source === 'resume') w.seedAt = Date.now();
@@ -916,6 +920,16 @@ function onHook(w, ev, res) {
       progress.open(w);
       roleStats.prompt(w, w.lastPrompt);
       setStatus(w, 'working', w.lastPrompt);
+      {
+        // 작업 지시(directives.js) — 이 세션에 아직 안 넣었거나 바뀌었으면 이번 메시지에 붙인다
+        const ctx = directives.takeContext(config.directives, w);
+        if (ctx) {
+          const names = config.directives.filter((d) => directives.appliesTo(d, w.name)).map((d) => d.title);
+          pushLog(w, 'status', names.length ? `작업 지시 전달: ${names.join(' · ')}` : '작업 지시 해제 전달');
+          saveWorkersSoon();
+          return reply({ hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: ctx } });
+        }
+      }
       break;
     case 'PreToolUse':
       // 서브에이전트(agent_id 있음)의 도구 사용은 메인 상태를 바꾸지 않는다 — 백그라운드면 메인 턴은 이미 끝났을 수 있다
@@ -1102,7 +1116,7 @@ function publicState() {
   if (Date.now() - branchAt > 1000) refreshBranches(); // 새로 띄운 워커도 바로 보이게(상태를 보낼 때 1초에 한 번까지)
   return {
     now: Date.now(),
-    workers: [...workers.values()].map(({ term, tx, approvalWaits, pot, ...w }) => ({ ...w, branch: branchOf.get(w.cwd) || null, profile: tx && profileSummary(tx, approvalWaits) })),
+    workers: [...workers.values()].map(({ term, tx, approvalWaits, pot, ...w }) => ({ ...w, branch: branchOf.get(w.cwd) || null, profile: tx && profileSummary(tx, approvalWaits), dirPending: directives.pending(config.directives, w) })),
     decisions: [...decisions.values()].map(({ res, timer, ...d }) => d),
     profiles: config.profiles,
     order: config.order,
@@ -1116,6 +1130,8 @@ function publicState() {
     progress: progress.public(),
     roles: roleStats.public(), // 역할별 레벨·칭호·배지 (이름 → 카드)
     daily: roleStats.publicDaily(),
+    directives: config.directives, // 작업 지시 (directives.js)
+    directivePresets: directives.PRESETS,
     schedules: config.schedules, // 예약 · 반복 실행 (schedule.js) // 마지막 하루 요약 카드 머리말 { date, at, seen, dates }
     shotKeep: SHOT_KEEP, // 화면 안내 문구용 (워커당 캡처 보관 장수)
     usage, // 계정 사용량 { fiveHour: { pct, resetsAt, at, from }, sevenDay, at, from }
@@ -1647,6 +1663,7 @@ const STATIC = {
   '/userreport.js': ['public/userreport.js', 'text/javascript; charset=utf-8'],
   '/growth.js': ['public/growth.js', 'text/javascript; charset=utf-8'],
   '/schedule.js': ['public/schedule.js', 'text/javascript; charset=utf-8'],
+  '/directives.js': ['public/directives.js', 'text/javascript; charset=utf-8'],
   '/style.css': ['public/style.css', 'text/css; charset=utf-8'],
   '/vendor/xterm.js': ['node_modules/@xterm/xterm/lib/xterm.js', 'text/javascript'],
   '/vendor/xterm.css': ['node_modules/@xterm/xterm/css/xterm.css', 'text/css'],
@@ -1892,6 +1909,33 @@ const server = http.createServer(async (req, res) => {
     return json(res, 200, { ok: true });
   }
   if (req.method === 'POST' && p === '/api/daily/build') return json(res, 200, tickDaily(true));
+  // 작업 지시 — op: add | edit | remove | role(한 역할에 붙이기/떼기 { role, on }) | reorder({ ids })
+  if (req.method === 'POST' && p === '/api/directives') {
+    const body = await readBody(req);
+    const list = config.directives;
+    const i = list.findIndex((x) => x.id === body.id);
+    if (body.op === 'add' || body.op === 'edit') {
+      if (body.op === 'edit' && i < 0) return json(res, 404, { error: '없는 작업 지시입니다' });
+      if (body.op === 'add' && list.length >= directives.LIMIT) return json(res, 400, { error: '작업 지시가 너무 많습니다' });
+      const r = directives.cleanDirective(body, body.op === 'edit' ? list[i] : undefined);
+      if (r.error) return json(res, 400, { error: r.error });
+      if (body.op === 'edit') list[i] = r.d; else list.push(r.d);
+      saveConfig();
+      return json(res, 200, { ok: true, id: r.d.id });
+    }
+    if (body.op === 'reorder' && Array.isArray(body.ids)) {
+      const rank = new Map(body.ids.map((x, k) => [String(x), k]));
+      list.sort((a, b) => (rank.get(a.id) ?? Infinity) - (rank.get(b.id) ?? Infinity));
+      saveConfig();
+      return json(res, 200, { ok: true });
+    }
+    if (i < 0) return json(res, 404, { error: '없는 작업 지시입니다' });
+    if (body.op === 'remove') list.splice(i, 1);
+    else if (body.op === 'role' && String(body.role || '').trim()) directives.setRole(list[i], String(body.role).trim(), Boolean(body.on));
+    else return json(res, 400, { error: 'op' });
+    saveConfig();
+    return json(res, 200, { ok: true });
+  }
   // 예약 · 반복 실행 — op: add | edit | remove | toggle | run(지금 한 번)
   if (req.method === 'POST' && p === '/api/schedules') {
     const body = await readBody(req);
