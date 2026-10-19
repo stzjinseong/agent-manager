@@ -1,9 +1,12 @@
 // ---------- 예약 · 반복 실행 ----------
 // 서버(schedule.js)가 state.schedules 로 보내는 예약을 보여 주고 고친다(/api/schedules).
-// - 헤더 ⏰ 버튼: 전체 예약 창(새 예약 · 목록 · 켜기/끄기 · 지금 실행 · 고치기 · 지우기)
-// - 상세 패널 업무 지시 칸 아래: 이 역할의 예약 몇 줄 + '⏰ 예약' (지시 칸에 쓴 글로 새 예약을 시작)
+// - 헤더 시계 버튼: 전체 예약 창(새 예약 · 목록 · 켜기/끄기 · 지금 실행 · 고치기 · 지우기)
+// - 상세 패널 업무 지시 칸 아래: 이 역할의 예약 몇 줄 + '예약' 버튼 (지시 칸에 쓴 글로 새 예약을 시작)
 (() => {
   const T = (s, v) => _t(s, v);
+  // 선 아이콘 — 시계(헤더 버튼 · 상세 패널 예약 줄 · '예약' 버튼), 모래시계(워커 기다리는 중). 글자색을 따른다
+  const CLOCK = '<svg class="sc-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="7.5"/><path d="M12 9v4l2.5 2M9 3.5h6" stroke-linecap="round"/></svg>';
+  const HOURGLASS = '<svg class="sc-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 3.5h11M6.5 20.5h11M8 3.5v2.5c0 2.8 4 4 4 6s-4 3.2-4 6v2.5M16 3.5v2.5c0 2.8-4 4-4 6s4 3.2 4 6v2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const DAYS = ['일', '월', '화', '수', '목', '금', '토'];
   const two = (n) => String(n).padStart(2, '0');
   const sameDay = (a, b) => a.toDateString() === b.toDateString();
@@ -25,7 +28,7 @@
     if (!r) return '';
     if (r.ok) return `<span class="sc-ok">✓ ${esc(T('{t} 넣음', { t: when(r.t) }))}</span>`;
     if (r.retry) return `<span class="sc-retry">↻ ${esc(srvText(r.retry))}</span>`;
-    if (r.wait) return `<span class="sc-wait" title="${esc(when(r.t))}">⏳ ${esc(srvText(r.wait))}</span>`;
+    if (r.wait) return `<span class="sc-wait" title="${esc(when(r.t))}">${HOURGLASS} ${esc(srvText(r.wait))}</span>`;
     return `<span class="sc-skip" title="${esc(when(r.t))}">⚠ ${esc(T('건너뜀'))}: ${esc(srvText(r.skip))}</span>`;
   };
   const list = () => (state.schedules || []).slice().sort((a, b) => (b.enabled - a.enabled) || ((a.nextRun || Infinity) - (b.nextRun || Infinity)));
@@ -131,7 +134,7 @@
         <div class="sc-main">
           <div class="sc-top"><b class="sc-rule">${esc(rule(s))}</b><span class="sc-role">${esc(s.role)}</span>
             <span class="sc-mode">${esc(T(s.whenOff === 'skip' ? '놓치면 건너뜀' : '놓치면 미룸'))}</span>
-            <span class="sc-next">${s.enabled && s.pendingSince ? `<i class="sc-pend">⏳ ${esc(T('워커 기다리는 중'))}</i>` : ''}${s.enabled && s.nextRun ? esc(T('다음 {t}', { t: when(s.nextRun) })) : s.enabled && s.pendingSince ? '' : esc(T(s.kind === 'once' && s.lastRun ? '끝남' : '꺼짐'))}</span></div>
+            <span class="sc-next">${s.enabled && s.pendingSince ? `<i class="sc-pend">${HOURGLASS} ${esc(T('워커 기다리는 중'))}</i>` : ''}${s.enabled && s.nextRun ? esc(T('다음 {t}', { t: when(s.nextRun) })) : s.enabled && s.pendingSince ? '' : esc(T(s.kind === 'once' && s.lastRun ? '끝남' : '꺼짐'))}</span></div>
           <div class="sc-text" title="${esc(s.text)}">${esc(s.text)}</div>
           ${s.lastResult ? `<div class="sc-res">${result(s.lastResult)}</div>` : ''}
         </div>
@@ -183,8 +186,6 @@
   };
 
   // ---------- 헤더 버튼 ----------
-  // 시계 아이콘 — 헤더 버튼 · 상세 패널 예약 줄 · '예약' 버튼이 같은 모양
-  const CLOCK = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="7.5"/><path d="M12 9v4l2.5 2M9 3.5h6" stroke-linecap="round"/></svg>';
   const btn = el(`<button id="btn-sched" class="btn ghost lang-btn sched-btn">
       ${CLOCK}
       <i class="sched-n" hidden></i>
@@ -211,7 +212,7 @@
     const n = $('.sched-n', btn); n.hidden = !on; n.textContent = on;
     const w = state.workers.find((x) => x.id === selected);
     const mine = w ? all.filter((s) => s.role === w.name).sort((a, b) => (b.enabled - a.enabled) || ((a.nextRun || Infinity) - (b.nextRun || Infinity))) : [];
-    $('.sc-mini-list', mini).innerHTML = mine.map((s) => `<div class="sc-mini-item${s.enabled ? '' : ' off'}" title="${esc(s.text)}">${s.enabled && s.pendingSince ? '⏳' : CLOCK} <b>${esc(rule(s))}</b> <span>${esc(s.text)}</span>${s.enabled && s.nextRun ? `<em>${esc(when(s.nextRun))}</em>` : ''}</div>`).join('');
+    $('.sc-mini-list', mini).innerHTML = mine.map((s) => `<div class="sc-mini-item${s.enabled ? '' : ' off'}" title="${esc(s.text)}">${s.enabled && s.pendingSince ? HOURGLASS : CLOCK} <b>${esc(rule(s))}</b> <span>${esc(s.text)}</span>${s.enabled && s.nextRun ? `<em>${esc(when(s.nextRun))}</em>` : ''}</div>`).join('');
     $('.sc-mini-add', mini).innerHTML = `${CLOCK}${esc(T('예약'))}`;
     $('.sc-mini-add', mini).title = T('업무 지시 칸에 쓴 글로 예약 만들기');
     if (!back.hidden) { texts(); renderList(); }
