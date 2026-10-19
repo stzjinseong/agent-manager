@@ -910,13 +910,14 @@ function newDot(btn, key) {
 
 // ---------- 렌더 ----------
 // 서버는 상세 패널을 연 워커만 타임라인 · 프로필 전부를 싣고 나머지는 가볍게(lite) 보낸다(server.js workerView).
-// 막 고른 워커는 서버가 전부를 보내 줄 때까지 잠깐 lite 로 남는다 — 그동안은 지난번에 받은 전체 값을 이어 쓰고, 없으면 빈 타임라인으로
+// 막 고른 워커는 서버가 전부를 보내 줄 때까지 잠깐 lite 로 남는다 — 그동안은 지난번에 받은 전체 값을 이어 쓰고, 없으면 빈 타임라인으로.
+// 프로필은 null 로 비우지 않고 lite 값을 그대로 둔다 — 비우면 카드의 대기(bgRunning) 상태 · 비용 · ctx 배지가 사라졌다 돌아와 카드가 깜빡였다
 let fullOf = null; // { id, log, past, profile } — 마지막으로 받은 연 워커의 전체 값
 function fillSelected() {
   const w = selected && state.workers.find((x) => x.id === selected);
   if (!w) return;
   if (!w.lite) { fullOf = { id: w.id, log: w.log, past: w.past, profile: w.profile }; return; }
-  const f = fullOf?.id === w.id ? fullOf : { log: [], past: [], profile: null };
+  const f = fullOf?.id === w.id ? fullOf : { log: [], past: [], profile: w.profile };
   Object.assign(w, { log: f.log, past: f.past, profile: f.profile, lite: false });
 }
 function render() {
@@ -2091,10 +2092,12 @@ let profileSig = '';
 let profileTurns = [];
 function renderProfile(w, force) {
   const p = w.profile;
-  const sig = p ? `${w.id}|${p.calls}|${p.turnCount}|${p.total.output}|${p.total.cacheRead}|${p.bgRunning}|${p.sub.tokens}|${p.apiErrors?.length}|${p.toolErrors}|${p.cacheMisses}|${Math.round((p.time?.total || 0) / 2000)}|${$('#profile').clientWidth}` : `${w.id}|none`;
+  // lite 프로필(전체 값 도착 전)에는 차트 · 턴 목록 재료가 없다 — 빈 안내로 바꿨다 되돌리지 않고 다음 렌더를 기다린다
+  if (p?.lite && !force) return;
+  const sig = p && !p.lite ? `${w.id}|${p.calls}|${p.turnCount}|${p.total.output}|${p.total.cacheRead}|${p.bgRunning}|${p.sub.tokens}|${p.apiErrors?.length}|${p.toolErrors}|${p.cacheMisses}|${Math.round((p.time?.total || 0) / 2000)}|${$('#profile').clientWidth}` : `${w.id}|none`;
   if (sig === profileSig && !force) return;
   profileSig = sig;
-  if (!p || !p.turnCount) {
+  if (!p || p.lite || !p.turnCount) {
     $('#kpis').innerHTML = `<div class="profile-empty">${_t('첫 지시가 끝나면 토큰 사용량이 여기에 쌓입니다.')}</div>`;
     // 이전 워커의 차트·목록·요약이 남지 않게 프로파일 칸을 전부 비운다
     ['#chart-tools', '#chart-tooltime', '#subagents', '#turns-table'].forEach((s) => ($(s).innerHTML = ''));
