@@ -512,6 +512,26 @@ async function cutSelection() {
     toast(_t('커서를 옮기지 못해 복사만 했어요'));
   } finally { cutting = false; }
 }
+// ---------- 전체 선택 (Ctrl/⌘+A) ----------
+// 입력칸에 쓴 글을 화면에서 선택한다 — 그대로 Ctrl+C 복사 · Ctrl+X 잘라내기로 이어진다.
+// 입력칸이 아니거나(메뉴·Vim 모드) 비어 있으면(흐린 안내 글만) false → ^A 를 그대로 CLI 로(줄 처음으로)
+function selectInput() {
+  const box = cutBox();
+  if (!box) return false;
+  const b = term.buffer.active;
+  let first = -1, last = -1;
+  for (let y = box.top + 1; y < box.bottom; y++) {
+    const l = b.getLine(y);
+    for (let x = box.start; l && x < l.length; x++) {
+      const c = l.getCell(x);
+      if (c?.getChars().trim() && !c.isDim()) { if (first < 0) first = y; last = y; break; }
+    }
+  }
+  if (first < 0) return false;
+  const end = cutRowEnd(last);
+  term.select(box.start, first, (last - first) * term.cols + end - box.start);
+  return true;
+}
 term.attachCustomKeyEventHandler((e) => {
   if (e.type !== 'keydown') return true;
   // Enter 는 헤더 ⌨ 의 키 세트대로(enterAction) — 업무 지시 입력창과 같은 규칙. 세트 1: Enter 줄바꿈 · Alt(⌥)·Cmd+Enter 제출,
@@ -539,6 +559,7 @@ term.attachCustomKeyEventHandler((e) => {
   if (mod && e.code === 'KeyV') return false; // 기본 paste 이벤트로 넘김
   // Ctrl/⌘+X: 선택이 있으면 잘라내기(입력칸 밖이면 복사만), 없으면 그대로 CLI 로
   if (mod && e.code === 'KeyX' && term.hasSelection()) { e.preventDefault(); cutSelection(); return false; }
+  if (mod && !e.shiftKey && !e.altKey && e.code === 'KeyA' && selectInput()) { e.preventDefault(); return false; }
   return true;
 });
 // ---------- 파일 첨부 ----------
