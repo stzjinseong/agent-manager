@@ -532,6 +532,13 @@ function selectInput() {
   term.select(box.start, first, (last - first) * term.cols + end - box.start);
   return true;
 }
+// 한글 조합 중 Ctrl+A: 바로 선택하면 곧이어 조합 글자가 확정·전송되고, xterm 은 입력이 들어오면 선택을 지운다(onUserInput)
+// → 두 번 눌러야 됐다. 조합이 끝나고 CLI 가 그 글자를 다시 그린 뒤 선택한다
+async function selectInputAfterIme() {
+  for (let t = 0; imeComposing && t < 50; t++) await new Promise((r) => setTimeout(r, 10));
+  await cutSettle();
+  selectInput();
+}
 term.attachCustomKeyEventHandler((e) => {
   if (e.type !== 'keydown') return true;
   // Enter 는 헤더 ⌨ 의 키 세트대로(enterAction) — 업무 지시 입력창과 같은 규칙. 세트 1: Enter 줄바꿈 · Alt(⌥)·Cmd+Enter 제출,
@@ -559,7 +566,10 @@ term.attachCustomKeyEventHandler((e) => {
   if (mod && e.code === 'KeyV') return false; // 기본 paste 이벤트로 넘김
   // Ctrl/⌘+X: 선택이 있으면 잘라내기(입력칸 밖이면 복사만), 없으면 그대로 CLI 로
   if (mod && e.code === 'KeyX' && term.hasSelection()) { e.preventDefault(); cutSelection(); return false; }
-  if (mod && !e.shiftKey && !e.altKey && e.code === 'KeyA' && selectInput()) { e.preventDefault(); return false; }
+  if (mod && !e.shiftKey && !e.altKey && e.code === 'KeyA') {
+    if (e.isComposing || imeComposing || e.keyCode === 229 || Date.now() - imeCompEndAt < 500) { e.preventDefault(); selectInputAfterIme(); return false; }
+    if (selectInput()) { e.preventDefault(); return false; }
+  }
   return true;
 });
 // ---------- 파일 첨부 ----------
