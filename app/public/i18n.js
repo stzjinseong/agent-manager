@@ -623,7 +623,7 @@ const EN = {
   '새로 띄우는 워커에도 붙어요 · 워커 칩을 끄면 그 워커만 빠져요': 'Also applies to new workers · turn a worker chip off to exclude it', '모든 워커에서 떼기': 'Detach from all workers', '모든 워커에 붙이기 (새로 띄우는 워커 포함)': 'Attach to all workers (including new ones)',
   '켠 워커에만 붙어요': 'Applies only to the workers turned on',
   '아무것도 안 켜면 보관만 해 둬요 — 나중에 목록에서 칩을 눌러 붙여요': 'Nothing on = kept only — attach it later by clicking chips in the list',
-  '헤더 추가': 'Add header', '헤더를 고쳤어요': 'Directive updated', '헤더를 추가했어요': 'Directive added', '추천': 'Suggested',
+  '헤더 추가': 'Add header', '헤더를 고쳤어요': 'Directive updated', '헤더를 추가했어요': 'Directive added', '헤더를 추가했어요 — 아래 목록에서 붙일 워커를 고르세요': 'Header added — pick workers for it in the list below', '추천': 'Suggested',
   '{r} 에서 떼기': 'Detach from {r}', '{r} 에 붙이기': 'Attach to {r}', 
   '아직 헤더가 없어요 — 위에 직접 쓰거나 추천에서 골라 보세요': 'No directives yet — write one above or pick a suggestion',
   '이 헤더를 지울까요?': 'Delete this directive?', '전체 {n}개 · 모든 워커 {g}개': '{n} total · {g} on all workers',

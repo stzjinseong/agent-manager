@@ -42,9 +42,6 @@
       <form class="sc-form dv-form" autocomplete="off">
         <div class="sc-row"><label class="sc-l" data-k="제목"></label><input name="title" maxlength="40"></div>
         <div class="sc-row top"><label class="sc-l" data-k="내용"></label><textarea name="text" rows="3" maxlength="2000"></textarea></div>
-        <div class="sc-row top"><label class="sc-l" data-k="붙일 곳"></label><div class="sc-when">
-          <div class="dv-roles"></div>
-          <small class="sc-hint dv-kind-hint"></small></div></div>
         <div class="sc-acts"><span class="sc-err"></span><button type="button" class="btn ghost sc-cancel" data-k="취소"></button><button type="submit" class="btn primary sc-save"></button></div>
       </form>
       <div class="dv-presets"></div>
@@ -53,8 +50,7 @@
     </div></div>`);
   document.body.append(back);
   const box = back.firstElementChild, form = $('.dv-form', box);
-  let editing = null, fGlobal = false, preset = null;
-  const picked = new Set(); // 모든 워커면 뺄 역할, 아니면 붙일 역할
+  let editing = null, preset = null;
 
   const close = () => { back.hidden = true; };
   back.addEventListener('click', (e) => { if (e.target === back || e.target.closest('[data-dv=close]')) close(); });
@@ -66,19 +62,6 @@
     return `<button type="button" class="dv-rc dv-rc-all${global ? ' on' : ''}" data-all title="${esc(T(global ? '모든 워커에서 떼기' : '모든 워커에 붙이기 (새로 띄우는 워커 포함)'))}">${GLOBE}${esc(T('모든 워커'))}</button>` +
       names.map((r) => `<button type="button" class="dv-rc${on(r) ? ' on' : ''}" data-role="${esc(r)}" title="${esc(T(on(r) ? '{r} 에서 떼기' : '{r} 에 붙이기', { r }))}">${esc(r)}</button>`).join('');
   }
-  function renderFormRoles() {
-    const names = roles();
-    for (const r of picked) if (!names.includes(r)) names.push(r);
-    $('.dv-roles', box).innerHTML = chipRow(fGlobal, (r) => (fGlobal ? !picked.has(r) : picked.has(r)), names);
-    $('.dv-kind-hint', box).textContent = T(fGlobal ? '새로 띄우는 워커에도 붙어요 · 워커 칩을 끄면 그 워커만 빠져요' : picked.size ? '켠 워커에만 붙어요' : '아무것도 안 켜면 보관만 해 둬요 — 나중에 목록에서 칩을 눌러 붙여요');
-  }
-  $('.dv-roles', box).addEventListener('click', (e) => {
-    if (e.target.closest('[data-all]')) { fGlobal = !fGlobal; picked.clear(); renderFormRoles(); return; }
-    const r = e.target.closest('[data-role]')?.dataset.role;
-    if (!r) return;
-    picked.has(r) ? picked.delete(r) : picked.add(r);
-    renderFormRoles();
-  });
   $('.sc-cancel', box).onclick = () => { fill(); renderList(); };
 
   // 입력칸 채우기 — 새 지시({ role } 이면 그 역할만 골라 둔 채) 또는 고칠 지시
@@ -87,10 +70,6 @@
     preset = d.preset || null;
     form.title.value = d.title || '';
     form.text.value = d.text || '';
-    fGlobal = isEdit ? Boolean(d.global) : false;
-    picked.clear();
-    (isEdit ? (d.global ? d.except : d.roles) || [] : d.role ? [d.role] : []).forEach((r) => picked.add(r));
-    renderFormRoles();
     $('.sc-err', box).textContent = '';
     $('.sc-save', box).textContent = T(isEdit ? '고치기 저장' : '헤더 추가');
     $('.sc-cancel', box).hidden = !isEdit && !d.text;
@@ -99,10 +78,11 @@
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const body = { op: editing ? 'edit' : 'add', id: editing, title: form.title.value, text: form.text.value, preset, global: fGlobal, roles: fGlobal ? [] : [...picked], except: fGlobal ? [...picked] : [] };
+    // 붙일 곳은 여기서 정하지 않는다 — 새 헤더는 아무 데도 안 붙은 채로 목록에 들어가고, 목록의 칩으로 붙인다. 고칠 때는 붙은 곳 그대로
+    const body = { op: editing ? 'edit' : 'add', id: editing, title: form.title.value, text: form.text.value, preset };
     const r = await api('/api/directives', body);
     if (r.error) { $('.sc-err', box).textContent = r.error; return; }
-    toast(T(editing ? '헤더를 고쳤어요' : '헤더를 추가했어요'));
+    toast(T(editing ? '헤더를 고쳤어요' : '헤더를 추가했어요 — 아래 목록에서 붙일 워커를 고르세요'), editing ? undefined : 3500);
     fill();
     renderList();
   });
@@ -115,8 +95,7 @@
   $('.dv-presets', box).addEventListener('click', (e) => {
     const p = (state.directivePresets || []).find((x) => x.key === e.target.closest('[data-pre]')?.dataset.pre);
     if (!p) return;
-    const role = form.dataset.role; // 워커 패널에서 열었으면 그 워커에
-    fill({ title: T(p.title), text: T(p.text), preset: p.key, role });
+    fill({ title: T(p.title), text: T(p.text), preset: p.key });
     form.text.focus();
   });
 
@@ -171,11 +150,10 @@
 
   window.openDirectives = (init = {}) => {
     texts();
-    form.dataset.role = init.role || '';
     init.edit ? fill(init.edit, true) : fill(init);
     renderList();
     back.hidden = false;
-    form[init.edit || init.role ? 'text' : 'title'].focus();
+    form[init.edit ? 'text' : 'title'].focus();
   };
 
   // ---------- 헤더 버튼 ----------
@@ -223,7 +201,7 @@
       st.className = `dv-state${w.dirPending ? ' wait' : ''}`;
       st.title = w.dirPending ? T('바뀐 헤더는 이 워커가 다음 메시지를 받을 때 함께 넘어가요') : T('이 세션에 지금 헤더가 전달됐어요');
     }
-    if (!back.hidden) { texts(); renderList(); if (!editing) renderFormRoles(); }
+    if (!back.hidden) { texts(); renderList(); }
   };
   document.addEventListener('langchange', () => window.renderDirectives());
 })();
