@@ -81,6 +81,21 @@ export function takeContext(list, w) {
   return release ? `${now}\n\n${release}` : now;
 }
 
+// 같은 추천(preset)에서 온 항목을 하나로 합친다 — 서버가 중복을 막기 전, 응답이 늦어 여러 번 눌려 겹쳐 들어간 것들.
+// 맨 앞 항목을 남기고 붙은 역할은 합친다(하나라도 공용이면 공용, 그때 뺄 역할은 모두 공통으로 뺀 것만)
+export function dedupe(list) {
+  const out = [], byPreset = new Map();
+  for (const d of list) {
+    const keep = d.preset && byPreset.get(d.preset);
+    if (!keep) { out.push(d); if (d.preset) byPreset.set(d.preset, d); continue; }
+    const ex = keep.global && d.global ? keep.except.filter((r) => d.except.includes(r)) : keep.global ? keep.except : d.global ? d.except : [];
+    keep.global = keep.global || d.global;
+    keep.roles = uniq([...keep.roles, ...d.roles]);
+    keep.except = keep.global ? ex.filter((r) => !keep.roles.includes(r)) : [];
+  }
+  return out;
+}
+
 export function renameRole(list, from, to) {
   for (const d of list) {
     d.roles = uniq(d.roles.map((x) => (x === from ? to : x)));

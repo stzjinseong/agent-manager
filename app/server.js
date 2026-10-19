@@ -167,7 +167,7 @@ function usageReporters() {
 function loadConfig() {
   try {
     const c = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
-    return { profiles: c.profiles || [], recentCwds: c.recentCwds || [], order: c.order || [], memos: c.memos || {}, colors: c.colors || {}, sessions: c.sessions || {}, diffCleared: c.diffCleared || {}, manualQueue: c.manualQueue || {}, schedules: c.schedules || [], directives: c.directives || [] };
+    return { profiles: c.profiles || [], recentCwds: c.recentCwds || [], order: c.order || [], memos: c.memos || {}, colors: c.colors || {}, sessions: c.sessions || {}, diffCleared: c.diffCleared || {}, manualQueue: c.manualQueue || {}, schedules: c.schedules || [], directives: directives.dedupe(c.directives || []) };
   } catch { return { profiles: [], recentCwds: [], order: [], memos: {}, colors: {}, sessions: {}, diffCleared: {}, manualQueue: {}, schedules: [], directives: [] }; }
 }
 
