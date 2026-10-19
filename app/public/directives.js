@@ -69,7 +69,7 @@
     const on = (r) => (kind === 'all' ? !picked.has(r) : picked.has(r));
     $('.dv-roles', box).hidden = kind === 'keep' || !names.length;
     $('.dv-roles', box).innerHTML = names.map((r) => `<button type="button" class="dv-rc${on(r) ? ' on' : ''}" data-role="${esc(r)}">${esc(r)}</button>`).join('');
-    $('.dv-kind-hint', box).textContent = T(kind === 'all' ? '새로 띄우는 워커에도 붙어요 · 칩을 끄면 그 워커만 빠져요' : kind === 'pick' ? '켠 워커에만 붙어요' : '아무 워커에도 안 붙이고 보관만 해요 — 나중에 워커 패널의 + 헤더 에서 골라 붙여요');
+    $('.dv-kind-hint', box).textContent = T(kind === 'all' ? '새로 띄우는 워커에도 붙어요 · 칩을 끄면 그 워커만 빠져요' : kind === 'pick' ? '켠 워커에만 붙어요' : "아무 워커에도 안 붙이고 보관만 해요 — 나중에 고치기에서 '모든 워커'나 '골라서'로 바꿔 붙여요");
   }
   $('.dv-roles', box).addEventListener('click', (e) => {
     const r = e.target.closest('[data-role]')?.dataset.role;
@@ -200,65 +200,13 @@
   btn.onclick = () => window.openDirectives();
   newDot(btn, 'directives');
 
-  // ---------- 상세 패널: 이 워커의 지시 ----------
-  const bar = el(`<div class="dv-bar"><div class="dv-chips"></div><button type="button" class="btn ghost dv-add"></button><span class="dv-state"></span></div>`);
+  // ---------- 상세 패널: 이 워커에 붙은 헤더 ----------
+  // 붙이기는 헤더 버튼 창(모든 워커 / 골라서)에서만 한다 — 여기는 붙은 것을 보여 주고 떼기 · 고치기만
+  const bar = el(`<div class="dv-bar"><div class="dv-chips"></div><span class="dv-state"></span></div>`);
   document.querySelector('#sec-task .side-h')?.after(bar);
-  // 예약 버튼(schedule.js)을 '+ 헤더' 오른쪽으로 — 이 워커에 붙이는 것들을 한 줄에 모은다
+  // 예약 버튼(schedule.js)을 헤더 칩 오른쪽으로 — 이 워커에 붙는 것들을 한 줄에 모은다
   const scAdd = document.querySelector('.sc-mini-add');
-  if (scAdd) $('.dv-add', bar).after(scAdd);
-  const pop = el(`<div class="panel dv-pop" hidden></div>`);
-  document.body.append(pop);
-  const closePop = () => { pop.hidden = true; };
-  document.addEventListener('pointerdown', (e) => { if (!pop.hidden && !pop.contains(e.target) && !e.target.closest('.dv-add')) closePop(); });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !pop.hidden) closePop(); });
-
-  function renderPop() {
-    const w = cur();
-    if (!w) return closePop();
-    // 지금 붙어 있는 워커 수 — 많이 쓰는 헤더가 위로(같으면 보관함 순서 그대로)
-    const rs = roles(), uses = (d) => rs.filter((r) => applies(d, r)).length;
-    const off = list().filter((d) => !applies(d, w.name)).map((d) => ({ d, n: uses(d) })).sort((a, b) => b.n - a.n);
-    const ps = presets();
-    const row = (attrs, title, sub, extra = '', n = null) => `<button type="button" class="dv-pi" ${attrs}><b>${extra}${esc(title)}${n ? `<em title="${esc(T('지금 붙어 있는 워커 수'))}">${esc(T('워커 {n}', { n }))}</em>` : ''}</b><span>${esc(sub)}</span></button>`;
-    // 새로 쓰기 · 모두 관리 줄은 맨 위에 고정 (목록을 내려도 남는다)
-    pop.innerHTML = `
-      <div class="dv-pf"><button type="button" class="btn ghost" data-pop="new">✎ ${esc(T('새로 쓰기'))}</button><button type="button" class="btn ghost" data-pop="all">${esc(T('모두 관리'))}</button></div>
-      ${off.length ? `<div class="dv-ph">${esc(T('보관함 · 다른 워커'))}</div>${off.map(({ d, n }) => row(`data-id="${d.id}"`, d.title, d.text, d.global ? GLOBE : '', n)).join('')}` : ''}
-      ${ps.length ? `<div class="dv-ph">${esc(T('추천'))}</div>${ps.map((p) => row(`data-pre="${p.key}"`, T(p.title), T(p.text))).join('')}` : ''}
-      ${!off.length && !ps.length ? `<div class="dv-pe">${esc(T('붙일 헤더가 더 없어요'))}</div>` : ''}`;
-  }
-  pop.addEventListener('click', async (e) => {
-    const w = cur();
-    if (!w) return;
-    const t = e.target.closest('[data-id],[data-pre],[data-pop]');
-    if (!t) return;
-    if (t.dataset.id) { post({ op: 'role', id: t.dataset.id, role: w.name, on: true }); return; }
-    if (t.dataset.pre) {
-      const p = (state.directivePresets || []).find((x) => x.key === t.dataset.pre);
-      if (p) post({ op: 'add', title: T(p.title), text: T(p.text), preset: p.key, roles: [w.name] });
-      return;
-    }
-    closePop();
-    window.openDirectives(t.dataset.pop === 'new' ? { role: w.name } : {});
-  });
-  $('.dv-add', bar).onclick = () => {
-    if (!pop.hidden) return closePop();
-    renderPop();
-    pop.hidden = false;
-    const r = $('.dv-add', bar).getBoundingClientRect();
-    pop.style.left = `${Math.max(8, Math.min(r.left, innerWidth - pop.offsetWidth - 8))}px`;
-    pop.style.top = `${Math.max(8, Math.min(r.bottom + 4, innerHeight - pop.offsetHeight - 8))}px`;
-  };
-  // 크기 조절 — 오른쪽 아래 모서리를 끌어서. 끈 크기는 이 브라우저에 기억한다
-  const POP_SIZE_KEY = 'am.dirPopSize';
-  try {
-    const z = JSON.parse(localStorage.getItem(POP_SIZE_KEY) || 'null');
-    if (z?.w || z?.h) { pop.style.width = z.w || ''; pop.style.height = z.h || ''; }
-  } catch {}
-  new ResizeObserver(() => {
-    if (pop.hidden || !(pop.style.width || pop.style.height)) return; // 내용 때문에 바뀐 높이는 기억하지 않는다
-    try { localStorage.setItem(POP_SIZE_KEY, JSON.stringify({ w: pop.style.width, h: pop.style.height })); } catch {}
-  }).observe(pop);
+  if (scAdd) $('.dv-chips', bar).after(scAdd);
   bar.addEventListener('click', (e) => {
     const w = cur(), c = e.target.closest('[data-id]');
     if (!w || !c) return;
@@ -286,14 +234,11 @@
         ...mine.map((d) => `<span class="dv-chip${d.global ? ' g' : ''}" data-id="${d.id}" title="${esc(d.text)}">${d.global ? GLOBE : ''}<span>${esc(d.title)}</span><button type="button" class="dv-x" title="${esc(T('이 워커에서 떼기'))}" aria-label="${esc(T('이 워커에서 떼기'))}">✕</button></span>`),
         ...out.map((d) => `<span class="dv-chip g out" data-id="${d.id}" title="${esc(T('공용 헤더 — 이 워커는 빠짐'))}">${GLOBE}<span>${esc(d.title)}</span><button type="button" class="dv-x" title="${esc(T('다시 넣기'))}" aria-label="${esc(T('다시 넣기'))}">+</button></span>`),
       ].join('');
-      $('.dv-add', bar).innerHTML = `${ICON}${esc(mine.length ? '+' : T('+ 헤더'))}`;
-      $('.dv-add', bar).title = T('보관함 · 추천에서 이 워커에 헤더 붙이기');
       const st = $('.dv-state', bar);
       st.textContent = w.status === 'exited' ? '' : w.dirPending ? T(mine.length ? '다음 메시지에 전달' : '다음 메시지에 해제 전달') : mine.length ? T('✓ 전달됨') : '';
       st.className = `dv-state${w.dirPending ? ' wait' : ''}`;
       st.title = w.dirPending ? T('바뀐 헤더는 이 워커가 다음 메시지를 받을 때 함께 넘어가요') : T('이 세션에 지금 헤더가 전달됐어요');
     }
-    if (!pop.hidden) renderPop();
     if (!back.hidden) { texts(); renderList(); if (!editing) renderFormRoles(); }
   };
   document.addEventListener('langchange', () => window.renderDirectives());

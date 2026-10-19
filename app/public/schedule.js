@@ -197,7 +197,7 @@
   // ---------- 상세 패널: 이 역할의 예약 ----------
   const mini = el(`<div class="sc-mini"><div class="sc-mini-list"></div><button type="button" class="btn ghost sc-mini-add"></button></div>`);
   document.querySelector('#auto-queue')?.closest('.auto-q')?.after(mini);
-  // 버튼은 directives.js 가 '+ 헤더' 오른쪽으로 옮긴다 — mini 안에서 찾지 말고 잡아 둔 것을 쓴다
+  // 버튼은 directives.js 가 헤더 칩 오른쪽으로 옮긴다 — mini 안에서 찾지 말고 잡아 둔 것을 쓴다
   const miniAdd = $('.sc-mini-add', mini);
   miniAdd.onclick = () => {
     const w = state.workers.find((x) => x.id === selected);
