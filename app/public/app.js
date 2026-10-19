@@ -307,10 +307,24 @@ term.open($('#term'));
 let enterAs = null;
 // 시작 중(신뢰 확인 같은 선택창 없이)엔 터미널 입력을 막는다 — 가림막(#term-boot)과 같은 조건
 const termLocked = () => { const w = selected && state.workers.find((x) => x.id === selected); return Boolean(w && w.status === 'starting' && !w.bootOpen); };
+// 선택한 입력칸 글 위에 글자를 치면(덮어쓰기) 선택한 글을 먼저 지운다 — 지우는 동안(커서를 옮기며 몇 번 왕복) 친 글자는
+// 붙잡아 두었다가 다 지운 뒤 보낸다. 안 그러면 지우는 도중의 커서 자리에 끼어들었다
+let replaceJob = null;
+const heldInput = [];
+function sendInput(data) {
+  if (replaceJob) { heldInput.push(data); return; }
+  if (selected) send({ type: 'input', id: selected, data });
+}
+function typeOver() {
+  if (replaceJob || cutting || !term.hasSelection() || termLocked()) return;
+  const job = cutSelection(true); // 입력칸 밖 선택이면 false — 그때는 xterm 이 선택만 풀고 글자는 그대로 간다
+  if (!job) return;
+  replaceJob = job.finally(() => { replaceJob = null; const d = heldInput.splice(0).join(''); if (d) sendInput(d); });
+}
 term.onData((data) => {
   if (enterAs && (data === '\r' || data === '\x1b\r')) { data = enterAs; enterAs = null; }
   if (termLocked()) return;
-  if (selected) send({ type: 'input', id: selected, data });
+  sendInput(data);
 });
 // ---------- Safari: 조합 이벤트 없이 들어오는 한글 ----------
 // Safari 는 가끔 터미널 입력칸에서 조합 이벤트(compositionstart…)를 전혀 보내지 않고, 첫 자모는 insertText 로 넣은 뒤
@@ -343,7 +357,7 @@ if (IS_SAFARI && term.textarea) {
     const data = '\x7f'.repeat(before.length - p) + after.slice(p);
     imeBefore = after;
     if (!data || termLocked()) return;
-    if (selected) send({ type: 'input', id: selected, data });
+    sendInput(data);
   }, true);
 }
 
@@ -450,7 +464,7 @@ function cutSelection(del = false) {
   if (!del) try { navigator.clipboard.writeText(cutText(s, e, box.start)).catch(() => {}); } catch {}
   term.clearSelection();
   cutting = true;
-  (async () => { try {
+  return (async () => { try {
     // 입력칸 맨 위 가로선 기준 상대 줄로 다룬다 — 도중에 위쪽 출력이 늘어 화면이 밀려도 맞도록
     const rel = (p, bx) => ({ y: p.y - bx.top, x: p.x });
     const key = (p) => p.y * 10000 + p.x;
@@ -512,8 +526,7 @@ function cutSelection(del = false) {
     }
   } catch {
     toast(_t(del ? '커서를 옮기지 못해 지우지 못했어요' : '커서를 옮기지 못해 복사만 했어요'));
-  } finally { cutting = false; } })();
-  return true;
+  } finally { cutting = false; } })(); // 지우기가 끝나면 풀리는 약속 — 덮어쓰기(typeOver)가 기다린다
 }
 // ---------- 전체 선택 (Ctrl/⌘+A) ----------
 // 입력칸에 쓴 글을 화면에서 선택한다 — 그대로 Ctrl+C 복사 · Ctrl+X 잘라내기로 이어진다.
@@ -566,11 +579,13 @@ term.attachCustomKeyEventHandler((e) => {
   const mod = e.ctrlKey || e.metaKey;
   // e.key 가 아니라 물리 키(e.code)로 판정 — 한글 입력 상태면 Ctrl+V 의 key 가 'ㅍ', Ctrl+C 는 'ㅊ' 로 온다
   if (mod && e.code === 'KeyC' && (term.hasSelection() || e.shiftKey || e.metaKey)) { e.preventDefault(); copySelection(); return false; }
-  if (mod && e.code === 'KeyV') return false; // 기본 paste 이벤트로 넘김
+  if (mod && e.code === 'KeyV') { typeOver(); return false; } // 기본 paste 이벤트로 넘김 — 선택한 입력칸 글이 있으면 그 자리에 붙여넣기
   // Ctrl/⌘+X: 선택이 있으면 잘라내기(입력칸 밖이면 복사만), 없으면 그대로 CLI 로
   if (mod && e.code === 'KeyX' && term.hasSelection()) { e.preventDefault(); cutSelection(); return false; }
   // Backspace/Delete: 입력칸 글을 선택해 두었으면(Ctrl+A 등) 그 글을 지운다 — 클립보드는 그대로.
   // 입력칸 밖 선택이면 선택만 풀고 키는 원래대로 CLI 로(한 글자 지우기)
+  // 글자 키(한글 조합 시작 포함): 선택한 입력칸 글을 지우고 그 자리에 — 키는 그대로 xterm 이 처리하고 보낼 글자는 지울 때까지 붙잡는다
+  if (!mod && !e.altKey && (e.key.length === 1 || e.keyCode === 229 || e.key === 'Process') && term.hasSelection()) typeOver();
   if (!mod && !e.altKey && (e.key === 'Backspace' || e.key === 'Delete') && term.hasSelection() && !e.isComposing && !imeComposing) {
     if (cutSelection(true)) { e.preventDefault(); return false; }
     term.clearSelection();
