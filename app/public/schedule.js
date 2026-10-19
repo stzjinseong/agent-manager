@@ -195,15 +195,9 @@
   newDot(btn, 'schedules'); // 새 기능 점 (app.js)
 
   // ---------- 상세 패널: 이 역할의 예약 ----------
-  const mini = el(`<div class="sc-mini"><div class="sc-mini-list"></div><button type="button" class="btn ghost sc-mini-add"></button></div>`);
+  const mini = el(`<div class="sc-mini"><div class="sc-mini-list"></div></div>`);
   // Tasks 제목 위 — directives.js 가 나중에 헤더 칩 줄을 맨 앞에 끼우므로 순서는 헤더 칩 · 예약 · 제목 · 입력창
   document.querySelector('#sec-task .side-h')?.before(mini);
-  // 버튼은 directives.js 가 헤더 칩 오른쪽으로 옮긴다 — mini 안에서 찾지 말고 잡아 둔 것을 쓴다
-  const miniAdd = $('.sc-mini-add', mini);
-  miniAdd.onclick = () => {
-    const w = state.workers.find((x) => x.id === selected);
-    window.openSchedules({ role: w?.name, text: document.querySelector('#task-form textarea')?.value.trim() });
-  };
   mini.addEventListener('click', (e) => { if (e.target.closest('.sc-mini-item')) window.openSchedules({ role: state.workers.find((x) => x.id === selected)?.name }); });
 
   window.renderSchedules = () => {
@@ -216,8 +210,6 @@
     const w = state.workers.find((x) => x.id === selected);
     const mine = w ? all.filter((s) => s.role === w.name).sort((a, b) => (b.enabled - a.enabled) || ((a.nextRun || Infinity) - (b.nextRun || Infinity))) : [];
     $('.sc-mini-list', mini).innerHTML = mine.map((s) => `<div class="sc-mini-item${s.enabled ? '' : ' off'}" title="${esc(s.text)}">${s.enabled && s.pendingSince ? HOURGLASS : CLOCK} <b>${esc(rule(s))}</b> <span>${esc(s.text)}</span>${s.enabled && s.nextRun ? `<em>${esc(when(s.nextRun))}</em>` : ''}</div>`).join('');
-    miniAdd.innerHTML = `${CLOCK}${esc(T('예약'))}`;
-    miniAdd.title = T('업무 지시 칸에 쓴 글로 예약 만들기');
     if (!back.hidden) { texts(); renderList(); }
   };
   document.addEventListener('langchange', () => window.renderSchedules());

@@ -650,7 +650,7 @@ const EN = {
   '놓치면': 'If missed', '미뤘다 실행': 'Run later', '건너뛰기': 'Skip', '놓치면 건너뜀': 'skip if missed', '놓치면 미룸': 'run later if missed', '워커 기다리는 중': 'waiting for worker',
   '그 시각에 워커나 서버가 꺼져 있었으면 워커가 다시 뜰 때 넣어요 (24시간까지)': 'If the worker or server was off at that time, it runs when the worker is back (up to 24h)',
   '그 시각에 워커나 서버가 꺼져 있었으면 그 회차는 넘어가요': 'If the worker or server was off at that time, that run is skipped',
-  '이 PC 시각 기준 · 클로드 키우기가 켜져 있을 때만 돌아요 · 작업 중이면 대기열로 · 5시간 한도 90% 이상이면 건너뜀 · CLI 입력창이 막혀 있으면 1분마다 다시(10번)': "This PC's clock · runs only while the dashboard is on · queued if the worker is busy · skipped at 90%+ 5-hour usage · retried every minute (10×) if the CLI input is blocked", '예약': 'Schedule', '업무 지시 칸에 쓴 글로 예약 만들기': 'Schedule the text in the task box',
+  '이 PC 시각 기준 · 클로드 키우기가 켜져 있을 때만 돌아요 · 작업 중이면 대기열로 · 5시간 한도 90% 이상이면 건너뜀 · CLI 입력창이 막혀 있으면 1분마다 다시(10번)': "This PC's clock · runs only while the dashboard is on · queued if the worker is busy · skipped at 90%+ 5-hour usage · retried every minute (10×) if the CLI input is blocked", '예약': 'Schedule',
 };
 const DICTS = { en: EN };
 // 서버가 만든 한국어 문구(타임라인 기록·알림·오류) — 서버는 언어를 모르니 화면에서 바꾼다. 이미 저장된 예전 기록에도 그대로 통한다.
