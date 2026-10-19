@@ -226,8 +226,19 @@
     pop.hidden = false;
     const r = $('.dv-add', bar).getBoundingClientRect();
     pop.style.left = `${Math.max(8, Math.min(r.left, innerWidth - pop.offsetWidth - 8))}px`;
-    pop.style.top = `${Math.min(r.bottom + 4, innerHeight - pop.offsetHeight - 8)}px`;
+    pop.style.top = `${Math.max(8, Math.min(r.bottom + 4, innerHeight - pop.offsetHeight - 8))}px`;
   };
+  // 크기 조절 — 오른쪽 아래 모서리를 끌어서. 끈 크기는 이 브라우저에 기억한다
+  const POP_SIZE_KEY = 'am.dirPopSize';
+  try {
+    const z = JSON.parse(localStorage.getItem(POP_SIZE_KEY) || 'null');
+    if (z?.w || z?.h) { pop.style.width = z.w || ''; pop.style.height = z.h || ''; pop.classList.add('sized'); }
+  } catch {}
+  new ResizeObserver(() => {
+    if (pop.hidden || !(pop.style.width || pop.style.height)) return; // 내용 때문에 바뀐 높이는 기억하지 않는다
+    pop.classList.add('sized');
+    try { localStorage.setItem(POP_SIZE_KEY, JSON.stringify({ w: pop.style.width, h: pop.style.height })); } catch {}
+  }).observe(pop);
   bar.addEventListener('click', (e) => {
     const w = cur(), c = e.target.closest('[data-id]');
     if (!w || !c) return;

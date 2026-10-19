@@ -637,6 +637,7 @@ const EN = {
   '검증하고 끝내기': 'Verify before done', '수정한 뒤에는 빌드나 테스트를 돌려 확인한다. 실패하면 완료라고 하지 말고 실패 내용을 그대로 보고한다.': 'After changes, run the build or tests. If they fail, do not call it done — report the failure as is.',
   '묻지 말고 진행': "Don't ask, proceed", '애매한 결정은 합리적인 기본값으로 정해 진행하고, 정한 내용을 보고에 남긴다. 되돌리기 어려운 작업만 먼저 묻는다.': 'Resolve ambiguous choices with sensible defaults and note them in the report. Ask first only for hard-to-reverse actions.',
   '작업 브랜치에서': 'Work on a branch', '기본 브랜치에 바로 커밋하지 않는다. 작업마다 새 브랜치를 만들어 거기서 커밋한다.': 'Never commit directly to the default branch. Create a new branch per task and commit there.',
+  '남은 일 알려주기': 'Show remaining work', '할 일이 여러 개인 세션이면 매 응답 끝에 아직 남은 일을 목록으로 알려 준다. 남은 일이 없거나 한 번에 끝나는 단일 요청이면 생략한다.': 'In a session with several pending tasks, end every reply with a list of what is still left. Skip it when nothing is left or the request is a single one-off.',
   '리뷰만 하기': 'Review only', '코드를 고치지 않는다. 문제를 찾아 파일:줄과 함께 보고만 한다.': 'Do not change code. Only report problems with file:line.',
   '이 PC 시각 기준 · 클로드 키우기가 켜져 있을 때만 돌아요 · 작업 중이면 대기열로 · 워커가 꺼져 있거나 5시간 한도 90% 이상이면 건너뜀 · CLI 입력창이 막혀 있으면 1분마다 다시(10번)': "This PC's clock · runs only while the dashboard is on · queued if the worker is busy · skipped if the worker is off or 5-hour usage is 90%+ · retried every minute (10×) if the CLI input is blocked",
   '예약 실행 · 켜진 예약 {n}개': 'Scheduled tasks · {n} active',
