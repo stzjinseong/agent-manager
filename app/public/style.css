@@ -2442,7 +2442,7 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 .sc-switch input:focus-visible + i { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* 상세 패널: 이 역할의 예약 */
 .sc-mini { display: flex; flex-direction: column; gap: 3px; align-self: stretch; }
-.sc-mini-list:empty { display: none; }
+.sc-mini-list:empty, .sc-mini:has(> .sc-mini-list:empty) { display: none; } /* 예약이 없으면 칸째 숨겨 #sec-task 의 gap 이 비어 남지 않게 */
 .sc-mini-list { display: flex; flex-direction: column; gap: 3px; }
 .sc-mini-item { display: flex; align-items: baseline; gap: 6px; font-size: 11.5px; color: var(--text-2); cursor: pointer; padding: 3px 6px; border-radius: 6px; background: rgb(var(--ink) / .03); white-space: nowrap; overflow: hidden; }
 .sc-mini-item:hover { background: rgb(var(--ink) / .07); }
