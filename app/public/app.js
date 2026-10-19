@@ -885,7 +885,18 @@ function newDot(btn, key) {
 }
 
 // ---------- 렌더 ----------
+// 서버는 상세 패널을 연 워커만 타임라인 · 프로필 전부를 싣고 나머지는 가볍게(lite) 보낸다(server.js workerView).
+// 막 고른 워커는 서버가 전부를 보내 줄 때까지 잠깐 lite 로 남는다 — 그동안은 지난번에 받은 전체 값을 이어 쓰고, 없으면 빈 타임라인으로
+let fullOf = null; // { id, log, past, profile } — 마지막으로 받은 연 워커의 전체 값
+function fillSelected() {
+  const w = selected && state.workers.find((x) => x.id === selected);
+  if (!w) return;
+  if (!w.lite) { fullOf = { id: w.id, log: w.log, past: w.past, profile: w.profile }; return; }
+  const f = fullOf?.id === w.id ? fullOf : { log: [], past: [], profile: null };
+  Object.assign(w, { log: f.log, past: f.past, profile: f.profile, lite: false });
+}
 function render() {
+  fillSelected();
   renderStats();
   renderStale();
   renderUpd();

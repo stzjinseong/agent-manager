@@ -442,6 +442,25 @@ export function editLog(p) {
   return { files: [...files.values()].sort((a, b) => b.last - a.last), requests };
 }
 
+// 카드 · 워커 비교 표 · 상단 통계에 쓰는 값만 — 상세 패널을 열지 않은 워커는 이것만 방송한다.
+// profileSummary 는 턴 30개 · 서브에이전트 목록 등 배열을 매번 새로 만들어 워커 20개면 상태 한 번에 280KB 였다(실측)
+export function profileLite(p) {
+  const total = Object.fromEntries(KEYS.map((k) => [k, p.sess[k]]));
+  const inputAll = total.input + total.cacheWrite + total.cacheRead;
+  const lastT = p.turns.at(-1), lastMiss = lastT && !lastT.missCounted ? missOf(lastT) : null;
+  const sub = { tokens: 0, cost: 0 };
+  let running = 0;
+  for (const s of p.subs.values()) {
+    sub.tokens += s.input + s.cacheWrite + s.cacheRead + s.output; sub.cost += s.cost;
+    if (isRunning(p, s)) running++;
+  }
+  return {
+    lite: true, model: p.model, window: windowFor(p.model), total, turnCount: p.turns.length, context: p.context,
+    cacheHit: inputAll ? total.cacheRead / inputAll : null, cacheMisses: p.miss.n + (lastMiss ? 1 : 0),
+    sub, bgRunning: running + runningTasks(p).length,
+  };
+}
+
 // waits: 관제탑 결정함을 거친 권한 승인 대기 [{ toolUseId, ms }] — 트랜스크립트에는 없는 정보라 서버가 넘겨준다
 export function profileSummary(p, waits = []) {
   const approvalByTurn = new Map();

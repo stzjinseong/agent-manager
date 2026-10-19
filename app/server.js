@@ -11,7 +11,7 @@ import { execSync, execFile, spawn as spawnProcess } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import WebSocket, { WebSocketServer } from 'ws';
 import { createRequire } from 'node:module';
-import { createProfile, readProfile, profileSummary, runningSubagents, editLog, trimHunks, pruneEdits, clearEdits } from './profile.js';
+import { createProfile, readProfile, profileSummary, profileLite, runningSubagents, editLog, trimHunks, pruneEdits, clearEdits } from './profile.js';
 import { snapshot, changedSince, readBlob } from './shelldiff.js';
 import { createProgress, isCommit } from './progress.js';
 import { createUserProfile } from './userprofile.js';
@@ -1112,11 +1112,22 @@ function resolveDecision(did, decision) {
 
 // ---------- 상태 브로드캐스트 ----------
 
-function publicState() {
+// 워커 하나를 화면에 보낼 모양으로. full: 상세 패널을 연 워커 — 타임라인(log · past) · 프로필 전부.
+// 나머지는 카드 · 비교 표에 쓰는 것만(lite). 화면이 안 쓰는 필드(lastPrompt · todos · currentTool 등)는 아무 워커에도 안 보낸다.
+// 예전엔 모든 워커를 전부 실어 상태 한 번이 1.1MB · 만들기 약 250ms 였다(워커 20개, log 490KB · profile 280KB 실측)
+function workerView(w, full) {
+  const { term, tx, approvalWaits, pot, lastPrompt, lastMessage, todos, notice, currentTool, subTool, ptySize, sentPrompt, seedAt, bootInputAt, dirSent, cacheJudged, modelAt, ...rest } = w;
+  const base = { ...rest, branch: branchOf.get(w.cwd) || null, dirPending: directives.pending(config.directives, w) };
+  if (full) return { ...base, profile: tx && profileSummary(tx, approvalWaits) };
+  const { log, past, ...lite } = base;
+  return { ...lite, lite: true, profile: tx && profileLite(tx) };
+}
+
+function publicState(sel = null) {
   if (Date.now() - branchAt > 1000) refreshBranches(); // 새로 띄운 워커도 바로 보이게(상태를 보낼 때 1초에 한 번까지)
   return {
     now: Date.now(),
-    workers: [...workers.values()].map(({ term, tx, approvalWaits, pot, ...w }) => ({ ...w, branch: branchOf.get(w.cwd) || null, profile: tx && profileSummary(tx, approvalWaits), dirPending: directives.pending(config.directives, w) })),
+    workers: [...workers.values()].map((w) => workerView(w, w.id === sel)),
     decisions: [...decisions.values()].map(({ res, timer, ...d }) => d),
     profiles: config.profiles,
     order: config.order,
@@ -1145,10 +1156,27 @@ let stateTimer = null;
 function emitState() {
   saveWorkersSoon();
   if (stateTimer) return;
-  stateTimer = setTimeout(() => { stateTimer = null; roleStats.watch(workers.values()); broadcast({ type: 'state', state: publicState() }); }, 50);
+  stateTimer = setTimeout(() => { stateTimer = null; roleStats.watch(workers.values()); broadcastState(); }, 50);
 }
 
 const sockets = new Set();
+// 상태는 탭마다 연 워커(ws.sel)만 전부 싣는다 — 공통 부분은 한 번 만들고, 연 워커가 같은 탭끼리는 같은 글을 보낸다
+function stateFor(base, sel) {
+  const w = sel && workers.get(sel);
+  return w ? { ...base, workers: base.workers.map((x) => (x.id === sel ? workerView(w, true) : x)) } : base;
+}
+function broadcastState() {
+  const base = publicState(), bySel = new Map();
+  for (const ws of sockets) if (ws.readyState === 1) {
+    const k = workers.has(ws.sel) ? ws.sel : '';
+    if (!bySel.has(k)) bySel.set(k, []);
+    bySel.get(k).push(ws);
+  }
+  for (const [sel, list] of bySel) {
+    const s = JSON.stringify({ type: 'state', state: stateFor(base, sel) });
+    for (const ws of list) ws.send(s);
+  }
+}
 function broadcast(msg) {
   const s = JSON.stringify(msg);
   for (const ws of sockets) if (ws.readyState === 1) ws.send(s);
@@ -2143,6 +2171,8 @@ wss.on('connection', (ws) => {
     if (!w) return;
     if (msg.type === 'input' && w.status !== 'exited') w.term.write(msg.data);
     if (msg.type === 'resize' && msg.cols > 10 && msg.rows > 5) w.term.resize(msg.cols, msg.rows);
+    // 상세 패널을 연 워커 — 이 탭에는 그 워커의 타임라인 · 프로필 전부를 실어 보낸다. 바로 한 번 보내 빈 패널이 오래 남지 않게
+    if (msg.type === 'attach' && ws.sel !== w.id) { ws.sel = w.id; ws.send(JSON.stringify({ type: 'state', state: stateFor(publicState(), w.id) })); }
     if (msg.type === 'attach') { const req = ++snapSeq; snapWaiters.set(req, ws); hostSend({ op: 'snapshot', id: w.id, req }); }
   });
   ws.on('close', () => sockets.delete(ws));
