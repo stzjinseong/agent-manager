@@ -183,8 +183,10 @@
   };
 
   // ---------- 헤더 버튼 ----------
+  // 시계 아이콘 — 헤더 버튼 · 상세 패널 예약 줄 · '예약' 버튼이 같은 모양
+  const CLOCK = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="7.5"/><path d="M12 9v4l2.5 2M9 3.5h6" stroke-linecap="round"/></svg>';
   const btn = el(`<button id="btn-sched" class="btn ghost lang-btn sched-btn">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="7.5"/><path d="M12 9v4l2.5 2M9 3.5h6" stroke-linecap="round"/></svg>
+      ${CLOCK}
       <i class="sched-n" hidden></i>
     </button>`);
   (document.querySelector('#btn-daily') || document.querySelector('#btn-ureport'))?.after(btn);
@@ -209,8 +211,8 @@
     const n = $('.sched-n', btn); n.hidden = !on; n.textContent = on;
     const w = state.workers.find((x) => x.id === selected);
     const mine = w ? all.filter((s) => s.role === w.name).sort((a, b) => (b.enabled - a.enabled) || ((a.nextRun || Infinity) - (b.nextRun || Infinity))) : [];
-    $('.sc-mini-list', mini).innerHTML = mine.map((s) => `<div class="sc-mini-item${s.enabled ? '' : ' off'}" title="${esc(s.text)}">${s.enabled && s.pendingSince ? '⏳' : '⏰'} <b>${esc(rule(s))}</b> <span>${esc(s.text)}</span>${s.enabled && s.nextRun ? `<em>${esc(when(s.nextRun))}</em>` : ''}</div>`).join('');
-    $('.sc-mini-add', mini).textContent = `⏰ ${T('예약')}`;
+    $('.sc-mini-list', mini).innerHTML = mine.map((s) => `<div class="sc-mini-item${s.enabled ? '' : ' off'}" title="${esc(s.text)}">${s.enabled && s.pendingSince ? '⏳' : CLOCK} <b>${esc(rule(s))}</b> <span>${esc(s.text)}</span>${s.enabled && s.nextRun ? `<em>${esc(when(s.nextRun))}</em>` : ''}</div>`).join('');
+    $('.sc-mini-add', mini).innerHTML = `${CLOCK}${esc(T('예약'))}`;
     $('.sc-mini-add', mini).title = T('업무 지시 칸에 쓴 글로 예약 만들기');
     if (!back.hidden) { texts(); renderList(); }
   };
