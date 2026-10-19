@@ -105,7 +105,7 @@
     const label = T('하루 요약');
     btn.title = label; btn.setAttribute('aria-label', label);
     btn.querySelector('.upd-dot').hidden = !d || d.seen;
-    const show = Boolean(d && !d.seen && dismissed !== d.date);
+    const show = Boolean(d && !d.seen && dismissed !== d.date && !window.isStashed?.(`daily:${d.date}`)); // 보관함에 넣었으면 숨김 (stash.js)
     bar.hidden = !show;
     if (!show) return;
     bar.querySelector('.db-text').innerHTML = `<b>${esc(T('하루 요약 카드가 도착했어요'))}</b> <small>${esc(dateLabel(d.date))} · ${esc(T('오후 5시 기준'))}</small>`;

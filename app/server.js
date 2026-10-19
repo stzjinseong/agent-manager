@@ -1664,6 +1664,7 @@ const STATIC = {
   '/growth.js': ['public/growth.js', 'text/javascript; charset=utf-8'],
   '/schedule.js': ['public/schedule.js', 'text/javascript; charset=utf-8'],
   '/directives.js': ['public/directives.js', 'text/javascript; charset=utf-8'],
+  '/stash.js': ['public/stash.js', 'text/javascript; charset=utf-8'],
   '/style.css': ['public/style.css', 'text/css; charset=utf-8'],
   '/vendor/xterm.js': ['node_modules/@xterm/xterm/lib/xterm.js', 'text/javascript'],
   '/vendor/xterm.css': ['node_modules/@xterm/xterm/css/xterm.css', 'text/css'],

@@ -892,6 +892,7 @@ function render() {
   window.renderDaily?.(); // 하루 요약 카드 도착 띠 · 우편함 버튼 (growth.js)
   window.renderSchedules?.(); // 예약 실행 버튼 · 상세 패널의 이 역할 예약 (schedule.js)
   window.renderDirectives?.(); // 작업 지시 버튼 · 상세 패널의 이 워커 지시 칩 (directives.js)
+  window.renderStash?.(); // 알림 보관함 버튼 · 끝난 알림 정리 (stash.js)
   renderInbox();
   renderFloor();
   renderDock();
@@ -908,7 +909,8 @@ function pendingCount() {
 
 function renderStale() {
   const stale = $('#stale-bar');
-  stale.hidden = !(state.serverStale || !('serverStale' in state));
+  // 보관함에 넣어 둔 동안은 숨긴다 (stash.js)
+  stale.hidden = !(state.serverStale || !('serverStale' in state)) || Boolean(window.isStashed?.('stale'));
 }
 // 상단 알림 띠 묶음(#top-stack): 헤더 바로 아래에 겹쳐서. 띠가 새로 뜨거나 사라지면 다른 띠는 자리를 밀거나 당기며 미끄러지고(FLIP),
 // 새 띠는 위에서 내려오며 나타난다 — 띠를 숨기고 보이는 곳이 여럿이라(renderStale · growth.js renderDaily) hidden 속성 변화를 지켜본다

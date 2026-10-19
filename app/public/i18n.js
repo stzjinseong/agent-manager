@@ -613,6 +613,11 @@ const EN = {
   '아직 예약이 없어요 — 위에서 역할 · 지시 · 시각을 정해 추가하세요': 'No schedules yet — pick a role, task and time above',
   '이 예약을 지울까요?': 'Delete this schedule?', '{role} 에 넣었어요': 'Sent to {role}', '예약 실행': 'Scheduled tasks', '켜진 예약 {n}개': '{n} active',
   '정해 둔 시각에 이 역할의 워커에 보낼 지시': 'Task to send to this role at the set time',
+  // 알림 보관함 (stash.js)
+  '서버 재시작 필요': 'Server restart needed', '꺼내기': 'Take out', '알림 보관함': 'Notice box', '알림 보관함 · {n}개': 'Notice box · {n}', '보관': 'Keep',
+  '방금 보관': 'kept just now', '{n}분 전 보관': 'kept {n} min ago', '{n}시간 전 보관': 'kept {n}h ago',
+  "보관한 알림이 없어요 — 알림 띠의 '보관' 을 누르면 여기로 들어와요": "No kept notices — press 'Keep' on a notice bar to put it here",
+  '나중에 처리 — 헤더의 보관함으로 넣어 두기': 'Deal with it later — put it in the notice box in the header',
   // 작업 지시 (directives.js)
   '헤더': 'Headers', '제목': 'Title', '내용': 'Text', '붙일 곳': 'Apply to', '모든 워커': 'All workers', '골라서': 'Pick', '보관만': 'Keep only',
   '새로 띄우는 워커에도 붙어요 · 칩을 끄면 그 워커만 빠져요': 'Also applies to new workers · turn a chip off to exclude that worker',
