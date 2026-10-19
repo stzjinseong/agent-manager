@@ -31,7 +31,7 @@
 
   // ---------- 헤더 버튼 · 목록 ----------
   const btn = el(`<button id="btn-stash" class="btn ghost lang-btn sched-btn stash-btn">${BOX}<i class="sched-n" hidden></i></button>`);
-  (document.querySelector('#btn-dir') || document.querySelector('#btn-sched') || document.querySelector('#btn-ureport'))?.after(btn);
+  document.querySelector('#btn-theme')?.after(btn); // 헤더 버튼들 중 맨 왼쪽 — 다크/라이트 토글 바로 오른쪽
   newDot(btn, 'stash');
   const pop = el('<div class="panel st-pop" hidden></div>');
   document.body.append(pop);
