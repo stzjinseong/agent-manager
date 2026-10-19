@@ -24,7 +24,7 @@ const uniq = (a) => [...new Set((Array.isArray(a) ? a : []).map((x) => String(x)
 export function cleanDirective(body, prev) {
   const title = String(body.title ?? prev?.title ?? '').trim().slice(0, MAX_TITLE);
   const text = String(body.text ?? prev?.text ?? '').trim().slice(0, MAX_TEXT);
-  if (!text) return { error: '지시 내용이 비었습니다' };
+  if (!text) return { error: '헤더 내용이 비었습니다' };
   return {
     d: {
       id: prev?.id || `d${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`,

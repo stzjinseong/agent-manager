@@ -47,7 +47,7 @@
     const on = (r) => (kind === 'all' ? !picked.has(r) : picked.has(r));
     $('.dv-roles', box).hidden = kind === 'keep' || !names.length;
     $('.dv-roles', box).innerHTML = names.map((r) => `<button type="button" class="dv-rc${on(r) ? ' on' : ''}" data-role="${esc(r)}">${esc(r)}</button>`).join('');
-    $('.dv-kind-hint', box).textContent = T(kind === 'all' ? '새로 띄우는 워커에도 붙어요 · 칩을 끄면 그 워커만 빠져요' : kind === 'pick' ? '켠 워커에만 붙어요' : '아무 워커에도 안 붙이고 보관만 해요 — 나중에 워커 패널의 + 지시 에서 골라 붙여요');
+    $('.dv-kind-hint', box).textContent = T(kind === 'all' ? '새로 띄우는 워커에도 붙어요 · 칩을 끄면 그 워커만 빠져요' : kind === 'pick' ? '켠 워커에만 붙어요' : '아무 워커에도 안 붙이고 보관만 해요 — 나중에 워커 패널의 + 헤더 에서 골라 붙여요');
   }
   $('.dv-roles', box).addEventListener('click', (e) => {
     const r = e.target.closest('[data-role]')?.dataset.role;
@@ -75,7 +75,7 @@
     (isEdit ? (d.global ? d.except : d.roles) || [] : d.role ? [d.role] : []).forEach((r) => picked.add(r));
     renderFormRoles();
     $('.sc-err', box).textContent = '';
-    $('.sc-save', box).textContent = T(isEdit ? '고치기 저장' : '지시 추가');
+    $('.sc-save', box).textContent = T(isEdit ? '고치기 저장' : '헤더 추가');
     $('.sc-cancel', box).hidden = !isEdit && !d.text;
     form.classList.toggle('editing', isEdit);
   }
@@ -85,7 +85,7 @@
     const body = { op: editing ? 'edit' : 'add', id: editing, title: form.title.value, text: form.text.value, preset, global: kind === 'all', roles: kind === 'pick' ? [...picked] : [], except: kind === 'all' ? [...picked] : [] };
     const r = await api('/api/directives', body);
     if (r.error) { $('.sc-err', box).textContent = r.error; return; }
-    toast(T(editing ? '작업 지시를 고쳤어요' : '작업 지시를 추가했어요'));
+    toast(T(editing ? '헤더를 고쳤어요' : '헤더를 추가했어요'));
     fill();
     renderList();
   });
@@ -128,7 +128,7 @@
       ['keep', T('보관함 · 아직 안 붙음'), all.filter((d) => !d.global && !d.roles?.length)],
     ].filter(([, , xs]) => xs.length);
     $('.dv-list', box).innerHTML = groups.length ? groups.map(([k, h, xs]) => `<h4 class="dv-gh">${esc(h)} <small>${xs.length}</small></h4><ol class="sc-list dv-ol" data-group="${k}">${xs.map(item).join('')}</ol>`).join('')
-      : `<div class="sc-empty">${esc(T('아직 작업 지시가 없어요 — 위에 직접 쓰거나 추천에서 골라 보세요'))}</div>`;
+      : `<div class="sc-empty">${esc(T('아직 헤더가 없어요 — 위에 직접 쓰거나 추천에서 골라 보세요'))}</div>`;
     renderPresets();
   }
   $('.dv-list', box).addEventListener('click', async (e) => {
@@ -139,7 +139,7 @@
     if (b.dataset.act === 'role') { const r = b.dataset.role; post({ op: 'role', id, role: r, on: !applies(d, r) }); return; }
     if (b.dataset.act === 'edit') { fill(d, true); renderList(); form.text.focus(); return; }
     if (b.dataset.act === 'remove') {
-      if (!(await ask({ title: T('이 작업 지시를 지울까요?'), body: `${d.title}\n${d.text}`, ok: T('지우기'), danger: true }))) return;
+      if (!(await ask({ title: T('이 헤더를 지울까요?'), body: `${d.title}\n${d.text}`, ok: T('지우기'), danger: true }))) return;
       if (editing === id) fill();
       post({ op: 'remove', id });
     }
@@ -153,7 +153,7 @@
   });
 
   function texts() {
-    $('.dv-title', box).textContent = T('작업 지시');
+    $('.dv-title', box).textContent = T('헤더');
     const all = list();
     $('.dv-sub', box).textContent = T('공용 {g}개 · 워커별 {r}개 · 보관함 {k}개', { g: all.filter((d) => d.global).length, r: all.filter((d) => !d.global && d.roles?.length).length, k: all.filter((d) => !d.global && !d.roles?.length).length });
     box.querySelectorAll('[data-k]').forEach((x) => { x.textContent = T(x.dataset.k); });
@@ -181,6 +181,9 @@
   // ---------- 상세 패널: 이 워커의 지시 ----------
   const bar = el(`<div class="dv-bar"><div class="dv-chips"></div><button type="button" class="btn ghost dv-add"></button><span class="dv-state"></span></div>`);
   document.querySelector('#sec-task .side-h')?.after(bar);
+  // 예약 버튼(schedule.js)을 '+ 헤더' 오른쪽으로 — 이 워커에 붙이는 것들을 한 줄에 모은다
+  const scAdd = document.querySelector('.sc-mini-add');
+  if (scAdd) $('.dv-add', bar).after(scAdd);
   const pop = el(`<div class="panel dv-pop" hidden></div>`);
   document.body.append(pop);
   const closePop = () => { pop.hidden = true; };
@@ -196,7 +199,7 @@
     pop.innerHTML = `
       ${off.length ? `<div class="dv-ph">${esc(T('보관함 · 다른 워커'))}</div>${off.map((d) => row(`data-id="${d.id}"`, d.title, d.text, d.global ? GLOBE : '')).join('')}` : ''}
       ${ps.length ? `<div class="dv-ph">${esc(T('추천'))}</div>${ps.map((p) => row(`data-pre="${p.key}"`, T(p.title), T(p.text))).join('')}` : ''}
-      ${!off.length && !ps.length ? `<div class="dv-pe">${esc(T('붙일 지시가 더 없어요'))}</div>` : ''}
+      ${!off.length && !ps.length ? `<div class="dv-pe">${esc(T('붙일 헤더가 더 없어요'))}</div>` : ''}
       <div class="dv-pf"><button type="button" class="btn ghost" data-pop="new">✎ ${esc(T('새로 쓰기'))}</button><button type="button" class="btn ghost" data-pop="all">${esc(T('모두 관리'))}</button></div>`;
   }
   pop.addEventListener('click', async (e) => {
@@ -229,7 +232,7 @@
     if (!d) return;
     if (e.target.closest('.dv-x')) {
       post({ op: 'role', id: d.id, role: w.name, on: !applies(d, w.name) });
-      if (d.global && applies(d, w.name)) toast(T('공용 지시에서 이 워커만 뺐어요'));
+      if (d.global && applies(d, w.name)) toast(T('공용 헤더에서 이 워커만 뺐어요'));
       return;
     }
     window.openDirectives({ edit: d });
@@ -237,7 +240,7 @@
 
   window.renderDirectives = () => {
     const all = list(), g = all.filter((d) => d.global).length;
-    btn.title = T('작업 지시 · 공용 {g}개 · 전체 {n}개', { g, n: all.length });
+    btn.title = T('헤더 · 공용 {g}개 · 전체 {n}개', { g, n: all.length });
     btn.setAttribute('aria-label', btn.title);
     const n = $('.sched-n', btn); n.hidden = !all.length; n.textContent = all.length;
     const w = cur();
@@ -247,14 +250,14 @@
       const out = all.filter((d) => d.global && !applies(d, w.name)); // 공용인데 이 워커만 뺀 것 — 눌러 다시 넣게 흐리게 보인다
       $('.dv-chips', bar).innerHTML = [
         ...mine.map((d) => `<span class="dv-chip${d.global ? ' g' : ''}" data-id="${d.id}" title="${esc(d.text)}">${d.global ? GLOBE : ''}<span>${esc(d.title)}</span><button type="button" class="dv-x" title="${esc(T('이 워커에서 떼기'))}" aria-label="${esc(T('이 워커에서 떼기'))}">✕</button></span>`),
-        ...out.map((d) => `<span class="dv-chip g out" data-id="${d.id}" title="${esc(T('공용 지시 — 이 워커는 빠짐'))}">${GLOBE}<span>${esc(d.title)}</span><button type="button" class="dv-x" title="${esc(T('다시 넣기'))}" aria-label="${esc(T('다시 넣기'))}">+</button></span>`),
+        ...out.map((d) => `<span class="dv-chip g out" data-id="${d.id}" title="${esc(T('공용 헤더 — 이 워커는 빠짐'))}">${GLOBE}<span>${esc(d.title)}</span><button type="button" class="dv-x" title="${esc(T('다시 넣기'))}" aria-label="${esc(T('다시 넣기'))}">+</button></span>`),
       ].join('');
-      $('.dv-add', bar).innerHTML = `${ICON}${esc(mine.length ? '+' : T('+ 작업 지시'))}`;
-      $('.dv-add', bar).title = T('보관함 · 추천에서 이 워커에 지시 붙이기');
+      $('.dv-add', bar).innerHTML = `${ICON}${esc(mine.length ? '+' : T('+ 헤더'))}`;
+      $('.dv-add', bar).title = T('보관함 · 추천에서 이 워커에 헤더 붙이기');
       const st = $('.dv-state', bar);
       st.textContent = w.status === 'exited' ? '' : w.dirPending ? T(mine.length ? '다음 메시지에 전달' : '다음 메시지에 해제 전달') : mine.length ? T('✓ 전달됨') : '';
       st.className = `dv-state${w.dirPending ? ' wait' : ''}`;
-      st.title = w.dirPending ? T('바뀐 지시는 이 워커가 다음 메시지를 받을 때 함께 넘어가요') : T('이 세션에 지금 내용이 전달됐어요');
+      st.title = w.dirPending ? T('바뀐 헤더는 이 워커가 다음 메시지를 받을 때 함께 넘어가요') : T('이 세션에 지금 헤더가 전달됐어요');
     }
     if (!pop.hidden) renderPop();
     if (!back.hidden) { texts(); renderList(); if (!editing) renderFormRoles(); }

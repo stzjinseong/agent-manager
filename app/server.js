@@ -925,7 +925,7 @@ function onHook(w, ev, res) {
         const ctx = directives.takeContext(config.directives, w);
         if (ctx) {
           const names = config.directives.filter((d) => directives.appliesTo(d, w.name)).map((d) => d.title);
-          pushLog(w, 'status', names.length ? `작업 지시 전달: ${names.join(' · ')}` : '작업 지시 해제 전달');
+          pushLog(w, 'status', names.length ? `헤더 전달: ${names.join(' · ')}` : '헤더 해제 전달');
           saveWorkersSoon();
           return reply({ hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: ctx } });
         }
@@ -1915,8 +1915,8 @@ const server = http.createServer(async (req, res) => {
     const list = config.directives;
     const i = list.findIndex((x) => x.id === body.id);
     if (body.op === 'add' || body.op === 'edit') {
-      if (body.op === 'edit' && i < 0) return json(res, 404, { error: '없는 작업 지시입니다' });
-      if (body.op === 'add' && list.length >= directives.LIMIT) return json(res, 400, { error: '작업 지시가 너무 많습니다' });
+      if (body.op === 'edit' && i < 0) return json(res, 404, { error: '없는 헤더입니다' });
+      if (body.op === 'add' && list.length >= directives.LIMIT) return json(res, 400, { error: '헤더가 너무 많습니다' });
       const r = directives.cleanDirective(body, body.op === 'edit' ? list[i] : undefined);
       if (r.error) return json(res, 400, { error: r.error });
       if (body.op === 'edit') list[i] = r.d; else list.push(r.d);
@@ -1929,7 +1929,7 @@ const server = http.createServer(async (req, res) => {
       saveConfig();
       return json(res, 200, { ok: true });
     }
-    if (i < 0) return json(res, 404, { error: '없는 작업 지시입니다' });
+    if (i < 0) return json(res, 404, { error: '없는 헤더입니다' });
     if (body.op === 'remove') list.splice(i, 1);
     else if (body.op === 'role' && String(body.role || '').trim()) directives.setRole(list[i], String(body.role).trim(), Boolean(body.on));
     else return json(res, 400, { error: 'op' });
