@@ -165,7 +165,7 @@
   // ---------- 상세 패널: 이 워커에 붙은 헤더 ----------
   // 붙이기는 헤더 버튼 창(모든 워커 / 골라서)에서만 한다 — 여기는 붙은 것을 보여 주고 떼기 · 고치기만
   const bar = el(`<div class="dv-bar"><div class="dv-chips"></div><span class="dv-state"></span></div>`);
-  document.querySelector('#sec-task .side-h')?.after(bar);
+  document.querySelector('#sec-task')?.prepend(bar); // Tasks 제목 위, 예약 목록(schedule.js)보다 앞
   // 예약 버튼(schedule.js)을 헤더 칩 오른쪽으로 — 이 워커에 붙는 것들을 한 줄에 모은다
   const scAdd = document.querySelector('.sc-mini-add');
   if (scAdd) $('.dv-chips', bar).after(scAdd);
