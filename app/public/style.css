@@ -2457,6 +2457,9 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 .dv-ico, .dv-g { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.6; flex: none; }
 .lang-btn .dv-ico { width: 18px; height: 18px; }
 .dv-form input[name=title] { font: inherit; font-size: 13px; }
+.dv-form .sc-acts { justify-content: center; flex-wrap: wrap; } /* 헤더 창의 취소 · 저장 버튼은 가운데 */
+.dv-form .sc-err:empty { display: none; }
+.dv-form .sc-err { flex-basis: 100%; text-align: center; }
 .dv-roles { display: flex; flex-wrap: wrap; gap: 4px; }
 .dv-roles[hidden] { display: none; }
 .dv-rc { font: inherit; font-size: 11.5px; padding: 2px 9px; border-radius: 12px; cursor: pointer; color: var(--dim); background: transparent; border: 1px dashed rgb(var(--ink) / .2); }
