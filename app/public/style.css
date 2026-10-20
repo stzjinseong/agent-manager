@@ -731,7 +731,7 @@ body.term-full .side-grip { left: -6px; }
    md = 타임라인, sm = 입력칸 아래·대기열·나중에 할 작업(칸이 좁아 더 작게) */
 .att { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; white-space: normal; }
 .att .att-img { display: block; border-radius: 6px; border: 1px solid rgb(var(--ink) / .7); cursor: zoom-in; background: var(--bg); object-fit: cover; }
-.att .att-img:hover, .att .att-file:hover { border-color: rgb(var(--ink)); }
+.att .att-img:hover, .att .att-file:hover, .att .att-doc:hover { border-color: rgb(var(--ink)); }
 /* 첨부 동영상: 첫 장면 썸네일 + 가운데 ▶. 누르면 동영상 뷰어(app.js openVideo) */
 .att .att-vid { position: relative; display: block; overflow: hidden; border-radius: 6px; border: 1px solid rgb(var(--ink) / .7); background: #000; cursor: pointer; }
 .att .att-vid:hover { border-color: rgb(var(--ink)); }
@@ -742,18 +742,18 @@ body.term-full .side-grip { left: -6px; }
 .att-sm .att-vid { width: 40px; height: 40px; border-radius: 5px; }
 .att-sm .att-vid .play { width: 18px; height: 18px; margin: -9px 0 0 -9px; }
 .att-sm .att-vid .play::after { left: 6.5px; top: 4.5px; border-width: 4px 0 4px 6px; }
-.att .att-file { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; border: 1px solid rgb(var(--ink) / .45); border-radius: 6px; background: var(--surface-3); color: var(--text); text-decoration: none; cursor: pointer; }
-.att .att-file .ic { flex: none; line-height: 1; }
-.att .att-file .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); color: var(--text-2); }
+.att :is(.att-file, .att-doc) { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; border: 1px solid rgb(var(--ink) / .45); border-radius: 6px; background: var(--surface-3); color: var(--text); text-decoration: none; cursor: pointer; }
+.att :is(.att-file, .att-doc) .ic { flex: none; line-height: 1; }
+.att :is(.att-file, .att-doc) .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); color: var(--text-2); }
 .att-md .att-img { max-width: 140px; max-height: 90px; }
 .att-md .att-file { padding: 5px 9px; max-width: 240px; }
 .att-md .att-file .ic { font-size: 16px; }
 .att-md .att-file .nm { font-size: 12px; }
 .att-sm { gap: 4px; margin-top: 4px; }
 .att-sm .att-img { width: 40px; height: 40px; border-radius: 5px; }
-.att-sm .att-file { height: 40px; padding: 0 7px; max-width: 160px; border-radius: 5px; }
-.att-sm .att-file .ic { font-size: 14px; }
-.att-sm .att-file .nm { font-size: 11px; }
+.att-sm :is(.att-file, .att-doc) { height: 40px; padding: 0 7px; max-width: 160px; border-radius: 5px; }
+.att-sm :is(.att-file, .att-doc) .ic { font-size: 14px; }
+.att-sm :is(.att-file, .att-doc) .nm { font-size: 11px; }
 .att-live:empty { display: none; }
 .att-live .att { margin-top: 0; }
 .shot-view { position: fixed; inset: 0; z-index: 500; display: grid; place-items: center; background: rgba(0, 0, 0, .78); cursor: zoom-out; padding: 24px; }

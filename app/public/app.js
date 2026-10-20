@@ -1754,19 +1754,27 @@ function renderDetail() {
   setSecCount('sec-memo', memoN ? _t('{n}건', { n: memoN }) : '');
 }
 
-// 상세 패널 위에 걸린 탭: 타임라인(지난 요청 포함)에 남은 첨부를 최신 것부터 한 줄로 — 다른 로그 사이에서 지난 첨부를 찾느라 스크롤하지 않게.
-// 타임라인과 같은 글에서 찾으므로(uploadsIn) 타임라인에서 밀려난 첨부는 여기서도 빠진다. 바뀐 때만 다시 그린다(썸네일 다시 로드 방지)
+// 상세 패널 위에 걸린 탭: 타임라인(지난 요청 포함)에 남은 첨부와 워커가 만든 결과물(w.docs)을 최신 것부터 한 줄로 — 다른 로그 사이에서 찾느라 스크롤하지 않게.
+// 첨부는 타임라인과 같은 글에서 찾으므로(uploadsIn) 타임라인에서 밀려난 첨부는 여기서도 빠진다. 바뀐 때만 다시 그린다(썸네일 다시 로드 방지)
 function renderAttTab(w) {
-  const seen = new Set(), list = [];
-  for (let i = timelineCache.length - 1; i >= 0; i--) {
-    const r = timelineCache[i];
+  const seen = new Set(), items = [];
+  for (const r of timelineCache) {
     if (r.kind !== 'req' && r.kind !== 'queued' && r.kind !== 'unqueued') continue;
-    for (const f of uploadsIn(r.text, true)) if (!seen.has(f.url)) { seen.add(f.url); list.push(f); }
+    for (const f of uploadsIn(r.text, true)) if (!seen.has(f.url)) { seen.add(f.url); items.push({ t: r.t, html: attTile(f) }); }
   }
+  // 결과물은 이름이 보이게 파일 타일 모양으로 — 여는 방식(크게 보기 · 새 탭)은 카드 · 타임라인과 같은 docImgAttr
+  for (const d of w.docs || []) {
+    if (seen.has(d.url)) continue;
+    seen.add(d.url);
+    const ext = d.name.split('.').pop().toLowerCase();
+    items.push({ t: d.t, html: `<a class="att-doc" href="${esc(d.url)}" target="_blank" rel="noopener" draggable="false"${docImgAttr(d, ext)} title="${_t('결과물')} · ${esc(d.title ? `${d.title}
+` : '')}${esc(d.name)}&#10;${docOpenHint(IMG_DOC.has(ext) || VID_DOC.has(ext) || TXT_DOC.has(ext))}"><span class="ic">${DOC_ICON[ext] || '📄'}</span><span class="nm">${esc(d.name)}</span></a>` });
+  }
+  items.sort((a, b) => b.t - a.t);
   const tab = $('#att-tab'), box = $('#att-tab-list');
-  tab.hidden = !list.length;
-  $('#att-tab-h').textContent = _t('첨부 {n}', { n: list.length });
-  const html = attTiles(list, 'sm');
+  tab.hidden = !items.length;
+  $('#att-tab-h').textContent = _t('첨부 {n}', { n: items.length });
+  const html = items.length ? `<span class="att att-sm">${items.map((x) => x.html).join('')}</span>` : '';
   if (box._html !== html) box.innerHTML = box._html = html;
 }
 
@@ -1834,7 +1842,7 @@ const TXT_DOC = new Set(['md', 'markdown', 'txt', 'log', 'csv', 'tsv', 'json', '
 const docOpenHint = (img) => _t(img ? (LOCAL_VIEW ? '클릭: 크게 보기 · Ctrl/⌘+클릭: 열기' : '클릭: 크게 보기 · Ctrl/⌘+클릭: 새 탭')
   : LOCAL_VIEW ? '클릭: 열기 · Ctrl/⌘+클릭: 새 탭' : '클릭: 새 탭에서 열기');
 document.addEventListener('click', (e) => {
-  const a = e.target.closest?.('a.card-doc, a.dock-doc, a.tl-doc');
+  const a = e.target.closest?.('a.card-doc, a.dock-doc, a.tl-doc, a.att-doc');
   if (!a || e.button || e.shiftKey) return;
   const mod = e.ctrlKey || e.metaKey, vid = a.dataset.vid != null, txt = a.dataset.txt != null, img = a.dataset.img != null || vid || txt;
   if (img && !mod) {
@@ -1899,13 +1907,15 @@ function attachChips(text, size = 'sm') {
   return attTiles(uploadsIn(text, size === 'md'), size);
 }
 function attTiles(list, size) {
-  if (!list.length) return '';
-  return `<span class="att att-${size}">${list.map((f) => f.image
+  return list.length ? `<span class="att att-${size}">${list.map(attTile).join('')}</span>` : '';
+}
+function attTile(f) {
+  return f.image
     ? shotImg({ url: f.url }, 'att-img').replace('<img ', '<img onerror="this.remove()" ')
     : f.video
       // 첫 장면(#t=0.1)을 썸네일로 — 못 읽는 형식(브라우저가 재생 못 하는 코덱)이어도 ▶ 표시와 이름은 남는다
       ? `<span class="att-vid" data-video="${esc(f.url)}" title="${esc(f.label)}&#10;${_t('클릭해 재생')}"><video src="${esc(f.url)}#t=0.1" preload="metadata" muted playsinline></video><span class="play" aria-hidden="true"></span></span>`
-      : `<a class="att-file" href="${esc(f.url)}" target="_blank" rel="noopener" draggable="false" title="${esc(f.label)}&#10;${_t('클릭: 새 탭에서 열기')}"><span class="ic">${DOC_ICON[f.ext] || '📄'}</span><span class="nm">${esc(f.label)}</span></a>`).join('')}</span>`;
+      : `<a class="att-file" href="${esc(f.url)}" target="_blank" rel="noopener" draggable="false" title="${esc(f.label)}&#10;${_t('클릭: 새 탭에서 열기')}"><span class="ic">${DOC_ICON[f.ext] || '📄'}</span><span class="nm">${esc(f.label)}</span></a>`;
 }
 // 첨부 파일 타일을 눌러도 요청 줄 이동(타임라인)·카드 선택으로 번지지 않게 — 새 탭 열기(기본 동작)는 그대로
 document.addEventListener('click', (e) => { if (e.target.closest?.('.att-file')) e.stopPropagation(); }, true);
