@@ -413,6 +413,13 @@ body.card-drag .node-add { opacity: .25; transition: opacity .2s; }
 /* ---------- 상세 ---------- */
 /* 가로로 아무리 늘려도 터미널이 과하게 길어지지 않게 상세 패널 폭 상한 */
 .detail { width: calc(100% - 48px); max-width: 1480px; margin: 18px auto 32px !important; padding: 14px 16px 16px; }
+/* 첨부 탭: 상세 패널 왼쪽 위에 붙은 탭 — 패널과 같은 바탕·테두리, 아래 테두리는 패널 윗선을 1px 덮어 이어 보이게 */
+.att-tab { width: calc(100% - 48px); max-width: 1480px; margin: 18px auto 0 !important; display: flex; position: relative; z-index: 1; }
+.att-tab-in { display: flex; align-items: center; gap: 10px; min-width: 0; max-width: 100%; padding: 6px 10px 7px; margin-bottom: -1px; background: var(--surface); border: 1px solid var(--line); border-bottom: 0; border-radius: var(--radius) var(--radius) 0 0; }
+.att-tab-h { flex: none; font-size: 11.5px; color: var(--dim); }
+.att-tab-list { min-width: 0; overflow-x: auto; scrollbar-width: thin; }
+.att-tab-list .att { flex-wrap: nowrap; margin-top: 0; }
+.att-tab:not([hidden]) + .detail { margin-top: 0 !important; border-top-left-radius: 0; }
 .detail-head { position: relative; display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .detail-avatar svg { width: 40px; height: 22px; display: block; }
 .detail-title { display: flex; flex-direction: column; min-width: 0; flex: 1; }
@@ -603,7 +610,7 @@ body.term-full .side-grip { left: -6px; }
 @media (max-width: 640px) {
   main, .new-panel, #inbox, .floor, .detail { margin-left: 12px; margin-right: 12px; }
   .topbar { padding: 10px 12px; gap: 12px; }
-  .detail, .floor, .new-panel { width: calc(100% - 24px); }
+  .detail, .floor, .new-panel, .att-tab { width: calc(100% - 24px); }
   #new-form { grid-template-columns: 1fr; }
   .new-panel { max-height: calc(100dvh - var(--np-top, 76px) - 12px); overflow-y: auto; } /* 한 줄씩 쌓여 길어지면 창 안에서 스크롤 */
   .decision { flex-wrap: wrap; }
@@ -1450,7 +1457,7 @@ html[data-char="clawd-white"] :is(.node, .dchip, .detail-avatar, .term-wrap) { -
 /* 라이트 · 세션 프로파일 — 참고 이미지(Claude Motion 대시보드)의 결: 크림 바탕 위 흰빛 카드, 작은 대문자 라벨,
    숫자 아래 얇은 색 막대, 따뜻한 격자. 맨 아래 안내는 복숭아색 띠에 코랄 글자 */
 /* CLI·세션 프로파일이 든 상세 패널 바탕은 참고 이미지 카드 바탕(#f6f5ee, 점 찍은 곳에서 추출)으로 — 크림보다 덜 노란 웜 화이트 */
-:root[data-theme="light"] .detail { background: #f6f5ee; }
+:root[data-theme="light"] .detail, :root[data-theme="light"] .att-tab-in { background: #f6f5ee; }
 :root[data-theme="light"] .profile { --card: #fefefc; --peach: #f8e6da; --coral: #c8623f; }
 :root[data-theme="light"] :is(.kpi, .chart-card) {
   background: var(--card); border-color: rgb(var(--ink) / .12); border-radius: 10px;

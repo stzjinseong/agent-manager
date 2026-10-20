@@ -1700,6 +1700,7 @@ function renderDetail() {
   const w = state.workers.find((x) => x.id === selected);
   const wasHidden = $('#detail').hidden;
   $('#detail').hidden = !w;
+  if (!w) $('#att-tab').hidden = true;
   scheduleSelLink();
   $('#term-wrap').classList.toggle('unseen', Boolean(w && isUnseenDone(w))); // 확인 안 한 완료 빛 — 카드 대신 여기(unseenOnCard)
   $('#term-boot').hidden = !termLocked();
@@ -1744,12 +1745,29 @@ function renderDetail() {
     updatePin();
     markGoneSoon();
   }
+  renderAttTab(w);
   renderProfile(w);
   renderDiffButton(w);
   // 접은 영역 제목줄에 건수를 보여 준다 (펼쳐 있으면 안에 보이므로 비움)
   const memoN = (state.memos?.[w.name] || []).length;
   setSecCount('sec-task', w.queue.length ? _t('대기 {n}', { n: w.queue.length }) : '');
   setSecCount('sec-memo', memoN ? _t('{n}건', { n: memoN }) : '');
+}
+
+// 상세 패널 위에 걸린 탭: 타임라인(지난 요청 포함)에 남은 첨부를 최신 것부터 한 줄로 — 다른 로그 사이에서 지난 첨부를 찾느라 스크롤하지 않게.
+// 타임라인과 같은 글에서 찾으므로(uploadsIn) 타임라인에서 밀려난 첨부는 여기서도 빠진다. 바뀐 때만 다시 그린다(썸네일 다시 로드 방지)
+function renderAttTab(w) {
+  const seen = new Set(), list = [];
+  for (let i = timelineCache.length - 1; i >= 0; i--) {
+    const r = timelineCache[i];
+    if (r.kind !== 'req' && r.kind !== 'queued' && r.kind !== 'unqueued') continue;
+    for (const f of uploadsIn(r.text, true)) if (!seen.has(f.url)) { seen.add(f.url); list.push(f); }
+  }
+  const tab = $('#att-tab'), box = $('#att-tab-list');
+  tab.hidden = !list.length;
+  $('#att-tab-h').textContent = _t('첨부 {n}', { n: list.length });
+  const html = attTiles(list, 'sm');
+  if (box._html !== html) box.innerHTML = box._html = html;
 }
 
 // 타임라인 정리: 사용자 요청을 한 줄로 모아 강조한다.
@@ -1878,7 +1896,9 @@ function uploadsIn(text, clipped = false) {
   return list.filter((f, i) => list.findIndex((g) => g.url === f.url) === i);
 }
 function attachChips(text, size = 'sm') {
-  const list = uploadsIn(text, size === 'md');
+  return attTiles(uploadsIn(text, size === 'md'), size);
+}
+function attTiles(list, size) {
   if (!list.length) return '';
   return `<span class="att att-${size}">${list.map((f) => f.image
     ? shotImg({ url: f.url }, 'att-img').replace('<img ', '<img onerror="this.remove()" ')

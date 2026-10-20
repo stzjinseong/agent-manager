@@ -249,6 +249,7 @@ const EN = {
   '이전 캡처 (←)': 'Previous capture (←)',
   '다음 캡처 (→)': 'Next capture (→)',
   '사람이 첨부': 'Attached by you',
+  '첨부 {n}': 'Files {n}',
   '첨부 원본을 그대로 보여 줍니다 (7일 지나면 정리됨).': 'Showing the original attachment (cleaned up after 7 days).',
   '이미지는 최대 {n}장까지 관리됩니다.': 'Up to {n} images are kept.',
   // 세션 프로파일·차트·설명 툴팁
