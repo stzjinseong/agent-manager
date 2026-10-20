@@ -37,7 +37,7 @@
 
   // ---------- 창 ----------
   const back = el(`<div class="modal-back sc-back dv-back" hidden><div class="modal panel sc-modal dv-modal" role="dialog" aria-modal="true" tabindex="-1">
-      <div class="gr-head"><div><h3 class="dv-title"></h3><small class="gr-sub dv-sub"></small></div>
+      <div class="gr-head"><div><h3 class="dv-title"></h3><small class="gr-sub dv-sub"></small><div class="dv-desc"></div></div>
         <button class="btn ghost gr-x" data-dv="close">✕</button></div>
       <form class="sc-form dv-form" autocomplete="off">
         <div class="sc-row"><label class="sc-l" data-k="제목"></label><input name="title" maxlength="40"></div>
@@ -141,6 +141,7 @@
     $('.dv-title', box).textContent = T('헤더');
     const all = list();
     $('.dv-sub', box).textContent = T('전체 {n}개 · 모든 워커 {g}개', { n: all.length, g: all.filter((d) => d.global).length });
+    $('.dv-desc', box).textContent = T('워커(세션)에 보내는 다음 메시지에 함께 전달되어 작동에 반영됩니다. 고치면 다시 전달됩니다.');
     box.querySelectorAll('[data-k]').forEach((x) => { x.textContent = T(x.dataset.k); });
     $('.gr-x', box).setAttribute('aria-label', T('닫기'));
     form.title.placeholder = T('짧은 이름 (예: 작업 끝나면 커밋)');

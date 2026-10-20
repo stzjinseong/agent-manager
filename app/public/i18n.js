@@ -250,6 +250,7 @@ const EN = {
   '다음 캡처 (→)': 'Next capture (→)',
   '사람이 첨부': 'Attached by you',
   '첨부 {n}': 'Files {n}',
+  '워커(세션)에 보내는 다음 메시지에 함께 전달되어 작동에 반영됩니다. 고치면 다시 전달됩니다.': 'Sent along with the next message to the worker (session) and applied to how it works. Sent again when you edit it.',
   '첨부 원본을 그대로 보여 줍니다 (7일 지나면 정리됨).': 'Showing the original attachment (cleaned up after 7 days).',
   '이미지는 최대 {n}장까지 관리됩니다.': 'Up to {n} images are kept.',
   // 세션 프로파일·차트·설명 툴팁

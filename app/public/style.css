@@ -2347,6 +2347,7 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 .gr-head > div:nth-child(2) { flex: 1; min-width: 0; }
 .gr-head h3 { margin: 0; font-size: 17px; }
 .gr-sub { color: var(--dim); font-size: 12px; }
+.dv-desc { margin-top: 6px; color: var(--text); font-size: 12.5px; line-height: 1.5; } /* 헤더 창: 헤더가 어떻게 반영되는지 한 줄 */
 .gr-lv { flex: none; width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; font-weight: 800; font-size: 15px;
   color: var(--gold); background: color-mix(in srgb, var(--gold) 14%, transparent); border: 1px solid color-mix(in srgb, var(--gold) 40%, transparent); }
 .gr-lv.daily { font-size: 24px; }
