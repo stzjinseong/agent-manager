@@ -291,6 +291,13 @@ function roamStop(dot) { // 점프로 제자리에 닿았을 때(예비) — 연
   dot.style.translate = '';
   drawTraces();
 }
+// 매니저가 산책을 나가면 제자리에 그림자(같은 모양의 어두운 실루엣 + 바닥 그림자)를 남긴다 — 자리가 비어 보이지 않게.
+// 나갈 때마다 지금 모습(단계 · 꾸밈)을 본떠 다시 만든다. 보이고 숨는 것은 .core-dot.roam 을 따르는 CSS
+function roamGhost(dot) {
+  let g = $('.mgr-ghost');
+  if (!g) { g = el('<span class="mgr-ghost" aria-hidden="true"></span>'); dot.before(g); }
+  g.innerHTML = $('.core-mark', dot)?.innerHTML || '';
+}
 function roamSync(stay) {
   const dot = $('.core-dot');
   if (!dot) return;
@@ -304,6 +311,7 @@ function roamSync(stay) {
       if (!roam.on) return;
       const next = roamPick(dot);
       if (!next) { roam.on = false; return; }
+      roamGhost(dot);
       dot.classList.add('roam');
       roamJumpTo(dot, next, roamRandOx(dot, next));
       roam.last = 0;

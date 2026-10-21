@@ -227,6 +227,13 @@ main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24p
 .core-dot.busy .clawd .legs-b { animation: legB .36s steps(1) infinite; }
 /* 산책(app.js roamSync): 작업 중 워커가 없으면 화면을 걸어 다닌다. 떠 있는 동안 다른 요소 위로, 클릭은 통과 */
 .core-dot.roam { z-index: 45; pointer-events: none; }
+/* 산책 중 제자리에 남는 그림자(app.js roamGhost) — .core-dot 과 같은 여백 · 크기로 겹쳐 둔다 */
+.mgr-ghost { position: absolute; left: 50%; top: 0; translate: -50% 0; padding: 6px 10px 2px; pointer-events: none; opacity: 0; transition: opacity .35s; }
+.mgr-ghost svg { width: 84px; height: 47px; display: block; overflow: visible; filter: brightness(0); opacity: .45; }
+.mgr-ghost svg * { animation: none !important; }
+.mgr-ghost::after { content: ""; position: absolute; left: 50%; bottom: -2px; width: 64px; height: 8px; translate: -50% 0; border-radius: 50%; background: radial-gradient(closest-side, rgb(0 0 0 / .45), transparent); }
+:root[data-theme="light"] .mgr-ghost svg { opacity: .18; }
+.core:has(> .core-dot.roam) > .mgr-ghost { opacity: 1; }
 .core-dot.walking .core-mark { animation: bob .36s steps(2, jump-none) infinite alternate; }
 .core-dot.walking .clawd .legs-a { animation: legA .36s steps(1) infinite; }
 .core-dot.walking .clawd .legs-b { animation: legB .36s steps(1) infinite; }
