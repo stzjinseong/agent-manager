@@ -1837,7 +1837,7 @@ function renderDetail() {
   setSecCount('sec-memo', memoN ? _t('{n}건', { n: memoN }) : '');
 }
 
-// 상세 패널 위에 걸린 탭: 워커가 만든 결과물(w.docs) · 요청에 붙은 입력 첨부 · 도구 캡처(w.shots)를 세 묶음으로 한 줄에 — 다른 로그 사이에서 찾느라 스크롤하지 않게.
+// 상세 패널 위에 걸린 탭: 워커가 만든 결과물(w.docs) · 도구 캡처(w.shots) · 요청에 붙은 입력 첨부를 세 묶음으로 한 줄에 — 다른 로그 사이에서 찾느라 스크롤하지 않게.
 // 첨부는 서버가 자르기 전에 따로 모은 w.atts(최근 100개, /clear 때 비움)가 본체이고, 그 기능 전에 쌓인 타임라인 · 지난 요청 글도 함께 읽는다.
 // 바뀐 때만 다시 그린다(썸네일 다시 로드 방지)
 function renderAttTab(w) {
@@ -1868,8 +1868,8 @@ function renderAttTab(w) {
   items.sort((a, b) => b.t - a.t);
   const tab = $('#att-tab'), box = $('#att-tab-list');
   tab.hidden = !items.length;
-  // 결과물 · 입력 · 캡처 순으로 묶음마다 이름과 개수, 묶음 안은 최신 것부터. 빈 묶음은 뺀다
-  const html = [['doc', '결과물'], ['in', '입력'], ['shot', '캡처']].map(([cat, label]) => {
+  // 결과물 · 캡처 · 입력 순으로 묶음마다 이름과 개수, 묶음 안은 최신 것부터. 빈 묶음은 뺀다
+  const html = [['doc', '결과물'], ['shot', '캡처'], ['in', '입력']].map(([cat, label]) => {
     const g = items.filter((x) => x.cat === cat);
     return g.length ? `<span class="att-grp" data-cat="${cat}"><span class="att-grp-h">${_t(label)} <b>${g.length}</b></span><span class="att att-sm">${g.map((x) => x.html).join('')}</span></span>` : '';
   }).join('');
