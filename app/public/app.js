@@ -1876,6 +1876,33 @@ function renderAttTab(w) {
   if (box._html !== html) box.innerHTML = box._html = html;
 }
 
+// 첨부 탭의 이미지(입력 · 캡처 · 그림 결과물)에 마우스를 올리면 크게 본 모습을 툴팁처럼 띄운다.
+// 탭은 상세 패널 위에 걸려 있어 위쪽이 넉넉하다 — 타일 위에, 모자라면 아래에. 설명(원래 title)은 그림 밑에 옮겨 브라우저 툴팁과 겹치지 않게
+const attPeek = el('<div class="att-peek" hidden><img alt=""><div class="cap"></div></div>');
+document.body.append(attPeek);
+const peekHide = () => { attPeek.hidden = true; attPeek._for = null; };
+$('#att-tab-list').addEventListener('mouseover', (e) => {
+  const t = e.target.closest('img.att-img, a.att-doc[data-img]');
+  if (!t || t === attPeek._for) return;
+  if (t.title) { t.dataset.cap = t.title; t.removeAttribute('title'); }
+  attPeek._for = t;
+  const img = $('img', attPeek), src = t.tagName === 'IMG' ? t.currentSrc || t.src : t.href;
+  $('.cap', attPeek).textContent = (t.dataset.cap || '').split('\n')[0];
+  const place = () => {
+    if (attPeek._for !== t) return;
+    attPeek.hidden = false;
+    const r = t.getBoundingClientRect(), pr = attPeek.getBoundingClientRect();
+    const left = Math.max(8, Math.min(innerWidth - pr.width - 8, r.left + r.width / 2 - pr.width / 2));
+    const top = r.top - pr.height - 10 >= 8 ? r.top - pr.height - 10 : Math.min(innerHeight - pr.height - 8, r.bottom + 10);
+    attPeek.style.left = `${left}px`; attPeek.style.top = `${top}px`;
+  };
+  if (img.getAttribute('src') !== src) { attPeek.hidden = true; img.onload = place; img.onerror = peekHide; img.src = src; }
+  else place();
+});
+$('#att-tab-list').addEventListener('mouseout', (e) => { if (attPeek._for && !attPeek._for.contains(e.relatedTarget)) peekHide(); });
+addEventListener('scroll', peekHide, true);
+document.addEventListener('pointerdown', peekHide, true);
+
 // 타임라인 정리: 사용자 요청을 한 줄로 모아 강조한다.
 //  · 대시보드 지시는 'assign' 과 곧이어 오는 'working: 같은 글' 두 줄로 찍힌다 → 한 줄('요청')
 //  · 터미널에서 직접 친 요청은 'working: …' 만 찍힌다 → '요청'
