@@ -1837,7 +1837,7 @@ function renderDetail() {
   setSecCount('sec-memo', memoN ? _t('{n}건', { n: memoN }) : '');
 }
 
-// 상세 패널 위에 걸린 탭: 요청에 붙은 첨부와 워커가 만든 결과물(w.docs)을 최신 것부터 한 줄로 — 다른 로그 사이에서 찾느라 스크롤하지 않게.
+// 상세 패널 위에 걸린 탭: 요청에 붙은 첨부 · 도구 캡처(w.shots) · 워커가 만든 결과물(w.docs)을 최신 것부터 한 줄로 — 다른 로그 사이에서 찾느라 스크롤하지 않게.
 // 첨부는 서버가 자르기 전에 따로 모은 w.atts(최근 100개, /clear 때 비움)가 본체이고, 그 기능 전에 쌓인 타임라인 · 지난 요청 글도 함께 읽는다.
 // 바뀐 때만 다시 그린다(썸네일 다시 로드 방지)
 function renderAttTab(w) {
@@ -1847,6 +1847,13 @@ function renderAttTab(w) {
   for (const r of timelineCache) {
     if (r.kind !== 'req' && r.kind !== 'queued' && r.kind !== 'unqueued') continue;
     add(r.t, r.text, true);
+  }
+  // 도구 결과 캡처(w.shots, 최근 50장 · /clear 때 비움)도 섞는다 — 점선 테두리로 첨부와 구분, 누르면 같은 워커 캡처끼리 넘겨 보기
+  for (const sh of w.shots || []) {
+    if (seen.has(sh.url)) continue;
+    seen.add(sh.url);
+    const cap = [_t('📷 캡처'), sh.tool, sh.arg].filter(Boolean).join(' · ');
+    items.push({ t: sh.t, html: shotImg(sh, 'att-img att-shot').replace('<img ', `<img onerror="this.remove()" `).replace(/title="[^"]*"/, `title="${esc(cap)}&#10;${_t('클릭해 크게 보기')}"`) });
   }
   // 결과물은 이름이 보이게 파일 타일 모양으로 — 여는 방식(크게 보기 · 새 탭)은 카드 · 타임라인과 같은 docImgAttr
   for (const d of w.docs || []) {

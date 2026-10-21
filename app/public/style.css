@@ -740,6 +740,7 @@ body.term-full .side-grip { left: -6px; }
 .att { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; white-space: normal; }
 .att .att-img { display: block; border-radius: 6px; border: 1px solid rgb(var(--ink) / .7); cursor: zoom-in; background: var(--bg); object-fit: cover; }
 .att .att-img:hover, .att .att-file:hover, .att .att-doc:hover { border-color: rgb(var(--ink)); }
+.att .att-img.att-shot { border-style: dashed; } /* 첨부 탭: 도구 캡처는 점선으로 사람이 붙인 첨부와 구분 */
 /* 첨부 동영상: 첫 장면 썸네일 + 가운데 ▶. 누르면 동영상 뷰어(app.js openVideo) */
 .att .att-vid { position: relative; display: block; overflow: hidden; border-radius: 6px; border: 1px solid rgb(var(--ink) / .7); background: #000; cursor: pointer; }
 .att .att-vid:hover { border-color: rgb(var(--ink)); }
