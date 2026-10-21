@@ -249,7 +249,6 @@ const EN = {
   '이전 캡처 (←)': 'Previous capture (←)',
   '다음 캡처 (→)': 'Next capture (→)',
   '사람이 첨부': 'Attached by you',
-  '첨부 {n}': 'Files {n}',
   '누르면 해당 워커 카드가 꿈틀거립니다': 'Click to wiggle those worker cards',
   '워커(세션)에 보내 작동에 반영됩니다. 고치면 다시 전달됩니다.': 'Sent to the worker (session) and applied to how it works. Sent again when you edit it.',
   '첨부 원본을 그대로 보여 줍니다 (7일 지나면 정리됨).': 'Showing the original attachment (cleaned up after 7 days).',

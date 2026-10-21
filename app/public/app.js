@@ -1837,12 +1837,14 @@ function renderDetail() {
   setSecCount('sec-memo', memoN ? _t('{n}건', { n: memoN }) : '');
 }
 
-// 상세 패널 위에 걸린 탭: 요청에 붙은 첨부 · 도구 캡처(w.shots) · 워커가 만든 결과물(w.docs)을 최신 것부터 한 줄로 — 다른 로그 사이에서 찾느라 스크롤하지 않게.
+// 상세 패널 위에 걸린 탭: 워커가 만든 결과물(w.docs) · 요청에 붙은 입력 첨부 · 도구 캡처(w.shots)를 세 묶음으로 한 줄에 — 다른 로그 사이에서 찾느라 스크롤하지 않게.
 // 첨부는 서버가 자르기 전에 따로 모은 w.atts(최근 100개, /clear 때 비움)가 본체이고, 그 기능 전에 쌓인 타임라인 · 지난 요청 글도 함께 읽는다.
 // 바뀐 때만 다시 그린다(썸네일 다시 로드 방지)
 function renderAttTab(w) {
   const seen = new Set(), items = [];
-  const add = (t, text, clipped) => { for (const f of uploadsIn(text, clipped)) if (!seen.has(f.url)) { seen.add(f.url); items.push({ t, html: attTile(f) }); } };
+  // 끌어 넣은 경로도 가리키는 것에 따라 나눈다: /shots/ = 캡처, /docs/ = 결과물, 나머지(업로드) = 입력
+  const catOf = (url) => url.startsWith('/shots/') ? 'shot' : url.startsWith('/docs/') ? 'doc' : 'in';
+  const add = (t, text, clipped) => { for (const f of uploadsIn(text, clipped)) if (!seen.has(f.url)) { seen.add(f.url); items.push({ t, cat: catOf(f.url), html: attTile(f) }); } };
   for (const a of [...(w.atts || [])].reverse()) add(a.t, a.ref, false); // 최신부터 — 같은 파일은 가장 최근 시각 하나만
   for (const r of timelineCache) {
     if (r.kind !== 'req' && r.kind !== 'queued' && r.kind !== 'unqueued') continue;
@@ -1853,21 +1855,24 @@ function renderAttTab(w) {
     if (seen.has(sh.url)) continue;
     seen.add(sh.url);
     const cap = [_t('📷 캡처'), sh.tool, sh.arg].filter(Boolean).join(' · ');
-    items.push({ t: sh.t, html: shotImg(sh, 'att-img att-shot').replace('<img ', `<img onerror="this.remove()" `).replace(/title="[^"]*"/, `title="${esc(cap)}&#10;${_t('클릭해 크게 보기')}"`) });
+    items.push({ t: sh.t, cat: 'shot', html: shotImg(sh, 'att-img att-shot').replace('<img ', `<img onerror="this.remove()" `).replace(/title="[^"]*"/, `title="${esc(cap)}&#10;${_t('클릭해 크게 보기')}"`) });
   }
   // 결과물은 이름이 보이게 파일 타일 모양으로 — 여는 방식(크게 보기 · 새 탭)은 카드 · 타임라인과 같은 docImgAttr
   for (const d of w.docs || []) {
     if (seen.has(d.url)) continue;
     seen.add(d.url);
     const ext = d.name.split('.').pop().toLowerCase();
-    items.push({ t: d.t, html: `<a class="att-doc" href="${esc(d.url)}" target="_blank" rel="noopener" draggable="false"${docImgAttr(d, ext)} title="${_t('결과물')} · ${esc(d.title ? `${d.title}
+    items.push({ t: d.t, cat: 'doc', html: `<a class="att-doc" href="${esc(d.url)}" target="_blank" rel="noopener" draggable="false"${docImgAttr(d, ext)} title="${_t('결과물')} · ${esc(d.title ? `${d.title}
 ` : '')}${esc(d.name)}&#10;${docOpenHint(IMG_DOC.has(ext) || VID_DOC.has(ext) || TXT_DOC.has(ext))}"><span class="ic">${DOC_ICON[ext] || '📄'}</span><span class="nm">${esc(d.name)}</span></a>` });
   }
   items.sort((a, b) => b.t - a.t);
   const tab = $('#att-tab'), box = $('#att-tab-list');
   tab.hidden = !items.length;
-  $('#att-tab-h').textContent = _t('첨부 {n}', { n: items.length });
-  const html = items.length ? `<span class="att att-sm">${items.map((x) => x.html).join('')}</span>` : '';
+  // 결과물 · 입력 · 캡처 순으로 묶음마다 이름과 개수, 묶음 안은 최신 것부터. 빈 묶음은 뺀다
+  const html = [['doc', '결과물'], ['in', '입력'], ['shot', '캡처']].map(([cat, label]) => {
+    const g = items.filter((x) => x.cat === cat);
+    return g.length ? `<span class="att-grp" data-cat="${cat}"><span class="att-grp-h">${_t(label)} <b>${g.length}</b></span><span class="att att-sm">${g.map((x) => x.html).join('')}</span></span>` : '';
+  }).join('');
   if (box._html !== html) box.innerHTML = box._html = html;
 }
 
