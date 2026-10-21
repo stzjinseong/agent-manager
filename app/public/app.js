@@ -160,7 +160,7 @@ try {
 // 졸 때(sleepy) · 최소화 · 움직임 줄이기일 때는 나가지 않고, 떠 있는 동안은 클릭을 막지 않게 pointer-events 를 끈다
 const ROAM_WALK = 60; // 담장 위를 걷는 속도 px/초
 const ROAM_LEDGES = '#floor, #nodes .node, .att-tab-in, #detail, #term-wrap, .side-sec';
-const roam = { on: false, raf: 0, timer: 0, last: 0, mode: 'idle', until: 0, el: null, ox: 0, tx: 0, jump: null };
+const roam = { on: false, raf: 0, timer: 0, last: 0, mode: 'idle', until: 0, el: null, ox: 0, tx: 0, jump: null, tele: false };
 const roamAt = (dot) => { const t = getComputedStyle(dot).translate; if (!t || t === 'none') return [0, 0]; const [x, y = '0'] = t.split(' '); return [parseFloat(x) || 0, parseFloat(y) || 0]; };
 // 발 위치(가운데 아래) 기준으로 다룬다. 제자리 발 위치 = 지금 위치 - 이동분
 function roamHomeFeet(dot) {
@@ -227,8 +227,8 @@ function roamFrame(now) {
   // 서 있던 윗면이 사라지거나 화면 밖으로 나가면 다른 곳으로 뛴다(없으면 제자리로)
   if (!el || !el.isConnected || !roamLedges(dot).includes(el)) {
     const next = roamPick(dot);
-    roamJumpTo(dot, next, next ? roamRandOx(dot, next) : 0);
-    if (!next) roam.on = false;
+    if (next) roamJumpTo(dot, next, roamRandOx(dot, next));
+    else { roam.on = false; roamTeleport(dot); } // 설 곳이 없으면 제자리로 순간이동 — 다음 렌더에서 다시 나간다
     return;
   }
   const r = el.getBoundingClientRect(), w = dot.getBoundingClientRect().width;
@@ -249,7 +249,42 @@ function roamFrame(now) {
   const p = roamOn(el, roam.ox);
   roamPut(dot, p.x, p.y);
 }
-function roamStop(dot) {
+// 제자리로는 순간이동: 그 자리에서 가늘게 늘어나며 사라지고(빛 고리 · 반짝이) 제자리에서 같은 연출로 나타난다.
+// 크기 연출은 CSS scale 개별 속성(WAAPI)이라 xp-got 의 transform · 걷기 bob 과 겹치지 않는다
+function roamBurst(x, y) {
+  const ring = el('<i class="mgr-tp-ring"></i>');
+  ring.style.left = `${x}px`; ring.style.top = `${y}px`;
+  document.body.append(ring);
+  ring.animate([{ scale: .2, opacity: .9 }, { scale: 1.6, opacity: 0 }], { duration: 420, easing: 'ease-out' }).finished.then(() => ring.remove());
+  for (let i = 0; i < 10; i++) {
+    const a = (i / 10) * Math.PI * 2 + Math.random() * .4, d = 26 + Math.random() * 22;
+    const sp = el('<i class="mgr-tp-spark"></i>');
+    sp.style.left = `${x}px`; sp.style.top = `${y}px`;
+    document.body.append(sp);
+    sp.animate([{ translate: '0 0', opacity: 1, scale: 1 }, { translate: `${Math.cos(a) * d}px ${Math.sin(a) * d}px`, opacity: 0, scale: .3 }],
+      { duration: 380 + Math.random() * 160, easing: 'cubic-bezier(.2,.7,.3,1)' }).finished.then(() => sp.remove());
+  }
+}
+async function roamTeleport(dot) {
+  if (roam.tele) return;
+  roam.tele = true;
+  cancelAnimationFrame(roam.raf);
+  roam.raf = 0; roam.mode = 'idle'; roam.el = null; roam.last = 0;
+  dot.classList.remove('walking', 'jumping', 'land');
+  const mid = () => { const r = $('.core-mark', dot).getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; };
+  roamBurst(...mid());
+  await dot.animate([{ scale: '1 1', opacity: 1 }, { scale: '.15 1.7', opacity: 0 }], { duration: 230, easing: 'ease-in', fill: 'forwards' }).finished.catch(() => {});
+  dot.style.translate = '';
+  dot.classList.remove('face-l');
+  drawTraces();
+  roamBurst(...mid());
+  const a = dot.animate([{ scale: '.15 1.7', opacity: 0 }, { scale: '1.15 .88', opacity: 1, offset: .65 }, { scale: '1 1', opacity: 1 }], { duration: 320, easing: 'ease-out' });
+  dot.getAnimations().filter((x) => x !== a && x.effect?.target === dot && x.playState === 'finished').forEach((x) => x.cancel()); // 사라질 때 남긴 fill 정리
+  await a.finished.catch(() => {});
+  dot.classList.remove('roam');
+  roam.tele = false;
+}
+function roamStop(dot) { // 점프로 제자리에 닿았을 때(예비) — 연출 없이 정리
   cancelAnimationFrame(roam.raf);
   roam.raf = 0; roam.mode = 'idle'; roam.el = null; roam.last = 0;
   dot.classList.remove('walking', 'jumping', 'roam', 'face-l');
@@ -261,14 +296,9 @@ function roamSync(stay) {
   if (!dot) return;
   stay = stay || dot.classList.contains('sleepy') || $('#floor').hidden || matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (!stay) {
-    if (roam.on) return;
+    if (roam.on || roam.tele) return; // 순간이동 중이면 끝난 뒤 다음 렌더에서 다시 나간다
     roam.on = true;
     clearTimeout(roam.timer);
-    if (roam.raf) { // 제자리로 뛰던 중에 다시 한가해짐 — 근처 윗면으로 방향을 튼다
-      const next = roamPick(dot);
-      if (next) roamJumpTo(dot, next, roamRandOx(dot, next));
-      return;
-    }
     // 잠깐 쉬었다가 제자리에서 가까운 윗면으로 첫 점프. 탭이 안 보이면 rAF 가 멈춰 그 자리에서 기다린다
     roam.timer = setTimeout(() => {
       if (!roam.on) return;
@@ -284,7 +314,7 @@ function roamSync(stay) {
   if (!roam.on) return;
   roam.on = false;
   clearTimeout(roam.timer);
-  if (roam.raf) roamJumpTo(dot, null, 0); // 제자리로 폴짝 — 도착하면 roamStop
+  if (roam.raf) roamTeleport(dot); // 제자리로 순간이동
 }
 
 // 매 렌더·30초마다: 시선 기울기, 졸음(모두 30분 넘게 쉬거나 늦은 밤)

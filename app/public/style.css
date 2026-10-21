@@ -230,6 +230,9 @@ main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24p
 .core-dot.jumping .core-mark svg { rotate: -8deg; } /* 뛰는 중: 살짝 몸을 젖힌다 */
 .core-dot.land .core-mark { animation: mgr-land .26s ease-out; transform-origin: 50% 100%; } /* 내려앉을 때 납작했다 펴짐 */
 @keyframes mgr-land { 0% { transform: scale(1.12, .82); } 60% { transform: scale(.96, 1.05); } 100% { transform: none; } }
+/* 제자리로 순간이동(app.js roamTeleport): 빛 고리 + 반짝이 */
+.mgr-tp-ring { position: fixed; z-index: 46; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .85); box-shadow: 0 0 14px rgba(255, 255, 255, .6), inset 0 0 10px rgba(255, 255, 255, .4); pointer-events: none; }
+.mgr-tp-spark { position: fixed; z-index: 46; width: 4px; height: 4px; margin: -2px 0 0 -2px; background: #fff; box-shadow: 0 0 6px #fff; pointer-events: none; }
 @keyframes core-glow {
   0%, 100% { filter: drop-shadow(0 0 5px rgba(255, 255, 255, .55)) drop-shadow(0 0 18px rgba(255, 255, 255, .25)); }
   50% { filter: drop-shadow(0 0 9px rgba(255, 255, 255, .9)) drop-shadow(0 0 32px rgba(255, 255, 255, .45)); }
