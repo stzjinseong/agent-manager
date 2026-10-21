@@ -153,35 +153,108 @@ try {
   if (localStorage.getItem(k) === todayKey()) $('.core-dot').classList.add('party-day');
 } catch {}
 // ---------- 매니저 산책 ----------
-// 작업 중인 워커가 없으면 매니저가 화면(보이는 영역) 안을 걸어 다니다 쉬다 한다. 작업이 생기면 걸어서 제자리로.
+// 작업 중인 워커가 없으면 매니저가 화면 속 패널 · 카드 윗면을 담장 삼아 걸어 다니고, 다른 윗면으로 폴짝 뛰어 옮겨 간다(플랫폼 게임처럼).
+// 작업이 생기면 제자리로 뛰어 돌아온다. 서 있는 위치는 '어느 요소의 윗면 · 왼쪽에서 몇 px' 로 기억해, 스크롤해도 그 담장 위에 그대로 있다.
 // 자리(.core)는 그대로 두고 .core-dot 을 CSS translate 로만 옮긴다 — transform 을 쓰는 xp-got 연출과 겹치지 않고,
 // 매니저에 붙은 xp 바 · 반짝이 · 먼지도 함께 따라온다. 회로 선은 제자리 기준(drawTraces 가 이동분을 뺀다).
-// 졸 때(sleepy) · 최소화 · 움직임 줄이기 · 탭이 안 보일 때는 걷지 않는다. 떠 있는 동안은 클릭을 막지 않게 pointer-events 를 끈다
-const ROAM_SPEED = 70, ROAM_HOME_SPEED = 160; // px/초
-const roam = { on: false, timer: 0 };
+// 졸 때(sleepy) · 최소화 · 움직임 줄이기일 때는 나가지 않고, 떠 있는 동안은 클릭을 막지 않게 pointer-events 를 끈다
+const ROAM_WALK = 60; // 담장 위를 걷는 속도 px/초
+const ROAM_LEDGES = '#floor, #nodes .node, .att-tab-in, #detail, #term-wrap, .side-sec';
+const roam = { on: false, raf: 0, timer: 0, last: 0, mode: 'idle', until: 0, el: null, ox: 0, tx: 0, jump: null };
 const roamAt = (dot) => { const t = getComputedStyle(dot).translate; if (!t || t === 'none') return [0, 0]; const [x, y = '0'] = t.split(' '); return [parseFloat(x) || 0, parseFloat(y) || 0]; };
-function roamWalk(dot, x, y, speed) {
-  const [cx, cy] = roamAt(dot);
-  const d = Math.hypot(x - cx, y - cy), sec = Math.max(.6, Math.min(14, d / speed));
-  if (Math.abs(x - cx) > 4) dot.classList.toggle('face-l', x < cx);
-  dot.style.translate = `${cx}px ${cy}px`; // 걷는 중에 방향을 틀어도 지금 자리에서 이어 가게
-  void dot.offsetWidth;
-  dot.style.transition = `translate ${sec}s linear`;
-  dot.style.translate = `${x}px ${y}px`;
-  dot.classList.add('walking');
-  return sec * 1000;
-}
-function roamNext() {
-  const dot = $('.core-dot');
-  if (!roam.on || !dot) return;
-  if (document.hidden) { roam.timer = setTimeout(roamNext, 3000); return; }
+// 발 위치(가운데 아래) 기준으로 다룬다. 제자리 발 위치 = 지금 위치 - 이동분
+function roamHomeFeet(dot) {
   const [cx, cy] = roamAt(dot), r = dot.getBoundingClientRect();
-  const homeL = r.left - cx, homeT = r.top - cy; // 이동분을 뺀 제자리(화면 좌표)
-  const top = (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--topbar-h')) || 59) + 12;
-  const tx = 16 + Math.random() * Math.max(0, innerWidth - r.width - 32);
-  const ty = top + Math.random() * Math.max(0, innerHeight - r.height - top - 16);
-  const ms = roamWalk(dot, tx - homeL, ty - homeT, ROAM_SPEED);
-  roam.timer = setTimeout(() => { dot.classList.remove('walking'); roam.timer = setTimeout(roamNext, 2000 + Math.random() * 5000); }, ms);
+  return { x: r.left - cx + r.width / 2, y: r.top - cy + r.height };
+}
+function roamPut(dot, x, y) {
+  const h = roamHomeFeet(dot);
+  dot.style.translate = `${Math.round(x - h.x)}px ${Math.round(y - h.y)}px`;
+}
+function roamFeet(dot) { const r = dot.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.bottom }; }
+// 올라설 수 있는 윗면: 보이고, 매니저가 설 만큼 넓고, 윗면이 화면 안(상단바 아래, 머리가 가리지 않게 여유)에 있는 것
+function roamLedges(dot) {
+  const top = (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--topbar-h')) || 59) + 60;
+  const w = dot.getBoundingClientRect().width;
+  return [...document.querySelectorAll(ROAM_LEDGES)].filter((el) => {
+    if (el.closest('[hidden]') || !el.getClientRects().length) return false;
+    const r = el.getBoundingClientRect();
+    return r.width >= w + 20 && r.top >= top && r.top <= innerHeight - 30;
+  });
+}
+const roamOn = (el, ox) => { const r = el.getBoundingClientRect(); return { x: r.left + ox, y: r.top }; };
+function roamJumpTo(dot, el, ox) { // el 이 없으면 제자리로
+  const from = roamFeet(dot), to = el ? roamOn(el, ox) : roamHomeFeet(dot);
+  const dist = Math.hypot(to.x - from.x, to.y - from.y);
+  roam.jump = { from, el, ox, t0: performance.now(), dur: Math.max(450, Math.min(1100, 380 + dist * .9)), peak: 40 + Math.min(90, dist * .12) };
+  roam.mode = 'jump';
+  if (Math.abs(to.x - from.x) > 4) dot.classList.toggle('face-l', to.x < from.x);
+  dot.classList.remove('walking');
+  dot.classList.add('jumping');
+}
+function roamPick(dot) {
+  const ls = roamLedges(dot).filter((el) => el !== roam.el);
+  if (!ls.length) return null;
+  const f = roamFeet(dot);
+  // 가까운 윗면일수록 자주 — 화면을 가로질러 순간이동하듯 뛰지 않게
+  const ws = ls.map((el) => { const r = el.getBoundingClientRect(); const d = Math.hypot(Math.max(r.left - f.x, 0, f.x - r.right), r.top - f.y); return 1 / (1 + d / 220) ** 2; });
+  let k = Math.random() * ws.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < ls.length; i++) if ((k -= ws[i]) <= 0) return ls[i];
+  return ls.at(-1);
+}
+function roamRandOx(dot, el) { const w = dot.getBoundingClientRect().width, r = el.getBoundingClientRect(); return w / 2 + 6 + Math.random() * Math.max(0, r.width - w - 12); }
+function roamFrame(now) {
+  const dot = $('.core-dot');
+  if (!dot) return;
+  roam.raf = requestAnimationFrame(roamFrame);
+  const dt = Math.min(.05, (now - (roam.last || now)) / 1000);
+  roam.last = now;
+  if (roam.mode === 'jump') {
+    const j = roam.jump, p = Math.min(1, (now - j.t0) / j.dur);
+    // 목적지는 매 프레임 다시 잰다 — 뛰는 사이 스크롤 · 레이아웃이 바뀌어도 그 윗면에 내려앉게
+    const to = j.el ? roamOn(j.el, j.ox) : roamHomeFeet(dot);
+    roamPut(dot, j.from.x + (to.x - j.from.x) * p, j.from.y + (to.y - j.from.y) * p - 4 * j.peak * p * (1 - p));
+    if (p < 1) return;
+    dot.classList.remove('jumping');
+    dot.classList.add('land');
+    setTimeout(() => dot.classList.remove('land'), 260);
+    if (!j.el) { roamStop(dot); return; }
+    roam.el = j.el; roam.ox = j.ox;
+    roam.mode = 'idle'; roam.until = now + 600 + Math.random() * 1500;
+    return;
+  }
+  const el = roam.el;
+  // 서 있던 윗면이 사라지거나 화면 밖으로 나가면 다른 곳으로 뛴다(없으면 제자리로)
+  if (!el || !el.isConnected || !roamLedges(dot).includes(el)) {
+    const next = roamPick(dot);
+    roamJumpTo(dot, next, next ? roamRandOx(dot, next) : 0);
+    if (!next) roam.on = false;
+    return;
+  }
+  const r = el.getBoundingClientRect(), w = dot.getBoundingClientRect().width;
+  roam.ox = Math.max(w / 2, Math.min(r.width - w / 2, roam.ox)); // 패널 폭이 줄어도 끝에 걸쳐 떨어지지 않게
+  if (roam.mode === 'walk') {
+    const d = roam.tx - roam.ox, step = ROAM_WALK * dt;
+    if (Math.abs(d) <= step) { roam.ox = roam.tx; roam.mode = 'idle'; roam.until = now + 1200 + Math.random() * 3500; dot.classList.remove('walking'); }
+    else roam.ox += Math.sign(d) * step;
+  } else if (now >= roam.until) {
+    // 쉬었으면 다음 행동: 이 담장 위를 걷거나(60%) 다른 윗면으로 뛴다(40%)
+    const next = Math.random() < .4 && roamPick(dot);
+    if (next) { roamJumpTo(dot, next, roamRandOx(dot, next)); return; }
+    roam.tx = roamRandOx(dot, el);
+    roam.mode = 'walk';
+    dot.classList.toggle('face-l', roam.tx < roam.ox);
+    dot.classList.add('walking');
+  }
+  const p = roamOn(el, roam.ox);
+  roamPut(dot, p.x, p.y);
+}
+function roamStop(dot) {
+  cancelAnimationFrame(roam.raf);
+  roam.raf = 0; roam.mode = 'idle'; roam.el = null; roam.last = 0;
+  dot.classList.remove('walking', 'jumping', 'roam', 'face-l');
+  dot.style.translate = '';
+  drawTraces();
 }
 function roamSync(stay) {
   const dot = $('.core-dot');
@@ -191,19 +264,27 @@ function roamSync(stay) {
     if (roam.on) return;
     roam.on = true;
     clearTimeout(roam.timer);
-    dot.classList.add('roam');
-    roam.timer = setTimeout(roamNext, 1500 + Math.random() * 2500);
+    if (roam.raf) { // 제자리로 뛰던 중에 다시 한가해짐 — 근처 윗면으로 방향을 튼다
+      const next = roamPick(dot);
+      if (next) roamJumpTo(dot, next, roamRandOx(dot, next));
+      return;
+    }
+    // 잠깐 쉬었다가 제자리에서 가까운 윗면으로 첫 점프. 탭이 안 보이면 rAF 가 멈춰 그 자리에서 기다린다
+    roam.timer = setTimeout(() => {
+      if (!roam.on) return;
+      const next = roamPick(dot);
+      if (!next) { roam.on = false; return; }
+      dot.classList.add('roam');
+      roamJumpTo(dot, next, roamRandOx(dot, next));
+      roam.last = 0;
+      roam.raf = requestAnimationFrame(roamFrame);
+    }, 1500 + Math.random() * 2500);
     return;
   }
   if (!roam.on) return;
   roam.on = false;
   clearTimeout(roam.timer);
-  const ms = roamWalk(dot, 0, 0, ROAM_HOME_SPEED);
-  roam.timer = setTimeout(() => {
-    dot.classList.remove('walking', 'roam', 'face-l');
-    dot.style.transition = dot.style.translate = '';
-    drawTraces();
-  }, ms);
+  if (roam.raf) roamJumpTo(dot, null, 0); // 제자리로 폴짝 — 도착하면 roamStop
 }
 
 // 매 렌더·30초마다: 시선 기울기, 졸음(모두 30분 넘게 쉬거나 늦은 밤)
