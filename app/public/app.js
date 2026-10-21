@@ -1815,7 +1815,9 @@ document.body.append(dockTraces);
 let dockTraceSig = '';
 function drawDockTraces() {
   const mark = $('.brand-mark');
-  const on = $('#floor').hidden && mark?.classList.contains('mgr-on') && !document.body.classList.contains('term-full');
+  // 아무 워커도 움직이지 않으면(작업 중 · 백그라운드 · 결정 대기 없음) 선을 그리지 않는다 — 헤더 아래가 늘 선으로 덮여 있지 않게
+  const busy = state.workers.some((w) => ['working', 'waiting', 'decision'].includes(viewStatus(w))) || state.decisions.length > 0;
+  const on = busy && $('#floor').hidden && mark?.classList.contains('mgr-on') && !document.body.classList.contains('term-full');
   const lr = on && $('#dock-list').getBoundingClientRect();
   const chips = on ? [...document.querySelectorAll('#dock-list .dchip')].map((c) => {
     const r = c.getBoundingClientRect(), w = state.workers.find((x) => x.id === c.dataset.id);
