@@ -180,6 +180,10 @@ main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24p
 /* 최소화 중 헤더 로고(매니저) → 칩 줄 워커 칩 연결선(app.js drawDockTraces) — 헤더(10) · 칩 줄(9) 위에 화면 좌표로 */
 .traces.dock-traces { position: fixed; z-index: 11; }
 .dock-traces path { stroke: rgb(var(--ink) / .16); }
+.dock-traces .t-bus path.base { stroke: rgb(var(--ink) / .22); stroke-width: 1.5; } /* 버스 · 줄기: 옅은 중립색 */
+.dock-traces path.flow { stroke-dasharray: 2 5; } /* 가지가 짧아 흐름 점을 촘촘히 */
+.dock-traces .joint { fill: rgb(var(--ink) / .35); }
+.dock-traces .t-working .joint, .dock-traces .t-decision .joint, .dock-traces .t-done .joint, .dock-traces .t-waiting .joint { fill: currentColor; }
 /* 작업 중: Claude 코랄 전류 */
 .traces .t-working path.base { stroke: color-mix(in srgb, var(--accent) 38%, transparent); animation: hum 2.2s ease-in-out infinite; }
 .traces .t-working path.flow { stroke: color-mix(in srgb, var(--accent-hi) 70%, #fff); opacity: .55; stroke-width: 1.5; stroke-dasharray: 2 9; animation: flow .5s linear infinite; }

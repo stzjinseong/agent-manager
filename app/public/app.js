@@ -1799,7 +1799,7 @@ selLink.setAttribute('class', 'sel-link');
 selLink.setAttribute('aria-hidden', 'true');
 var selLinkRaf = 0, selLinkSig = ''; // var: 이 줄보다 먼저 도는 초기화(setFloorMin·renderDetail)에서도 부를 수 있게
 function scheduleSelLink() { if (!selLinkRaf) selLinkRaf = requestAnimationFrame(() => { selLinkRaf = 0; drawSelLink(); drawDockTraces(); }); }
-// 최소화 중엔 헤더 로고가 매니저다 — 바닥의 회로선(drawTraces)처럼 매니저 아래 가장자리에서 칩 줄의 워커 칩 위쪽 가운데로 선을 잇는다.
+// 최소화 중엔 헤더 로고가 매니저다 — 바닥의 회로선(drawTraces)처럼 매니저에서 칩 줄의 워커 칩으로 선을 잇는다(버스선 + 가지).
 // 헤더 · 칩 줄은 붙박이(sticky)라 화면 좌표로 그리는 고정 SVG 하나(#dock-traces, 헤더 위)에 그린다.
 // 칩 줄이 가로로 굴러 줄 밖으로 밀린 칩은 뺀다. 선 모양 · 상태 색은 바닥 회로선과 같은 .traces 규칙
 const dockTraces = el('<svg class="traces dock-traces" id="dock-traces" aria-hidden="true"></svg>');
@@ -1818,15 +1818,17 @@ function drawDockTraces() {
   if (sig === dockTraceSig) return;
   dockTraceSig = sig;
   if (!sig) { dockTraces.innerHTML = ''; return; }
-  // 출발점은 로고 아래 가장자리에 목표 x 순서대로 촘촘히 펼친다(로고가 작아 바닥보다 좁게)
-  const cx = mr.left + mr.width / 2, ay = Math.round(mr.bottom) + 1, n = chips.length;
-  const span = Math.min(mr.width - 6, Math.max(0, (n - 1) * 5));
-  chips.sort((a, b) => a.tx - b.tx);
-  dockTraces.innerHTML = chips.map((o, i) => {
-    const ax = Math.round(cx - span / 2 + (n > 1 ? (span * i) / (n - 1) : span / 2)), k = Math.max(8, Math.round((o.ty - ay) / 2));
-    const d = `M${ax} ${ay} C${ax} ${ay + k} ${o.tx} ${o.ty - k} ${o.tx} ${o.ty}`;
-    return `<g class="${o.st === 'socket' ? 't-socket' : `t-${o.st}`}"><path class="base" d="${d}"/><path class="flow" d="${d}"/><circle class="pad" cx="${o.tx}" cy="${o.ty}" r="2.5"/></g>`;
-  }).join('');
+  // 선마다 로고에서 칩까지 따로 그으면 좁은 띠(약 29px)에서 긴 가로선이 겹쳐 읽기 어려웠다 → 버스선 하나 + 짧은 가지.
+  // 로고 아래에서 내려온 줄기가 로고와 칩 사이 가운데 높이의 가로선(버스)에 붙고, 칩마다 버스에서 가지가 내려간다.
+  // 버스 · 줄기는 옅은 중립색, 상태 색 · 흐름은 가지와 칩 위 단자에만
+  const cx = Math.round(mr.left + mr.width / 2), ay = Math.round(mr.bottom) + 1;
+  const top = Math.min(...chips.map((o) => o.ty)), by = Math.round((ay + top) / 2);
+  const x0 = Math.min(cx, ...chips.map((o) => o.tx)), x1 = Math.max(cx, ...chips.map((o) => o.tx));
+  dockTraces.innerHTML = `<g class="t-bus"><path class="base" d="M${cx} ${ay} V${by} M${x0} ${by} H${x1}"/><circle class="pad" cx="${cx}" cy="${ay}" r="2"/></g>` +
+    chips.map((o) => {
+      const d = `M${o.tx} ${by} V${o.ty}`;
+      return `<g class="${o.st === 'socket' ? 't-socket' : `t-${o.st}`}"><path class="base" d="${d}"/><path class="flow" d="${d}"/><circle class="joint" cx="${o.tx}" cy="${by}" r="1.5"/><circle class="pad" cx="${o.tx}" cy="${o.ty}" r="2.5"/></g>`;
+    }).join('');
 }
 function drawSelLink() {
   const detail = $('#detail'), min = $('#floor').hidden;
