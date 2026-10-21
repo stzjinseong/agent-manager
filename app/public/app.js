@@ -1798,7 +1798,36 @@ const selLink = document.body.appendChild(Object.assign(document.createElementNS
 selLink.setAttribute('class', 'sel-link');
 selLink.setAttribute('aria-hidden', 'true');
 var selLinkRaf = 0, selLinkSig = ''; // var: 이 줄보다 먼저 도는 초기화(setFloorMin·renderDetail)에서도 부를 수 있게
-function scheduleSelLink() { if (!selLinkRaf) selLinkRaf = requestAnimationFrame(() => { selLinkRaf = 0; drawSelLink(); }); }
+function scheduleSelLink() { if (!selLinkRaf) selLinkRaf = requestAnimationFrame(() => { selLinkRaf = 0; drawSelLink(); drawDockTraces(); }); }
+// 최소화 중엔 헤더 로고가 매니저다 — 바닥의 회로선(drawTraces)처럼 매니저 아래 가장자리에서 칩 줄의 워커 칩 위쪽 가운데로 선을 잇는다.
+// 헤더 · 칩 줄은 붙박이(sticky)라 화면 좌표로 그리는 고정 SVG 하나(#dock-traces, 헤더 위)에 그린다.
+// 칩 줄이 가로로 굴러 줄 밖으로 밀린 칩은 뺀다. 선 모양 · 상태 색은 바닥 회로선과 같은 .traces 규칙
+const dockTraces = el('<svg class="traces dock-traces" id="dock-traces" aria-hidden="true"></svg>');
+document.body.append(dockTraces);
+let dockTraceSig = '';
+function drawDockTraces() {
+  const mark = $('.brand-mark');
+  const on = $('#floor').hidden && mark?.classList.contains('mgr-on') && !document.body.classList.contains('term-full');
+  const lr = on && $('#dock-list').getBoundingClientRect();
+  const chips = on ? [...document.querySelectorAll('#dock-list .dchip')].map((c) => {
+    const r = c.getBoundingClientRect(), w = state.workers.find((x) => x.id === c.dataset.id);
+    return { tx: Math.round(r.left + r.width / 2), ty: Math.round(r.top) - 1, st: c.classList.contains('socket') ? 'socket' : w ? viewStatus(w) : 'socket' };
+  }).filter((o) => o.tx >= lr.left + 6 && o.tx <= lr.right - 6) : [];
+  const mr = on && mark.getBoundingClientRect();
+  const sig = chips.length ? `${Math.round(mr.left)},${Math.round(mr.bottom)}|` + chips.map((o) => `${o.tx},${o.ty},${o.st}`).join('|') : '';
+  if (sig === dockTraceSig) return;
+  dockTraceSig = sig;
+  if (!sig) { dockTraces.innerHTML = ''; return; }
+  // 출발점은 로고 아래 가장자리에 목표 x 순서대로 촘촘히 펼친다(로고가 작아 바닥보다 좁게)
+  const cx = mr.left + mr.width / 2, ay = Math.round(mr.bottom) + 1, n = chips.length;
+  const span = Math.min(mr.width - 6, Math.max(0, (n - 1) * 5));
+  chips.sort((a, b) => a.tx - b.tx);
+  dockTraces.innerHTML = chips.map((o, i) => {
+    const ax = Math.round(cx - span / 2 + (n > 1 ? (span * i) / (n - 1) : span / 2)), k = Math.max(8, Math.round((o.ty - ay) / 2));
+    const d = `M${ax} ${ay} C${ax} ${ay + k} ${o.tx} ${o.ty - k} ${o.tx} ${o.ty}`;
+    return `<g class="${o.st === 'socket' ? 't-socket' : `t-${o.st}`}"><path class="base" d="${d}"/><path class="flow" d="${d}"/><circle class="pad" cx="${o.tx}" cy="${o.ty}" r="2.5"/></g>`;
+  }).join('');
+}
 function drawSelLink() {
   const detail = $('#detail'), min = $('#floor').hidden;
   // 최소화 중엔 칩 줄(#dock — 헤더 아래 붙박이)의 선택 칩에서 출발
