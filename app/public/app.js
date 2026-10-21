@@ -1890,10 +1890,13 @@ $('#att-tab-list').addEventListener('mouseover', (e) => {
   $('.cap', attPeek).textContent = (t.dataset.cap || '').split('\n')[0];
   const place = () => {
     if (attPeek._for !== t) return;
+    // 워커 카드를 최소화했으면 탭이 화면 위쪽에 붙어 위가 상단바뿐이다 — 늘 아래로, 남은 높이에 맞춰 그림을 줄인다
+    const below = $('#floor').hidden, r0 = t.getBoundingClientRect();
+    $('img', attPeek).style.maxHeight = below ? `${Math.max(120, Math.min(600, innerHeight - r0.bottom - 60))}px` : '';
     attPeek.hidden = false;
-    const r = t.getBoundingClientRect(), pr = attPeek.getBoundingClientRect();
+    const r = r0, pr = attPeek.getBoundingClientRect();
     const left = Math.max(8, Math.min(innerWidth - pr.width - 8, r.left + r.width / 2 - pr.width / 2));
-    const top = r.top - pr.height - 10 >= 8 ? r.top - pr.height - 10 : Math.min(innerHeight - pr.height - 8, r.bottom + 10);
+    const top = below ? r.bottom + 10 : r.top - pr.height - 10 >= 8 ? r.top - pr.height - 10 : Math.min(innerHeight - pr.height - 8, r.bottom + 10);
     attPeek.style.left = `${left}px`; attPeek.style.top = `${top}px`;
   };
   if (img.getAttribute('src') !== src) { attPeek.hidden = true; img.onload = place; img.onerror = peekHide; img.src = src; }
