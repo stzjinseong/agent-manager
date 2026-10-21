@@ -457,7 +457,7 @@ function spawnWorker({ name, cwd, args = '', permissionMode = 'default', resume 
     status: 'starting', // starting | idle | working | decision | done | exited
     sessionId: null, model: null,
     currentTool: null, subTool: null, lastPrompt: null, lastMessage: null, notice: null,
-    todos: [], queue: [], toolCount: 0, shots: [],
+    todos: [], queue: [], toolCount: 0, shots: [], atts: [],
     startedAt: Date.now(), turnStartedAt: null, updatedAt: Date.now(),
     log: [], // 최근 이벤트 타임라인
     tx: null, // 트랜스크립트 프로파일러 상태 (profile.js)
@@ -482,8 +482,23 @@ function spawnWorker({ name, cwd, args = '', permissionMode = 'default', resume 
 }
 
 function pushLog(w, kind, text) {
-  w.log.push({ t: Date.now(), kind, text: String(text ?? '').slice(0, 300) });
+  text = String(text ?? '');
+  if (kind === 'assign' || kind === 'queue' || kind === 'unqueue' || (kind === 'status' && text.startsWith('working: ') && !text.startsWith('working: <task-notification>'))) keepAtts(w, text);
+  w.log.push({ t: Date.now(), kind, text: text.slice(0, 300) });
   if (w.log.length > 200) w.log.shift();
+}
+
+// 요청 글에 붙은 첨부 경로를 자르기 전에 따로 모은다(w.atts) — 상세 패널 위 첨부 탭(app.js renderAttTab)이 쓴다.
+// 타임라인은 200줄 · 줄마다 300자라 도구 줄이 많은 워커는 오전 첨부가 금방 밀려났다. /clear 때 비운다(SessionStart)
+// ref 는 화면 uploadsIn 이 다시 읽는 경로 글 그대로: 업로드 · 끌어 넣은 캡처 · 워커가 만든 결과물(w.docs 의 path)
+const ATT_KEEP = 100;
+const ATT_RE = /[\\/](?:uploads[\\/]\d{14}-[a-z0-9]{1,8}(?:\.[a-z0-9]+|-[\p{L}\p{N}._-]*[\p{L}\p{N}_-])|shots[\\/][\w-]+[\\/][\w-]+\.(?:png|jpe?g|gif|webp))/giu;
+function keepAtts(w, text) {
+  const refs = [...new Set([...text.matchAll(ATT_RE)].map((m) => m[0]))];
+  for (const x of workers.values()) for (const d of x.docs || []) if (d.path && text.includes(d.path)) refs.push(d.path);
+  if (!refs.length) return;
+  const t = Date.now();
+  w.atts = (w.atts || []).filter((a) => !refs.includes(a.ref)).concat(refs.map((ref) => ({ t, ref }))).slice(-ATT_KEEP); // 다시 붙이면 최신 시각으로
 }
 
 function setStatus(w, status, note) {
@@ -890,7 +905,7 @@ function onHook(w, ev, res) {
         w.log = [];
         w.past = []; // 이어 붙였던 지난 요청도
         for (const s of w.shots || []) fs.rmSync(path.join(SHOT_DIR, w.id, s.name), { force: true });
-        w.shots = []; w.docs = [];
+        w.shots = []; w.docs = []; w.atts = [];
         // 터미널의 이전 대화 기록(스크롤백)도 지운다 — 호스트 원본 화면과 브라우저 터미널 둘 다.
         // Claude 가 새 화면을 그릴 틈을 조금 준 뒤에(화면 자체는 건드리지 않고 기록만 지운다)
         setTimeout(() => { hostSend({ op: 'clearScrollback', id: w.id }); broadcast({ type: 'clearScrollback', id: w.id }); }, 300);
@@ -1119,7 +1134,7 @@ function workerView(w, full) {
   const { term, tx, approvalWaits, pot, lastPrompt, lastMessage, todos, notice, currentTool, subTool, ptySize, sentPrompt, seedAt, bootInputAt, dirSent, cacheJudged, modelAt, ...rest } = w;
   const base = { ...rest, branch: branchOf.get(w.cwd) || null, dirPending: directives.pending(config.directives, w) };
   if (full) return { ...base, profile: tx && profileSummary(tx, approvalWaits) };
-  const { log, past, ...lite } = base;
+  const { log, past, atts, ...lite } = base;
   return { ...lite, lite: true, profile: tx && profileLite(tx) };
 }
 

@@ -912,13 +912,13 @@ function newDot(btn, key) {
 // 서버는 상세 패널을 연 워커만 타임라인 · 프로필 전부를 싣고 나머지는 가볍게(lite) 보낸다(server.js workerView).
 // 막 고른 워커는 서버가 전부를 보내 줄 때까지 잠깐 lite 로 남는다 — 그동안은 지난번에 받은 전체 값을 이어 쓰고, 없으면 빈 타임라인으로.
 // 프로필은 null 로 비우지 않고 lite 값을 그대로 둔다 — 비우면 카드의 대기(bgRunning) 상태 · 비용 · ctx 배지가 사라졌다 돌아와 카드가 깜빡였다
-let fullOf = null; // { id, log, past, profile } — 마지막으로 받은 연 워커의 전체 값
+let fullOf = null; // { id, log, past, atts, profile } — 마지막으로 받은 연 워커의 전체 값
 function fillSelected() {
   const w = selected && state.workers.find((x) => x.id === selected);
   if (!w) return;
-  if (!w.lite) { fullOf = { id: w.id, log: w.log, past: w.past, profile: w.profile }; return; }
-  const f = fullOf?.id === w.id ? fullOf : { log: [], past: [], profile: w.profile };
-  Object.assign(w, { log: f.log, past: f.past, profile: f.profile, lite: false });
+  if (!w.lite) { fullOf = { id: w.id, log: w.log, past: w.past, atts: w.atts, profile: w.profile }; return; }
+  const f = fullOf?.id === w.id ? fullOf : { log: [], past: [], atts: [], profile: w.profile };
+  Object.assign(w, { log: f.log, past: f.past, atts: f.atts, profile: f.profile, lite: false });
 }
 function render() {
   fillSelected();
@@ -1754,13 +1754,16 @@ function renderDetail() {
   setSecCount('sec-memo', memoN ? _t('{n}건', { n: memoN }) : '');
 }
 
-// 상세 패널 위에 걸린 탭: 타임라인(지난 요청 포함)에 남은 첨부와 워커가 만든 결과물(w.docs)을 최신 것부터 한 줄로 — 다른 로그 사이에서 찾느라 스크롤하지 않게.
-// 첨부는 타임라인과 같은 글에서 찾으므로(uploadsIn) 타임라인에서 밀려난 첨부는 여기서도 빠진다. 바뀐 때만 다시 그린다(썸네일 다시 로드 방지)
+// 상세 패널 위에 걸린 탭: 요청에 붙은 첨부와 워커가 만든 결과물(w.docs)을 최신 것부터 한 줄로 — 다른 로그 사이에서 찾느라 스크롤하지 않게.
+// 첨부는 서버가 자르기 전에 따로 모은 w.atts(최근 100개, /clear 때 비움)가 본체이고, 그 기능 전에 쌓인 타임라인 · 지난 요청 글도 함께 읽는다.
+// 바뀐 때만 다시 그린다(썸네일 다시 로드 방지)
 function renderAttTab(w) {
   const seen = new Set(), items = [];
+  const add = (t, text, clipped) => { for (const f of uploadsIn(text, clipped)) if (!seen.has(f.url)) { seen.add(f.url); items.push({ t, html: attTile(f) }); } };
+  for (const a of [...(w.atts || [])].reverse()) add(a.t, a.ref, false); // 최신부터 — 같은 파일은 가장 최근 시각 하나만
   for (const r of timelineCache) {
     if (r.kind !== 'req' && r.kind !== 'queued' && r.kind !== 'unqueued') continue;
-    for (const f of uploadsIn(r.text, true)) if (!seen.has(f.url)) { seen.add(f.url); items.push({ t: r.t, html: attTile(f) }); }
+    add(r.t, r.text, true);
   }
   // 결과물은 이름이 보이게 파일 타일 모양으로 — 여는 방식(크게 보기 · 새 탭)은 카드 · 타임라인과 같은 docImgAttr
   for (const d of w.docs || []) {
