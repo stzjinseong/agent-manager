@@ -94,6 +94,8 @@ textarea { resize: vertical; }
 .stat i { width: 7px; height: 7px; border-radius: 50%; background: var(--c); box-shadow: 0 0 8px var(--c); }
 .stat.hot { background: color-mix(in srgb, var(--decision) 16%, var(--surface-2)); color: var(--decision); }
 .stat.hot b { color: var(--decision); }
+.stat.tap { cursor: pointer; user-select: none; } /* 누르면 해당 워커 카드가 꿈틀 (app.js wiggle) */
+.stat.tap:hover { background: color-mix(in srgb, var(--c) 14%, var(--surface-2)); }
 
 main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24px; }
 

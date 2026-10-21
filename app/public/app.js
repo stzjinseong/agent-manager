@@ -986,14 +986,15 @@ function renderStats() {
   renderUsage();
   const n = (st) => state.workers.filter((w) => viewStatus(w) === st).length;
   const pend = pendingCount();
-  $('#stats').innerHTML = [
-    ['워커', state.workers.filter((w) => w.status !== 'exited').length, 'var(--idle)'],
-    ['작업 중', n('working'), 'var(--working)'],
-    ['백그라운드', n('waiting'), 'var(--waiting)'],
-    ['결정 대기', pend, 'var(--decision)', pend > 0],
-    ['완료', n('done'), 'var(--done)'],
-    ['확인됨', n('checked'), 'var(--checked)'],
-  ].map(([k, v, c, hot]) => `<span class="stat ${hot ? 'hot' : ''}" style="--c:${c}"><i></i>${_t(k)} <b>${v}</b></span>`).join('');
+  const html = [
+    ['all', '워커', state.workers.filter((w) => w.status !== 'exited').length, 'var(--idle)'],
+    ['working', '작업 중', n('working'), 'var(--working)'],
+    ['waiting', '백그라운드', n('waiting'), 'var(--waiting)'],
+    ['decision', '결정 대기', pend, 'var(--decision)', pend > 0],
+    ['done', '완료', n('done'), 'var(--done)'],
+    ['checked', '확인됨', n('checked'), 'var(--checked)'],
+  ].map(([st, k, v, c, hot]) => `<span class="stat ${hot ? 'hot' : ''}${v ? ' tap' : ''}" style="--c:${c}" data-st="${st}"${v ? ` role="button" title="${_t('누르면 해당 워커 카드가 꿈틀거립니다')}"` : ''}><i></i>${_t(k)} <b>${v}</b></span>`).join('');
+  if ($('#stats')._html !== html) $('#stats').innerHTML = $('#stats')._html = html;
   // 매니저 캐릭터: 작업 중이면 흰 빛 맥동 + 걷기, 결정 대기가 있으면 주황 빛
   const busy = n('working');
   const dot = $('.core-dot');
@@ -1004,6 +1005,32 @@ function renderStats() {
   document.title = pend ? `(${pend}) ${_t('클로드 키우기')}` : _t('클로드 키우기');
   setFavicon(pend > 0);
 }
+
+// 상단 상태 버튼: 누르면 그 상태의 워커 카드(최소화 칩 포함)를 꿈틀거리게 — 어느 카드인지 바로 찾게.
+// 카드 className 은 렌더마다 통째로 바뀌므로(updateNode) 클래스 대신 Web Animations 로 흔든다
+const statWorkers = (st) => {
+  if (st === 'all') return state.workers.filter((w) => w.status !== 'exited');
+  if (st === 'decision') { const ids = new Set(state.decisions.map((d) => d.workerId)); return state.workers.filter((w) => w.status === 'decision' || ids.has(w.id)); }
+  return state.workers.filter((w) => viewStatus(w) === st);
+};
+function wiggle(elx) {
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  elx.getAnimations().filter((a) => a.id === 'wiggle').forEach((a) => a.cancel());
+  const frames = reduce
+    ? [{ filter: 'brightness(1)' }, { filter: 'brightness(1.6)' }, { filter: 'brightness(1)' }]
+    : [{ rotate: '0deg' }, { rotate: '-3deg', scale: '1.03' }, { rotate: '3deg' }, { rotate: '-2.5deg' }, { rotate: '2deg' }, { rotate: '-1deg' }, { rotate: '0deg', scale: '1' }];
+  elx.animate(frames, { duration: reduce ? 500 : 650, easing: 'ease-in-out', composite: 'add', id: 'wiggle' });
+}
+$('#stats').addEventListener('click', (e) => {
+  const b = e.target.closest('.stat.tap');
+  if (!b) return;
+  const els = statWorkers(b.dataset.st).flatMap((w) => [...document.querySelectorAll(`.node[data-id="${CSS.escape(w.id)}"], .dchip[data-id="${CSS.escape(w.id)}"]`)])
+    .filter((x) => x.offsetParent); // 접혀 숨은 쪽(바닥 · 칩 줄)은 빼고 보이는 것만
+  if (!els.length) return;
+  const vh = innerHeight;
+  if (!els.some((x) => { const r = x.getBoundingClientRect(); return r.bottom > 0 && r.top < vh; })) els[0].scrollIntoView({ block: 'center', behavior: 'smooth' });
+  els.forEach(wiggle);
+});
 
 // 결정함 — 결정 목록이 바뀔 때만 다시 만든다 (버튼 클릭 중에 DOM 이 바뀌지 않게)
 let inboxSig = '';
