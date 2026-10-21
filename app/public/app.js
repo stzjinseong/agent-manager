@@ -152,6 +152,60 @@ try {
   if (localStorage.getItem(k) !== todayKey() && Math.random() < 0.01) localStorage.setItem(k, todayKey());
   if (localStorage.getItem(k) === todayKey()) $('.core-dot').classList.add('party-day');
 } catch {}
+// ---------- 매니저 산책 ----------
+// 작업 중인 워커가 없으면 매니저가 화면(보이는 영역) 안을 걸어 다니다 쉬다 한다. 작업이 생기면 걸어서 제자리로.
+// 자리(.core)는 그대로 두고 .core-dot 을 CSS translate 로만 옮긴다 — transform 을 쓰는 xp-got 연출과 겹치지 않고,
+// 매니저에 붙은 xp 바 · 반짝이 · 먼지도 함께 따라온다. 회로 선은 제자리 기준(drawTraces 가 이동분을 뺀다).
+// 졸 때(sleepy) · 최소화 · 움직임 줄이기 · 탭이 안 보일 때는 걷지 않는다. 떠 있는 동안은 클릭을 막지 않게 pointer-events 를 끈다
+const ROAM_SPEED = 70, ROAM_HOME_SPEED = 160; // px/초
+const roam = { on: false, timer: 0 };
+const roamAt = (dot) => { const t = getComputedStyle(dot).translate; if (!t || t === 'none') return [0, 0]; const [x, y = '0'] = t.split(' '); return [parseFloat(x) || 0, parseFloat(y) || 0]; };
+function roamWalk(dot, x, y, speed) {
+  const [cx, cy] = roamAt(dot);
+  const d = Math.hypot(x - cx, y - cy), sec = Math.max(.6, Math.min(14, d / speed));
+  if (Math.abs(x - cx) > 4) dot.classList.toggle('face-l', x < cx);
+  dot.style.translate = `${cx}px ${cy}px`; // 걷는 중에 방향을 틀어도 지금 자리에서 이어 가게
+  void dot.offsetWidth;
+  dot.style.transition = `translate ${sec}s linear`;
+  dot.style.translate = `${x}px ${y}px`;
+  dot.classList.add('walking');
+  return sec * 1000;
+}
+function roamNext() {
+  const dot = $('.core-dot');
+  if (!roam.on || !dot) return;
+  if (document.hidden) { roam.timer = setTimeout(roamNext, 3000); return; }
+  const [cx, cy] = roamAt(dot), r = dot.getBoundingClientRect();
+  const homeL = r.left - cx, homeT = r.top - cy; // 이동분을 뺀 제자리(화면 좌표)
+  const top = (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--topbar-h')) || 59) + 12;
+  const tx = 16 + Math.random() * Math.max(0, innerWidth - r.width - 32);
+  const ty = top + Math.random() * Math.max(0, innerHeight - r.height - top - 16);
+  const ms = roamWalk(dot, tx - homeL, ty - homeT, ROAM_SPEED);
+  roam.timer = setTimeout(() => { dot.classList.remove('walking'); roam.timer = setTimeout(roamNext, 2000 + Math.random() * 5000); }, ms);
+}
+function roamSync(stay) {
+  const dot = $('.core-dot');
+  if (!dot) return;
+  stay = stay || dot.classList.contains('sleepy') || $('#floor').hidden || matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!stay) {
+    if (roam.on) return;
+    roam.on = true;
+    clearTimeout(roam.timer);
+    dot.classList.add('roam');
+    roam.timer = setTimeout(roamNext, 1500 + Math.random() * 2500);
+    return;
+  }
+  if (!roam.on) return;
+  roam.on = false;
+  clearTimeout(roam.timer);
+  const ms = roamWalk(dot, 0, 0, ROAM_HOME_SPEED);
+  roam.timer = setTimeout(() => {
+    dot.classList.remove('walking', 'roam', 'face-l');
+    dot.style.transition = dot.style.translate = '';
+    drawTraces();
+  }, ms);
+}
+
 // 매 렌더·30초마다: 시선 기울기, 졸음(모두 30분 넘게 쉬거나 늦은 밤)
 function mgrUpdate() {
   const dot = $('.core-dot'), lean = $('.core-mark .mgr-lean');
@@ -1000,6 +1054,7 @@ function renderStats() {
   const dot = $('.core-dot');
   dot.classList.toggle('busy', busy > 0);
   dot.classList.toggle('alert', pend > 0);
+  roamSync(busy > 0);
   const shown = mgrStageSync();
   dot.title = `${_t('매니저 · {busy}명 작업 중', { busy })}${pend ? _t(' · 결정 대기 {n}건', { n: pend }) : ''}${state.progress ? ` · Lv.${shown} · ${_t(NEAR_TEXT[shown < state.progress.stage ? 'near' : state.progress.near])}` : ''}`;
   document.title = pend ? `(${pend}) ${_t('클로드 키우기')}` : _t('클로드 키우기');
@@ -1584,7 +1639,8 @@ function drawTraces() {
   // 그 순간의 이동까지 반영해서, 다시 그릴 때마다 출발점이 4px 오르내렸다 → 현재 transform 이동분을 빼고 잰다
   const mark = $('.core-mark'), cr = mark.getBoundingClientRect();
   const m = getComputedStyle(mark).transform, ty = m && m !== 'none' ? new DOMMatrixReadOnly(m).m42 : 0;
-  const cx = Math.round(cr.left + cr.width / 2 - fr.left), cy = Math.round(cr.bottom - ty - fr.top + 4);
+  const [rx, ry] = roamAt($('.core-dot')); // 산책 중이면 그 이동분도 빼서 선은 제자리에서 출발
+  const cx = Math.round(cr.left - rx + cr.width / 2 - fr.left), cy = Math.round(cr.bottom - ty - ry - fr.top + 4);
   // 칩 위치는 레이아웃 좌표(offsetTop/Left)로 잰다. getBoundingClientRect 는 호버·선택 시 떠오르는
   // translateY(-2px) 까지 반영해서, 떠오를 때마다 선 끝이 흔들리고 다시 그려졌다.
   const nr = $('#nodes').getBoundingClientRect();

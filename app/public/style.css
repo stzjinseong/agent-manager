@@ -221,6 +221,12 @@ main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24p
 .core-dot.busy .core-mark { animation: core-glow 2.2s ease-in-out infinite, bob .36s steps(2, jump-none) infinite alternate; }
 .core-dot.busy .clawd .legs-a { animation: legA .36s steps(1) infinite; }
 .core-dot.busy .clawd .legs-b { animation: legB .36s steps(1) infinite; }
+/* 산책(app.js roamSync): 작업 중 워커가 없으면 화면을 걸어 다닌다. 떠 있는 동안 다른 요소 위로, 클릭은 통과 */
+.core-dot.roam { z-index: 45; pointer-events: none; }
+.core-dot.walking .core-mark { animation: bob .36s steps(2, jump-none) infinite alternate; }
+.core-dot.walking .clawd .legs-a { animation: legA .36s steps(1) infinite; }
+.core-dot.walking .clawd .legs-b { animation: legB .36s steps(1) infinite; }
+.core-dot.face-l .core-mark svg { scale: -1 1; }
 @keyframes core-glow {
   0%, 100% { filter: drop-shadow(0 0 5px rgba(255, 255, 255, .55)) drop-shadow(0 0 18px rgba(255, 255, 255, .25)); }
   50% { filter: drop-shadow(0 0 9px rgba(255, 255, 255, .9)) drop-shadow(0 0 32px rgba(255, 255, 255, .45)); }
