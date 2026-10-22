@@ -1838,7 +1838,9 @@ function drawDockTraces() {
   dockTraces.innerHTML = chips.map((o, i) => {
     const ax = Math.round(cx - span / 2 + (n > 1 ? (span * i) / (n - 1) : span / 2));
     const ly = Math.round(n > 1 ? hi - (hi - lo - gap * (n - 1)) / 2 - gap * i : (lo + hi) / 2); // i 가 클수록(먼 칩) 위 차선
-    const d = `M${ax} ${ay} V${ly} H${o.tx} V${o.ty}`;
+    // 꺾이는 두 모서리는 둥글게(반지름 최대 5px — 차선 · 세로 길이가 짧으면 그만큼 줄인다)
+    const sx = Math.sign(o.tx - ax) || 1, r = Math.max(0, Math.min(5, ly - ay, o.ty - ly, Math.abs(o.tx - ax) / 2));
+    const d = `M${ax} ${ay} V${ly - r} Q${ax} ${ly} ${ax + sx * r} ${ly} H${o.tx - sx * r} Q${o.tx} ${ly} ${o.tx} ${ly + r} V${o.ty}`;
     return `<g class="${o.st === 'socket' ? 't-socket' : `t-${o.st}`}"><path class="base" d="${d}"/><path class="flow" d="${d}"/><circle class="pad" cx="${o.tx}" cy="${o.ty}" r="2.5"/></g>`;
   }).join('');
 }
