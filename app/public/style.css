@@ -1861,6 +1861,15 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 .notes-md code { font: 12px var(--mono); padding: 1px 5px; border-radius: 4px; background: var(--surface-3); color: var(--text); }
 .notes-md a { color: var(--accent-hi); }
 .notes-md h1, .notes-md h2, .notes-md h3, .notes-md h4 { margin: 10px 0 4px; font-size: 13.5px; color: var(--text); }
+/* Claude Code 노트: 버전마다 접는 칸(summary 가 머리줄) */
+.notes-cc > summary { cursor: pointer; list-style: none; user-select: none; }
+.notes-cc > summary::-webkit-details-marker { display: none; }
+.notes-cc > summary::before { content: "▸"; color: var(--dim); font-size: 11px; transition: transform .15s; }
+.notes-cc[open] > summary::before { transform: rotate(90deg); }
+.notes-cc > summary b { color: var(--text); font: 600 14px var(--mono); }
+.notes-n { margin-left: auto; color: var(--dim); font-size: 11.5px; }
+.notes-cc .notes-md p { font-weight: 400; color: var(--text-2); }
+.notes-note { padding: 10px 0 0; font-size: 12px; }
 
 /* 접기 화살표: 글자 크기만 한 정사각형 가운데에 두어 제자리에서 돈다 — 줄 높이만 한 칸의 왼쪽 아래에 있으면
    회전 중심(칸 가운데)에서 벗어나 접을 때 ▸ 가 아래로 처져 보였다 */

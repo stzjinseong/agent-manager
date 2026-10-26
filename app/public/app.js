@@ -4198,6 +4198,8 @@ function updRow(title, x, kind) {
   // 클로드 키우기: 릴리즈 노트 — 누르면 큰 창에 모든 릴리즈(최신 → 과거)를 스크롤로
   let notes = '';
   if (kind === 'app' && x?.url) notes = `<button class="upd-notes" data-notes>${_t(x.newer ? '새 버전 릴리즈 노트 보기' : '릴리즈 노트 보기')}</button>`;
+  // Claude Code: 설치된 버전 다음 ~ 최신의 변경 내역(CHANGELOG) — 버전 번호를 알면
+  if (kind === 'claude' && (x?.current || x?.latest)) notes = `<button class="upd-notes" data-notes="claude">${_t(x.newer ? '새 버전 릴리즈 노트 보기' : '릴리즈 노트 보기')}</button>`;
   return `<div class="upd-row"><div class="upd-top"><b>${title}</b><span class="upd-cur">${esc(cur)}</span></div>${status}${guide}${notes}</div>`;
 }
 function renderUpd() {
@@ -4221,7 +4223,7 @@ function setUpdPop(open) {
 updBtn.addEventListener('click', () => { if (!notesPop.hidden) { setNotesPop(false); return; } setUpdPop(updPop.hidden); });
 document.addEventListener('click', (e) => { if (!updPop.hidden && !e.target.closest('.upd-wrap')) setUpdPop(false); });
 document.addEventListener('keydown', (e) => { if (!updPop.hidden && e.key === 'Escape') { setUpdPop(false); updBtn.focus(); } });
-updPop.addEventListener('click', (e) => { if (e.target.closest('[data-notes]')) { setUpdPop(false); setNotesPop(true); } });
+updPop.addEventListener('click', (e) => { const b = e.target.closest('[data-notes]'); if (b) { setUpdPop(false); setNotesPop(true, b.dataset.notes || 'app'); } });
 
 // ---------- 릴리즈 노트 (업데이트 창 → 릴리즈 노트 보기) ----------
 // 서버가 GitHub 에서 받은 릴리즈 전체(최신 → 과거)를 큰 창에 스크롤로. 본문은 GitHub 이 만든 HTML — 허용한 태그만 남기고
@@ -4243,13 +4245,52 @@ function cleanNoteHtml(html) {
   return root.innerHTML;
 }
 let notesReq = 0;
-async function setNotesPop(open) {
+// CHANGELOG 의 마크다운은 '- 항목' 목록과 `코드` · **굵게** · [링크](주소) 정도라 직접 바꾼다(CDN 렌더러 없이 오프라인에서도).
+// 결과는 릴리즈 노트와 같은 cleanNoteHtml 로 한 번 더 거른다
+function changelogHtml(md) {
+  const inline = (t) => esc(t).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2">$1</a>');
+  let html = '', list = false;
+  for (const line of String(md).split('\n')) {
+    const li = line.match(/^\s*[-*] (.*)$/);
+    if (li) { if (!list) { html += '<ul>'; list = true; } html += `<li>${inline(li[1])}</li>`; continue; }
+    if (list && line.trim()) { html += '</ul>'; list = false; }
+    if (line.trim()) html += /^#{1,6} /.test(line) ? `<h4>${inline(line.replace(/^#+ /, ''))}</h4>` : `<p>${inline(line)}</p>`;
+  }
+  return cleanNoteHtml(html + (list ? '</ul>' : ''));
+}
+async function renderClaudeNotes(head, my) {
+  let d;
+  try { d = await (await fetch('/api/claude-notes')).json(); } catch { d = { error: 'network' }; }
+  if (my !== notesReq || notesPop.hidden) return;
+  const gh = `<a class="upd-notes" href="${esc(d.url || 'https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md')}" target="_blank" rel="noopener">CHANGELOG ↗</a>`;
+  if (d.error || !d.versions?.length) {
+    notesPop.innerHTML = head(gh) + `<div class="notes-body"><div class="upd-dim">${_t('인터넷에 접속하지 못해 릴리즈 노트를 불러오지 못했어요')}</div></div>`;
+    return;
+  }
+  const vn = (v) => String(v).split('.').map(Number), gt = (a, b) => { for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] > b[i]; return false; };
+  const cur = d.current ? vn(d.current) : null;
+  const note = [
+    d.source === 'local' ? _t('인터넷에 접속하지 못해 이 PC 에 받아 둔 기록을 보여 줘요 (설치된 버전까지만 있어요)') : '',
+    d.more ? _t('사이에 버전이 {n}개 더 있어요 — 전체는 CHANGELOG 에서', { n: d.more }) : '',
+  ].filter(Boolean).map((t) => `<div class="upd-dim notes-note">${t}</div>`).join('');
+  // 버전마다 접는 칸 — 최신 하나만 펼친다(버전당 항목이 수십 개라 다 펼치면 길다). 영어 원문 그대로
+  const items = d.versions.map((x, i) => {
+    const n = (x.md.match(/^\s*[-*] /gm) || []).length;
+    const badge = d.current === x.v ? `<span class="notes-badge cur">${_t('지금 버전')}</span>` : cur && gt(vn(x.v), cur) ? `<span class="notes-badge new">${_t('새 버전')}</span>` : '';
+    return `<details class="notes-rel notes-cc"${i === 0 ? ' open' : ''}><summary class="notes-rt"><b>${esc(x.v)}</b>${badge}<span class="notes-n">${_t('{n}개 항목', { n })}</span></summary><div class="notes-md">${changelogHtml(x.md)}</div></details>`;
+  }).join('');
+  notesPop.innerHTML = head(gh) + `<div class="notes-body">${note}${items}</div>`;
+}
+async function setNotesPop(open, kind = 'app') {
   notesPop.hidden = !open;
   if (!open) return;
   setLangPop(false); setCharPop(false); setPowerPop(false);
-  const head = (extra = '') => `<div class="notes-head"><div class="upd-h">${_t('릴리즈 노트')}</div>${extra}<button class="notes-x" data-notes-close aria-label="${_t('닫기')}">✕</button></div>`;
+  const title = kind === 'claude' ? _t('Claude Code 릴리즈 노트') : _t('릴리즈 노트');
+  const head = (extra = '') => `<div class="notes-head"><div class="upd-h">${title}</div>${extra}<button class="notes-x" data-notes-close aria-label="${_t('닫기')}">✕</button></div>`;
   notesPop.innerHTML = head() + `<div class="notes-body"><div class="upd-dim">${_t('불러오는 중…')}</div></div>`;
   const my = ++notesReq;
+  if (kind === 'claude') return renderClaudeNotes(head, my);
   let d;
   try { d = await (await fetch('/api/releases')).json(); } catch { d = { error: 'network' }; }
   if (my !== notesReq || notesPop.hidden) return;

@@ -250,6 +250,10 @@ const EN = {
   '사람이 첨부': 'Attached by you',
   '누르면 해당 워커 카드가 꿈틀거립니다': 'Click to wiggle those worker cards',
   '워커(세션)에 보내 작동에 반영됩니다. 고치면 다시 전달됩니다.': 'Sent to the worker (session) and applied to how it works. Sent again when you edit it.',
+  'Claude Code 릴리즈 노트': 'Claude Code release notes',
+  '인터넷에 접속하지 못해 이 PC 에 받아 둔 기록을 보여 줘요 (설치된 버전까지만 있어요)': "Couldn't reach the internet — showing the copy saved on this PC (only up to the installed version)",
+  '사이에 버전이 {n}개 더 있어요 — 전체는 CHANGELOG 에서': '{n} more versions in between — see CHANGELOG for all',
+  '{n}개 항목': '{n} items',
   '첨부 원본을 그대로 보여 줍니다 (7일 지나면 정리됨).': 'Showing the original attachment (cleaned up after 7 days).',
   '이미지는 최대 {n}장까지 관리됩니다.': 'Up to {n} images are kept.',
   // 세션 프로파일·차트·설명 툴팁
