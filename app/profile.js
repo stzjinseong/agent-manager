@@ -442,7 +442,7 @@ export function editLog(p) {
   return { files: [...files.values()].sort((a, b) => b.last - a.last), requests };
 }
 
-// 카드 · 워커 비교 표 · 상단 통계에 쓰는 값만 — 상세 패널을 열지 않은 워커는 이것만 방송한다.
+// 카드 · 상단 통계에 쓰는 값만 — 상세 패널을 열지 않은 워커는 이것만 방송한다.
 // profileSummary 는 턴 30개 · 서브에이전트 목록 등 배열을 매번 새로 만들어 워커 20개면 상태 한 번에 280KB 였다(실측)
 export function profileLite(p) {
   const total = Object.fromEntries(KEYS.map((k) => [k, p.sess[k]]));

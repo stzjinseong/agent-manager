@@ -105,11 +105,4 @@ const INFO_EN = {
     use: 'Check turns with cost spikes alongside their prompts. Looking at the idle gap before a low cache-hit turn tells you whether the cache expired.',
     trust: 'High (only duration is approximate).',
   },
-  '워커 비교': {
-    title: 'Worker comparison',
-    what: 'Per-worker total tokens, estimated cost (🤖 = subagents, separate), cache hit rate, context/window.',
-    how: 'Summary values from each worker\'s session profile. The total tokens bar is relative to the largest worker.',
-    use: 'See at a glance which role uses the most tokens, and which session\'s context has ballooned and needs a new session.',
-    trust: 'Follows each item\'s reliability (tokens actual, cost estimated).',
-  },
 };

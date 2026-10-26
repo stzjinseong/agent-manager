@@ -1105,7 +1105,6 @@ function render() {
   renderInbox();
   renderFloor();
   renderDock();
-  renderCompare();
   renderDetail();
   renderHint();
   mgrUpdate();
@@ -1725,27 +1724,6 @@ function electric(d) {
     spark(0) + spark(-0.8);
 }
 
-// 워커 비교 — 누적 토큰은 워커 간 최대값 기준, 컨텍스트는 각자의 창 기준
-function renderCompare() {
-  // 지금 관리 중인(세션이 살아 있는) 워커만 — 종료된 워커는 비교에서 뺀다
-  const ws_ = state.workers.filter((w) => w.status !== 'exited' && w.profile?.turnCount);
-  $('#compare').hidden = ws_.length < 1;
-  if (!ws_.length) return;
-  const tok = (w) => { const t = w.profile.total; return t.input + t.cacheWrite + t.cacheRead + t.output; };
-  const max = Math.max(...ws_.map(tok), 1);
-  $('#cmp').innerHTML = `<div class="cmp-h"><span>${_t('워커')}</span><span>${_t('누적 토큰')}</span><span class="r">${_t('추정 비용')}</span><span class="r">${_t('캐시 적중')}</span><span>${_t('컨텍스트')}</span></div>` +
-    ws_.map((w) => {
-      const p = w.profile, ctx = ctxLevel(p);
-      return `<div class="cmp-row s-${viewStatus(w)}${w.id === selected ? ' sel' : ''}" data-id="${w.id}">
-        <span class="cmp-name"><span class="led"></span>${esc(w.name)}</span>
-        <span class="cmp-bar"><span class="b"><i style="width:${(tok(w) / max) * 100}%"></i></span><b>${fmtN(tok(w))}</b></span>
-        <span class="r">${fmtUsd(p.total.cost)}${p.sub.cost ? `<small> +🤖${fmtUsd(p.sub.cost)}</small>` : ''}</span>
-        <span class="r">${p.cacheHit == null ? '—' : Math.round(p.cacheHit * 100) + '%'}${p.cacheMisses ? ` <span class="warn-t" title="${_t('캐시 재작성 턴')}">⚠${p.cacheMisses}</span>` : ''}</span>
-        <span class="cmp-bar ctx"><span class="b"><i class="${ctx.level ? 'warn' : ''}" style="width:${Math.min(100, ctx.pct * 100)}%"></i></span><b class="${ctx.level ? 'warn-t' : ''}">${fmtN(p.context)} / ${fmtN(p.window)}</b></span>
-      </div>`;
-    }).join('');
-}
-$('#cmp').addEventListener('click', (e) => { const r = e.target.closest('.cmp-row'); if (r) select(r.dataset.id); });
 
 // 코어 → 각 칩으로 회로선. 매니저 아래에서 칩 위쪽 가운데로 S 곡선.
 let traceSig = '';
@@ -1888,7 +1866,7 @@ function dockLinkPoints(chip) {
   const x = cx + scrollX, from = Math.min(Math.max(x, t.l), t.r), ex = from + Math.sign(t.x - from) * Math.min(38, Math.abs(t.x - from));
   return [[Math.round(x), Math.round(cr.bottom + scrollY)], [Math.round(ex), t.y]]; // 칩 아래 가장자리에 맞닿게
 }
-for (const sel of ['#floor', '#detail', '#hint', '#compare']) { const n = $(sel); if (n) new ResizeObserver(scheduleSelLink).observe(n); }
+for (const sel of ['#floor', '#detail', '#hint']) { const n = $(sel); if (n) new ResizeObserver(scheduleSelLink).observe(n); }
 new ResizeObserver(scheduleSelLink).observe(document.body);
 window.addEventListener('resize', scheduleSelLink);
 // 최소화 중엔 칩 줄이 붙박이라 페이지를 굴리면 선이 따라가야 한다(펼친 상태는 둘 다 페이지와 함께 움직여 그대로)
@@ -2699,12 +2677,6 @@ const INFO = {
     use: '비용이 튄 턴을 질문 내용과 함께 확인. 캐시 적중이 낮은 턴의 공백 시간을 보면 만료 여부를 알 수 있다.',
     trust: '높음(소요 시간만 근사).',
   },
-  '워커 비교': {
-    what: '워커별 누적 토큰·추정 비용(🤖 = 서브에이전트 별도)·캐시 적중률·컨텍스트/창.',
-    how: '각 워커 세션 프로파일의 요약값. 누적 토큰 막대는 워커 중 최댓값 기준 비율.',
-    use: '어느 역할이 토큰을 많이 쓰는지, 어느 세션의 컨텍스트가 불어나 새 세션이 필요한지 한눈에.',
-    trust: '각 항목의 신뢰도를 따름(토큰 실측, 비용 추정).',
-  },
 };
 
 function showInfo(el) {
@@ -2870,7 +2842,7 @@ function renderUsage() {
   const clock = (t) => new Date(t).toLocaleTimeString(uiLocale(), { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
   // 색은 항목별로 고정(style.css --m-ctx · --m-5h · --m-wk) — 사용률에 따라 바꾸지 않는다
   const parts = [];
-  // 컨텍스트: 선택한 워커의 현재 대화가 차지한 양 / 모델 컨텍스트 창 — 워커 비교 표와 같은 값·같은 경고 기준(ctxLevel)
+  // 컨텍스트: 선택한 워커의 현재 대화가 차지한 양 / 모델 컨텍스트 창 — 카드 ctx 배지와 같은 경고 기준(ctxLevel)
   const w = selected && state.workers.find((x) => x.id === selected);
   const p = w?.profile;
   if (p && p.context) {
@@ -4595,17 +4567,7 @@ try { if (localStorage.getItem(PROFILE_KEY)) setProfileCollapsed(true); } catch 
 $('#profile-toggle').addEventListener('click', () => setProfileCollapsed(!$('#profile').classList.contains('collapsed')));
 $('#profile-toggle').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('#profile-toggle').click(); } });
 
-// ---------- 워커 비교 접기/펼치기 (브라우저에 기억) ----------
-const COMPARE_KEY = 'am.compareCollapsed';
-function setCompareCollapsed(on) {
-  $('#compare').classList.toggle('collapsed', on);
-  $('#compare-toggle').setAttribute('aria-expanded', String(!on));
-  try { on ? localStorage.setItem(COMPARE_KEY, '1') : localStorage.removeItem(COMPARE_KEY); } catch {}
-}
-try { if (localStorage.getItem(COMPARE_KEY)) setCompareCollapsed(true); } catch {}
 try { if (localStorage.getItem(FLOOR_MIN_KEY)) setFloorMin(true); } catch {}
-$('#compare-toggle').addEventListener('click', () => setCompareCollapsed(!$('#compare').classList.contains('collapsed')));
-$('#compare-toggle').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('#compare-toggle').click(); } });
 
 // ---------- 터미널 높이 조절 (CLI 아래 가로선을 위아래로 끌기) ----------
 // 높이는 #detail 의 --term-h 로 정하고 브라우저에 기억한다. 크기가 바뀌면 기존 ResizeObserver 가 fit + pty resize 를 한다
