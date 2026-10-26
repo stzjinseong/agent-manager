@@ -441,7 +441,7 @@ body.card-drag .node-add { opacity: .25; transition: opacity .2s; }
 /* 첨부 탭: 상세 패널 왼쪽 위에 붙은 탭 — 패널과 같은 바탕·테두리, 아래 테두리는 패널 윗선을 1px 덮어 이어 보이게 */
 .att-tab { width: calc(100% - 48px); max-width: 1480px; margin: 18px auto 0 !important; display: flex; position: relative; z-index: 1; }
 .att-tab-in { display: flex; align-items: center; gap: 10px; min-width: 0; max-width: 100%; padding: 6px 10px 7px; margin-bottom: -1px; background: var(--surface); border: 1px solid var(--line); border-bottom: 0; border-radius: var(--radius) var(--radius) 0 0; }
-.att-tab-list { display: flex; align-items: center; gap: 12px; min-width: 0; overflow-x: auto; scrollbar-width: thin; }
+.att-tab-list { display: flex; align-items: center; gap: 12px; min-width: 0; overflow-x: auto; } /* 스크롤바는 타임라인과 같은 규칙(아래 #log 묶음) */
 .att-grp { flex: none; display: flex; align-items: center; gap: 7px; }
 .att-grp + .att-grp { padding-left: 12px; border-left: 1px solid var(--line); } /* 묶음 사이 칸막이 */
 .att-grp-h { flex: none; font-size: 11.5px; color: var(--dim); white-space: nowrap; }
@@ -592,15 +592,15 @@ body.term-full .side-grip { left: -6px; }
 /* 옆 패널(타임라인·대기열·나중에 할 작업)·세션 프로파일 서브에이전트 목록·diff 요청 목록 스크롤바: 트랙 없이 얇은 둥근 막대, 올리면 조금 진하게.
    크롬 계열은 ::-webkit-scrollbar 로 다듬고(표준 scrollbar-color 를 같이 주면 이 규칙이 무시되므로 주지 않는다),
    그 밖의 브라우저만 표준 속성으로 얇게 */
-:is(#log, .queue, .memos, .subagents, #diff-files)::-webkit-scrollbar { width: 10px; }
-:is(#log, .queue, .memos, .subagents, #diff-files)::-webkit-scrollbar-track { background: transparent; }
-:is(#log, .queue, .memos, .subagents, #diff-files)::-webkit-scrollbar-thumb {
+:is(#log, .queue, .memos, .subagents, #diff-files, .att-tab-list)::-webkit-scrollbar { width: 10px; height: 10px; }
+:is(#log, .queue, .memos, .subagents, #diff-files, .att-tab-list)::-webkit-scrollbar-track { background: transparent; }
+:is(#log, .queue, .memos, .subagents, #diff-files, .att-tab-list)::-webkit-scrollbar-thumb {
   background: rgb(var(--ink) / .14); border-radius: 10px; border: 3px solid transparent; background-clip: padding-box; min-height: 32px;
 }
-:is(#log, .queue, .memos, .subagents, #diff-files)::-webkit-scrollbar-thumb:hover { background-color: rgb(var(--ink) / .3); }
-:is(#log, .queue, .memos, .subagents, #diff-files)::-webkit-scrollbar-button { display: none; }
+:is(#log, .queue, .memos, .subagents, #diff-files, .att-tab-list)::-webkit-scrollbar-thumb:hover { background-color: rgb(var(--ink) / .3); }
+:is(#log, .queue, .memos, .subagents, #diff-files, .att-tab-list)::-webkit-scrollbar-button { display: none; }
 @supports not selector(::-webkit-scrollbar) {
-  #log, .queue, .memos, .subagents, #diff-files { scrollbar-width: thin; scrollbar-color: rgb(var(--ink) / .18) transparent; }
+  #log, .queue, .memos, .subagents, #diff-files, .att-tab-list { scrollbar-width: thin; scrollbar-color: rgb(var(--ink) / .18) transparent; }
 }
 #log li { padding: 5px 0 5px 12px; border-left: 1px solid var(--line-2); position: relative; color: var(--text-2); word-break: break-all; }
 #log li::before { content: ""; position: absolute; left: -3.5px; top: 11px; width: 6px; height: 6px; border-radius: 50%; background: var(--surface-3); }
