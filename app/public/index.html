@@ -194,7 +194,7 @@
           <div class="term-boot term-gone" id="term-gone" hidden><span data-i18n>프로세스 종료됨</span><small data-i18n>터미널 화면은 남아 있지 않아요 · 대기실 카드의 ▶ 투입으로 이어서 띄울 수 있어요</small></div>
           <div class="chat-view" id="chat-view" hidden>
             <div class="cv-list" id="cv-list"></div>
-            <form class="cv-comp" id="chat-form"><div class="cv-box"><textarea name="text" rows="1" placeholder="메시지 보내기" data-i18n-attr="placeholder"></textarea><button type="submit" class="cv-send" title="보내기 (Enter)" data-i18n-attr="title">↑</button></div>
+            <form class="cv-comp" id="chat-form"><div class="cv-box"><textarea name="text" rows="1" placeholder="메시지 보내기" data-i18n-attr="placeholder"></textarea><span class="cv-acts" id="cv-acts"><button type="button" class="cv-act" data-send="now" title="바로 전송 — 작업 중이어도 대기열을 건너뛰고 지금 CLI 에 넣음" data-i18n-attr="title" data-i18n>바로 전송</button><button type="button" class="cv-act cv-main" data-send="task" title="Tasks — 쉬고 있으면 바로, 작업 중이면 대기열에 (입력칸 Enter)" data-i18n-attr="title">Tasks</button><button type="button" class="cv-act" data-send="memo" title="Backlog — 자동 실행 안 됨 · ▶ 로 나중에 투입" data-i18n-attr="title">Backlog</button></span></div>
               <div class="cv-hint"><span id="cv-keys"></span><span data-i18n>Esc 중단</span><span data-i18n>/ 명령도 그대로 보냄</span></div></form>
           </div>
           <div class="diff-view" id="diff-view" hidden>

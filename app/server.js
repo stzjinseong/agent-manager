@@ -545,6 +545,27 @@ async function assignTask(w, text) {
   w.queue.push(text); pushLog(w, 'queue', text); emitState();
   return {};
 }
+// 바로 전송(채팅 보기): 대기열을 건너뛰고 지금 CLI 입력창에 넣는다. 작업 중이면 Claude Code 가 입력을 받아 두었다가
+// 그 턴의 다음 틈에 읽는다(턴을 새로 세지 않으므로 상태·전송 확인은 건드리지 않는다).
+// 결정 대기(선택창)엔 글이 선택 키로 먹히고 시작 중엔 넣을 곳이 없어 받지 않는다. 종료 등 그 밖의 상태는 보통 지시로
+async function sendNow(w, text) {
+  text = String(text || '').trim();
+  if (!text) return {};
+  if (w.status === 'starting') return { rejected: 'starting' };
+  if (w.status === 'decision') return { rejected: 'blocked' };
+  if (!isIdle(w) && w.status !== 'working') return assignTask(w, text);
+  const cli = await cliDraft(w);
+  if (cli.state !== 'empty') { logDraft(w, cli, 'reject'); return { rejected: cli.state, seen: seenDraft(cli) }; }
+  if (w.status === 'working') {
+    pasteInput(w, text);
+    pushLog(w, 'assign', text);
+    emitState();
+    return {};
+  }
+  cancelDispatch(w);
+  sendPrompt(w, text);
+  return {};
+}
 // ---------- 시작 중 터미널 가림 ----------
 // 시작 중(SessionStart 전)엔 화면이 터미널 입력을 막아 둔다(app.js term-boot). 다만 처음 여는 폴더의 신뢰 확인처럼 터미널에서
 // 골라야 넘어가는 화면이 이때 뜬다 → 화면에 무언가 떴는데 입력창이 아니면(blocked) 가림을 걷는다(w.bootOpen).
@@ -726,11 +747,14 @@ const PROMPT_CONFIRM_MS = 8000;
 const RETRYABLE_STOP = new Set(['overloaded', 'server_error', 'unknown', 'max_output_tokens']); // StopFailure 뒤 대기열을 이어도 되는 오류
 const retryText = new Map(); // 워커 id → 마지막으로 투입에 실패해 다시 보낸 지시 (confirmPrompt)
 const confirmTimers = new Map(); // 워커 id → setTimeout (draftTimers 와 같은 이유로 워커 밖에 둔다)
-function sendPrompt(w, text) {
-  // bracketed paste 로 넣어야 여러 줄 지시가 줄마다 전송되지 않는다.
-  // 끝이 \ 이면 Claude Code 가 뒤따르는 Enter 를 줄바꿈으로 바꿔 전송되지 않고 입력창에 남았다 — 공백을 하나 붙여 막는다
+// bracketed paste 로 넣어야 여러 줄 지시가 줄마다 전송되지 않는다.
+// 끝이 \ 이면 Claude Code 가 뒤따르는 Enter 를 줄바꿈으로 바꿔 전송되지 않고 입력창에 남았다 — 공백을 하나 붙여 막는다
+function pasteInput(w, text) {
   w.term.write(`\x1b[200~${text}${/\\$/.test(text) ? ' ' : ''}\x1b[201~`);
   setTimeout(() => w.term.write('\r'), 120);
+}
+function sendPrompt(w, text) {
+  pasteInput(w, text);
   // UserPromptSubmit 훅이 오기 전에 다음 지시가 들어오면 바로 투입돼 버리므로 선제적으로 작업 중 처리
   w.status = 'working';
   w.turnStartedAt = Date.now();
@@ -2140,7 +2164,7 @@ const server = http.createServer(async (req, res) => {
     const w = workers.get(m[1]);
     if (!w) return json(res, 404, { error: 'no worker' });
     const body = await readBody(req);
-    if (m[2] === 'task') return json(res, 200, { ok: true, ...(await assignTask(w, body.text)) });
+    if (m[2] === 'task') return json(res, 200, { ok: true, ...(await (body.mode === 'now' ? sendNow(w, body.text) : assignTask(w, body.text))) });
     if (m[2] === 'interrupt' && w.status !== 'exited') { w.term.write('\x1b'); pushLog(w, 'status', '관리자가 중단(Esc)'); emitState(); setTimeout(() => scheduleProfile(w), 700); }
     // 대기열에서 빼기(unqueue) · 나중에 할 작업으로 되돌리기(tomemo). 화면이 본 번호와 글이 둘 다 맞는 항목만 —
     // 그사이 CLI 로 나갔으면(dispatchQueued 가 앞에서 꺼냄) 번호가 밀리므로 글로 다시 찾고, 없으면 409(이미 전송).

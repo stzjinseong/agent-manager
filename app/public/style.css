@@ -2638,6 +2638,12 @@ button.cv-more:hover { color: var(--text); }
 .cv-box textarea { flex: 1; min-width: 0; resize: none; border: 0; outline: 0; background: none; color: var(--text); font: inherit; padding: 4px 0; max-height: 180px; overflow-y: hidden; }
 .cv-box .att-live { order: -1; flex-basis: 100%; }
 .cv-box .att-live:empty { display: none; }
-.cv-send { all: unset; cursor: pointer; width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; background: var(--accent); color: #1a0f0a; font-weight: 700; }
-.cv-send:hover { background: var(--accent-hi); }
+/* 보내기 세 갈래 — 기본(Tasks, 입력칸 Enter)만 코랄로 채우고 나머지는 옅게. Tab 으로 옮겨 다니므로 포커스 링을 또렷하게 */
+.cv-acts { flex: none; display: inline-flex; gap: 4px; }
+.cv-act { all: unset; cursor: pointer; height: 28px; padding: 0 10px; border-radius: 8px; display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; white-space: nowrap; color: var(--text-2); background: var(--surface-3); }
+.cv-act:hover { color: var(--text); background: var(--btn-hover); }
+.cv-act.cv-main { background: var(--accent); color: #1a0f0a; }
+.cv-act.cv-main:hover { background: var(--accent-hi); }
+.cv-act:focus-visible { outline: 2px solid var(--accent-hi); outline-offset: 2px; }
+:root[data-theme="light"] .cv-act.cv-main { color: #fff; }
 .cv-hint { font-size: 11px; color: var(--faint); margin-top: 5px; display: flex; gap: 12px; flex-wrap: wrap; }

@@ -5071,26 +5071,45 @@ function chatGrow() {
 chatForm.text.addEventListener('input', chatGrow);
 acceptFiles(chatForm.text);
 onEnterKey(chatForm.text, () => chatForm.requestSubmit());
-chatForm.onsubmit = async (e) => {
-  e.preventDefault();
+// 보내기 세 갈래(입력칸 오른쪽 버튼): 바로 전송(작업 중이어도 지금 CLI 에) · Tasks(업무 지시와 같음 — 쉬면 바로, 작업 중이면 대기열) ·
+// Backlog(나중에 할 작업 — 자동 실행 안 됨). 입력칸 Enter 는 Tasks. 입력칸에서 Tab 이면 세 버튼을 차례로, 버튼에서 Shift+Tab 이면 입력칸으로
+async function chatSend(mode) {
   const ta = chatForm.text, text = ta.value.trim();
-  if (!text || !selected || ta.readOnly) return;
-  const to = selected;
-  ta.readOnly = true;
-  const r = await api(`/api/workers/${to}/task`, { text });
-  ta.readOnly = false;
-  if (r?.rejected) {
-    toast(r.rejected === 'starting' ? _t('전송 실패 — 워커가 아직 시작 중입니다. 준비되면 다시 보내세요') : r.rejected === 'blocked'
-      ? _t('전송 실패 — CLI 가 입력 대기 화면이 아닙니다(선택창, ! 셸 모드 등). 입력창으로 돌아온 뒤 다시 보내세요')
-      : _t('전송 실패 — CLI 입력창에 쓰던 글이 있습니다. 그 글을 보내거나 지운 뒤 다시 보내세요') + (r.seen ? ` · ${_t('감지한 글')}: "${r.seen}"` : ''), r.seen ? 8000 : 4500);
-    shake(ta);
-    return;
+  const w = state.workers.find((x) => x.id === selected);
+  if (!text || !w || ta.readOnly) return;
+  if (mode === 'memo') {
+    const r = await api('/api/memos', { role: w.name, op: 'add', text });
+    if (r?.error) return;
+    flyToWorker(w.id, ta, 'memo');
+  } else {
+    ta.readOnly = true;
+    const r = await api(`/api/workers/${w.id}/task`, mode === 'now' ? { text, mode: 'now' } : { text });
+    ta.readOnly = false;
+    if (r?.rejected) {
+      toast(r.rejected === 'starting' ? _t('전송 실패 — 워커가 아직 시작 중입니다. 준비되면 다시 보내세요') : r.rejected === 'blocked'
+        ? _t('전송 실패 — CLI 가 입력 대기 화면이 아닙니다(선택창, ! 셸 모드 등). 입력창으로 돌아온 뒤 다시 보내세요')
+        : _t('전송 실패 — CLI 입력창에 쓰던 글이 있습니다. 그 글을 보내거나 지운 뒤 다시 보내세요') + (r.seen ? ` · ${_t('감지한 글')}: "${r.seen}"` : ''), r.seen ? 8000 : 4500);
+      shake(ta);
+      return;
+    }
+    if (r?.error) return;
+    flyToWorker(w.id, ta, 'task');
   }
-  if (r?.error) return;
   ta.value = '';
   chatGrow();
   ta.focus();
-};
+}
+chatForm.onsubmit = (e) => { e.preventDefault(); chatSend('task'); };
+$('#cv-acts').addEventListener('click', (e) => { const b = e.target.closest('[data-send]'); if (b) chatSend(b.dataset.send); });
+// 입력칸 Tab → 첫 버튼(사이에 낀 첨부 타일 링크를 건너뛰게 직접 옮긴다)
+chatForm.text.addEventListener('keydown', (e) => {
+  if (e.key !== 'Tab' || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey || e.isComposing) return;
+  e.preventDefault();
+  $('#cv-acts [data-send]').focus();
+});
+$('#cv-acts').addEventListener('keydown', (e) => {
+  if (e.key === 'Tab' && e.shiftKey) { e.preventDefault(); chatForm.text.focus(); }
+});
 // 빈 칸에서 Esc = 작업 중단(터미널의 Esc 와 같음)
 chatForm.text.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape' || chatForm.text.value || !selected) return;
