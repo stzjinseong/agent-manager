@@ -4983,7 +4983,7 @@ const chatUnfold = new Set(); // 펼친 도구 묶음(첫 칩 seq)
 let chatPending = [];
 // 비교용: Claude Code 는 붙인 그림 경로를 [Image #N] 으로 바꿔 기록한다 → 경로·[Image #N]·공백을 빼고 비교
 const chatNorm = (t) => String(t || '').replace(/\[Image #\d+\]/g, '').replace(/(?:[A-Za-z]:[\\/]|\/)[^\s"'<>|]*?\.(?:png|jpe?g|gif|webp|bmp|svg)/gi, '').replace(/\s+/g, '');
-// 기록에 들어온 요청 하나가 흐린 말풍선 하나를 지운다 — 같은 글이 먼저, 없으면(글이 바뀌어 기록됨) 그 요청보다 먼저 보낸 가장 오래된 것
+// 기록에 들어온 요청 하나가 흐린 말풍선 하나를 지운다 — 같은 글이 먼저, 없으면 앞부분(12자)이 같은 것(글이 조금 바뀌어 기록됨)
 function chatSettle(wid) {
   const now = Date.now();
   chatPending = chatPending.filter((p) => now - p.at < 600_000);
@@ -4993,7 +4993,9 @@ function chatSettle(wid) {
   for (const x of chatData.items) {
     if (x.k !== 'u') continue;
     const t = x.ts + clockSkew, live = mine.filter((p) => !used.has(p) && t >= p.at - 5000);
-    const hit = live.find((p) => chatNorm(x.text) === p.norm) || live[0];
+    // 글이 똑같지 않아도 앞부분이 같으면 같은 글(슬래시 명령 · 붙인 글 정리 등으로 조금 바뀌어 기록됨). 전혀 다른 글로는 지우지 않는다 —
+    // 예전엔 아무 요청이나 가장 오래된 흐린 말풍선을 지워, 전달되지 못한 글이 흔적 없이 사라져 보였다
+    const xn = chatNorm(x.text), hit = live.find((p) => xn === p.norm) || live.find((p) => p.norm.slice(0, 12) && xn.slice(0, 12) === p.norm.slice(0, 12));
     if (hit) used.add(hit);
   }
   chatPending = chatPending.filter((p) => !used.has(p));

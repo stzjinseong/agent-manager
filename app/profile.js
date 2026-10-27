@@ -226,6 +226,16 @@ function apply(p, e, line) {
     if (cm) { p.compactLog.push({ ts, trigger: cm.trigger || null, pre: cm.preTokens ?? null, post: cm.postTokens ?? null, ms: cm.durationMs ?? null }); if (p.compactLog.length > 20) p.compactLog.shift(); }
     return;
   }
+  // 작업 중에 보낸 글(Claude Code 대기열 → 턴 도중 도구 사이에 전달)은 user 메시지가 아니라 queued_command 첨부로만 남는다.
+  // 채팅이 이걸 안 읽어 그 글이 대화에 안 보였고, 흐린 말풍선은 다음 요청이 들어올 때 대신 지워져 '감쪽같이 사라진' 것처럼 보였다
+  if (e.type === 'attachment' && e.attachment?.type === 'queued_command' && e.attachment.commandMode === 'prompt') {
+    const pr = e.attachment.prompt;
+    const text = (typeof pr === 'string' ? pr : Array.isArray(pr) ? pr.filter((b) => b.type === 'text').map((b) => b.text).join(' ') : '').trim();
+    const img = Array.isArray(pr) ? pr.filter((b) => b.type === 'image').length : 0;
+    const dup = p.chat?.findLast((x) => x.k === 'u');
+    if (p.chat && text && !text.includes('<task-notification>') && !(dup && dup.text === text.slice(0, CHAT_TEXT) && Math.abs(dup.ts - ts) < 10_000)) chatPush(p, { k: 'u', ts, text: text.slice(0, CHAT_TEXT), img });
+    return;
+  }
   if (e.type === 'user') {
     const c = e.message?.content;
     if (Array.isArray(c)) for (const b of c) {

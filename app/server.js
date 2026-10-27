@@ -581,8 +581,21 @@ async function flushNow(w) {
     if (cli.state !== 'empty' || w.status !== 'working') return;
     const list = w.nowQ.splice(0);
     list.forEach((text, i) => setTimeout(() => { pasteInput(w, text); pushLog(w, 'assign', text); emitState(); }, i * 400));
+    setTimeout(() => confirmNowPaste(w, list), list.length * 400 + 1500);
     emitState();
   } finally { nowBusy.delete(w.id); }
+}
+// 넣은 글이 입력창에 그대로 남아 있으면(Enter 가 먹히지 않음 — 실측: 도구가 막 끝난 순간 붙여 넣은 글이 대기열에 안 들어가고 사라졌다)
+// Enter 를 한 번 더. 입력창이 비었으면 Claude Code 가 받아 간 것
+async function confirmNowPaste(w, list) {
+  if (!workers.has(w.id) || w.status === 'exited') return;
+  const cli = await cliDraft(w);
+  if (cli.state !== 'draft') return;
+  const seen = cli.text.replace(/\s+/g, ''), hit = list.some((t) => { const k = t.replace(/\s+/g, '').slice(-20); return k && seen.includes(k); });
+  if (!hit) return;
+  w.term.write('\r');
+  pushLog(w, 'status', '작업 사이에 전달 — 입력창에 남아 Enter 다시 보냄');
+  emitState();
 }
 // 턴이 끝났는데(또는 중단) 아직 못 넣은 바로 전송 글 → 대기열 맨 앞으로. 자동 투입을 끈 역할이어도 '바로' 보낸 글이라 첫 건은 보낸다
 function nowToQueue(w, send) {
