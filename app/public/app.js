@@ -492,10 +492,10 @@ const heldInput = [];
 // 채팅 보기 중이면 터미널이 안 보이므로 기록은 CLI 로 돌아올 때 받는다(pending)
 const TERM_SNAP_LINES = 1500;
 let termSnap = { id: null, partial: false, loadingFull: false, fromBottom: 0, pending: false };
+// 채팅 보기면 지금 화면 높이만큼만 받는다(수십 줄) — CLI 가 메뉴 · 선택창을 띄웠는지 알아야 해서(cliPeek). 긴 기록은 CLI 로 돌아올 때(pending)
 function attachMsg(id) {
-  const snap = !chatOpen;
-  termSnap = { id, partial: false, loadingFull: false, fromBottom: 0, pending: !snap };
-  return { type: 'attach', id, snap, lines: TERM_SNAP_LINES };
+  termSnap = { id, partial: false, loadingFull: false, fromBottom: 0, pending: chatOpen };
+  return { type: 'attach', id, snap: true, lines: chatOpen ? term.rows + 20 : TERM_SNAP_LINES };
 }
 // 최근 줄만 받은 터미널을 맨 위까지 올리면 나머지 기록을 받는다 — 다 받으면 보던 줄이 그대로 맨 위에 오게(scrollback 처리)
 term.onScroll((y) => {
@@ -509,6 +509,64 @@ function loadTermSnapIfPending() {
   termSnap.pending = false;
   send({ type: 'snapshot', id: selected, lines: TERM_SNAP_LINES });
 }
+// ---------- 채팅 보기에서 CLI 엿보기 ----------
+// Claude Code 는 채팅에 없는 화면(되감기 · /model 같은 메뉴, 권한 선택창, 폴더 신뢰 확인 …)을 띄우면 평소 입력창(가로선 사이 ❯ 줄)을
+// 감춘다. 채팅 보기에선 그게 안 보여 멈춘 줄도 몰랐다(실측: Esc 두 번에 Rewind 메뉴가 떠 다음 지시가 '보내는 중'에 갇힘).
+// 화면 맨 아래에 입력창이 없으면 채팅 아래쪽을 걷어 실제 터미널을 보여 주고 키를 그쪽으로 — 입력창이 돌아오면 다시 닫는다
+function cliScreenBlocked() {
+  const b = term.buffer.active;
+  if (b.type === 'alternate') return false; // 전체 화면 모드 워커는 화면 모양이 달라 보지 않는다
+  const rows = [];
+  for (let i = b.baseY; i < b.baseY + term.rows; i++) rows.push(b.getLine(i)?.translateToString(true) || '');
+  let last = rows.length - 1;
+  while (last >= 0 && !rows[last].trim()) last--;
+  if (last < 0) return false; // 아직 화면을 못 받음
+  peekLast = last;
+  const rule = rows.map((t, i) => (/^\s*─{20,}/.test(t) ? i : -1)).filter((i) => i >= 0);
+  for (let k = rule.length - 1; k > 0; k--) {
+    if (last - rule[k] > 8) break; // 입력창 아래엔 상태줄 · 안내 몇 줄뿐
+    if (rule[k] - rule[k - 1] >= 2 && /^\s*[❯›>]/.test(rows[rule[k - 1] + 1])) return false;
+  }
+  return true;
+}
+let peekOn = false, peekHidden = false, peekTimer = null, peekSince = 0, peekLast = 0;
+// 화면이 아직 짧으면(막 띄운 워커 등) 메뉴가 터미널 위쪽에 그려져 채팅 칸에 가린다 → 마지막 글 줄이 드러난 칸 맨 아래에 오게 터미널을 내린다
+function peekShift() {
+  const el = $('#term');
+  if (!peekOn) { el.style.transform = ''; return; }
+  const cell = ($('#term .xterm-screen')?.clientHeight || 0) / term.rows;
+  el.style.transform = cell ? `translateY(${Math.max(0, term.rows - 1 - peekLast) * cell}px)` : '';
+}
+function cliPeekCheck() {
+  clearTimeout(peekTimer);
+  peekTimer = setTimeout(() => {
+    const w = state.workers.find((x) => x.id === selected);
+    const want = Boolean(chatOpen && w && termSnap.id === selected && !['starting', 'exited'].includes(w.status) && !$('#detail').hidden && cliScreenBlocked());
+    if (!want) { peekSince = 0; peekHidden = false; $('#cv-peek').hidden = true; return setCliPeek(false); }
+    if (!peekSince) peekSince = Date.now();
+    if (Date.now() - peekSince < 500) return cliPeekCheck(); // 다시 그리는 중의 잠깐 빈 화면은 넘긴다
+    $('#cv-peek').hidden = false; // 접어 둬도 막대는 남겨 '기다리는 중'을 알린다
+    setCliPeek(!peekHidden);
+    peekShift();
+  }, 120);
+}
+// 채팅 칸을 위로 줄여 아래에 깔린 실제 터미널(맨 아래 줄들 — 메뉴가 뜨는 자리)을 드러낸다. 터미널 크기는 그대로(pty 크기를 바꾸지 않게)
+function setCliPeek(on) {
+  if (on === peekOn) return;
+  peekOn = on;
+  $('#term-wrap').classList.toggle('cli-peek', on);
+  $('#cv-peek').classList.toggle('open', on);
+  $('[data-peek]', $('#cv-peek')).textContent = _t(on ? '접기' : '펼치기');
+  peekShift();
+  if (on) { term.scrollToBottom(); if (!(document.activeElement === chatForm.text && chatForm.text.value)) term.focus(); }
+  else if (chatOpen && document.activeElement?.closest?.('#term')) chatForm.text.focus();
+}
+$('#cv-peek').addEventListener('click', (e) => {
+  if (!e.target.closest('[data-peek]')) return;
+  peekHidden = peekOn;
+  setCliPeek(!peekOn);
+});
+term.onWriteParsed(cliPeekCheck);
 function sendInput(data) {
   if (replaceJob) { heldInput.push(data); return; }
   if (selected) send({ type: 'input', id: selected, data });
@@ -1055,7 +1113,7 @@ function connect() {
     else if (msg.type === 'scrollback' && msg.id === selected) {
       if (TOUCH) { ptyCols = msg.cols || TERM_COLS; fitTerm(); } // 기록은 pty 폭으로 만들어졌다 — 그 폭으로 받아야 줄이 어긋나지 않는다
       const more = termSnap.loadingFull ? termSnap.fromBottom : null; // 맨 위로 올려 전부 불러온 것 — 보던 줄을 그대로 맨 위에
-      termSnap = { id: msg.id, partial: Boolean(msg.partial), loadingFull: false, fromBottom: 0, pending: false };
+      termSnap = { id: msg.id, partial: Boolean(msg.partial), loadingFull: false, fromBottom: 0, pending: termSnap.id === msg.id && termSnap.pending };
       term.reset();
       term.write(recolorTerm(msg.data), () => (more == null ? restoreTermScroll(msg.id) : term.scrollToLine(Math.max(0, term.buffer.active.baseY - more))));
     }
@@ -5304,6 +5362,7 @@ function setChatOpen(on, keepPref = false) {
   if (on && diffOpen) setDiffOpen(false);
   $('#chat-view').hidden = !on;
   $('#term-wrap').classList.toggle('chatting', on);
+  peekHidden = false; cliPeekCheck();
   if (on) {
     term.blur();
     loadMdLibs().then(() => { chatHtml.clear(); $('#cv-list')._html = ''; renderChat(); }).catch(() => {}); // 못 불러오면 글 그대로

@@ -2723,3 +2723,15 @@ button.cv-more:hover { color: var(--text); }
 .cv-wait-sep { display: flex; align-items: center; gap: 10px; margin: 6px 0 10px; color: var(--faint); font-size: 11px; }
 .cv-wait-sep::before, .cv-wait-sep::after { content: ""; flex: 1; border-top: 1px dashed var(--line-2); }
 @media (hover: none) { .cv-box .cv-kbd-hint { display: none !important; } } /* 터치 기기엔 / 키가 없다 */
+/* 채팅 보기 CLI 엿보기(app.js cliPeek) — CLI 가 메뉴 · 선택창을 띄우면 채팅 칸을 위쪽 절반으로 줄여 아래에 깔린 실제 터미널을 드러낸다.
+   막대는 채팅 칸 맨 아래(터미널 바로 위)에 붙고, 접어 두면 채팅은 원래 크기로 돌아가고 막대만 남는다 */
+.term-wrap.chatting.cli-peek .chat-view { bottom: 50%; border-bottom: 1px solid var(--decision); }
+.cv-peek { flex: none; display: flex; align-items: center; gap: 8px; padding: 6px 12px; font-size: 12px; background: color-mix(in srgb, var(--decision) 14%, var(--chat-bg, var(--term-bg))); border-top: 1px solid color-mix(in srgb, var(--decision) 45%, transparent); }
+.cv-peek b { color: var(--decision); font-weight: 700; }
+.cv-peek-help { color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.cv-peek-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--decision); flex: none; animation: peek-blink 1.2s ease-in-out infinite; }
+@keyframes peek-blink { 50% { opacity: .3; } }
+.cv-peek button { all: unset; margin-left: auto; cursor: pointer; padding: 2px 10px; border-radius: 6px; font-size: 11.5px; background: var(--surface-3); color: var(--text-2); }
+.cv-peek button:hover { color: var(--text); }
+@media (prefers-reduced-motion: reduce) { .cv-peek-dot { animation: none; } }
+.term-wrap.cli-peek .term-stage { overflow: hidden; } /* 터미널을 아래로 내려 마지막 줄을 맞출 때 넘친 부분은 자른다 */
