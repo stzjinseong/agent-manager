@@ -439,6 +439,8 @@ const EN = {
   'CLI 에서 답하기': 'Answer in CLI',
   '생각 중': 'Thinking',
   '아직 대화가 없어요': 'No conversation yet',
+  '글자 작게 (Ctrl+휠)': 'Smaller text (Ctrl+wheel)',
+  '글자 크게 (Ctrl+휠)': 'Larger text (Ctrl+wheel)',
   '이미지 {n}개': ({ n }) => `${n} image${n === 1 ? '' : 's'}`,
   '↑ 를 누르면 보냅니다': 'Tap ↑ to send',
   '지금까지의 요청·파일 변경 기록을 목록에서 지웁니다. 실제 파일은 바뀌지 않고, 앞으로의 수정부터 다시 쌓입니다.': 'Removes the request and file change history so far from the list. Your files are not changed; new edits will appear from now on.',

@@ -5010,7 +5010,30 @@ function chatBar(w) {
   stEl.textContent = statusLabel(st);
   stEl.style.color = `var(--${st === 'waiting' ? 'idle' : st}, var(--dim))`;
 }
+// 채팅 글자 크기 — 목록(대화 내용)만 비율로 키운다(CSS zoom: 글·칩·썸네일이 함께). 입력칸·막대는 그대로
+const CHAT_ZOOM_KEY = 'am.chatZoom', CHAT_ZOOMS = [0.8, 0.9, 1, 1.1, 1.2, 1.35, 1.5];
+let chatZoom = 1;
+try { const z = Number(localStorage.getItem(CHAT_ZOOM_KEY)); if (CHAT_ZOOMS.includes(z)) chatZoom = z; } catch {}
+function setChatZoom(z) {
+  const list = $('#cv-list'), keep = list.scrollHeight - list.scrollTop - list.clientHeight < 60; // 맨 아래를 보고 있었으면 그대로 맨 아래
+  chatZoom = z;
+  list.style.zoom = z === 1 ? '' : String(z);
+  $('.cv-zpct').textContent = `${Math.round(z * 100)}%`;
+  for (const b of document.querySelectorAll('#cv-zoom [data-zoom]')) b.disabled = (b.dataset.zoom === '-1' && z === CHAT_ZOOMS[0]) || (b.dataset.zoom === '1' && z === CHAT_ZOOMS.at(-1));
+  try { z === 1 ? localStorage.removeItem(CHAT_ZOOM_KEY) : localStorage.setItem(CHAT_ZOOM_KEY, String(z)); } catch {}
+  if (keep) list.scrollTop = list.scrollHeight;
+}
+const stepChatZoom = (d) => setChatZoom(d ? CHAT_ZOOMS[Math.max(0, Math.min(CHAT_ZOOMS.length - 1, CHAT_ZOOMS.indexOf(chatZoom) + d))] : 1);
+$('#cv-zoom').addEventListener('click', (e) => { const b = e.target.closest('[data-zoom]'); if (b) stepChatZoom(Number(b.dataset.zoom)); });
+// 목록 위 Ctrl(⌘)+휠 = 채팅 글자만(브라우저 전체 확대 대신)
+$('#cv-list').addEventListener('wheel', (e) => {
+  if (!e.ctrlKey && !e.metaKey) return;
+  e.preventDefault();
+  stepChatZoom(e.deltaY < 0 ? 1 : -1);
+}, { passive: false });
+setChatZoom(chatZoom);
 function chatSeg() {
+  $('#cv-zoom').hidden = !chatOpen;
   for (const b of document.querySelectorAll('.btn-chat')) b.classList.toggle('on', chatOpen);
   for (const b of document.querySelectorAll('.cv-seg [data-cv]')) b.classList.toggle('on', (b.dataset.cv === 'chat') === chatOpen);
 }

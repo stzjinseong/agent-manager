@@ -2561,6 +2561,11 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 .cv-seg button:not(.on):hover { color: var(--text); }
 .cv-nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 12px; color: var(--text-2); }
 .cv-st { margin-left: auto; flex: none; font-size: 11.5px; }
+.cv-zoom { flex: none; display: inline-flex; align-items: center; gap: 2px; margin-left: 4px; }
+.cv-zoom button { all: unset; cursor: pointer; min-width: 22px; padding: 1px 5px; border-radius: 6px; font-size: 11.5px; text-align: center; color: var(--dim); }
+.cv-zoom button:hover:not(:disabled) { color: var(--text); background: var(--surface-3); }
+.cv-zoom button:disabled { opacity: .35; cursor: default; }
+.cv-zoom .cv-zpct { min-width: 34px; font-variant-numeric: tabular-nums; }
 .cv-st::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; margin-right: 6px; vertical-align: 1px; }
 .cv-list { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 12px 6px 6px; }
 .cv-empty { color: var(--faint); text-align: center; padding: 40px 0; }
