@@ -459,7 +459,7 @@ function spawnWorker({ name, cwd, args = '', permissionMode = 'default', resume 
     status: 'starting', // starting | idle | working | decision | done | exited
     sessionId: null, model: null,
     currentTool: null, subTool: null, lastPrompt: null, lastMessage: null, notice: null,
-    todos: [], queue: [], toolCount: 0, shots: [], atts: [],
+    todos: [], queue: [], nowQ: [], toolCount: 0, shots: [], atts: [],
     startedAt: Date.now(), turnStartedAt: null, updatedAt: Date.now(),
     log: [], // 최근 이벤트 타임라인
     tx: null, // 트랜스크립트 프로파일러 상태 (profile.js)
@@ -547,8 +547,10 @@ async function assignTask(w, text) {
   w.queue.push(text); pushLog(w, 'queue', text); emitState();
   return {};
 }
-// 바로 전송(채팅 보기): 대기열을 건너뛰고 지금 CLI 입력창에 넣는다. 작업 중이면 Claude Code 가 입력을 받아 두었다가
-// 그 턴의 다음 틈에 읽는다(턴을 새로 세지 않으므로 상태·전송 확인은 건드리지 않는다).
+// 바로 전송(채팅 보기): 대기열을 건너뛰고 지금 CLI 입력창에 넣는다. 작업 중이면 서버가 w.nowQ 에 들고 있다가 클로드가
+// 도구 하나를 끝낼 때(PostToolUse — Claude Code 가 쌓인 입력을 읽는 틈) CLI 에 넣는다(flushNow). 곧장 붙여 넣으면 Claude Code
+// 안쪽 대기열에 들어가 화면에서 뺄 수 없었다 — 들고 있는 동안은 채팅 보기에서 빼기 · Backlog 로 옮기기가 된다(unqueue · tomemo now).
+// 턴을 새로 세지 않으므로 상태·전송 확인은 건드리지 않는다.
 // 결정 대기(선택창)엔 글이 선택 키로 먹히고 시작 중엔 넣을 곳이 없어 받지 않는다. 종료 등 그 밖의 상태는 보통 지시로
 async function sendNow(w, text) {
   text = String(text || '').trim();
@@ -559,14 +561,35 @@ async function sendNow(w, text) {
   const cli = await cliDraft(w);
   if (cli.state !== 'empty') { logDraft(w, cli, 'reject'); return { rejected: cli.state, seen: seenDraft(cli) }; }
   if (w.status === 'working') {
-    pasteInput(w, text);
-    pushLog(w, 'assign', text);
+    (w.nowQ ||= []).push(text);
+    pushLog(w, 'status', `작업 사이에 전달 대기: ${text}`);
     emitState();
     return {};
   }
   cancelDispatch(w);
   sendPrompt(w, text);
   return {};
+}
+// 들고 있던 바로 전송 글을 CLI 에 넣는다 — 도구 하나가 끝날 때(PostToolUse). 입력창에 쓰던 글이 있으면 섞이지 않게 다음 틈까지 둔다.
+// 여러 개면 말풍선 하나씩 맞춰 지워지게 따로따로(붙여 넣기 + Enter 가 120ms 걸려 400ms 간격)
+const nowBusy = new Set();
+async function flushNow(w) {
+  if (!w.nowQ?.length || w.status !== 'working' || nowBusy.has(w.id)) return;
+  nowBusy.add(w.id);
+  try {
+    const cli = await cliDraft(w);
+    if (cli.state !== 'empty' || w.status !== 'working') return;
+    const list = w.nowQ.splice(0);
+    list.forEach((text, i) => setTimeout(() => { pasteInput(w, text); pushLog(w, 'assign', text); emitState(); }, i * 400));
+    emitState();
+  } finally { nowBusy.delete(w.id); }
+}
+// 턴이 끝났는데(또는 중단) 아직 못 넣은 바로 전송 글 → 대기열 맨 앞으로. 자동 투입을 끈 역할이어도 '바로' 보낸 글이라 첫 건은 보낸다
+function nowToQueue(w, send) {
+  if (!w.nowQ?.length) return false;
+  w.queue.unshift(...w.nowQ.splice(0));
+  if (send && manualQueue(w)) setTimeout(() => dispatchQueued(w, true), DISPATCH_GRACE_MS);
+  return true;
 }
 // ---------- 시작 중 터미널 가림 ----------
 // 시작 중(SessionStart 전)엔 화면이 터미널 입력을 막아 둔다(app.js term-boot). 다만 처음 여는 폴더의 신뢰 확인처럼 터미널에서
@@ -1001,6 +1024,7 @@ function onHook(w, ev, res) {
       for (const [did, d] of decisions) if (d.workerId === w.id && (d.toolUseId ? d.toolUseId === ev.tool_use_id : d.tool === ev.tool_name)) resolveDecision(did, null);
       if (w.status === 'decision' && !hasPending(w.id)) w.status = 'working';
       emitState();
+      flushNow(w);
       break;
     case 'PermissionRequest': {
       // 권한 선택은 터미널(CLI 의 원래 선택창)에서 한다 — 페이지 상단에 허용/거부 알림을 띄우지 않는다.
@@ -1039,6 +1063,7 @@ function onHook(w, ev, res) {
       progress.drop(w);
       roleStats.end(w, 'failed');
       setStatus(w, 'idle', `API 오류로 턴이 끝남 (${err})`);
+      nowToQueue(w, RETRYABLE_STOP.has(err));
       if (RETRYABLE_STOP.has(err)) afterTurn(w);
       else if (w.queue.length) pushLog(w, 'notice', `API 오류(${err})라 대기열을 바로 잇지 않았습니다 — 해결된 뒤 지시를 보내면 이어서 투입`);
       emitState();
@@ -1053,6 +1078,7 @@ function onHook(w, ev, res) {
       roleStats.end(w, 'done');
       setTimeout(() => judgeCache(w), 1500); // 마지막 응답이 트랜스크립트에 다 쓰일 시간을 준다
       setStatus(w, 'done', '턴 완료');
+      nowToQueue(w, true);
       afterTurn(w);
       break;
     case 'SubagentStop':
@@ -1342,6 +1368,8 @@ function onHostHello({ ptys }) {
     else { w.pid = p.pid; pushLog(w, 'status', '관제 서버 재시작 — 워커 다시 연결'); }
     // 완료 시각 기록(doneAt) 이전에 끝난 워커도 '확인 안 한 완료'로 보이게 마지막 갱신 시각으로 채운다
     if (w.status === 'done' && !w.doneAt) w.doneAt = w.updatedAt || Date.now();
+    w.nowQ ||= []; // 작업 중이 아니면 들고 있던 바로 전송 글을 넣을 틈(PostToolUse)이 다시 오지 않는다 → 대기열 맨 앞으로
+    if (w.nowQ.length && w.status !== 'working') w.queue.unshift(...w.nowQ.splice(0));
     if (w.docs) w.docs = w.docs.filter((d) => isDocCandidate(d.path)); // 규칙이 바뀌기 전에 잡힌 이 앱 자체 파일 등을 정리
     ensureRoleColor(w.name);
     workers.set(w.id, w);
@@ -1759,6 +1787,7 @@ function loadSavedWorkers() {
 function forgetWorker(w) {
   noteWorkerSession(w);
   // 대기열은 워커에 붙어 있어 기록을 지우면 같이 사라졌다 — 남은 지시는 그 역할의 '나중에 할 작업'으로 옮긴다
+  if (w.nowQ?.length) w.queue.unshift(...w.nowQ.splice(0));
   if (w.queue?.length) {
     (config.memos[w.name] ||= []).push(...w.queue.map((text, i) => ({ id: `m${Date.now().toString(36)}${i}${Math.random().toString(36).slice(2, 5)}`, text, createdAt: Date.now() })));
     w.queue = [];
@@ -2246,15 +2275,17 @@ const server = http.createServer(async (req, res) => {
     if (!w) return json(res, 404, { error: 'no worker' });
     const body = await readBody(req);
     if (m[2] === 'task') return json(res, 200, { ok: true, ...(await (body.mode === 'now' ? sendNow(w, body.text) : assignTask(w, body.text))) });
-    if (m[2] === 'interrupt' && w.status !== 'exited') { w.term.write('\x1b'); pushLog(w, 'status', '관리자가 중단(Esc)'); emitState(); setTimeout(() => scheduleProfile(w), 700); }
+    if (m[2] === 'interrupt' && w.status !== 'exited') { w.term.write('\x1b'); nowToQueue(w, false); pushLog(w, 'status', '관리자가 중단(Esc)'); emitState(); setTimeout(() => scheduleProfile(w), 700); }
     // 대기열에서 빼기(unqueue) · 나중에 할 작업으로 되돌리기(tomemo). 화면이 본 번호와 글이 둘 다 맞는 항목만 —
     // 그사이 CLI 로 나갔으면(dispatchQueued 가 앞에서 꺼냄) 번호가 밀리므로 글로 다시 찾고, 없으면 409(이미 전송).
     // 꺼내기와 옮기기를 한 번에(중간에 await 없이) 하므로 자동 전송과 겹쳐 두 번 실행되지 않는다
+    // body.now: 들고 있는 바로 전송 글(w.nowQ)에서
     if (m[2] === 'unqueue' || m[2] === 'tomemo') {
+      const arr = body.now ? (w.nowQ ||= []) : w.queue;
       const idx = Number(body.index), text = body.text;
-      const i = text == null ? idx : w.queue[idx] === text ? idx : w.queue.indexOf(text);
-      if (!(i >= 0 && i < w.queue.length)) return json(res, 409, { error: '이미 CLI 로 보낸 지시입니다' });
-      const [q] = w.queue.splice(i, 1);
+      const i = text == null ? idx : arr[idx] === text ? idx : arr.indexOf(text);
+      if (!(i >= 0 && i < arr.length)) return json(res, 409, { error: '이미 CLI 로 보낸 지시입니다' });
+      const [q] = arr.splice(i, 1);
       if (m[2] === 'tomemo') {
         (config.memos[w.name] ||= []).push({ id: `m${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`, text: q, createdAt: Date.now() });
         pushLog(w, 'status', `대기열 → 나중에 할 작업: ${q}`);
