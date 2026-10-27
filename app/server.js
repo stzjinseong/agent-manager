@@ -346,6 +346,19 @@ function workerTheme() {
   return null;
 }
 
+// 중단(Esc) 뒤에도 트랜스크립트에 중단 기록이 안 남는 때가 있다(지시를 막 보낸 순간 등) — 그러면 '작업 중'에 머물러 화면이 Esc 를
+// 계속 보냈다. 1.5초 뒤 CLI 입력창이 다시 보이고 돌고 있다는 표시(진행 줄 · esc to interrupt)가 없으면 중단된 것으로 본다
+const escAt = new Map(); // 워커 id → 마지막으로 Esc 를 보낸 시각
+async function confirmInterrupt(w) {
+  if (!workers.has(w.id) || w.status !== 'working') return;
+  const cli = await cliDraft(w);
+  if (w.status !== 'working' || cli.state === 'blocked' || cli.busy) return;
+  w.currentTool = null;
+  progress.drop(w);
+  roleStats.end(w, 'interrupted');
+  setStatus(w, 'interrupted', '사용자 중단 (화면으로 확인)');
+  afterTurn(w);
+}
 // 사용자가 중단(Esc)하면 Stop 훅이 오지 않아 '작업 중'으로 남는다. 트랜스크립트의 중단 기록이
 // 이번 턴 시작 이후면 '중단됨'으로 바꾸고, 정상 완료처럼 대기열을 잇는다(예전엔 멈춰 두었는데 끝날 턴이 없어 하염없이 기다렸다).
 function checkInterrupted(w) {
@@ -2305,7 +2318,14 @@ const server = http.createServer(async (req, res) => {
     if (!w) return json(res, 404, { error: 'no worker' });
     const body = await readBody(req);
     if (m[2] === 'task') return json(res, 200, { ok: true, ...(await (body.mode === 'now' ? sendNow(w, body.text) : assignTask(w, body.text))) });
-    if (m[2] === 'interrupt' && w.status !== 'exited') { w.term.write('\x1b'); nowToQueue(w, false); pushLog(w, 'status', '관리자가 중단(Esc)'); emitState(); setTimeout(() => scheduleProfile(w), 700); }
+    if (m[2] === 'interrupt' && w.status !== 'exited') {
+      // 2초 안에 다시 온 Esc 는 버린다 — 빈 입력창에서 Esc 두 번이면 Claude Code 가 되감기(Rewind) 메뉴를 연다.
+      // 실측: 중단 기록이 남지 않아 '작업 중'에 머문 사이 화면 Esc 30번이 14초 동안 그대로 들어가 Rewind 메뉴가 떠 입력이 막혔다
+      if (Date.now() - (escAt.get(w.id) || 0) < 2000) return json(res, 200, { ok: true, skipped: 'repeat' });
+      escAt.set(w.id, Date.now());
+      w.term.write('\x1b'); nowToQueue(w, false); pushLog(w, 'status', '관리자가 중단(Esc)'); emitState(); setTimeout(() => scheduleProfile(w), 700);
+      setTimeout(() => confirmInterrupt(w), 1500);
+    }
     // 대기열에서 빼기(unqueue) · 나중에 할 작업으로 되돌리기(tomemo). 화면이 본 번호와 글이 둘 다 맞는 항목만 —
     // 그사이 CLI 로 나갔으면(dispatchQueued 가 앞에서 꺼냄) 번호가 밀리므로 글로 다시 찾고, 없으면 409(이미 전송).
     // 꺼내기와 옮기기를 한 번에(중간에 await 없이) 하므로 자동 전송과 겹쳐 두 번 실행되지 않는다

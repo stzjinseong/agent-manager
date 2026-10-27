@@ -5531,9 +5531,13 @@ document.addEventListener('keydown', (e) => {
   const w = state.workers.find((x) => x.id === selected);
   if (!w || viewStatus(w) !== 'working') return;
   e.preventDefault();
+  // 연달아 누른 Esc 는 한 번만(서버도 2초 안의 Esc 는 버린다 — 빈 입력창에 Esc 두 번이면 Claude Code 가 되감기 메뉴를 연다)
+  if (Date.now() - chatEscAt < 2000) return;
+  chatEscAt = Date.now();
   api(`/api/workers/${selected}/interrupt`, {});
   toast(_t('중단했어요 (Esc)'), 1500);
 });
+let chatEscAt = 0;
 // 어느 입력칸에도 포커스가 없을 때 / = 채팅 입력칸으로(검색창 단축키처럼 — / 자체는 넣지 않는다).
 // 터미널은 xterm 의 숨은 글상자에 포커스가 있어 textarea 로 걸러진다. 창(모달)·크게 보기 뷰어가 떠 있으면 건드리지 않는다
 document.addEventListener('keydown', (e) => {
