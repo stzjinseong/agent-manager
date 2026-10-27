@@ -5108,7 +5108,7 @@ function chatBlocks(items, limit = Infinity) {
       const more = open ? '' : `<button type="button" class="cv-chip cv-more" data-unfold="${id}">+${b.list.length - CHIP_FOLD}</button>`;
       return `<div class="cv-ev cv-t"><span class="cv-dot"></span><div class="cv-chips">${shown.map(chatChip).join('')}${more}</div></div>`;
     }
-    if (b.k === 'a') return `<div class="cv-ev cv-a"><span class="cv-dot"></span><div class="cv-body"><div class="cv-lab"><b>${_t('클로드')}</b>${chatTime(b.list[0].ts)}</div>${b.list.map(chatItemHtml).join('')}</div></div>`;
+    if (b.k === 'a') return `<div class="cv-ev cv-a"><span class="cv-dot"></span><div class="cv-body"><div class="cv-lab"><b>${_t('클로드')}</b>${chatTime(b.list[0].ts)}</div>${b.list.map((x) => `<div class="cv-ai" data-seq="${x.seq}">${chatItemHtml(x)}</div>`).join('')}</div></div>`;
     return chatItemHtml(b.x);
   }).join('');
 }
@@ -5161,6 +5161,7 @@ function renderChat() {
   list.innerHTML = list._html = html;
   for (const a of list.querySelectorAll('.cv-md a[href]')) { a.target = '_blank'; a.rel = 'noopener'; }
   chatOlder = false;
+  chatReveal(list, w.id, items);
   list._wid = w.id;
   list._settling = true;
   afterFrame('chat', () => {
@@ -5169,6 +5170,26 @@ function renderChat() {
     list._settling = false;
     if (stick) list._atBottom = true;
   });
+}
+// 새로 도착한 클로드 답은 위에서 아래로 쓸어 내리듯 드러낸다(마스크 애니메이션 하나 — style.css .cv-reveal).
+// 워커를 바꾸거나 처음 불러온 대화 · 이전 대화는 그냥 보인다. 목록은 상태가 올 때마다 통째로 다시 그려지므로, 재생 중인 답은
+// 시작 시각을 기억해 두었다가 다시 그린 요소에 지난 시간만큼 앞당겨(음수 delay) 이어 붙인다 — 처음부터 다시 재생되지 않게
+const REVEAL_MS = 700;
+let revealSeen = { wid: null, gen: null, max: -1 }, revealing = new Map(); // seq → 시작 시각
+function chatReveal(list, wid, items) {
+  const maxA = items.reduce((m, x) => (x.k === 'a' && x.seq > m ? x.seq : m), -1);
+  if (revealSeen.wid !== wid || revealSeen.gen !== chatData.gen || list._wid !== wid || chatLoading) { revealSeen = { wid, gen: chatData.gen, max: maxA }; revealing.clear(); return; }
+  const now = performance.now();
+  for (const [seq, at] of revealing) if (now - at > REVEAL_MS) revealing.delete(seq);
+  for (const x of items) if (x.k === 'a' && x.seq > revealSeen.max) revealing.set(x.seq, now);
+  revealSeen.max = Math.max(revealSeen.max, maxA);
+  if (!revealing.size || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  for (const el of list.querySelectorAll('.cv-ai[data-seq]')) {
+    const at = revealing.get(Number(el.dataset.seq));
+    if (at == null) continue;
+    el.style.animationDelay = `-${Math.round(now - at)}ms`;
+    el.classList.add('cv-reveal');
+  }
 }
 // 대화를 처음엔 끝 CHAT_WIN 묶음만 그린다 — 300개를 다 그리면 배치 계산만 60~130ms(실측 묶음 130~180개 · 요소 1.8~2.8k)라
 // 워커를 바꿀 때와 작업 중 새 글이 올 때마다 화면이 멈췄다. 맨 위까지 올리거나 '이전 대화' 를 누르면 앞으로 더 붙인다

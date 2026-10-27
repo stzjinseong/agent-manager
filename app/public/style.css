@@ -2615,7 +2615,12 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 button.cv-more { cursor: pointer; color: var(--dim); }
 button.cv-more:hover { color: var(--text); }
 .cv-md { overflow-wrap: anywhere; }
-.cv-md + .cv-md { margin-top: 8px; }
+.cv-md + .cv-md, .cv-ai + .cv-ai { margin-top: 8px; }
+/* 새로 도착한 클로드 답 — 위에서 아래로 쓸어 내리듯(app.js chatReveal). 마스크 하나라 가볍다. 0.7초 */
+.cv-ai.cv-reveal { -webkit-mask-image: linear-gradient(#000 40%, transparent 60%); mask-image: linear-gradient(#000 40%, transparent 60%);
+  -webkit-mask-size: 100% 250%; mask-size: 100% 250%; animation: cv-reveal .7s cubic-bezier(.3, .6, .4, 1) both; }
+@keyframes cv-reveal { from { -webkit-mask-position: 0 100%; mask-position: 0 100%; } to { -webkit-mask-position: 0 0; mask-position: 0 0; } }
+@media (prefers-reduced-motion: reduce) { .cv-ai.cv-reveal { animation: none; -webkit-mask-image: none; mask-image: none; } }
 .cv-plain { white-space: pre-wrap; }
 .cv-md > :first-child { margin-top: 0; }
 .cv-md > :last-child { margin-bottom: 0; }
