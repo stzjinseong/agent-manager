@@ -1947,7 +1947,7 @@ function renderDetail() {
     : '';
   // 상태가 올 때마다 통째로 바꾸면 썸네일이 다시 로드되고 누르는 중인 타일이 사라진다 → 바뀐 때만
   if (queueEl._html !== queueHtml) { queueEl.innerHTML = queueEl._html = queueHtml; tickQueueCountdown(); }
-  const fmt = (t) => new Date(t + clockSkew).toLocaleTimeString(uiLocale(), { hour12: false });
+  const fmt = (t) => fmtDate(t + clockSkew, TIME_HMS);
   timelineCache = timelineRows(w.log, w.shots, w.docs, w.past);
   // CLI 처럼 아래로 갈수록 최신. 맨 아래를 보고 있었거나 워커를 바꿨으면 새 줄을 따라 내려가고,
   // 위로 올려 지난 기록을 보는 중이면 그 자리를 지킨다
@@ -2462,7 +2462,7 @@ function renderProfile(w, force) {
     ? p.toolTop.map(([n, c]) => `<div class="hbar"><span class="n" title="${esc(n)}">${esc(n)}</span><span class="b"><i style="width:${(c / maxTool) * 100}%" data-k="u:${esc(n)}"></i></span><span class="c">${c}</span></div>`).join('')
     : `<div class="profile-empty">${_t('도구 사용 없음')}</div>`;
 
-  const fmtT = (ts) => new Date(ts).toLocaleTimeString(uiLocale(), { hour12: false, hour: '2-digit', minute: '2-digit' });
+  const fmtT = (ts) => fmtDate(ts, TIME_HM);
   const live = w.status === 'working' || w.status === 'decision';
   $('#turns-table').innerHTML =
     `<thead><tr><th>#</th><th>${_t('시각')}</th><th>${_t('질문')}</th><th class="r">${_t('첫 응답')}</th><th class="r">${_t('소요')}</th><th class="r">API</th><th class="r">${_t('도구')}</th><th class="r">${_t('입력')}</th><th class="r">${_t('캐시 적중')}</th><th class="r">${_t('출력')}</th><th class="r">${_t('비용')}</th><th>${_t('비고')}</th></tr></thead><tbody>` +
@@ -2562,7 +2562,7 @@ function errKpi(p) {
   const apiT = api.length ? `${_t('API 오류 {n}건', { n: api.length })}${last?.status ? ` (${_t('최근 {s}', { s: last.status })})` : ''}` : '';
   const toolT = p.toolErrors ? `${_t('도구 실패 {n}건', { n: p.toolErrors })}${p.toolErrTop?.length ? ` · ${p.toolErrTop.map(([k, v]) => `${k} ${v}`).join(', ')}` : ''}` : '';
   const sub = [apiT, toolT].filter(Boolean).join(' · ') || _t('이 세션에서 오류 없음');
-  const tip = api.map((x) => `${new Date(x.ts + clockSkew).toLocaleTimeString(uiLocale(), { hour12: false })} ${x.status ?? ''} ${x.text}`).join('\n');
+  const tip = api.map((x) => `${fmtDate(x.ts + clockSkew, TIME_HMS)} ${x.status ?? ''} ${x.text}`).join('\n');
   return kpi('오류', n ? String(n) : '—',
     `${limited ? `<span class="warn-t">⚠ ${_t('사용량 한도({type}) · {t} 해제', { type: esc(q.rateLimitType || ''), t: new Date(q.resetsAt * 1000 + clockSkew).toLocaleTimeString(uiLocale(), { hour12: false, hour: '2-digit', minute: '2-digit' }) })}</span> · ` : ''}<span title="${esc(tip)}">${esc(sub)}</span>`);
 }
@@ -3261,7 +3261,7 @@ function renderMemos(w) {
   if (sig === memoSig) return; // 상태 갱신마다 다시 그리면 버튼 클릭이 끊긴다
   if ($('#memos li.editing') && sig.startsWith(`${w.id}|`)) return; // 수정 중엔 다시 그리지 않는다 — 끝나면 다음 갱신에 반영
   memoSig = sig;
-  const fmt = (t) => new Date(t + clockSkew).toLocaleString(uiLocale(), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+  const fmt = (t) => fmtDate(t + clockSkew, DATE_MD_HM);
   $('#memos').innerHTML = list.length
     ? `<li class="mh">${_t('{n}건', { n: list.length })}</li>` + list.map((m) => `<li data-id="${m.id}" draggable="true" title="${_t('워커 카드에 끌어다 놓으면 그 워커의 Backlog 로 옮겨집니다')}"><span class="mt">${esc(m.text)}</span>${attachChips(m.text, 'sm')}
         <span class="ma"><time>${fmt(m.createdAt)}</time><button class="btn mini ghost memo-ic" data-memo="edit" title="${_t('내용 수정')}" aria-label="${_t('내용 수정')}">${MEMO_EDIT_SVG}</button><button class="btn mini ghost memo-ic" data-memo="send" title="${_t('Tasks 로 보내기 (작업 중이면 대기열)')}" aria-label="${_t('Tasks 로 보내기')}">${MEMO_SEND_SVG}</button><button class="btn mini ghost memo-ic" data-memo="remove" title="${_t('삭제')}" aria-label="${_t('삭제')}">${X_SVG}</button></span></li>`).join('')
@@ -4955,7 +4955,7 @@ function chatMd(text) {
   }
   return `<div class="cv-md cv-plain">${esc(text)}</div>`;
 }
-const chatTime = (ts) => new Date(ts + clockSkew).toLocaleTimeString(uiLocale(), { hour12: false, hour: '2-digit', minute: '2-digit' });
+const chatTime = (ts) => fmtDate(ts + clockSkew, TIME_HM);
 function chatChip(x) {
   const st = x.st === 'err' ? ' err' : x.st === 'ok' ? '' : ' run';
   return `<span class="cv-chip${st}" title="${esc(`${x.name}${x.arg ? ` · ${x.arg}` : ''}`)}">${esc(x.name)}${x.arg ? ` <b>${esc(x.arg)}</b>` : ''}${x.st === 'err' ? ' ✕' : x.st === 'ok' ? '' : ' …'}</span>`;
@@ -5340,7 +5340,7 @@ $('#chat-view').addEventListener('click', (e) => {
 });
 document.addEventListener('langchange', () => { chatHtml.clear(); $('#cv-list')._html = ''; renderChat(); });
 if (chatOpen) { chatOpen = false; setChatOpen(true); } // 지난번에 채팅 보기로 두었으면 그대로
-const fmtClock = (t) => new Date(t + clockSkew).toLocaleTimeString(uiLocale(), { hour12: false });
+const fmtClock = (t) => fmtDate(t + clockSkew, TIME_HMS);
 // 요청 글: 붙여 넣은 글 표시(<pasted_content …>) 같은 태그는 빼고 한 줄로
 const reqText = (t) => String(t || '').replace(/<\/?[a-z_-]+[^>]*>/gi, ' ').replace(/\s+/g, ' ').trim();
 // 요청별로 묶기: 요청(오름차순) → 그 요청에서 고친 파일(처음 고친 순) · 파일별 +/− 는 그 요청 안의 수정만 센다

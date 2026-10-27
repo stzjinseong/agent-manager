@@ -759,6 +759,21 @@ const SERVER_EN = [
 const srvText = (s) => (LANG === 'ko' || !s ? s : SERVER_EN.reduce((a, [re, en]) => a.replace(re, en), String(s)));
 // 날짜·시각 표기 지역 (toLocaleString 등)
 const uiLocale = () => (LANG === 'ko' ? 'ko-KR' : 'en-US');
+// 시각 문자열 — toLocaleTimeString 은 부를 때마다 형식기(Intl.DateTimeFormat)를 새로 만들어 느리다
+// (실측 2000번 114ms → 형식기 재사용 1ms). 타임라인 수백 줄을 그릴 때마다 불려 워커 전환이 40~235ms 늦어졌다 → 옵션·언어마다 하나만 만든다.
+// 옵션은 아래 상수처럼 같은 객체를 넘겨야 다시 쓴다
+const fmtCache = new Map();
+const fmtDate = (t, opts) => {
+  let m = fmtCache.get(opts);
+  if (!m) fmtCache.set(opts, (m = new Map()));
+  const loc = uiLocale();
+  let f = m.get(loc);
+  if (!f) m.set(loc, (f = new Intl.DateTimeFormat(loc, opts)));
+  return f.format(t);
+};
+const TIME_HMS = { hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: false }; // = toLocaleTimeString(loc, { hour12: false })
+const TIME_HM = { hour12: false, hour: '2-digit', minute: '2-digit' };
+const DATE_MD_HM = { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false };
 
 function _t(src, vars) {
   let s = LANG === 'ko' ? src : DICTS[LANG]?.[src];
