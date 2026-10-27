@@ -5046,12 +5046,18 @@ function renderChat() {
   const items = chatData.wid === w.id ? chatData.items : [];
   // 아직 클로드가 읽지 않은 글(보낸 직후 · 작업 사이에 전달 · Tasks 대기열) — 대화 끝에 '대기 중' 구분선 아래로 모은다.
   // 대기열(w.queue)은 채팅에서 보낸 흐린 말풍선과 같은 글이면 한 번만
-  const pend = chatPending.filter((x) => x.wid === w.id);
-  const queued = (w.queue || []).map((t, i) => ({ text: t, norm: chatNorm(t), label: _t('대기열 {n}번', { n: i + 1 }) })).filter((q) => !pend.some((p) => p.norm === q.norm));
-  const waiting = [...pend.map((x) => ({ ...x, label: _t(x.label) })), ...queued];
+  // 대기열에 있는 글(qi = w.queue 번호)은 빼기 · Backlog 로 옮기기 버튼. '작업 사이에 전달'(바로 전송)은 이미 CLI 입력에 들어가 있어 뺄 수 없다
+  const pend = chatPending.filter((x) => x.wid === w.id), queue = w.queue || [], claimed = new Set();
+  const qOf = (norm) => { const i = queue.findIndex((t, j) => !claimed.has(j) && chatNorm(t) === norm); if (i >= 0) claimed.add(i); return i; };
+  const pendRows = pend.map((x) => ({ ...x, label: _t(x.label), qi: qOf(x.norm) }));
+  const queued = queue.map((t, i) => ({ text: t, norm: chatNorm(t), qi: i, label: _t('대기열 {n}번', { n: i + 1 }) })).filter((q) => !claimed.has(q.qi));
+  const waiting = [...pendRows, ...queued];
+  const waitActs = (x) => x.qi >= 0
+    ? `<span class="cv-wait-acts"><button type="button" class="cv-wq" data-wq="tomemo" data-qi="${x.qi}" title="${_t('Backlog 로 옮기기')}" aria-label="${_t('Backlog 로 옮기기')}">${UNDO_SVG}</button><button type="button" class="cv-wq" data-wq="unqueue" data-qi="${x.qi}" title="${_t('삭제')}" aria-label="${_t('삭제')}">${X_SVG}</button></span>`
+    : '';
   const html = (items.length || waiting.length ? chatBlocks(items) : `<div class="cv-empty">${_t(chatLoading ? '불러오는 중…' : '아직 대화가 없어요')}</div>`)
     + (waiting.length ? `<div class="cv-wait-sep"><span>${_t('대기 중 · 클로드가 아직 읽지 않음')} ${waiting.length}</span></div>` : '')
-    + waiting.map((x) => `<div class="cv-ev cv-u cv-pending"><div class="cv-lab"><b>${_t('나')}</b>${esc(x.label)}</div><div class="cv-msg">${esc(x.text)}${chatAtt({ text: x.text })}</div></div>`).join('')
+    + waiting.map((x) => `<div class="cv-ev cv-u cv-pending"${x.qi >= 0 ? '' : ` title="${_t('이미 CLI 입력에 넣은 글이라 뺄 수 없어요')}"`}><div class="cv-lab">${waitActs(x)}<b>${_t('나')}</b>${esc(x.label)}</div><div class="cv-msg">${esc(x.text)}${chatAtt({ text: x.text })}</div></div>`).join('')
     + chatTail(w);
   if (list._html === html) return;
   const stick = list.scrollHeight - list.scrollTop - list.clientHeight < 60;
@@ -5264,6 +5270,24 @@ async function chatSend(mode) {
   ta.focus();
 }
 chatForm.onsubmit = (e) => { e.preventDefault(); chatSend('now'); };
+// 대기 중인 글 빼기 · Backlog 로 — Tasks 칸의 ✕ · ↩ 와 같은 API(번호 + 글, 그사이 CLI 로 나갔으면 409)
+$('#cv-list').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-wq]');
+  const w = b && state.workers.find((x) => x.id === selected);
+  if (!w) return;
+  const op = b.dataset.wq, i = Number(b.dataset.qi), text = w.queue?.[i];
+  if (text == null) return toast(_t('이미 CLI 로 보낸 지시라 옮기지 못했어요'));
+  b.disabled = true;
+  const r = await fetch(`/api/workers/${w.id}/${op}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ index: i, text }) }).catch(() => null);
+  if (!r) { b.disabled = false; return; }
+  if (r.status === 409) { toast(_t('이미 CLI 로 보낸 지시라 옮기지 못했어요')); b.disabled = false; return; }
+  if (!r.ok) { b.disabled = false; return; }
+  const norm = chatNorm(text), k = chatPending.findIndex((p) => p.wid === w.id && p.norm === norm);
+  if (k >= 0) chatPending.splice(k, 1); // 흐린 말풍선도 같이 — 상태가 오기 전에 바로 사라지게
+  w.queue = w.queue.filter((_, j) => j !== i);
+  $('#cv-list')._html = ''; renderChat();
+  toast(_t(op === 'tomemo' ? 'Backlog 로 옮겼어요' : '대기열에서 뺐어요'), 1500);
+});
 $('#cv-acts').addEventListener('click', (e) => { const b = e.target.closest('[data-send]'); if (b) chatSend(b.dataset.send); });
 // 입력칸 Tab → 첫 버튼(사이에 낀 첨부 타일 링크를 건너뛰게 직접 옮긴다)
 chatForm.text.addEventListener('keydown', (e) => {
