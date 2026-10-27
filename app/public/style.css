@@ -2625,6 +2625,8 @@ button.cv-more:hover { color: var(--text); }
 .cv-comp { padding: 8px 2px 0; border-top: 1px solid var(--line); }
 .cv-box { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; background: var(--surface); border: 1px solid var(--line-2); border-radius: 12px; padding: 6px 6px 6px 12px; }
 .cv-box:focus-within { border-color: rgb(var(--ink) / .2); }
+/* 칸 안의 글상자엔 공통 포커스 링(코랄 3px)을 끈다 — 링이 바깥 상자 안쪽에 한 겹 더 생겨 겹쳐 보였다. 포커스는 바깥 상자 테두리만 진하게 */
+.cv-box textarea:focus { border: 0; box-shadow: none; outline: none; }
 .cv-box textarea { flex: 1; min-width: 0; resize: none; border: 0; outline: 0; background: none; color: var(--text); font: inherit; padding: 4px 0; max-height: 180px; overflow-y: hidden; }
 .cv-box .att-live { order: -1; flex-basis: 100%; }
 .cv-box .att-live:empty { display: none; }
