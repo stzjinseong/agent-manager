@@ -2559,7 +2559,8 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 .cv-seg button { all: unset; cursor: pointer; padding: 1px 10px; border-radius: 6px; font-size: 12px; color: var(--dim); }
 .cv-seg button.on { background: var(--surface-3); color: var(--text); cursor: default; }
 .cv-seg button:not(.on):hover { color: var(--text); }
-.cv-nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 12px; color: var(--text-2); }
+/* 워커 정보(id · 모델 · 권한 · 세션 · 브랜치 · 경로) — 상세 헤더 제목 아래에 있던 줄. 길면 끝을 줄임 */
+.cv-bar #detail-meta { flex: 0 1 auto; min-width: 0; }
 .cv-st { margin-left: auto; flex: none; font-size: 11.5px; }
 .cv-zoom { flex: none; display: inline-flex; align-items: center; gap: 2px; margin-left: 4px; }
 .cv-zoom button { all: unset; cursor: pointer; min-width: 22px; padding: 1px 5px; border-radius: 6px; font-size: 11.5px; text-align: center; color: var(--dim); }

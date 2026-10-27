@@ -5002,10 +5002,9 @@ async function loadChat() {
   renderChat();
 }
 // 상태가 올 때마다(render): 버튼 표시 · 바뀌었으면 가져오기 · 끝줄(상태) 다시 그리기
-// 위 막대(CLI | 채팅 · 워커 · 상태)는 터미널에서도 늘 보인다
+// 위 막대(CLI | 채팅 · 워커 정보(#detail-meta — 상세 헤더에서 옮김) · 상태)는 터미널에서도 늘 보인다
 function chatBar(w) {
   const st = viewStatus(w);
-  $('#cv-nm').textContent = `${w.id} · ${w.name || ''}`;
   const stEl = $('#cv-st');
   stEl.textContent = statusLabel(st);
   stEl.style.color = `var(--${st === 'waiting' ? 'idle' : st}, var(--dim))`;
