@@ -5290,8 +5290,20 @@ function slashPaint() {
   box.hidden = false;
   box.querySelector('.on')?.scrollIntoView({ block: 'nearest' });
 }
+// '/명령 ' 뒤(인자를 쓰는 중)엔 그 명령의 인자 힌트(argument-hint)와 설명을 한 줄로 — 키는 가로채지 않는다(Enter 는 그대로 보내기)
+function slashHint(ta) {
+  const m = ta.value.match(/^\/(\S+)\s/);
+  const x = m && ta.selectionStart > m[1].length && slashList.wid === selected && slashList.items.find((c) => c.name === m[1]);
+  if (!x || (!x.hint && !x.desc)) return false;
+  const box = $('#cv-slash');
+  slashMenu.open = false;
+  box.innerHTML = `<div class="cv-sl cv-sl-hint"><b>/${esc(x.name)}</b><span>${x.hint ? `<i>${esc(x.hint)}</i> ` : ''}${esc(x.desc || '')}</span><small>${_t(SLASH_SRC[x.src] || '')}</small></div>`;
+  box.hidden = false;
+  return true;
+}
 async function slashUpdate() {
   const ta = chatForm.text, q = slashQuery(ta);
+  if (q == null && selected && /^\/\S+\s/.test(ta.value)) { await slashCommandsFor(selected); if (!slashHint(ta)) slashClose(); return; }
   if (q == null || !selected) return slashClose();
   const wid = selected, all = await slashCommandsFor(wid);
   if (selected !== wid || slashQuery(ta) !== q) return; // 기다리는 사이 글이 바뀌었으면 다음 입력에 맡긴다
@@ -5314,9 +5326,11 @@ function slashFill(send) {
   chatGrow();
   ta.focus();
   if (send) chatForm.requestSubmit();
+  else slashHint(ta); // 채웠으면 바로 인자 힌트
 }
 chatForm.text.addEventListener('input', slashUpdate);
 chatForm.text.addEventListener('click', slashUpdate);
+chatForm.text.addEventListener('keyup', (e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'Home' || e.key === 'End') slashUpdate(); });
 chatForm.text.addEventListener('blur', () => setTimeout(() => { if (document.activeElement !== chatForm.text) slashClose(); }, 150));
 // 입력칸의 다른 키 처리(Enter 보내기 · Tab 버튼 이동 · Esc 중단)보다 먼저 받는다
 chatForm.text.addEventListener('keydown', (e) => {

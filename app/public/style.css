@@ -2684,6 +2684,10 @@ button.cv-more:hover { color: var(--text); }
 .cv-sl b { font-family: var(--mono); font-size: 12.5px; font-weight: 600; color: var(--text); }
 .cv-sl span { font-size: 12px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cv-sl small { font-size: 10.5px; color: var(--faint); }
-.cv-sl.on, .cv-sl:hover { background: var(--surface-3); }
+.cv-sl:not(.cv-sl-hint).on, .cv-sl:not(.cv-sl-hint):hover { background: var(--surface-3); }
+/* 인자 힌트 한 줄('/명령 ' 뒤) — 고르는 목록이 아니라 안내라 눌림 표시 없음 */
+.cv-sl-hint { cursor: default; }
+.cv-sl-hint i { font-style: normal; font-family: var(--mono); color: var(--accent-hi); margin-right: 4px; }
+.cv-sl-hint span { white-space: normal; }
 .cv-sl.on b { color: var(--accent-hi); }
 :root[data-theme="light"] .cv-slash { background: #fff; }
