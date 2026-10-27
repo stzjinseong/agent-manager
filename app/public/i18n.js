@@ -439,6 +439,8 @@ const EN = {
   'CLI 에서 답하기': 'Answer in CLI',
   '생각 중': 'Thinking',
   '아직 대화가 없어요': 'No conversation yet',
+  '작업 사이에 전달': 'delivered between steps',
+  '보내는 중…': 'Sending…',
   '바로 전송': 'Send now',
   '바로 전송 — 작업 중이어도 대기열을 건너뛰고 지금 CLI 에 넣음 (입력칸 Enter)': 'Send now — skips the queue and types into the CLI even while working (Enter in the box)',
   'Tasks — 쉬고 있으면 바로, 작업 중이면 대기열에': 'Tasks — sent right away when idle, queued while working',

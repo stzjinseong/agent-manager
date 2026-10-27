@@ -2593,6 +2593,9 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 .cv-u::before { display: none; }
 .cv-msg { max-width: 78%; background: var(--surface-2); border-radius: 10px; border-top-right-radius: 4px; padding: 8px 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .cv-msg .att { margin-top: 6px; white-space: normal; }
+/* 보내고 기록에 남기 전(흐리게) — 기록에 들어오면 보통 말풍선으로 바뀐다 */
+.cv-pending .cv-msg { opacity: .6; }
+.cv-pending .cv-lab { color: var(--faint); }
 .cv-sys { color: var(--dim); font-size: 12px; padding-top: 2px; }
 .cv-err .cv-sys { color: var(--decision); }
 .cv-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 1px 0 2px; }

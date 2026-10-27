@@ -4903,6 +4903,15 @@ const CHAT_KEY = 'am.chatOpen', CHIP_FOLD = 8;
 let chatOpen = false, chatData = { wid: null, gen: null, rev: 0, key: null, items: [] }, chatTimer = null, chatLoading = false;
 const chatHtml = new Map(); // `${gen}|${seq}:${rev}` → 그린 HTML (마크다운은 한 번만)
 const chatUnfold = new Set(); // 펼친 도구 묶음(첫 칩 seq)
+// 보낸 글은 기록(트랜스크립트)에 남아야 목록에 생겨 몇 초 늦게 보였다 — 보내자마자 흐린 말풍선으로 먼저 띄우고,
+// 기록에 같은 글의 요청이 들어오면 지운다(공백 빼고 비교). 대기열로 간 Tasks 는 투입될 때까지 '대기열'로 남는다. 10분이 지나면 버린다
+let chatPending = [];
+const chatNorm = (t) => String(t || '').replace(/\s+/g, '');
+function chatSettle(wid) {
+  const now = Date.now(), seen = chatData.wid === wid ? chatData.items.filter((x) => x.k === 'u') : [];
+  chatPending = chatPending.filter((p) => p.wid !== wid ? now - p.at < 600_000
+    : now - p.at < 600_000 && !seen.some((x) => x.ts + clockSkew >= p.at - 5000 && chatNorm(x.text) === p.norm));
+}
 try { chatOpen = localStorage.getItem(CHAT_KEY) === '1'; } catch {}
 function chatMd(text) {
   if (window.marked && window.DOMPurify) {
@@ -4971,7 +4980,10 @@ function renderChat() {
   const list = $('#cv-list');
   if (!w || !chatOpen) return;
   const items = chatData.wid === w.id ? chatData.items : [];
-  const html = (items.length ? chatBlocks(items) : `<div class="cv-empty">${_t(chatLoading ? '불러오는 중…' : '아직 대화가 없어요')}</div>`) + chatTail(w);
+  const pend = chatPending.filter((x) => x.wid === w.id);
+  const html = (items.length || pend.length ? chatBlocks(items) : `<div class="cv-empty">${_t(chatLoading ? '불러오는 중…' : '아직 대화가 없어요')}</div>`)
+    + pend.map((x) => `<div class="cv-ev cv-u cv-pending"><div class="cv-lab"><b>${_t('나')}</b>${_t(x.label)}</div><div class="cv-msg">${esc(x.text)}${chatAtt({ text: x.text })}</div></div>`).join('')
+    + chatTail(w);
   if (list._html === html) return;
   const stick = list.scrollHeight - list.scrollTop - list.clientHeight < 60;
   list.innerHTML = list._html = html;
@@ -4998,6 +5010,7 @@ async function loadChat() {
     if (chatData.items.length > 300) chatData.items.splice(0, chatData.items.length - 300);
   }
   Object.assign(chatData, { wid: w.id, gen: d.gen, rev: d.rev, key });
+  chatSettle(w.id);
   if (chatHtml.size > 2000) chatHtml.clear();
   renderChat();
 }
@@ -5094,6 +5107,10 @@ async function chatSend(mode) {
     }
     if (r?.error) return;
     flyToWorker(w.id, ta, 'task');
+    const busy = viewStatus(w) === 'working';
+    chatPending.push({ wid: w.id, text, norm: chatNorm(text), at: Date.now(), label: mode === 'now' ? (busy ? '작업 사이에 전달' : '보내는 중…') : busy ? '대기열' : '보내는 중…' });
+    $('#cv-list')._html = ''; renderChat();
+    const l = $('#cv-list'); l.scrollTop = l.scrollHeight;
   }
   ta.value = '';
   chatGrow();
