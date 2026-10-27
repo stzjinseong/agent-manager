@@ -4568,7 +4568,8 @@ powerPop.addEventListener('click', async (e) => {
   $('#down-screen').hidden = false;
 });
 
-$('#btn-interrupt').onclick = () => selected && api(`/api/workers/${selected}/interrupt`);
+// from: 멈춘 자리 — 채팅 보기면 CLI 입력창에 되돌아온 글을 채팅 입력칸으로 받는다(server restoreAfterEsc), CLI 면 CLI 에 그대로
+$('#btn-interrupt').onclick = () => selected && api(`/api/workers/${selected}/interrupt`, { from: chatOpen ? 'chat' : 'cli' });
 
 // 터미널 크게 보기: 브라우저 전체화면 API 는 Esc 로 빠져나가는데 Esc 는 Claude 중단 키라 겹친다 → 창 전체를 덮는 오버레이로
 // ---------- 타임라인 요청 → 터미널 해당 위치로 ----------
@@ -5594,7 +5595,7 @@ document.addEventListener('keydown', (e) => {
   // 연달아 누른 Esc 는 한 번만(서버도 2초 안의 Esc 는 버린다 — 빈 입력창에 Esc 두 번이면 Claude Code 가 되감기 메뉴를 연다)
   if (Date.now() - chatEscAt < 2000) return;
   chatEscAt = Date.now();
-  api(`/api/workers/${selected}/interrupt`, {});
+  api(`/api/workers/${selected}/interrupt`, { from: 'chat' });
   toast(_t('중단했어요 (Esc)'), 1500);
 });
 let chatEscAt = 0;
@@ -5822,7 +5823,7 @@ async function cardMenu(n) {
     { key: 'remove', label: _t(socket ? '저장된 역할 삭제' : '제거'), danger: true },
   ]);
   if (key === 'launch' || key === 'fresh') launchProfile(name, key === 'fresh');
-  if (key === 'stop') api(`/api/workers/${w.id}/interrupt`);
+  if (key === 'stop') api(`/api/workers/${w.id}/interrupt`, { from: chatOpen && w.id === selected ? 'chat' : 'cli' });
   if (key === 'prev' || key === 'next') moveCard(name, key === 'prev' ? -1 : 1);
   if (key === 'remove') removeCard(n);
   if (key === 'rename') {
