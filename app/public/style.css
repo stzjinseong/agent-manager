@@ -1551,7 +1551,7 @@ html[data-char="clawd-white"] :is(.node, .dchip, .term-wrap) { --avatar: var(--c
 .df-stat { color: var(--dim); font: 11px var(--mono); }
 .diff-main { overflow: auto; min-width: 0; padding: 0 0 16px; }
 .diff-path { position: sticky; top: 0; z-index: 1; padding: 6px 12px; background: var(--term-bg); border-bottom: 1px solid var(--line); font: 600 12.5px var(--mono); }
-.diff-reqline { margin: 0 0 4px; font: 12px/1.45 inherit; font-family: system-ui, sans-serif; font-weight: 400; color: var(--text-2);
+.diff-reqline { margin: 0 0 4px; font-size: 12px; line-height: 1.45; font-family: system-ui, sans-serif; font-weight: 400; color: var(--text-2);
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .diff-reqline b { margin-right: 8px; color: var(--accent-hi); font-weight: 600; }
 .diff-path small { margin-left: 10px; font-weight: 400; color: var(--dim); font-family: inherit; }
@@ -2409,7 +2409,8 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 
 /* ---------- 예약 · 반복 실행 (schedule.js) ---------- */
 .sched-btn { position: relative; }
-.sched-n { position: absolute; top: 0; right: 0; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 7px; font: 700 9.5px/14px inherit; font-style: normal; text-align: center;
+.sched-n { position: absolute; top: 0; right: 0; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 7px; font-family: inherit; font-weight: 700; font-size: 9.5px; line-height: 14px; font-style: normal; text-align: center; font-variant-numeric: tabular-nums;
+  /* font: 700 9.5px/14px inherit 는 inherit 를 줄임 속성에 섞어 통째로 무시됐다 → 숫자가 물려받은 큰 글자 · 줄 높이로 그려져 아래가 잘렸다 */
   color: var(--bg); background: var(--accent); }
 .sched-n[hidden] { display: none; }
 .sched-n:not([hidden]) ~ .new-dot { display: none; } /* 켜진 예약 수가 같은 자리에 뜨면 — 예약이 있으면 이미 써 본 기능 */
