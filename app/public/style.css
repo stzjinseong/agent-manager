@@ -2638,7 +2638,7 @@ button.cv-more:hover { color: var(--text); }
 .cv-box textarea { flex: 1; min-width: 0; resize: none; border: 0; outline: 0; background: none; color: var(--text); font: inherit; padding: 4px 0; max-height: 180px; overflow-y: hidden; }
 .cv-box .att-live { order: -1; flex-basis: 100%; }
 .cv-box .att-live:empty { display: none; }
-/* 보내기 세 갈래 — 기본(Tasks, 입력칸 Enter)만 코랄로 채우고 나머지는 옅게. Tab 으로 옮겨 다니므로 포커스 링을 또렷하게 */
+/* 보내기 세 갈래 — 기본(바로 전송, 입력칸 Enter)만 코랄로 채우고 나머지는 옅게. Tab 으로 옮겨 다니므로 포커스 링을 또렷하게 */
 .cv-acts { flex: none; display: inline-flex; gap: 4px; }
 .cv-act { all: unset; cursor: pointer; height: 28px; padding: 0 10px; border-radius: 8px; display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; white-space: nowrap; color: var(--text-2); background: var(--surface-3); }
 .cv-act:hover { color: var(--text); background: var(--btn-hover); }

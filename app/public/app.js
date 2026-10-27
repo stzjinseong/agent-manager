@@ -5072,7 +5072,7 @@ chatForm.text.addEventListener('input', chatGrow);
 acceptFiles(chatForm.text);
 onEnterKey(chatForm.text, () => chatForm.requestSubmit());
 // 보내기 세 갈래(입력칸 오른쪽 버튼): 바로 전송(작업 중이어도 지금 CLI 에) · Tasks(업무 지시와 같음 — 쉬면 바로, 작업 중이면 대기열) ·
-// Backlog(나중에 할 작업 — 자동 실행 안 됨). 입력칸 Enter 는 Tasks. 입력칸에서 Tab 이면 세 버튼을 차례로(마지막 다음은 첫 버튼), 버튼에서 Shift+Tab 이면 입력칸으로
+// Backlog(나중에 할 작업 — 자동 실행 안 됨). 입력칸 Enter 는 바로 전송. 입력칸에서 Tab 이면 세 버튼을 차례로(마지막 다음은 첫 버튼), 버튼에서 Shift+Tab 이면 입력칸으로
 async function chatSend(mode) {
   const ta = chatForm.text, text = ta.value.trim();
   const w = state.workers.find((x) => x.id === selected);
@@ -5099,7 +5099,7 @@ async function chatSend(mode) {
   chatGrow();
   ta.focus();
 }
-chatForm.onsubmit = (e) => { e.preventDefault(); chatSend('task'); };
+chatForm.onsubmit = (e) => { e.preventDefault(); chatSend('now'); };
 $('#cv-acts').addEventListener('click', (e) => { const b = e.target.closest('[data-send]'); if (b) chatSend(b.dataset.send); });
 // 입력칸 Tab → 첫 버튼(사이에 낀 첨부 타일 링크를 건너뛰게 직접 옮긴다)
 chatForm.text.addEventListener('keydown', (e) => {
