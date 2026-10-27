@@ -359,6 +359,23 @@ async function confirmInterrupt(w) {
   setStatus(w, 'interrupted', '사용자 중단 (화면으로 확인)');
   afterTurn(w);
 }
+// 답하기 전에 중단하면 Claude Code 는 보낸 글을 CLI 입력창에 되돌려 놓는다(보내기 취소). 채팅 보기에선 그게 안 보여 말풍선은
+// '보내는 중'에 남고, 다음에 보낸 글이 그 뒤에 붙어 섞였다(실측 17:29: 'ㄴㅁㅇ' 중단 → 'ㄴㅁㅇㅁㄴㅇㄴㅁ', 'ㄴㅁㅇasd').
+// 입력창에 방금 보낸 글이 돌아와 있으면 Ctrl+C 로 비우고(글이 있을 때 Ctrl+C = 입력 지우기) 화면의 채팅 입력칸으로 돌려준다
+const restoreNorm = (t) => String(t || '').replace(/\[Image #\d+\]/g, '').replace(/(?:[A-Za-z]:[\\/]|\/)[^\s"'<>|]*?\.(?:png|jpe?g|gif|webp|bmp|svg)/gi, '').replace(/\s+/g, '');
+async function restoreAfterEsc(w) {
+  if (!workers.has(w.id) || w.status === 'exited') return;
+  const last = w.log?.findLast((l) => l.kind === 'assign' && Date.now() - l.t < 120_000)?.text;
+  if (!last) return;
+  const cli = await cliDraft(w);
+  if (cli.state !== 'draft') return;
+  const a = restoreNorm(last), c = restoreNorm(cli.text), k = Math.min(20, a.length, c.length);
+  if (!k || a.slice(0, k) !== c.slice(0, k)) return; // 사람이 CLI 에서 직접 쓰던 다른 글이면 건드리지 않는다
+  w.term.write('\x03');
+  pushLog(w, 'status', '중단 — CLI 입력창으로 돌아온 글을 비우고 채팅 입력칸으로 돌려줌');
+  broadcast({ type: 'restored', id: w.id, text: last });
+  emitState();
+}
 // 사용자가 중단(Esc)하면 Stop 훅이 오지 않아 '작업 중'으로 남는다. 트랜스크립트의 중단 기록이
 // 이번 턴 시작 이후면 '중단됨'으로 바꾸고, 정상 완료처럼 대기열을 잇는다(예전엔 멈춰 두었는데 끝날 턴이 없어 하염없이 기다렸다).
 function checkInterrupted(w) {
@@ -2324,7 +2341,7 @@ const server = http.createServer(async (req, res) => {
       if (Date.now() - (escAt.get(w.id) || 0) < 2000) return json(res, 200, { ok: true, skipped: 'repeat' });
       escAt.set(w.id, Date.now());
       w.term.write('\x1b'); nowToQueue(w, false); pushLog(w, 'status', '관리자가 중단(Esc)'); emitState(); setTimeout(() => scheduleProfile(w), 700);
-      setTimeout(() => confirmInterrupt(w), 1500);
+      setTimeout(async () => { await confirmInterrupt(w); restoreAfterEsc(w); }, 1500);
     }
     // 대기열에서 빼기(unqueue) · 나중에 할 작업으로 되돌리기(tomemo). 화면이 본 번호와 글이 둘 다 맞는 항목만 —
     // 그사이 CLI 로 나갔으면(dispatchQueued 가 앞에서 꺼냄) 번호가 밀리므로 글로 다시 찾고, 없으면 409(이미 전송).

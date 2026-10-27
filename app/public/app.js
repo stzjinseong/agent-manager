@@ -1118,6 +1118,7 @@ function connect() {
       term.write(recolorTerm(msg.data), () => (more == null ? restoreTermScroll(msg.id) : term.scrollToLine(Math.max(0, term.buffer.active.baseY - more))));
     }
     else if (msg.type === 'clearScrollback' && msg.id === selected) term.write('\x1b[3J'); // /clear — 이전 대화 기록만 지움
+    else if (msg.type === 'restored') chatRestored(msg);
   };
   ws.onopen = ((orig) => () => { if (serverDown) { location.reload(); return; } orig?.(); })(ws.onopen);
   ws.onclose = () => setTimeout(connect, 1000);
@@ -5597,6 +5598,16 @@ document.addEventListener('keydown', (e) => {
   toast(_t('중단했어요 (Esc)'), 1500);
 });
 let chatEscAt = 0;
+// 중단으로 돌려받은 글(server restoreAfterEsc — CLI 입력창에 되돌아온 것을 비우고 보냄): 흐린 말풍선을 지우고, 이 워커를 보고 있고
+// 입력칸이 비었으면 거기에 다시 넣는다(CLI 에서 Esc 로 취소하면 글이 입력창에 남는 것과 같게). 아니면 알림만
+function chatRestored(msg) {
+  const norm = chatNorm(msg.text), k = chatPending.findIndex((p) => p.wid === msg.id && p.norm === norm);
+  if (k >= 0) chatPending.splice(k, 1);
+  const here = msg.id === selected && chatOpen;
+  if (here && !chatForm.text.value) { chatForm.text.value = msg.text; chatForm.text.dispatchEvent(new Event('input', { bubbles: true })); chatForm.text.focus(); }
+  if (here) { $('#cv-list')._html = ''; renderChat(); }
+  toast(here && chatForm.text.value === msg.text ? _t('중단돼서 보낸 글을 입력칸에 돌려놨어요') : _t('{id} 중단 — 보낸 글이 전달되지 않았어요', { id: msg.id }), 3500);
+}
 // 어느 입력칸에도 포커스가 없을 때 / = 채팅 입력칸으로(검색창 단축키처럼 — / 자체는 넣지 않는다).
 // 터미널은 xterm 의 숨은 글상자에 포커스가 있어 textarea 로 걸러진다. 창(모달)·크게 보기 뷰어가 떠 있으면 건드리지 않는다
 document.addEventListener('keydown', (e) => {
