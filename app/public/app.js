@@ -5097,6 +5097,15 @@ chatForm.text.addEventListener('keydown', (e) => {
   const w = state.workers.find((x) => x.id === selected);
   if (w && viewStatus(w) === 'working') { e.preventDefault(); api(`/api/workers/${selected}/interrupt`, {}); }
 });
+// 어느 입력칸에도 포커스가 없을 때 / = 채팅 입력칸으로(검색창 단축키처럼 — / 자체는 넣지 않는다).
+// 터미널은 xterm 의 숨은 글상자에 포커스가 있어 textarea 로 걸러진다. 창(모달)·크게 보기 뷰어가 떠 있으면 건드리지 않는다
+document.addEventListener('keydown', (e) => {
+  if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey || e.isComposing || !chatOpen || !selected || $('#detail').hidden) return;
+  if (document.activeElement?.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) return;
+  if (document.querySelector('.modal-back:not([hidden]), .shot-view')) return;
+  e.preventDefault();
+  chatForm.text.focus();
+});
 $('.cv-bar').addEventListener('click', (e) => {
   const b = e.target.closest('[data-cv]');
   if (b) setChatOpen(b.dataset.cv === 'chat');
