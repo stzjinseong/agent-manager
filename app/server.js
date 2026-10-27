@@ -1808,6 +1808,14 @@ const server = http.createServer(async (req, res) => {
   // 사람이 지시에 첨부한 파일 원본(data/uploads) — 입력칸·대기열·나중에 할 작업·타임라인의 첨부 타일용. 따로 복사하지 않고
   // 원본을 그대로 보여 주며, 보관은 기존 정리 규칙(cleanupUploads: 7일, 나중에 할 작업에 적힌 것은 유지)을 따른다.
   // 이름은 /api/upload 가 지은 규칙(시각-난수.확장자 / 시각-난수-원래이름)만 받는다 — 폴더 밖으로 나갈 수 없게
+  // 첨부 타일 정리: 화면이 본 업로드 이름 중 7일 정리(cleanupUploads)로 지워진 것을 알려 준다 — 그림은 못 읽으면 스스로 빠지지만
+  // 파일 타일(md · zip 등)은 눌러야 404 라 지워진 채 남았다. 이름만 받고 폴더 밖은 보지 않는다
+  if (req.method === 'POST' && p === '/api/uploads/gone') {
+    const { names } = await readBody(req);
+    const gone = (Array.isArray(names) ? names : []).slice(0, 500)
+      .filter((n) => typeof n === 'string' && n && path.basename(n) === n && !fs.existsSync(path.join(UPLOAD_DIR, n)));
+    return json(res, 200, { gone });
+  }
   if (req.method === 'GET' && p.startsWith('/uploads/')) {
     let name = '';
     try { name = decodeURIComponent(p.slice('/uploads/'.length)); } catch {}

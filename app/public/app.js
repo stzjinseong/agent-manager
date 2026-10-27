@@ -2174,6 +2174,7 @@ function attTiles(list, size) {
   return list.length ? `<span class="att att-${size}">${list.map(attTile).join('')}</span>` : '';
 }
 function attTile(f) {
+  if (goneUploads.has(f.url)) return ''; // 7일 정리로 원본이 지워진 파일(아래 checkGoneUploads)
   return f.image
     ? shotImg({ url: f.url }, 'att-img').replace('<img ', '<img onerror="this.remove()" ')
     : f.video
@@ -2181,6 +2182,30 @@ function attTile(f) {
       ? `<span class="att-vid" data-video="${esc(f.url)}" title="${esc(f.label)}&#10;${_t('클릭해 재생')}"><video src="${esc(f.url)}#t=0.1" preload="metadata" muted playsinline></video><span class="play" aria-hidden="true"></span></span>`
       : `<a class="att-file" href="${esc(f.url)}" target="_blank" rel="noopener" draggable="false" title="${esc(f.label)}&#10;${_t('클릭: 새 탭에서 열기')}"><span class="ic">${DOC_ICON[f.ext] || '📄'}</span><span class="nm">${esc(f.label)}</span></a>`;
 }
+// 원본이 지워진 첨부 파일 타일 빼기 — 업로드는 7일 뒤 정리되는데(server cleanupUploads) 그림 타일은 못 읽으면 스스로 빠지지만
+// 파일 타일은 눌러야 404 라 남았다. 새로 생긴 파일 타일(/uploads/…)을 모아 한 번에 묻고, 답은 기억해 다음부터는 그릴 때 거른다(attTile)
+const goneUploads = new Set(), seenUploads = new Set();
+let upGoneAsk = new Set(), upGoneTimer = null;
+function checkGoneUploads(root) {
+  for (const a of root.querySelectorAll?.('a.att-file[href^="/uploads/"]') || []) {
+    const url = a.getAttribute('href');
+    if (goneUploads.has(url)) a.remove();
+    else if (!seenUploads.has(url)) { seenUploads.add(url); upGoneAsk.add(url); }
+  }
+  if (upGoneAsk.size && !upGoneTimer) upGoneTimer = setTimeout(async () => {
+    upGoneTimer = null;
+    const urls = [...upGoneAsk]; upGoneAsk = new Set();
+    const names = urls.map((u) => { try { return decodeURIComponent(u.slice('/uploads/'.length)); } catch { return ''; } });
+    let gone = [];
+    try { gone = (await (await fetch('/api/uploads/gone', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ names }) })).json()).gone || []; }
+    catch { for (const u of urls) seenUploads.delete(u); return; } // 옛 서버(경로 없음)·끊김 — 다음에 다시
+    const goneSet = new Set(gone);
+    urls.forEach((u, i) => { if (goneSet.has(names[i])) goneUploads.add(u); });
+    for (const a of document.querySelectorAll('a.att-file[href^="/uploads/"]')) if (goneUploads.has(a.getAttribute('href'))) a.remove();
+  }, 400);
+}
+new MutationObserver((list) => { for (const m of list) for (const n of m.addedNodes) if (n.nodeType === 1) checkGoneUploads(n.matches?.('a.att-file') ? n.parentNode || n : n); })
+  .observe(document.body, { childList: true, subtree: true });
 // 첨부 파일 타일을 눌러도 요청 줄 이동(타임라인)·카드 선택으로 번지지 않게 — 새 탭 열기(기본 동작)는 그대로
 document.addEventListener('click', (e) => { if (e.target.closest?.('.att-file')) e.stopPropagation(); }, true);
 // 입력칸 바로 아래에 지금 글에 들어간 첨부를 보여 준다. 글이 바뀔 때만 다시 그린다(썸네일 깜박임 방지)
