@@ -1965,6 +1965,7 @@ function renderDetail() {
   renderAttTab(w);
   renderProfile(w);
   renderDiffButton(w);
+  syncChat(w);
   // 접은 영역 제목줄에 건수를 보여 준다 (펼쳐 있으면 안에 보이므로 비움)
   const memoN = (state.memos?.[w.name] || []).length;
   setSecCount('sec-task', w.queue.length ? _t('대기 {n}', { n: w.queue.length }) : '');
@@ -3575,6 +3576,7 @@ function applyKeyHints() {
   // 터치 기기는 화면 키보드에 Alt·⌘ 가 없다 — 입력칸 오른쪽 아래 버튼으로 보낸다(Enter 는 줄바꿈)
   taskForm.text.placeholder = TOUCH ? _t('지시를 적고 ↑ 를 누르면 보냅니다') : hint('전송');
   $('#memo-form').text.placeholder = TOUCH ? _t('적고 + 를 누르면 추가됩니다') : hint('추가');
+  $('#cv-keys').textContent = TOUCH ? _t('↑ 를 누르면 보냅니다') : `${_t('전송')} ${k.send} · ${_t('개행')} ${k.newline}`;
 }
 applyKeyHints();
 document.addEventListener('langchange', applyKeyHints);
@@ -4879,6 +4881,7 @@ $('#diff-clear').addEventListener('click', async () => {
   loadDiff();
 });
 function setDiffOpen(on) {
+  if (on && chatOpen) setChatOpen(false); // 채팅 보기와 diff 는 같은 자리 — 하나만
   diffOpen = on;
   $('#diff-view').hidden = !on;
   $('#term-wrap').classList.toggle('diffing', on);
@@ -4887,6 +4890,189 @@ function setDiffOpen(on) {
   if (on) { term.blur(); diffKey = ''; $('.term-stage').scrollLeft = 0; loadDiff(); } // 터치 기기의 확대 보기는 옆으로 밀려 있을 수 있다
   else term.focus();
 }
+// ---------- 채팅 보기 (터미널 자리) ----------
+// 터미널(실제 Claude Code)은 뒤에서 그대로 돌고, 이 화면은 트랜스크립트에서 모은 대화(server /chat · profile.js chatPush)를
+// 타임라인으로 다시 그린다. 내 요청은 오른쪽 말풍선, 클로드 쪽(도구 칩 · 답 글 · 권한 카드)은 왼쪽 코랄 줄을 따라 시간순.
+// 보내기는 업무 지시와 같은 길(/task — CLI 입력창에 붙여 넣고 Enter). 상태 방송엔 chatRev 표시만 싣고 내용은 열 때·바뀔 때 가져간다
+const CHAT_KEY = 'am.chatOpen', CHIP_FOLD = 8;
+let chatOpen = false, chatData = { wid: null, gen: null, rev: 0, key: null, items: [] }, chatTimer = null, chatLoading = false;
+const chatHtml = new Map(); // `${gen}|${seq}:${rev}` → 그린 HTML (마크다운은 한 번만)
+const chatUnfold = new Set(); // 펼친 도구 묶음(첫 칩 seq)
+try { chatOpen = localStorage.getItem(CHAT_KEY) === '1'; } catch {}
+function chatMd(text) {
+  if (window.marked && window.DOMPurify) {
+    try { return `<div class="cv-md">${DOMPurify.sanitize(marked.parse(text))}</div>`; } catch {}
+  }
+  return `<div class="cv-md cv-plain">${esc(text)}</div>`;
+}
+const chatTime = (ts) => new Date(ts + clockSkew).toLocaleTimeString(uiLocale(), { hour12: false, hour: '2-digit', minute: '2-digit' });
+function chatChip(x) {
+  const st = x.st === 'err' ? ' err' : x.st === 'ok' ? '' : ' run';
+  return `<span class="cv-chip${st}" title="${esc(`${x.name}${x.arg ? ` · ${x.arg}` : ''}`)}">${esc(x.name)}${x.arg ? ` <b>${esc(x.arg)}</b>` : ''}${x.st === 'err' ? ' ✕' : x.st === 'ok' ? '' : ' …'}</span>`;
+}
+// 요청에 붙은 파일: 글 속 업로드 경로 + 붙인 그림의 원본 경로(files). 경로를 모르는 그림(클립보드)은 개수만
+function chatAtt(x) {
+  const tiles = attachChips(`${x.text} ${(x.files || []).join(' ')}`, 'sm');
+  return tiles || (x.img ? `<div class="cv-sys">🖼 ${_t('이미지 {n}개', { n: x.img })}</div>` : '');
+}
+function chatItemHtml(x) {
+  const k = `${chatData.gen}|${x.seq}:${x.rev}`; // 워커·세션마다 seq 가 겹치므로 세대(gen)까지
+  if (chatHtml.has(k)) return chatHtml.get(k);
+  let h = '';
+  if (x.k === 'u') h = `<div class="cv-ev cv-u"><div class="cv-lab"><b>${_t('나')}</b>${chatTime(x.ts)}</div><div class="cv-msg">${esc(x.text)}${chatAtt(x)}</div></div>`;
+  else if (x.k === 'a') h = chatMd(x.text);
+  else if (x.k === 'n') h = `<div class="cv-ev cv-n"><span class="cv-dot"></span><div class="cv-sys">${esc(x.text)}</div></div>`;
+  else if (x.k === 'x') h = `<div class="cv-ev cv-n"><span class="cv-dot"></span><div class="cv-sys">${_t('사용자가 중단함')} · ${chatTime(x.ts)}</div></div>`;
+  else if (x.k === 'e') h = `<div class="cv-ev cv-n cv-err"><span class="cv-dot"></span><div class="cv-sys">${_t('API 오류')} · ${esc(x.text)}</div></div>`;
+  chatHtml.set(k, h);
+  return h;
+}
+// 이어지는 도구는 칩 한 줄로, 이어지는 답 글은 이름표 하나 아래로 묶는다
+function chatBlocks(items) {
+  const out = [];
+  for (const x of items) {
+    const last = out.at(-1);
+    if (x.k === 't') { if (last?.k === 't') last.list.push(x); else out.push({ k: 't', list: [x] }); }
+    else if (x.k === 'a') { if (last?.k === 'a') last.list.push(x); else out.push({ k: 'a', list: [x] }); }
+    else out.push({ k: x.k, x });
+  }
+  return out.map((b) => {
+    if (b.k === 't') {
+      const id = b.list[0].seq, open = chatUnfold.has(id) || b.list.length <= CHIP_FOLD + 1;
+      const shown = open ? b.list : b.list.slice(0, CHIP_FOLD);
+      const more = open ? '' : `<button type="button" class="cv-chip cv-more" data-unfold="${id}">+${b.list.length - CHIP_FOLD}</button>`;
+      return `<div class="cv-ev cv-t"><span class="cv-dot"></span><div class="cv-chips">${shown.map(chatChip).join('')}${more}</div></div>`;
+    }
+    if (b.k === 'a') return `<div class="cv-ev cv-a"><span class="cv-dot"></span><div class="cv-body"><div class="cv-lab"><b>${_t('클로드')}</b>${chatTime(b.list[0].ts)}</div>${b.list.map(chatItemHtml).join('')}</div></div>`;
+    return chatItemHtml(b.x);
+  }).join('');
+}
+// 끝줄: 결정 대기면 권한 카드, 작업 중이면 '생각 중'
+function chatTail(w) {
+  const st = viewStatus(w);
+  if (st === 'decision') {
+    const perm = /^권한 요청/.test(w.ask || '');
+    const q = perm ? _t('도구 실행을 허락할까요?') : _t('클로드가 답을 기다려요');
+    const btns = perm
+      ? `<button type="button" class="cv-yes" data-key="enter">${_t('허락')}</button><button type="button" data-key="esc">${_t('거절')}</button><button type="button" data-cv="cli">${_t('CLI 에서 고르기')}</button>`
+      : `<button type="button" class="cv-yes" data-cv="cli">${_t('CLI 에서 답하기')}</button>`;
+    return `<div class="cv-ev cv-p"><span class="cv-dot"></span><div class="cv-perm"><div class="cv-q">${q}</div>${w.ask ? `<code>${esc(w.ask.replace(/^권한 요청\s*/, '').replace(/\s*— 터미널에서 선택하세요$/, ''))}</code>` : ''}<div class="cv-btns">${btns}</div></div></div>`;
+  }
+  if (st === 'working') return `<div class="cv-ev cv-a cv-think"><span class="cv-dot"></span><div class="cv-sys"><span class="cv-typing"><i></i><i></i><i></i></span> ${_t('생각 중')}</div></div>`;
+  return '';
+}
+function renderChat() {
+  const w = state.workers.find((x) => x.id === selected);
+  const list = $('#cv-list');
+  if (!w || !chatOpen) return;
+  const st = viewStatus(w);
+  $('#cv-nm').textContent = `${w.id} · ${w.name || ''}`;
+  const stEl = $('#cv-st');
+  stEl.textContent = statusLabel(st);
+  stEl.style.color = `var(--${st === 'waiting' ? 'idle' : st}, var(--dim))`;
+  const items = chatData.wid === w.id ? chatData.items : [];
+  const html = (items.length ? chatBlocks(items) : `<div class="cv-empty">${_t(chatLoading ? '불러오는 중…' : '아직 대화가 없어요')}</div>`) + chatTail(w);
+  if (list._html === html) return;
+  const stick = list.scrollHeight - list.scrollTop - list.clientHeight < 60;
+  list.innerHTML = list._html = html;
+  for (const a of list.querySelectorAll('.cv-md a[href]')) { a.target = '_blank'; a.rel = 'noopener'; }
+  if (stick || list._wid !== w.id) list.scrollTop = list.scrollHeight;
+  list._wid = w.id;
+}
+async function loadChat() {
+  const w = state.workers.find((x) => x.id === selected);
+  if (!w || !chatOpen) return;
+  const same = chatData.wid === w.id, key = w.chatRev;
+  const q = same && chatData.gen ? `?gen=${encodeURIComponent(chatData.gen)}&since=${chatData.rev}` : '';
+  chatLoading = !same;
+  if (!same) { chatData = { wid: w.id, gen: null, rev: 0, key: null, items: [] }; renderChat(); }
+  let d;
+  try { d = await (await fetch(`/api/workers/${w.id}/chat${q}`)).json(); } catch { chatLoading = false; return; }
+  chatLoading = false;
+  if (!chatOpen || selected !== w.id || d.error) return;
+  if (d.full) chatData.items = d.items;
+  else {
+    const at = new Map(chatData.items.map((x, i) => [x.seq, i]));
+    for (const x of d.items) { const i = at.get(x.seq); if (i == null) chatData.items.push(x); else chatData.items[i] = x; }
+    chatData.items.sort((a, b) => a.seq - b.seq);
+    if (chatData.items.length > 300) chatData.items.splice(0, chatData.items.length - 300);
+  }
+  Object.assign(chatData, { wid: w.id, gen: d.gen, rev: d.rev, key });
+  if (chatHtml.size > 2000) chatHtml.clear();
+  renderChat();
+}
+// 상태가 올 때마다(render): 버튼 표시 · 바뀌었으면 가져오기 · 끝줄(상태) 다시 그리기
+function syncChat(w) {
+  for (const b of document.querySelectorAll('.btn-chat')) b.classList.toggle('on', chatOpen);
+  if (!chatOpen) return;
+  if (chatData.wid !== w.id || chatData.key !== w.chatRev) { clearTimeout(chatTimer); chatTimer = setTimeout(loadChat, chatData.wid === w.id ? 120 : 0); }
+  renderChat();
+}
+function setChatOpen(on) {
+  chatOpen = on;
+  try { localStorage.setItem(CHAT_KEY, on ? '1' : '0'); } catch {}
+  if (on && diffOpen) setDiffOpen(false);
+  $('#chat-view').hidden = !on;
+  $('#term-wrap').classList.toggle('chatting', on);
+  if (on) {
+    term.blur();
+    loadMdLibs().then(() => { chatHtml.clear(); $('#cv-list')._html = ''; renderChat(); }).catch(() => {}); // 못 불러오면 글 그대로
+    const w = state.workers.find((x) => x.id === selected);
+    if (w) syncChat(w);
+    setTimeout(() => chatForm.text.focus(), 0);
+  } else {
+    for (const b of document.querySelectorAll('.btn-chat')) b.classList.remove('on');
+    term.focus();
+  }
+}
+for (const b of document.querySelectorAll('.btn-chat')) b.onclick = () => setChatOpen(!chatOpen);
+const chatForm = $('#chat-form');
+function chatGrow() {
+  const ta = chatForm.text;
+  ta.style.height = 'auto';
+  ta.style.height = `${Math.min(ta.scrollHeight, 180)}px`;
+  ta.style.overflowY = ta.scrollHeight > 180 ? 'auto' : 'hidden';
+  syncAttach(ta);
+}
+chatForm.text.addEventListener('input', chatGrow);
+acceptFiles(chatForm.text);
+onEnterKey(chatForm.text, () => chatForm.requestSubmit());
+chatForm.onsubmit = async (e) => {
+  e.preventDefault();
+  const ta = chatForm.text, text = ta.value.trim();
+  if (!text || !selected || ta.readOnly) return;
+  const to = selected;
+  ta.readOnly = true;
+  const r = await api(`/api/workers/${to}/task`, { text });
+  ta.readOnly = false;
+  if (r?.rejected) {
+    toast(r.rejected === 'starting' ? _t('전송 실패 — 워커가 아직 시작 중입니다. 준비되면 다시 보내세요') : r.rejected === 'blocked'
+      ? _t('전송 실패 — CLI 가 입력 대기 화면이 아닙니다(선택창, ! 셸 모드 등). 입력창으로 돌아온 뒤 다시 보내세요')
+      : _t('전송 실패 — CLI 입력창에 쓰던 글이 있습니다. 그 글을 보내거나 지운 뒤 다시 보내세요') + (r.seen ? ` · ${_t('감지한 글')}: "${r.seen}"` : ''), r.seen ? 8000 : 4500);
+    shake(ta);
+    return;
+  }
+  if (r?.error) return;
+  ta.value = '';
+  chatGrow();
+  ta.focus();
+};
+// 빈 칸에서 Esc = 작업 중단(터미널의 Esc 와 같음)
+chatForm.text.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape' || chatForm.text.value || !selected) return;
+  const w = state.workers.find((x) => x.id === selected);
+  if (w && viewStatus(w) === 'working') { e.preventDefault(); api(`/api/workers/${selected}/interrupt`, {}); }
+});
+$('#chat-view').addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  if (b.dataset.cv === 'cli') return setChatOpen(false);
+  if (b.dataset.unfold) { chatUnfold.add(Number(b.dataset.unfold)); $('#cv-list')._html = ''; return renderChat(); }
+  // 권한 선택창: Enter = 맨 위(허락), Esc = 거절 — 터미널 선택창에 키를 대신 보낸다
+  if (b.dataset.key) sendInput(b.dataset.key === 'enter' ? '\r' : '\x1b');
+});
+document.addEventListener('langchange', () => { chatHtml.clear(); $('#cv-list')._html = ''; renderChat(); });
+if (chatOpen) { chatOpen = false; setChatOpen(true); } // 지난번에 채팅 보기로 두었으면 그대로
 const fmtClock = (t) => new Date(t + clockSkew).toLocaleTimeString(uiLocale(), { hour12: false });
 // 요청 글: 붙여 넣은 글 표시(<pasted_content …>) 같은 태그는 빼고 한 줄로
 const reqText = (t) => String(t || '').replace(/<\/?[a-z_-]+[^>]*>/gi, ' ').replace(/\s+/g, ' ').trim();

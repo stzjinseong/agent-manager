@@ -43,7 +43,27 @@ export function createProfile(file) {
     edits: [], editSeen: new Set(), // Edit/Write 로 고친 파일 이력 (diff 보기) — editOf. editSeen: 같은 결과가 두 번 기록돼도 한 번만
     diffClearedAt: 0, // diff 목록 비우기(🗑) 시각 — 그때까지의 수정은 다시 읽어도 담지 않는다(clearEdits)
     shellEdits: [], // 셸 명령으로 바뀐 파일 (서버가 git 비교로 채운다 — 트랜스크립트엔 없음)
+    // 채팅 보기용 대화 목록 — 서버가 워커 세션에만 [] 로 켠다(사용자 프로파일은 전체 기록을 읽으므로 null 그대로).
+    // 항목: { seq, rev, k:'u'(요청)|'n'(알림)|'a'(답 글)|'t'(도구)|'x'(중단)|'e'(API 오류), ts, text?, name?, arg?, st? }
+    // rev 는 새로 생기거나 바뀔 때마다(도구 결과 ok/err) 오른다 — 화면은 since=rev 로 바뀐 것만 받는다
+    chat: null, chatSeq: 0, chatRev: 0, chatGen: 0, chatTools: new Map(), chatSeen: new Set(),
   };
+}
+
+const CHAT_MAX = 300, CHAT_TEXT = 20_000;
+function chatPush(p, it) {
+  if (!p.chat) return null;
+  it.seq = ++p.chatSeq; it.rev = ++p.chatRev;
+  p.chat.push(it);
+  if (p.chat.length > CHAT_MAX) { const old = p.chat.shift(); if (old.id) p.chatTools.delete(old.id); }
+  return it;
+}
+// 도구 칩에 붙일 짧은 인자 — 파일은 이름만, 셸은 명령 첫 줄
+function chipArg(name, inp) {
+  const f = inp.file_path || inp.notebook_path || inp.path;
+  if (f) return String(f).split(/[\\/]/).filter(Boolean).pop() || null;
+  const s = inp.command || inp.pattern || inp.url || inp.description || inp.query || inp.prompt || inp.skill || '';
+  return String(s).split('\n')[0].slice(0, 60) || null;
 }
 
 const empty = () => Object.fromEntries(KEYS.map((k) => [k, 0]));
@@ -211,6 +231,8 @@ function apply(p, e, line) {
     if (Array.isArray(c)) for (const b of c) {
       if (b.type !== 'tool_result' || !b.tool_use_id) continue;
       p.toolResults.add(b.tool_use_id);
+      const ci = p.chatTools.get(b.tool_use_id);
+      if (ci) { ci.st = b.is_error ? 'err' : 'ok'; ci.rev = ++p.chatRev; p.chatTools.delete(b.tool_use_id); }
       if (!b.is_error && !p.editSeen.has(b.tool_use_id)) {
         const st = p.toolStart.get(b.tool_use_id);
         const ed = editOf(e.toolUseResult, b.tool_use_id, st?.name, st?.turn || p.toolTurn.get(b.tool_use_id), ts);
@@ -252,10 +274,20 @@ function apply(p, e, line) {
     p.lastKind = 'user';
     // 사용자 중단(Esc)은 Stop 훅이 오지 않고 이 문구의 user 메시지로만 남는다 — 턴이 아니라 중단 시각으로 기록
     const first = typeof c === 'string' ? c : Array.isArray(c) && c[0]?.type === 'text' ? c[0].text : '';
-    if (first.startsWith('[Request interrupted by user')) { p.interruptedAt = ts; p.interrupts = (p.interrupts || 0) + 1; return; }
+    if (first.startsWith('[Request interrupted by user')) { p.interruptedAt = ts; p.interrupts = (p.interrupts || 0) + 1; chatPush(p, { k: 'x', ts }); return; }
     if (e.isCompactSummary) return; // 압축 뒤 이어 붙는 요약 글 — 사람이 보낸 질문이 아니라 턴으로 세지 않는다
+    // 붙인 그림의 원본 경로는 요청 바로 뒤 메타 줄("[Image: source: …]")로 따로 온다 — 채팅의 그 요청에 붙인다(썸네일)
+    if (p.chat && e.isMeta && Array.isArray(c)) {
+      const src = c.map((b) => b.type === 'text' && b.text?.match(/^\[Image: source: (.+)\]$/)?.[1]).filter(Boolean);
+      const u = src.length && p.chat.findLast((x) => x.k === 'u');
+      if (u) { u.files = [...(u.files || []), ...src].slice(0, 20); u.rev = ++p.chatRev; }
+    }
     const text = promptText(e);
-    if (text) newTurn(p, text, ts);
+    if (text) {
+      newTurn(p, text, ts);
+      const img = Array.isArray(c) ? c.filter((b) => b.type === 'image').length : 0;
+      chatPush(p, { k: text.startsWith('🔔') ? 'n' : 'u', ts, text: text.slice(0, CHAT_TEXT), img });
+    }
     return;
   }
   if (e.type === 'assistant' && e.quotaLimits) p.quota = { ...e.quotaLimits, ts };
@@ -264,6 +296,7 @@ function apply(p, e, line) {
     const txt = (e.message?.content || []).filter((b) => b.type === 'text').map((b) => b.text).join(' ').slice(0, 200);
     p.apiErrors.push({ ts, status: e.apiErrorStatus ?? null, text: txt });
     if (p.apiErrors.length > 10) p.apiErrors.shift();
+    chatPush(p, { k: 'e', ts, text: txt });
     return;
   }
   if (e.type !== 'assistant' || !e.message?.usage || e.isSidechain) return;
@@ -298,8 +331,19 @@ function apply(p, e, line) {
   target.context = p.context;
   // 턴의 마지막 답 글 끝부분 — 사용자 프로파일이 다음 요청이 'Claude 의 질문에 대한 답'인지 가릴 때 쓴다
   for (const b of m.content || []) if (b.type === 'text' && b.text?.trim()) target.lastText = b.text.trim().slice(-300);
+  // 채팅: 답 글 블록 — 같은 응답이 여러 줄로 나뉘어 기록되므로 (응답 id + 글 앞부분)으로 한 번만
+  if (p.chat) for (const b of m.content || []) {
+    if (b.type !== 'text' || !b.text?.trim()) continue;
+    const key = `${m.id}|${b.text.slice(0, 200)}`;
+    if (p.chatSeen.has(key)) continue;
+    if (p.chatSeen.size > 3000) p.chatSeen.clear();
+    p.chatSeen.add(key);
+    chatPush(p, { k: 'a', ts, text: b.text.trim().slice(0, CHAT_TEXT) });
+  }
   for (const b of m.content || []) {
     if (b.type !== 'tool_use' || p.toolTurn.has(b.id)) continue;
+    const ci = chatPush(p, { k: 't', ts, id: b.id, name: b.name?.startsWith('mcp__') ? `MCP · ${b.name.split('__')[1]}` : b.name, arg: chipArg(b.name, b.input || {}) });
+    if (ci) p.chatTools.set(b.id, ci);
     p.toolTurn.set(b.id, target);
     target.tools++; p.sess.tools++;
     const name = b.name?.startsWith('mcp__') ? `MCP · ${b.name.split('__')[1]}` : b.name;
@@ -397,7 +441,11 @@ export function runningSubagents(p) {
 export function readProfile(p) {
   let r = readLines(p, p.path, (e, line) => apply(p, e, line));
   // 트랜스크립트가 줄었으면 처음부터 다시 읽는다 — 셸 수정은 트랜스크립트에 없는 서버 기록이라 그대로 둔다(비우면 다음 정리 때 디스크 파일까지 지워졌다)
-  if (r === 'reset') { const { shellEdits: shell, diffClearedAt } = p; Object.assign(p, createProfile(p.path)); Object.assign(p, { shellEdits: shell, diffClearedAt }); r = readLines(p, p.path, (e, line) => apply(p, e, line)); }
+  if (r === 'reset') {
+    const { shellEdits: shell, diffClearedAt } = p, chatOn = Boolean(p.chat), chatGen = p.chatGen + 1; // 채팅은 세대를 올려 화면이 통째로 다시 받게
+    Object.assign(p, createProfile(p.path)); Object.assign(p, { shellEdits: shell, diffClearedAt, chatGen, chat: chatOn ? [] : null });
+    r = readLines(p, p.path, (e, line) => apply(p, e, line));
+  }
   const s = readSubagents(p);
   return Boolean(r || s);
 }

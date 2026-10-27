@@ -180,6 +180,7 @@
       </div>
       <span class="spacer"></span>
       <div class="meters" id="meters"></div>
+      <button id="btn-chat" class="btn btn-chat" title="채팅 보기 — 이 워커와의 대화를 말풍선으로 (다시 누르면 터미널로)" data-i18n-attr="title" data-i18n>채팅</button>
       <button id="btn-diff" class="btn btn-diff" title="이 워커가 고친 파일의 변경 내용 — 터미널 자리에 보여 줌" data-i18n-attr="title">diff</button>
       <button id="btn-full" class="btn" title="터미널 크게 보기 (다시 누르거나 ✕ 로 복귀)" data-i18n-attr="title" data-i18n>⛶ 크게</button>
       <button id="btn-interrupt" class="btn" title="진행 중인 작업 중단 (Esc 전송)" data-i18n-attr="title" data-i18n>⏸ 중단</button>
@@ -187,11 +188,17 @@
     </div>
     <div class="detail-body">
       <div class="term-wrap" id="term-wrap">
-        <div class="term-bar"><span id="term-title"></span><div class="meters" id="meters-full"></div><button id="btn-diff-full" class="btn ghost btn-diff" title="이 워커가 고친 파일의 변경 내용" data-i18n-attr="title">diff</button><button id="btn-full-exit" class="btn ghost" title="원래 크기로" data-i18n-attr="title" data-i18n>✕ 닫기</button></div>
+        <div class="term-bar"><span id="term-title"></span><div class="meters" id="meters-full"></div><button id="btn-chat-full" class="btn ghost btn-chat" title="채팅 보기 — 이 워커와의 대화를 말풍선으로 (다시 누르면 터미널로)" data-i18n-attr="title" data-i18n>채팅</button><button id="btn-diff-full" class="btn ghost btn-diff" title="이 워커가 고친 파일의 변경 내용" data-i18n-attr="title">diff</button><button id="btn-full-exit" class="btn ghost" title="원래 크기로" data-i18n-attr="title" data-i18n>✕ 닫기</button></div>
         <div class="term-stage">
           <div id="term"></div>
           <div class="term-boot" id="term-boot" hidden><span class="tb-spin"></span><span data-i18n>Claude 시작 중…</span><small data-i18n>준비되면 입력할 수 있어요</small></div>
           <div class="term-boot term-gone" id="term-gone" hidden><span data-i18n>프로세스 종료됨</span><small data-i18n>터미널 화면은 남아 있지 않아요 · 대기실 카드의 ▶ 투입으로 이어서 띄울 수 있어요</small></div>
+          <div class="chat-view" id="chat-view" hidden>
+            <div class="cv-bar"><span class="cv-seg"><button type="button" data-cv="cli">CLI</button><button type="button" class="on" data-i18n>채팅</button></span><span class="cv-nm" id="cv-nm"></span><span class="cv-st" id="cv-st"></span></div>
+            <div class="cv-list" id="cv-list"></div>
+            <form class="cv-comp" id="chat-form"><div class="cv-box"><textarea name="text" rows="1" placeholder="메시지 보내기" data-i18n-attr="placeholder"></textarea><button type="submit" class="cv-send" title="보내기 (Enter)" data-i18n-attr="title">↑</button></div>
+              <div class="cv-hint"><span id="cv-keys"></span><span data-i18n>Esc 중단</span><span data-i18n>/ 명령도 그대로 보냄</span></div></form>
+          </div>
           <div class="diff-view" id="diff-view" hidden>
             <div class="diff-files">
               <div class="diff-files-head"><span id="diff-sum"></span><button type="button" class="diff-clear" id="diff-clear" title="diff 목록 비우기" aria-label="diff 목록 비우기" data-i18n-attr="title,aria-label" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg></button></div>

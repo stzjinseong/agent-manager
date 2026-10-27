@@ -786,6 +786,7 @@ const shellFile = (txPath) => path.join(SHELL_DIR, `${path.basename(txPath, '.js
 const shellLines = new Map(); // 파일 경로 → 디스크에 쌓인 줄 수
 function openProfile(txPath) {
   const p = createProfile(txPath);
+  p.chat = []; // 채팅 보기용 대화 목록을 켠다(profile.js chatPush)
   p.diffClearedAt = config.diffCleared[path.basename(txPath, '.jsonl')] || 0; // diff 목록을 비운 세션이면 그 뒤 수정만
   try {
     const lines = fs.readFileSync(shellFile(txPath), 'utf8').split('\n').filter(Boolean);
@@ -1130,10 +1131,13 @@ function resolveDecision(did, decision) {
 // 워커 하나를 화면에 보낼 모양으로. full: 상세 패널을 연 워커 — 타임라인(log · past) · 프로필 전부.
 // 나머지는 카드 · 비교 표에 쓰는 것만(lite). 화면이 안 쓰는 필드(lastPrompt · todos · currentTool 등)는 아무 워커에도 안 보낸다.
 // 예전엔 모든 워커를 전부 실어 상태 한 번이 1.1MB · 만들기 약 250ms 였다(워커 20개, log 490KB · profile 280KB 실측)
+const chatGenOf = (tx) => (tx?.chat ? `${path.basename(tx.path, '.jsonl')}:${tx.chatGen}` : null);
 function workerView(w, full) {
   const { term, tx, approvalWaits, pot, lastPrompt, lastMessage, todos, notice, currentTool, subTool, ptySize, sentPrompt, seedAt, bootInputAt, dirSent, cacheJudged, modelAt, ...rest } = w;
-  const base = { ...rest, branch: branchOf.get(w.cwd) || null, dirPending: directives.pending(config.directives, w) };
-  if (full) return { ...base, profile: tx && profileSummary(tx, approvalWaits) };
+  // chatRev: 채팅 보기가 바뀐 것을 알아채는 표시(내용은 열 때 /chat 으로 가져간다)
+  const base = { ...rest, branch: branchOf.get(w.cwd) || null, dirPending: directives.pending(config.directives, w), chatRev: chatGenOf(tx) && `${chatGenOf(tx)}#${tx.chatRev}` };
+  // ask: 결정 대기 중인 권한 요청·질문 문구 — 채팅 보기의 권한 카드에 쓴다
+  if (full) return { ...base, ask: w.status === 'decision' ? notice || null : null, profile: tx && profileSummary(tx, approvalWaits) };
   const { log, past, atts, ...lite } = base;
   return { ...lite, lite: true, profile: tx && profileLite(tx) };
 }
@@ -1819,6 +1823,18 @@ const server = http.createServer(async (req, res) => {
   // 릴리즈 노트 전체(최신 → 과거) — 업데이트 창의 '릴리즈 노트 보기'
   if (req.method === 'GET' && p === '/api/releases') return json(res, 200, await updates.releases());
   if (req.method === 'GET' && p === '/api/claude-notes') return json(res, 200, await updates.claudeNotes());
+
+  // 채팅 보기: 트랜스크립트에서 모은 대화 목록. gen 이 같으면 since(rev) 뒤에 생기거나 바뀐 것만, 다르면(새 세션·다시 읽음) 전부
+  const cm = req.method === 'GET' && p.match(/^\/api\/workers\/(W\d+)\/chat$/);
+  if (cm) {
+    const w = workers.get(cm[1]);
+    if (!w) return json(res, 404, { error: '워커가 없습니다' });
+    const tx = w.tx, gen = chatGenOf(tx);
+    if (!gen) return json(res, 200, { gen: null, rev: 0, full: true, items: [] });
+    const q = url.searchParams, since = Number(q.get('since')) || 0;
+    const full = q.get('gen') !== gen;
+    return json(res, 200, { gen, rev: tx.chatRev, full, items: full ? tx.chat : tx.chat.filter((x) => x.rev > since) });
+  }
 
   // diff 보기: 워커가 Edit/Write 로 고친 파일과 그 변경(트랜스크립트의 structuredPatch). 상태 방송에는 개수만 싣고 내용은 열 때 가져간다
   const dm = req.method === 'GET' && p.match(/^\/api\/workers\/(W\d+)\/diff$/);
