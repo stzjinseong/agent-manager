@@ -5519,11 +5519,20 @@ quoteBar.addEventListener('click', async (e) => {
   }
   quoteText = '';
 });
-// 빈 칸에서 Esc = 작업 중단(터미널의 Esc 와 같음)
-chatForm.text.addEventListener('keydown', (e) => {
-  if (e.key !== 'Escape' || chatForm.text.value || !selected) return;
+// 채팅 보기에서 Esc = 작업 중단(터미널의 Esc 와 같음). 예전엔 입력칸에 포커스가 있을 때만 돼 세 버튼 · 대화 목록을 누른 뒤나
+// 아무 데도 포커스가 없을 땐 듣지 않았다. 쓰던 글이 있는 입력칸(채팅 · 질문 카드의 기타 등)에선 실수로 멈추지 않게 빼고,
+// 창(모달) · 크게 보기 · / 목록 · 드래그 버튼처럼 Esc 로 닫는 것이 먼저 받는다(그쪽이 stopPropagation)
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape' || e.defaultPrevented || e.isComposing || !chatOpen || !selected || $('#detail').hidden) return;
+  if (document.querySelector('.modal-back:not([hidden]), .shot-view')) return;
+  const f = document.activeElement;
+  if (f?.matches?.('input, textarea, select, [contenteditable]:not([contenteditable="false"])') && (f !== chatForm.text || f.value)) return;
+  if (f && f !== document.body && !f.closest('#chat-view, .cv-bar, #detail')) return;
   const w = state.workers.find((x) => x.id === selected);
-  if (w && viewStatus(w) === 'working') { e.preventDefault(); api(`/api/workers/${selected}/interrupt`, {}); }
+  if (!w || viewStatus(w) !== 'working') return;
+  e.preventDefault();
+  api(`/api/workers/${selected}/interrupt`, {});
+  toast(_t('중단했어요 (Esc)'), 1500);
 });
 // 어느 입력칸에도 포커스가 없을 때 / = 채팅 입력칸으로(검색창 단축키처럼 — / 자체는 넣지 않는다).
 // 터미널은 xterm 의 숨은 글상자에 포커스가 있어 textarea 로 걸러진다. 창(모달)·크게 보기 뷰어가 떠 있으면 건드리지 않는다
