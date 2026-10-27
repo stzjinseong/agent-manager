@@ -2649,9 +2649,12 @@ button.cv-more:hover { color: var(--text); }
 .cv-box textarea:focus { border: 0; box-shadow: none; outline: none; }
 .cv-box textarea { flex: 1; min-width: 0; resize: none; border: 0; outline: 0; background: none; color: var(--text); font: inherit; padding: 4px 0; max-height: 180px; overflow-y: hidden; }
 .cv-box .att-live { order: -1; flex-basis: 100%; }
-/* 입력칸이 비었고 포커스가 없을 때만: '/ 눌러 입력' 안내(app.js — 입력칸 밖에서 / 를 누르면 여기로) */
-.cv-kbd-hint { display: none; align-self: center; align-items: center; gap: 5px; margin-right: 4px; font-size: 11px; color: var(--faint); white-space: nowrap; pointer-events: none; }
+/* 입력칸이 비었고 포커스가 없을 때만: '메시지 보내기' 자리에 '/ 눌러 입력' 안내(app.js — 입력칸 밖에서 / 를 누르면 여기로).
+   글이 비면 첨부 줄(.att-live)도 비어 입력칸이 늘 첫 줄 — 상자 여백(6px) + 입력칸 여백(4px) 자리에 겹쳐 둔다 */
+.cv-box { position: relative; }
+.cv-kbd-hint { display: none; position: absolute; left: 12px; top: 10px; align-items: center; gap: 6px; color: var(--faint); white-space: nowrap; pointer-events: none; }
 .cv-box:not(:focus-within):has(textarea:placeholder-shown) .cv-kbd-hint { display: inline-flex; }
+@media (hover: hover) { .cv-box:not(:focus-within) textarea:placeholder-shown::placeholder { color: transparent; } } /* 안내가 그 자리에 대신 — 터치 기기는 안내가 없으니 그대로 */
 .cv-kbd-hint kbd { display: inline-grid; place-items: center; min-width: 16px; height: 17px; padding: 0 4px; border: 1px solid var(--line-2); border-bottom-width: 2px; border-radius: 4px; font: 600 10.5px/1 ui-monospace, Consolas, monospace; color: var(--dim); background: var(--surface-2); }
 .cv-box .att-live:empty { display: none; }
 /* 보내기 세 갈래 — 기본(바로 전송, 입력칸 Enter)만 코랄로 채우고 나머지는 옅게. Tab 으로 옮겨 다니므로 포커스 링을 또렷하게 */
