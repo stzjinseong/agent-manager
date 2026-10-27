@@ -2566,7 +2566,9 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 .cv-empty { color: var(--faint); text-align: center; padding: 40px 0; }
 .cv-ev { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 10px; position: relative; padding-bottom: 12px; }
 .cv-ev::before { content: ""; position: absolute; left: 8px; top: 16px; bottom: 0; width: 2px; background: var(--line-2); }
-.cv-ev:last-child::before { display: none; }
+/* 마지막 항목도 줄을 그 블록 끝까지 — 예전엔 끝에서 끊어, 긴 마지막 답만 줄 없이 떠 보였다. 아래 여백만큼은 빼서 줄이 블록에서 끝난다 */
+.cv-ev:last-child { padding-bottom: 4px; }
+.cv-ev:last-child::before { bottom: 4px; }
 .cv-ev:is(.cv-t, .cv-a, .cv-p)::before { background: rgb(217 119 87 / .45); }
 .cv-dot { width: 12px; height: 12px; border-radius: 50%; margin: 5px 3px 0; background: var(--chat-bg, var(--term-bg)); border: 2px solid var(--faint); z-index: 1; }
 .cv-t .cv-dot { width: 8px; height: 8px; margin: 8px 5px 0; border-color: rgb(217 119 87 / .7); }
