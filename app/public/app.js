@@ -5349,6 +5349,54 @@ $('#cv-slash').addEventListener('click', (e) => {
   slashMenu.i = Number(b.dataset.k);
   slashFill(false);
 });
+// ---------- 채팅 내용 드래그 → 물어보기 · 복사 ----------
+// 대화 목록에서 글을 고르면 고른 곳 위에 작은 버튼을 띄운다. 물어보기 = 고른 글을 인용(> …)으로 입력칸 맨 위에 넣고
+// 그 아래에 커서 — 이어서 질문을 쓰면 된다(쓰던 글이 있으면 그 앞에). 입력칸에 넣기 = 고른 글 그대로 커서 자리에. 복사 = 클립보드. 선택이 풀리면(새 메시지로 목록이 다시 그려질 때 포함) 버튼도 닫는다
+const quoteBar = el(`<div class="cv-quote" hidden><button type="button" data-q="ask">${_t('물어보기')}</button><button type="button" data-q="paste">${_t('입력칸에 넣기')}</button><button type="button" data-q="copy">${_t('복사')}</button></div>`);
+$('#chat-view').append(quoteBar);
+let quoteText = '';
+function quoteHide() { quoteBar.hidden = true; quoteText = ''; }
+function quoteShow() {
+  const sel = getSelection(), list = $('#cv-list');
+  const text = sel && !sel.isCollapsed ? sel.toString().trim() : '';
+  if (!text || !list.contains(sel.anchorNode) || !list.contains(sel.focusNode)) return quoteHide();
+  const r = sel.getRangeAt(0).getBoundingClientRect(), box = $('#chat-view').getBoundingClientRect();
+  quoteText = text.slice(0, 4000);
+  quoteBar.hidden = false;
+  const w = quoteBar.offsetWidth, h = quoteBar.offsetHeight;
+  const x = Math.min(Math.max(8, r.left + r.width / 2 - box.left - w / 2), box.width - w - 8);
+  const above = r.top - box.top - h - 6;
+  quoteBar.style.left = `${x}px`;
+  const y = above >= 40 ? above : r.bottom - box.top + 6; // 위 막대에 걸리면 고른 글 아래로
+  quoteBar.style.top = `${Math.min(Math.max(40, y), box.height - h - 8)}px`; // 고른 글이 일부 가려져 있어도 창 안에
+}
+$('#cv-list').addEventListener('mouseup', () => setTimeout(quoteShow, 0));
+$('#cv-list').addEventListener('keyup', (e) => { if (e.shiftKey) quoteShow(); });
+$('#cv-list').addEventListener('scroll', quoteHide);
+document.addEventListener('selectionchange', () => { if (!quoteBar.hidden && getSelection()?.isCollapsed) quoteHide(); });
+document.addEventListener('mousedown', (e) => { if (!quoteBar.contains(e.target)) quoteHide(); });
+quoteBar.addEventListener('mousedown', (e) => e.preventDefault()); // 누르는 동안 선택이 풀리지 않게
+quoteBar.addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-q]');
+  if (!b || !quoteText) return;
+  const text = quoteText;
+  getSelection()?.removeAllRanges(); // 먼저 — 입력칸에 넣은 뒤에 풀면 입력칸 커서까지 맨 앞으로 간다
+  quoteHide();
+  quoteText = text;
+  if (b.dataset.q === 'copy') {
+    try { await navigator.clipboard.writeText(quoteText); toast(_t('복사했습니다'), 1500); } catch { toast(_t('복사하지 못했습니다'), 2500); }
+  } else if (b.dataset.q === 'paste') {
+    insertAtCursor(chatForm.text, quoteText);
+    chatGrow();
+  } else {
+    const ta = chatForm.text, quoted = quoteText.split(/\r?\n/).map((l) => `> ${l}`).join('\n') + '\n\n';
+    ta.value = quoted + ta.value;
+    ta.focus();
+    ta.setSelectionRange(quoted.length, quoted.length);
+    chatGrow();
+  }
+  quoteText = '';
+});
 // 빈 칸에서 Esc = 작업 중단(터미널의 Esc 와 같음)
 chatForm.text.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape' || chatForm.text.value || !selected) return;

@@ -2691,3 +2691,10 @@ button.cv-more:hover { color: var(--text); }
 .cv-sl-hint span { white-space: normal; }
 .cv-sl.on b { color: var(--accent-hi); }
 :root[data-theme="light"] .cv-slash { background: #fff; }
+
+/* 채팅 내용 드래그 → 물어보기 · 입력칸에 넣기 · 복사 (고른 글 위에 뜨는 작은 막대) */
+.cv-quote { position: absolute; z-index: 7; display: flex; gap: 2px; padding: 3px; border-radius: 9px; background: var(--surface-3); border: 1px solid var(--line-2); box-shadow: 0 6px 18px rgb(0 0 0 / calc(.2 + .3 * var(--shade))); }
+.cv-quote button { all: unset; cursor: pointer; padding: 3px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; color: var(--text-2); white-space: nowrap; }
+.cv-quote button:hover { background: var(--btn-hover); color: var(--text); }
+.cv-quote button[data-q="ask"] { color: var(--accent-hi); }
+:root[data-theme="light"] .cv-quote { background: #fff; }
