@@ -2648,6 +2648,10 @@ button.cv-more:hover { color: var(--text); }
 .cv-box textarea:focus { border: 0; box-shadow: none; outline: none; }
 .cv-box textarea { flex: 1; min-width: 0; resize: none; border: 0; outline: 0; background: none; color: var(--text); font: inherit; padding: 4px 0; max-height: 180px; overflow-y: hidden; }
 .cv-box .att-live { order: -1; flex-basis: 100%; }
+/* 입력칸이 비었고 포커스가 없을 때만: '/ 눌러 입력' 안내(app.js — 입력칸 밖에서 / 를 누르면 여기로) */
+.cv-kbd-hint { display: none; align-self: center; align-items: center; gap: 5px; margin-right: 4px; font-size: 11px; color: var(--faint); white-space: nowrap; pointer-events: none; }
+.cv-box:not(:focus-within):has(textarea:placeholder-shown) .cv-kbd-hint { display: inline-flex; }
+.cv-kbd-hint kbd { display: inline-grid; place-items: center; min-width: 16px; height: 17px; padding: 0 4px; border: 1px solid var(--line-2); border-bottom-width: 2px; border-radius: 4px; font: 600 10.5px/1 ui-monospace, Consolas, monospace; color: var(--dim); background: var(--surface-2); }
 .cv-box .att-live:empty { display: none; }
 /* 보내기 세 갈래 — 기본(바로 전송, 입력칸 Enter)만 코랄로 채우고 나머지는 옅게. Tab 으로 옮겨 다니므로 포커스 링을 또렷하게 */
 .cv-acts { flex: none; display: inline-flex; gap: 4px; }
@@ -2714,3 +2718,4 @@ button.cv-more:hover { color: var(--text); }
 .cv-older:hover { color: var(--text); background: var(--line); }
 .cv-wait-sep { display: flex; align-items: center; gap: 10px; margin: 6px 0 10px; color: var(--faint); font-size: 11px; }
 .cv-wait-sep::before, .cv-wait-sep::after { content: ""; flex: 1; border-top: 1px dashed var(--line-2); }
+@media (hover: none) { .cv-box .cv-kbd-hint { display: none !important; } } /* 터치 기기엔 / 키가 없다 */

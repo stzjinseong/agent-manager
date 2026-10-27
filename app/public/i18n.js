@@ -441,6 +441,7 @@ const EN = {
   '아직 대화가 없어요': 'No conversation yet',
   '대기 중 · 클로드가 아직 읽지 않음': 'Waiting · not read by Claude yet',
   '대기열 {n}번': ({ n }) => `Queued #${n}`,
+  '눌러 입력': 'to type',
   '이 계획대로 진행할까요?': 'Proceed with this plan?',
   '고칠 점 — 적고 수정 요청 (Ctrl+Enter)': 'What to change — then Request changes (Ctrl+Enter)',
   '승인': 'Approve',
