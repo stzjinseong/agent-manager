@@ -2668,6 +2668,8 @@ button.cv-more:hover { color: var(--text); }
 /* 채팅에서 답하기 — 클로드의 질문 카드(입력칸 위) */
 .cv-ask { flex: none; max-height: 55%; overflow-y: auto; padding: 8px 2px 0; }
 .cv-ask-card { background: var(--surface); border: 1px solid var(--line-2); border-radius: 10px; padding: 10px 12px; }
+.cv-plan-body { max-height: 40vh; overflow: auto; margin: 4px 0 8px; padding: 8px 10px; background: var(--surface-2); border-radius: 8px; font-size: 12.5px; }
+.cv-plan-fb { resize: vertical; min-height: 38px; }
 .cv-aq + .cv-aq { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
 .cv-aq-h { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-weight: 600; margin-bottom: 8px; }
 .cv-aq-h small { font-weight: 400; color: var(--dim); font-size: 11.5px; }

@@ -5169,6 +5169,7 @@ function renderAsk(w) {
   if (!q) { if (box._id) { box.innerHTML = ''; box._id = null; box.hidden = true; askState = null; } return; }
   if (box._id === q.id) return;
   box._id = q.id; box.hidden = false;
+  if (q.kind === 'plan') { renderPlanAsk(box, q); return; }
   askState = { id: q.id, qs: q.questions, sel: q.questions.map(() => new Set()), other: q.questions.map(() => '') };
   box.innerHTML = `<div class="cv-ask-card"><div class="cv-q">${_t('클로드가 묻고 있어요')}</div>${q.questions.map((x, i) => `<div class="cv-aq">
     <div class="cv-aq-h">${x.header ? `<span class="cv-aq-tag">${esc(x.header)}</span>` : ''}<span>${esc(x.question)}</span>${x.multiSelect ? `<small>${_t('여러 개 고를 수 있어요')}</small>` : ''}</div>
@@ -5176,6 +5177,25 @@ function renderAsk(w) {
     <input class="cv-other" data-q="${i}" placeholder="${esc(_t('기타 — 직접 쓰기 (Enter 로 보내기)'))}"></div>`).join('')}
     <div class="cv-btns"><button type="button" class="cv-yes" data-ask="send" disabled>${_t('답하기')}</button><button type="button" data-ask="cli">${_t('CLI 에서 답하기')}</button></div></div>`;
   const l = $('#cv-list'); l.scrollTop = l.scrollHeight;
+}
+// 계획 승인 카드(plan mode 끝 — ExitPlanMode). 승인 · 고칠 점을 적어 수정 요청(클로드가 계획을 다시 쓴다) · CLI 에서 고르기(진행 방식 고르기 등)
+function renderPlanAsk(box, q) {
+  askState = { id: q.id, kind: 'plan' };
+  box.innerHTML = `<div class="cv-ask-card cv-plan"><div class="cv-q">${_t('이 계획대로 진행할까요?')}</div>
+    <div class="cv-plan-body">${chatMd(q.plan || '')}</div>
+    <textarea class="cv-other cv-plan-fb" rows="2" placeholder="${esc(_t('고칠 점 — 적고 수정 요청 (Ctrl+Enter)'))}"></textarea>
+    <div class="cv-btns"><button type="button" class="cv-yes" data-plan="approve">${_t('승인')}</button><button type="button" data-plan="revise" disabled>${_t('수정 요청')}</button><button type="button" data-ask="cli">${_t('CLI 에서 고르기')}</button></div></div>`;
+  for (const a of box.querySelectorAll('.cv-md a[href]')) { a.target = '_blank'; a.rel = 'noopener'; }
+  const l = $('#cv-list'); l.scrollTop = l.scrollHeight;
+}
+async function planSend(approve) {
+  const w = state.workers.find((x) => x.id === selected), a = askState, box = $('#cv-ask');
+  if (!w || a?.kind !== 'plan') return;
+  const feedback = $('.cv-plan-fb', box).value.trim();
+  if (!approve && !feedback) return;
+  for (const b of box.querySelectorAll('button, textarea')) b.disabled = true;
+  const r = await api(`/api/workers/${w.id}/answer`, approve ? { id: a.id, approve: true } : { id: a.id, feedback });
+  if (r?.error) { for (const b of box.querySelectorAll('button, textarea')) b.disabled = false; $('[data-plan="revise"]', box).disabled = !$('.cv-plan-fb', box).value.trim(); }
 }
 function askAnswers() {
   const a = askState, out = {};
@@ -5193,19 +5213,21 @@ function askSync() {
 }
 async function askSend(cli) {
   const w = state.workers.find((x) => x.id === selected), a = askState;
-  if (!w || !a) return;
+  if (!w || !a || (a.kind === 'plan' && !cli)) return;
   const answers = cli ? null : askAnswers();
   if (!cli && !answers) return;
   const box = $('#cv-ask');
   for (const b of box.querySelectorAll('button, input')) b.disabled = true;
   const r = await api(`/api/workers/${w.id}/answer`, cli ? { id: a.id, cli: true } : { id: a.id, answers });
-  if (r?.error) { for (const b of box.querySelectorAll('button, input')) b.disabled = false; askSync(); return; }
+  if (r?.error) { for (const b of box.querySelectorAll('button, input, textarea')) b.disabled = false; if (a.kind !== 'plan') askSync(); return; }
   if (cli) setChatOpen(false);
 }
 $('#cv-ask').addEventListener('click', (e) => {
   const b = e.target.closest('button');
   if (!b || !askState) return;
+  if (b.dataset.plan) return planSend(b.dataset.plan === 'approve');
   if (b.dataset.ask) return askSend(b.dataset.ask === 'cli');
+  if (askState.kind === 'plan') return;
   const i = Number(b.dataset.q), j = Number(b.dataset.o), x = askState.qs[i], set = askState.sel[i];
   if (x.multiSelect) { if (set.has(j)) set.delete(j); else set.add(j); }
   else { set.clear(); set.add(j); askState.other[i] = ''; const inp = $(`.cv-other[data-q="${i}"]`, $('#cv-ask')); if (inp) inp.value = ''; }
@@ -5215,12 +5237,14 @@ $('#cv-ask').addEventListener('click', (e) => {
 $('#cv-ask').addEventListener('input', (e) => {
   const inp = e.target.closest('.cv-other');
   if (!inp || !askState) return;
+  if (askState.kind === 'plan') { $('[data-plan="revise"]', $('#cv-ask')).disabled = !inp.value.trim(); return; }
   const i = Number(inp.dataset.q);
   askState.other[i] = inp.value;
   if (inp.value.trim() && !askState.qs[i].multiSelect) askState.sel[i].clear(); // 하나 고르기면 직접 쓴 글이 답
   askSync();
 });
 $('#cv-ask').addEventListener('keydown', (e) => {
+  if (askState?.kind === 'plan') { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.isComposing && e.target.closest('.cv-plan-fb')) { e.preventDefault(); planSend(false); } return; }
   if (e.key === 'Enter' && !e.isComposing && e.target.closest('.cv-other')) { e.preventDefault(); askSend(false); }
 });
 // 위 막대(CLI | 채팅 · 워커 정보(#detail-meta — 상세 헤더에서 옮김) · 상태)는 터미널에서도 늘 보인다

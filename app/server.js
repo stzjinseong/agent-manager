@@ -1011,6 +1011,8 @@ function onHook(w, ev, res) {
       if (w.status !== 'decision') w.status = 'working';
       pushLog(w, 'tool', w.currentTool);
       if (ev.tool_name === 'AskUserQuestion' && Array.isArray(ev.tool_input?.questions) && chatWatching(w)) { holdAsk(w, ev, res); return; } // 응답 보류 — releaseAsk 가 답한다
+      // 계획 승인(plan mode 끝 — ExitPlanMode): 채팅 카드에서 승인(allow) · 수정 요청(deny + 고칠 점 → 클로드가 계획을 다시 쓴다)
+      if (ev.tool_name === 'ExitPlanMode' && chatWatching(w)) { holdAsk(w, ev, res, 'plan'); return; }
       emitState();
       break;
     case 'PostToolUse':
@@ -1163,36 +1165,45 @@ function refreshDecisionStatus(w) {
 // 그러면 터미널 선택창이 뜨지 않고 답이 바로 클로드에게 간다(hooks 문서 AskUserQuestion). updatedInput 은 입력 전체를 바꾸므로 questions 도 그대로 싣는다.
 // 그 워커를 채팅 보기로 보고 있는 탭이 있을 때만 붙잡는다. 'CLI 에서 답하기' · 채팅을 닫음 · 탭이 다 닫힘 · 시간 초과면 빈 응답으로 풀어 선택창에 맡긴다
 const ASK_HOLD_MS = 570_000; // 훅 한도(600초)보다 조금 먼저 푼다
-const asks = new Map(); // 워커 id → { id, input, res, timer }
+const asks = new Map(); // 워커 id → { id, kind: 'ask' | 'plan', input, res, timer }
 let askSeq = 0;
 function chatWatching(w) {
   for (const s of sockets) if (s.readyState === 1 && s.chatSel === w.id) return true;
   return false;
 }
+// answers: 질문이면 { 질문 글: 답 }, 계획이면 { approve: true } 또는 { feedback: '고칠 점' }. 없으면 터미널로 넘긴다(빈 응답 → CLI 선택창)
 function releaseAsk(wid, answers = null) {
   const a = asks.get(wid);
   if (!a) return false;
   clearTimeout(a.timer);
   asks.delete(wid);
+  const plan = a.kind === 'plan';
   if (!a.res.writableEnded) {
+    const out = !answers ? {}
+      : !plan ? { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'allow', updatedInput: { ...a.input, answers } } }
+      : answers.approve ? { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'allow', permissionDecisionReason: '채팅에서 계획 승인' } }
+      : { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: `사용자가 계획을 승인하지 않았습니다. 아래 의견을 반영해 계획을 고친 뒤 다시 승인을 요청하세요 (아직 plan mode — 파일을 고치지 마세요).
+
+${answers.feedback}` } };
     a.res.writeHead(200, { 'content-type': 'application/json' });
-    a.res.end(JSON.stringify(answers ? { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'allow', updatedInput: { ...a.input, answers } } } : {}));
+    a.res.end(JSON.stringify(out));
   }
   const w = workers.get(wid);
   if (w) {
-    pushLog(w, 'decision', `질문 → ${answers ? `채팅에서 답함: ${Object.values(answers).join(' / ').slice(0, 120)}` : '터미널로 넘김'}`);
-    if (w.status === 'decision') setStatus(w, 'working', answers ? '질문에 답함' : '질문 — 터미널에서 선택하세요');
+    const what = !answers ? '터미널로 넘김' : !plan ? `채팅에서 답함: ${Object.values(answers).join(' / ').slice(0, 120)}` : answers.approve ? '채팅에서 승인' : `수정 요청: ${answers.feedback.slice(0, 120)}`;
+    pushLog(w, 'decision', `${plan ? '계획' : '질문'} → ${what}`);
+    if (w.status === 'decision') setStatus(w, 'working', answers ? (plan ? (answers.approve ? '계획 승인' : '계획 수정 요청') : '질문에 답함') : `${plan ? '계획' : '질문'} — 터미널에서 선택하세요`);
     else emitState();
   }
   return true;
 }
-function holdAsk(w, ev, res) {
+function holdAsk(w, ev, res, kind = 'ask') {
   releaseAsk(w.id);
-  const a = { id: `Q${++askSeq}`, input: ev.tool_input, res };
+  const a = { id: `Q${++askSeq}`, kind, input: ev.tool_input || {}, res };
   a.timer = setTimeout(() => releaseAsk(w.id), ASK_HOLD_MS);
   res.on('close', () => { if (asks.get(w.id) === a) { clearTimeout(a.timer); asks.delete(w.id); emitState(); } }); // CLI 가 먼저 끊음(Esc 등)
   asks.set(w.id, a);
-  setStatus(w, 'decision', '질문 — 채팅에서 답하세요');
+  setStatus(w, 'decision', kind === 'plan' ? '계획 승인 — 채팅에서 고르세요' : '질문 — 채팅에서 답하세요');
 }
 function resolveDecision(did, decision) {
   const d = decisions.get(did);
@@ -1227,7 +1238,7 @@ function workerView(w, full) {
   const base = { ...rest, branch: branchOf.get(w.cwd) || null, dirPending: directives.pending(config.directives, w), chatRev: chatGenOf(tx) && `${chatGenOf(tx)}#${tx.chatRev}` };
   // ask: 결정 대기 중인 권한 요청·질문 문구 — 채팅 보기의 권한 카드에 쓴다
   const q = asks.get(w.id); // 채팅에서 답할 질문(붙잡은 PreToolUse)
-  if (full) return { ...base, ask: w.status === 'decision' ? notice || null : null, askQ: q ? { id: q.id, questions: q.input.questions } : null, profile: tx && profileSummary(tx, approvalWaits) };
+  if (full) return { ...base, ask: w.status === 'decision' ? notice || null : null, askQ: q ? (q.kind === 'plan' ? { id: q.id, kind: 'plan', plan: String(q.input.plan || '').slice(0, 40_000) } : { id: q.id, questions: q.input.questions }) : null, profile: tx && profileSummary(tx, approvalWaits) };
   // 카드에는 캡처가 마지막 한 장만 보인다(app.js recentMedia) — 목록 전부(최근 50장)를 워커마다 실으면 꺼진 워커가 많을 때
   // 상태 한 번이 277KB 중 약 200KB 가 캡처 목록이었고, 작업 중엔 초당 1~2번 오가 받을 때마다 화면이 ~140ms 멈췄다(실측 30명).
   // 상세를 연 워커(full)는 전부 그대로 — 첨부 탭·캡처 넘겨 보기가 쓴다
@@ -1945,6 +1956,12 @@ const server = http.createServer(async (req, res) => {
     const a = asks.get(qm[1]), body = await readBody(req);
     if (!a || a.id !== body.id) return json(res, 409, { error: '이미 답했거나 사라진 질문입니다' });
     if (body.cli) { releaseAsk(qm[1]); return json(res, 200, { ok: true }); }
+    if (a.kind === 'plan') { // { approve: true } 또는 { feedback }
+      const fb = String(body.feedback || '').trim().slice(0, 4000);
+      if (!body.approve && !fb) return json(res, 400, { error: '고칠 점을 적어 주세요' });
+      releaseAsk(qm[1], body.approve ? { approve: true } : { feedback: fb });
+      return json(res, 200, { ok: true });
+    }
     const qs = new Set(a.input.questions.map((x) => x.question)), ans = {};
     for (const [k, v] of Object.entries(body.answers || {})) if (qs.has(k) && typeof v === 'string' && v.trim()) ans[k] = v.trim().slice(0, 2000);
     if (Object.keys(ans).length !== qs.size) return json(res, 400, { error: '모든 질문에 답해 주세요' });
