@@ -1168,6 +1168,8 @@ body.thumb-drag :is(#term-wrap, .task-form textarea, .memo-form textarea):not(.d
 }
 .stale-bar span { flex: 1; }
 .stale-bar[hidden] { display: none; }
+/* 헤더에서 연 창(업데이트 · 릴리즈 노트)은 위 알림 띠(.top-stack, z 70)에 가려 제목·닫기가 안 보였다 — 열려 있는 동안만 헤더를 띠 위로 */
+.topbar:has(.upd-pop:not([hidden])) { z-index: 75; }
 @media (max-width: 640px) { .stale-bar { flex-wrap: wrap; } }
 
 /* ---------- 터미널 높이 조절 손잡이 (CLI 아래 가로선) ---------- */
