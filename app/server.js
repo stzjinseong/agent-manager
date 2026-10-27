@@ -319,7 +319,8 @@ function hookSettings() {
   // 설정은 띄울 때 읽고 바뀌어도 다시 읽지 않아(실측 v2.1.296), 훅을 늘리면 이미 떠 있는 워커는 다시 띄워야 받는다
   const events = ['SessionStart', 'UserPromptSubmit', 'Notification', 'Stop', 'StopFailure', 'SessionEnd', 'SubagentStop'];
   const hooks = Object.fromEntries(events.map((e) => [e, [{ hooks: h() }]]));
-  hooks.PreToolUse = [{ matcher: '*', hooks: h() }];
+  // 질문(AskUserQuestion)을 채팅에서 답할 때 서버가 이 훅을 붙잡고 기다린다(asks) — 다른 도구는 바로 답하므로 긴 한도가 걸릴 일은 없다
+  hooks.PreToolUse = [{ matcher: '*', hooks: h(600) }];
   hooks.PostToolUse = [{ matcher: '*', hooks: h() }];
   // 실패한 셸 명령도 파일을 바꿨을 수 있다 — diff 보기의 명령 전후 비교를 닫는다 (shelldiff.js)
   hooks.PostToolUseFailure = [{ matcher: 'Bash', hooks: h() }];
@@ -985,6 +986,7 @@ function onHook(w, ev, res) {
       roleStats.tool(w, ev.tool_name);
       if (w.status !== 'decision') w.status = 'working';
       pushLog(w, 'tool', w.currentTool);
+      if (ev.tool_name === 'AskUserQuestion' && Array.isArray(ev.tool_input?.questions) && chatWatching(w)) { holdAsk(w, ev, res); return; } // 응답 보류 — releaseAsk 가 답한다
       emitState();
       break;
     case 'PostToolUse':
@@ -1129,6 +1131,42 @@ function refreshDecisionStatus(w) {
 }
 
 // decision: null → 훅 응답 없이 놓아 터미널 프롬프트로 폴백 / { behavior, message }
+// ---------- 채팅에서 답하기 (AskUserQuestion) ----------
+// 질문 직전 PreToolUse 훅을 붙잡고, 채팅 카드에서 고른 답을 updatedInput.answers({ 질문 글: 고른 이름 })로 돌려준다 —
+// 그러면 터미널 선택창이 뜨지 않고 답이 바로 클로드에게 간다(hooks 문서 AskUserQuestion). updatedInput 은 입력 전체를 바꾸므로 questions 도 그대로 싣는다.
+// 그 워커를 채팅 보기로 보고 있는 탭이 있을 때만 붙잡는다. 'CLI 에서 답하기' · 채팅을 닫음 · 탭이 다 닫힘 · 시간 초과면 빈 응답으로 풀어 선택창에 맡긴다
+const ASK_HOLD_MS = 570_000; // 훅 한도(600초)보다 조금 먼저 푼다
+const asks = new Map(); // 워커 id → { id, input, res, timer }
+let askSeq = 0;
+function chatWatching(w) {
+  for (const s of sockets) if (s.readyState === 1 && s.chatSel === w.id) return true;
+  return false;
+}
+function releaseAsk(wid, answers = null) {
+  const a = asks.get(wid);
+  if (!a) return false;
+  clearTimeout(a.timer);
+  asks.delete(wid);
+  if (!a.res.writableEnded) {
+    a.res.writeHead(200, { 'content-type': 'application/json' });
+    a.res.end(JSON.stringify(answers ? { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'allow', updatedInput: { ...a.input, answers } } } : {}));
+  }
+  const w = workers.get(wid);
+  if (w) {
+    pushLog(w, 'decision', `질문 → ${answers ? `채팅에서 답함: ${Object.values(answers).join(' / ').slice(0, 120)}` : '터미널로 넘김'}`);
+    if (w.status === 'decision') setStatus(w, 'working', answers ? '질문에 답함' : '질문 — 터미널에서 선택하세요');
+    else emitState();
+  }
+  return true;
+}
+function holdAsk(w, ev, res) {
+  releaseAsk(w.id);
+  const a = { id: `Q${++askSeq}`, input: ev.tool_input, res };
+  a.timer = setTimeout(() => releaseAsk(w.id), ASK_HOLD_MS);
+  res.on('close', () => { if (asks.get(w.id) === a) { clearTimeout(a.timer); asks.delete(w.id); emitState(); } }); // CLI 가 먼저 끊음(Esc 등)
+  asks.set(w.id, a);
+  setStatus(w, 'decision', '질문 — 채팅에서 답하세요');
+}
 function resolveDecision(did, decision) {
   const d = decisions.get(did);
   if (!d) return false;
@@ -1161,7 +1199,8 @@ function workerView(w, full) {
   // chatRev: 채팅 보기가 바뀐 것을 알아채는 표시(내용은 열 때 /chat 으로 가져간다)
   const base = { ...rest, branch: branchOf.get(w.cwd) || null, dirPending: directives.pending(config.directives, w), chatRev: chatGenOf(tx) && `${chatGenOf(tx)}#${tx.chatRev}` };
   // ask: 결정 대기 중인 권한 요청·질문 문구 — 채팅 보기의 권한 카드에 쓴다
-  if (full) return { ...base, ask: w.status === 'decision' ? notice || null : null, profile: tx && profileSummary(tx, approvalWaits) };
+  const q = asks.get(w.id); // 채팅에서 답할 질문(붙잡은 PreToolUse)
+  if (full) return { ...base, ask: w.status === 'decision' ? notice || null : null, askQ: q ? { id: q.id, questions: q.input.questions } : null, profile: tx && profileSummary(tx, approvalWaits) };
   const { log, past, atts, ...lite } = base;
   return { ...lite, lite: true, profile: tx && profileLite(tx) };
 }
@@ -1848,6 +1887,18 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && p === '/api/releases') return json(res, 200, await updates.releases());
   if (req.method === 'GET' && p === '/api/claude-notes') return json(res, 200, await updates.claudeNotes());
 
+  // 채팅에서 답하기: { id, answers: { 질문 글: 답 } } 또는 { id, cli: true }(터미널로 넘김). 이미 풀린 질문이면 409
+  const qm = req.method === 'POST' && p.match(/^\/api\/workers\/(W\d+)\/answer$/);
+  if (qm) {
+    const a = asks.get(qm[1]), body = await readBody(req);
+    if (!a || a.id !== body.id) return json(res, 409, { error: '이미 답했거나 사라진 질문입니다' });
+    if (body.cli) { releaseAsk(qm[1]); return json(res, 200, { ok: true }); }
+    const qs = new Set(a.input.questions.map((x) => x.question)), ans = {};
+    for (const [k, v] of Object.entries(body.answers || {})) if (qs.has(k) && typeof v === 'string' && v.trim()) ans[k] = v.trim().slice(0, 2000);
+    if (Object.keys(ans).length !== qs.size) return json(res, 400, { error: '모든 질문에 답해 주세요' });
+    releaseAsk(qm[1], ans);
+    return json(res, 200, { ok: true });
+  }
   // 채팅 보기: 트랜스크립트에서 모은 대화 목록. gen 이 같으면 since(rev) 뒤에 생기거나 바뀐 것만, 다르면(새 세션·다시 읽음) 전부
   const cm = req.method === 'GET' && p.match(/^\/api\/workers\/(W\d+)\/chat$/);
   if (cm) {
@@ -2230,8 +2281,14 @@ wss.on('connection', (ws) => {
     // 상세 패널을 연 워커 — 이 탭에는 그 워커의 타임라인 · 프로필 전부를 실어 보낸다. 바로 한 번 보내 빈 패널이 오래 남지 않게
     if (msg.type === 'attach' && ws.sel !== w.id) { ws.sel = w.id; ws.send(JSON.stringify({ type: 'state', state: stateFor(publicState(), w.id) })); }
     if (msg.type === 'attach') { const req = ++snapSeq; snapWaiters.set(req, ws); hostSend({ op: 'snapshot', id: w.id, req }); }
+    // 채팅 보기로 보고 있는 워커 — 질문을 채팅에서 받을지 정한다(holdAsk). 아무도 안 보게 되면 붙잡은 질문을 터미널로 넘긴다
+    if (msg.type === 'chatview') { const prev = ws.chatSel; ws.chatSel = msg.on ? w.id : null; const pw = prev && workers.get(prev); if (pw && asks.has(prev) && !chatWatching(pw)) releaseAsk(prev); }
   });
-  ws.on('close', () => sockets.delete(ws));
+  ws.on('close', () => {
+    sockets.delete(ws);
+    const pw = ws.chatSel && workers.get(ws.chatSel);
+    if (pw && asks.has(pw.id) && !chatWatching(pw)) releaseAsk(pw.id);
+  });
 });
 
 await connectHost();

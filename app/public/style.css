@@ -2654,3 +2654,22 @@ button.cv-more:hover { color: var(--text); }
 .btn.btn-ic svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .btn.btn-ic svg .fill { fill: currentColor; stroke: none; }
 .btn.btn-ic-danger:hover { color: #e0655a; border-color: rgb(224 101 90 / .5); background: rgb(224 101 90 / .1); }
+
+/* 채팅에서 답하기 — 클로드의 질문 카드(입력칸 위) */
+.cv-ask { flex: none; max-height: 55%; overflow-y: auto; padding: 8px 2px 0; }
+.cv-ask-card { background: var(--surface); border: 1px solid var(--line-2); border-radius: 10px; padding: 10px 12px; }
+.cv-aq + .cv-aq { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.cv-aq-h { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-weight: 600; margin-bottom: 8px; }
+.cv-aq-h small { font-weight: 400; color: var(--dim); font-size: 11.5px; }
+.cv-aq-tag { font-size: 11px; font-weight: 600; color: var(--text-2); background: var(--surface-3); border-radius: 999px; padding: 1px 8px; }
+.cv-aq-opts { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 6px; }
+.cv-opt { all: unset; cursor: pointer; display: flex; flex-direction: column; gap: 2px; padding: 7px 10px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--line-2); }
+.cv-opt b { font-weight: 600; font-size: 12.5px; }
+.cv-opt span { font-size: 11.5px; color: var(--dim); line-height: 1.4; }
+.cv-opt:hover { border-color: rgb(var(--ink) / .25); }
+.cv-opt.on { border-color: var(--decision); background: color-mix(in srgb, var(--decision) 12%, var(--surface-2)); }
+.cv-opt:focus-visible, .cv-other:focus-visible { outline: 2px solid var(--accent-hi); outline-offset: 2px; }
+.cv-other { width: 100%; margin-top: 6px; background: var(--surface-2); border: 1px solid var(--line-2); border-radius: 8px; padding: 6px 10px; color: var(--text); font: inherit; font-size: 12.5px; }
+.cv-other:focus { border-color: rgb(var(--ink) / .25); box-shadow: none; outline: none; }
+.cv-btns button:disabled { opacity: .45; cursor: default; }
+:root[data-theme="light"] .cv-ask-card { background: #fff; }

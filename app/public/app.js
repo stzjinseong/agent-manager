@@ -1016,7 +1016,7 @@ addEventListener('focus', () => syncPtySize(true));
 function send(msg) { if (ws?.readyState === 1) ws.send(JSON.stringify(msg)); }
 function connect() {
   ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`); // https 로 열었으면 wss 여야 브라우저가 막지 않는다
-  ws.onopen = () => { if (selected) { syncPtySize(true); send({ type: 'attach', id: selected }); } };
+  ws.onopen = () => { if (selected) { syncPtySize(true); send({ type: 'attach', id: selected }); } chatViewSent = ''; sendChatView(); };
   ws.onmessage = (e) => {
     const msg = JSON.parse(e.data);
     if (msg.type === 'state') {
@@ -4975,6 +4975,7 @@ function chatBlocks(items) {
 // 끝줄: 결정 대기면 권한 카드, 작업 중이면 '생각 중'
 function chatTail(w) {
   const st = viewStatus(w);
+  if (st === 'decision' && w.askQ) return ''; // 질문은 입력칸 위 카드(#cv-ask)로
   if (st === 'decision') {
     const perm = /^권한 요청/.test(w.ask || '');
     const q = perm ? _t('도구 실행을 허락할까요?') : _t('클로드가 답을 기다려요');
@@ -5026,6 +5027,78 @@ async function loadChat() {
   renderChat();
 }
 // 상태가 올 때마다(render): 버튼 표시 · 바뀌었으면 가져오기 · 끝줄(상태) 다시 그리기
+// 서버에 '이 워커를 채팅으로 보는 중'을 알린다 — 그동안 클로드의 질문은 터미널 대신 채팅 카드로 온다(server holdAsk)
+let chatViewSent = '';
+function sendChatView() {
+  const k = chatOpen && selected ? selected : '';
+  if (k === chatViewSent) return;
+  const prev = chatViewSent;
+  chatViewSent = k;
+  if (k || prev) send({ type: 'chatview', id: k || prev, on: Boolean(k) });
+}
+// ---------- 채팅에서 답하기: 클로드의 질문(AskUserQuestion) 카드 ----------
+// 입력칸 바로 위에 따로 그린다(목록은 상태가 올 때마다 다시 그려져 쓰던 '기타' 글이 날아가므로). 질문이 바뀔 때만 새로 그린다.
+// 하나만 고르는 질문이 하나뿐이면 누르는 즉시 보낸다. 여러 개 고르기는 이름을 ', ' 로 잇고, '기타' 글은 그 질문의 답(여러 개면 덧붙임)
+let askState = null; // { id, qs, sel: Set[], other: string[] }
+function renderAsk(w) {
+  const box = $('#cv-ask'), q = chatOpen && w.askQ;
+  if (!q) { if (box._id) { box.innerHTML = ''; box._id = null; box.hidden = true; askState = null; } return; }
+  if (box._id === q.id) return;
+  box._id = q.id; box.hidden = false;
+  askState = { id: q.id, qs: q.questions, sel: q.questions.map(() => new Set()), other: q.questions.map(() => '') };
+  box.innerHTML = `<div class="cv-ask-card"><div class="cv-q">${_t('클로드가 묻고 있어요')}</div>${q.questions.map((x, i) => `<div class="cv-aq">
+    <div class="cv-aq-h">${x.header ? `<span class="cv-aq-tag">${esc(x.header)}</span>` : ''}<span>${esc(x.question)}</span>${x.multiSelect ? `<small>${_t('여러 개 고를 수 있어요')}</small>` : ''}</div>
+    <div class="cv-aq-opts">${(x.options || []).map((o, j) => `<button type="button" class="cv-opt" data-q="${i}" data-o="${j}"><b>${esc(o.label)}</b>${o.description ? `<span>${esc(o.description)}</span>` : ''}</button>`).join('')}</div>
+    <input class="cv-other" data-q="${i}" placeholder="${esc(_t('기타 — 직접 쓰기 (Enter 로 보내기)'))}"></div>`).join('')}
+    <div class="cv-btns"><button type="button" class="cv-yes" data-ask="send" disabled>${_t('답하기')}</button><button type="button" data-ask="cli">${_t('CLI 에서 답하기')}</button></div></div>`;
+  const l = $('#cv-list'); l.scrollTop = l.scrollHeight;
+}
+function askAnswers() {
+  const a = askState, out = {};
+  a.qs.forEach((x, i) => {
+    const picked = (x.options || []).filter((_, j) => a.sel[i].has(j)).map((o) => o.label), other = a.other[i].trim();
+    const v = x.multiSelect ? [...picked, ...(other ? [other] : [])].join(', ') : other || picked[0] || '';
+    if (v) out[x.question] = v;
+  });
+  return Object.keys(out).length === a.qs.length ? out : null;
+}
+function askSync() {
+  const box = $('#cv-ask');
+  for (const b of box.querySelectorAll('.cv-opt')) b.classList.toggle('on', askState.sel[b.dataset.q].has(Number(b.dataset.o)));
+  $('[data-ask="send"]', box).disabled = !askAnswers();
+}
+async function askSend(cli) {
+  const w = state.workers.find((x) => x.id === selected), a = askState;
+  if (!w || !a) return;
+  const answers = cli ? null : askAnswers();
+  if (!cli && !answers) return;
+  const box = $('#cv-ask');
+  for (const b of box.querySelectorAll('button, input')) b.disabled = true;
+  const r = await api(`/api/workers/${w.id}/answer`, cli ? { id: a.id, cli: true } : { id: a.id, answers });
+  if (r?.error) { for (const b of box.querySelectorAll('button, input')) b.disabled = false; askSync(); return; }
+  if (cli) setChatOpen(false);
+}
+$('#cv-ask').addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b || !askState) return;
+  if (b.dataset.ask) return askSend(b.dataset.ask === 'cli');
+  const i = Number(b.dataset.q), j = Number(b.dataset.o), x = askState.qs[i], set = askState.sel[i];
+  if (x.multiSelect) { if (set.has(j)) set.delete(j); else set.add(j); }
+  else { set.clear(); set.add(j); askState.other[i] = ''; const inp = $(`.cv-other[data-q="${i}"]`, $('#cv-ask')); if (inp) inp.value = ''; }
+  askSync();
+  if (!x.multiSelect && askState.qs.length === 1) askSend(false);
+});
+$('#cv-ask').addEventListener('input', (e) => {
+  const inp = e.target.closest('.cv-other');
+  if (!inp || !askState) return;
+  const i = Number(inp.dataset.q);
+  askState.other[i] = inp.value;
+  if (inp.value.trim() && !askState.qs[i].multiSelect) askState.sel[i].clear(); // 하나 고르기면 직접 쓴 글이 답
+  askSync();
+});
+$('#cv-ask').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.isComposing && e.target.closest('.cv-other')) { e.preventDefault(); askSend(false); }
+});
 // 위 막대(CLI | 채팅 · 워커 정보(#detail-meta — 상세 헤더에서 옮김) · 상태)는 터미널에서도 늘 보인다
 function chatBar(w) {
   const st = viewStatus(w);
@@ -5063,6 +5136,8 @@ function chatSeg() {
 function syncChat(w) {
   chatSeg();
   chatBar(w);
+  sendChatView();
+  renderAsk(w);
   if (!chatOpen) return;
   if (chatData.wid !== w.id || chatData.key !== w.chatRev) { clearTimeout(chatTimer); chatTimer = setTimeout(loadChat, chatData.wid === w.id ? 120 : 0); }
   renderChat();
@@ -5071,6 +5146,7 @@ function setChatOpen(on) {
   if (on === chatOpen) return;
   chatOpen = on;
   chatSeg();
+  sendChatView();
   try { localStorage.setItem(CHAT_KEY, on ? '1' : '0'); } catch {}
   if (on && diffOpen) setDiffOpen(false);
   $('#chat-view').hidden = !on;
