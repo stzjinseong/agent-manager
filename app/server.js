@@ -855,6 +855,12 @@ async function confirmPrompt(w, at) {
   const cli = await cliDraft(w);
   if (w.sentPrompt !== sent || w.status !== 'working') return;
   w.sentPrompt = null;
+  // 슬래시 명령(/model · /cost · /resume …)은 Claude 에게 가는 글이 아니라 UserPromptSubmit 이 오지 않는다 — 선택창을 띄우거나 결과만
+  // 찍고 끝난다. 실패로 보고 다시 보내 선택창이 두 번 뜨고 대기열에 남았다(실측 17:45 W80 '/model') → 들어간 것으로 본다
+  if (/^\/[\w:-]/.test(sent.text.trim()) && !(cli.state === 'draft' && cli.text.trim().startsWith(sent.text.trim().slice(0, 12)))) {
+    setStatus(w, 'idle', cli.state === 'blocked' ? `명령 실행 — CLI 선택창을 확인하세요 (${sent.text.trim().split(/\s/)[0]})` : `명령 실행 (${sent.text.trim().split(/\s/)[0]})`);
+    return;
+  }
   if (cli.state === 'draft' && cli.text.replace(/\s+/g, '').includes(sent.text.replace(/\s+/g, '').slice(0, 20))) {
     // Enter 만 먹히지 않아 지시가 입력창에 그대로 있다 — 그 글이 곧 '쓰던 글'이니 사람이 보내거나 지우면 된다
     setStatus(w, 'idle', '업무 지시가 CLI 입력창에 남아 있음 — Enter 로 보내거나 지우세요');

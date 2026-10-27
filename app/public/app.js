@@ -5412,7 +5412,9 @@ async function chatSend(mode) {
     if (r?.error) return;
     flyToWorker(w.id, ta, 'task');
     const busy = viewStatus(w) === 'working';
-    chatPending.push({ wid: w.id, text, mode, norm: chatNorm(text), at: Date.now(), label: mode === 'now' ? (busy ? '작업 사이에 전달' : '보내는 중…') : busy ? '대기열' : '보내는 중…' });
+    // 슬래시 명령(/model 등)은 대화 기록에 내 글로 남지 않을 때가 많아 흐린 말풍선이 지워지지 않았다 — 작업 중이면 서버 대기(nowQ ·
+    // 대기열) 줄로 보이고, 쉬고 있으면 곧장 CLI 에서 실행되므로 말풍선을 따로 만들지 않는다
+    if (!/^\/[\w:-]/.test(text.trim())) chatPending.push({ wid: w.id, text, mode, norm: chatNorm(text), at: Date.now(), label: mode === 'now' ? (busy ? '작업 사이에 전달' : '보내는 중…') : busy ? '대기열' : '보내는 중…' });
     $('#cv-list')._html = ''; renderChat();
     const l = $('#cv-list'); l.scrollTop = l.scrollHeight;
   }
