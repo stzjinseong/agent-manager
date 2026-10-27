@@ -1355,6 +1355,15 @@ function onHostHello({ ptys }) {
   emitState();
 }
 
+// 터미널 기록(직렬화한 스크롤백) 앞부분 자르기. 워커를 바꿀 때마다 기록 전체(실측 W80 632~730KB · 5400줄)를 받아
+// 터미널에 처음부터 다시 써서 전환이 늦었다. 줄은 \r\n 으로 나뉘고 끝의 커서 위치는 상대 이동이라 앞을 잘라도 화면 · 커서는 같다.
+// 잘린 첫 줄의 글자색은 그 앞에서 정해졌을 수 있어 색을 한 번 되돌리고 시작한다
+function trimScrollback(data, keep) {
+  if (!keep || !data) return { data, partial: false };
+  let i = data.length;
+  for (let n = 0; n < keep; n++) { i = data.lastIndexOf('\r\n', i - 1); if (i <= 0) return { data, partial: false }; }
+  return { data: '\x1b[0m' + data.slice(i + 2), partial: true };
+}
 function onHostMessage(msg) {
   const w = workers.get(msg.id);
   if (msg.ev === 'data') { broadcast({ type: 'pty', id: msg.id, data: msg.data }); return; }
@@ -1362,7 +1371,9 @@ function onHostMessage(msg) {
     const ws = snapWaiters.get(msg.req);
     snapWaiters.delete(msg.req);
     if (typeof ws === 'function') return ws(msg); // 서버가 직접 요청한 것(cliDraft)
-    if (ws?.readyState === 1) ws.send(JSON.stringify({ type: 'scrollback', id: msg.id, data: msg.data, cols: msg.cols, rows: msg.rows }));
+    // 화면이 최근 N줄만 달라고 했으면 앞(오래된 기록)을 잘라 보낸다 — partial 이면 화면이 맨 위로 올릴 때 전부 다시 받는다
+    const { data, partial } = trimScrollback(msg.data, ws?.lines || 0);
+    if (ws?.ws?.readyState === 1) ws.ws.send(JSON.stringify({ type: 'scrollback', id: msg.id, data, cols: msg.cols, rows: msg.rows, partial }));
     return;
   }
   if (!w) return;
@@ -2299,7 +2310,12 @@ wss.on('connection', (ws) => {
     if (msg.type === 'resize' && msg.cols > 10 && msg.rows > 5) w.term.resize(msg.cols, msg.rows);
     // 상세 패널을 연 워커 — 이 탭에는 그 워커의 타임라인 · 프로필 전부를 실어 보낸다. 바로 한 번 보내 빈 패널이 오래 남지 않게
     if (msg.type === 'attach' && ws.sel !== w.id) { ws.sel = w.id; ws.send(JSON.stringify({ type: 'state', state: stateFor(publicState(), w.id) })); }
-    if (msg.type === 'attach') { const req = ++snapSeq; snapWaiters.set(req, ws); hostSend({ op: 'snapshot', id: w.id, req }); }
+    // 터미널 기록: attach 때(채팅 보기면 snap:false 로 미룸) · 따로 snapshot 요청 때. lines 를 주면 최근 그만큼만(trimScrollback), full 이면 전부
+    if ((msg.type === 'attach' && msg.snap !== false) || msg.type === 'snapshot') {
+      const req = ++snapSeq;
+      snapWaiters.set(req, { ws, lines: msg.full ? 0 : Math.max(0, Number(msg.lines) || 0) });
+      hostSend({ op: 'snapshot', id: w.id, req });
+    }
     // 채팅 보기로 보고 있는 워커 — 질문을 채팅에서 받을지 정한다(holdAsk). 아무도 안 보게 되면 붙잡은 질문을 터미널로 넘긴다
     if (msg.type === 'chatview') { const prev = ws.chatSel; ws.chatSel = msg.on ? w.id : null; const pw = prev && workers.get(prev); if (pw && asks.has(prev) && !chatWatching(pw)) releaseAsk(prev); }
   });

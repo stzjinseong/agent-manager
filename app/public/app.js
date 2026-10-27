@@ -488,6 +488,27 @@ const termLocked = () => { const w = selected && state.workers.find((x) => x.id 
 // 붙잡아 두었다가 다 지운 뒤 보낸다. 안 그러면 지우는 도중의 커서 자리에 끼어들었다
 let replaceJob = null;
 const heldInput = [];
+// 터미널 기록 받기: 워커를 바꿀 때 최근 TERM_SNAP_LINES 줄만 받아 빨리 그리고(server trimScrollback), 맨 위까지 올리면 전부 받는다.
+// 채팅 보기 중이면 터미널이 안 보이므로 기록은 CLI 로 돌아올 때 받는다(pending)
+const TERM_SNAP_LINES = 1500;
+let termSnap = { id: null, partial: false, loadingFull: false, fromBottom: 0, pending: false };
+function attachMsg(id) {
+  const snap = !chatOpen;
+  termSnap = { id, partial: false, loadingFull: false, fromBottom: 0, pending: !snap };
+  return { type: 'attach', id, snap, lines: TERM_SNAP_LINES };
+}
+// 최근 줄만 받은 터미널을 맨 위까지 올리면 나머지 기록을 받는다 — 다 받으면 보던 줄이 그대로 맨 위에 오게(scrollback 처리)
+term.onScroll((y) => {
+  if (y !== 0 || !termSnap.partial || termSnap.loadingFull || termSnap.id !== selected) return;
+  termSnap.loadingFull = true;
+  termSnap.fromBottom = term.buffer.active.baseY - y;
+  send({ type: 'snapshot', id: selected, full: true });
+});
+function loadTermSnapIfPending() {
+  if (!termSnap.pending || termSnap.id !== selected) return;
+  termSnap.pending = false;
+  send({ type: 'snapshot', id: selected, lines: TERM_SNAP_LINES });
+}
 function sendInput(data) {
   if (replaceJob) { heldInput.push(data); return; }
   if (selected) send({ type: 'input', id: selected, data });
@@ -1016,7 +1037,7 @@ addEventListener('focus', () => syncPtySize(true));
 function send(msg) { if (ws?.readyState === 1) ws.send(JSON.stringify(msg)); }
 function connect() {
   ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`); // https 로 열었으면 wss 여야 브라우저가 막지 않는다
-  ws.onopen = () => { if (selected) { syncPtySize(true); send({ type: 'attach', id: selected }); } chatViewSent = ''; sendChatView(); };
+  ws.onopen = () => { if (selected) { syncPtySize(true); send(attachMsg(selected)); } chatViewSent = ''; sendChatView(); };
   ws.onmessage = (e) => {
     const msg = JSON.parse(e.data);
     if (msg.type === 'state') {
@@ -1033,7 +1054,10 @@ function connect() {
     else if (msg.type === 'ptysize' && msg.id === selected && TOUCH) { ptyCols = msg.cols; fitTerm(); } // PC 에서 터미널 폭이 바뀌면 따라간다
     else if (msg.type === 'scrollback' && msg.id === selected) {
       if (TOUCH) { ptyCols = msg.cols || TERM_COLS; fitTerm(); } // 기록은 pty 폭으로 만들어졌다 — 그 폭으로 받아야 줄이 어긋나지 않는다
-      term.reset(); term.write(recolorTerm(msg.data), () => restoreTermScroll(msg.id));
+      const more = termSnap.loadingFull ? termSnap.fromBottom : null; // 맨 위로 올려 전부 불러온 것 — 보던 줄을 그대로 맨 위에
+      termSnap = { id: msg.id, partial: Boolean(msg.partial), loadingFull: false, fromBottom: 0, pending: false };
+      term.reset();
+      term.write(recolorTerm(msg.data), () => (more == null ? restoreTermScroll(msg.id) : term.scrollToLine(Math.max(0, term.buffer.active.baseY - more))));
     }
     else if (msg.type === 'clearScrollback' && msg.id === selected) term.write('\x1b[3J'); // /clear — 이전 대화 기록만 지움
   };
@@ -2812,7 +2836,7 @@ function select(id) {
   // 크기를 먼저 맞춘 뒤 기록을 받는다 — 기록이 예전 크기로 만들어지지 않게
   requestAnimationFrame(() => {
     fitTerm(true);
-    send({ type: 'attach', id });
+    send(attachMsg(id));
     // 터치 기기: 입력칸에 바로 포커스를 주면 화면 키보드가 터미널을 가린다 — 대신 열린 상세 화면으로 내려 준다(카드 아래에 있어 안 보인다)
     if (TOUCH) $('#detail').scrollIntoView({ behavior: 'smooth', block: 'start' });
     else if (!document.querySelector('input.rename')) $('#task-form').text.focus();
@@ -5182,7 +5206,7 @@ function setChatOpen(on) {
     const w = state.workers.find((x) => x.id === selected);
     if (w) syncChat(w);
     setTimeout(() => chatForm.text.focus(), 0);
-  } else term.focus();
+  } else { loadTermSnapIfPending(); term.focus(); } // 채팅 중 미뤄 둔 터미널 기록을 이제 받는다
 }
 for (const b of document.querySelectorAll('.btn-chat')) b.onclick = () => setChatOpen(!chatOpen);
 const chatForm = $('#chat-form');
