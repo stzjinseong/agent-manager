@@ -4800,7 +4800,10 @@ function setTermFull(on) {
   wrap.classList.toggle('full', on);
   document.body.classList.toggle('term-full', on);
   scheduleSelLink();
-  $('#btn-full').textContent = _t(on ? '⛶ 원래대로' : '⛶ 크게');
+  // 아이콘만 — 크게(바깥으로 벌린 모서리) ↔ 원래대로(안으로 모은 모서리). 설명은 툴팁
+  const fb = $('#btn-full'), tip = _t(on ? '원래 크기로' : '터미널 크게 보기 (다시 누르거나 ✕ 로 복귀)');
+  fb.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${on ? 'M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5' : 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5'}"/></svg>`;
+  fb.title = tip; fb.setAttribute('aria-label', tip);
   const w = state.workers.find((x) => x.id === selected);
   $('#term-title').textContent = w ? w.name : '';
   // 터미널 글자는 상자가 늘어나는 동안 찌그러져 보여 숨겨 둔다. 예전엔 상자가 다 커진 뒤에야 글자 크기를 맞추고(다시 그리기) 페이드해

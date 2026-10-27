@@ -180,9 +180,9 @@
       <span class="spacer"></span>
       <div class="meters" id="meters"></div>
       <button id="btn-diff" class="btn btn-diff" title="이 워커가 고친 파일의 변경 내용 — 터미널 자리에 보여 줌" data-i18n-attr="title">diff</button>
-      <button id="btn-full" class="btn" title="터미널 크게 보기 (다시 누르거나 ✕ 로 복귀)" data-i18n-attr="title" data-i18n>⛶ 크게</button>
-      <button id="btn-interrupt" class="btn" title="진행 중인 작업 중단 (Esc 전송)" data-i18n-attr="title" data-i18n>⏸ 중단</button>
-      <button id="btn-remove" class="btn" data-i18n>제거</button>
+      <button id="btn-full" class="btn btn-ic" title="터미널 크게 보기 (다시 누르거나 ✕ 로 복귀)" aria-label="터미널 크게 보기 (다시 누르거나 ✕ 로 복귀)" data-i18n-attr="title,aria-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+      <button id="btn-interrupt" class="btn btn-ic" title="진행 중인 작업 중단 (Esc 전송)" aria-label="진행 중인 작업 중단 (Esc 전송)" data-i18n-attr="title,aria-label"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5.5" y="5.5" width="13" height="13" rx="2.5" class="fill"/></svg></button>
+      <button id="btn-remove" class="btn btn-ic btn-ic-danger" title="워커 제거" aria-label="워커 제거" data-i18n-attr="title,aria-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg></button>
     </div>
     <div class="detail-body">
       <div class="term-wrap" id="term-wrap">

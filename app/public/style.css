@@ -2650,3 +2650,9 @@ button.cv-more:hover { color: var(--text); }
 .cv-act:focus-visible { outline: 2px solid var(--accent-hi); outline-offset: 2px; }
 :root[data-theme="light"] .cv-act.cv-main { color: #fff; }
 .cv-hint { font-size: 11px; color: var(--faint); margin-top: 5px; display: flex; gap: 12px; flex-wrap: wrap; }
+
+/* 상세 헤더의 아이콘 버튼(크게 · 중단 · 제거) — 글자 없이 아이콘만, 설명은 툴팁 */
+.btn.btn-ic { display: inline-grid; place-items: center; width: 34px; padding-left: 0; padding-right: 0; }
+.btn.btn-ic svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.btn.btn-ic svg .fill { fill: currentColor; stroke: none; }
+.btn.btn-ic-danger:hover { color: #e0655a; border-color: rgb(224 101 90 / .5); background: rgb(224 101 90 / .1); }

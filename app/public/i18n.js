@@ -439,6 +439,7 @@ const EN = {
   'CLI 에서 답하기': 'Answer in CLI',
   '생각 중': 'Thinking',
   '아직 대화가 없어요': 'No conversation yet',
+  '워커 제거': 'Remove worker',
   '작업 사이에 전달': 'delivered between steps',
   '보내는 중…': 'Sending…',
   '바로 전송': 'Send now',
