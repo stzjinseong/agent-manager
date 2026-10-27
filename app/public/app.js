@@ -408,10 +408,14 @@ function schemeTheme(s) {
   for (const k of Object.keys(t)) if (t[k] === undefined) delete t[k];
   return t;
 }
-// 터미널 둘레(.term-wrap 여백 등 --term-bg)도 구성표 바탕색으로
+// 터미널 둘레(.term-wrap 여백 등 --term-bg)도 구성표 바탕색으로.
+// 채팅 보기·위 막대는 구성표가 아니라 화면 테마를 따른다(--chat-bg) — 라이트 화면에 어두운 구성표면 글자는 어둡고 바탕도 어두워졌다.
+// 그래서 구성표를 덮기 전의 테마 값을 먼저 읽어 둔다. 라이트·다크 전환과 사용자 테마를 불러온 뒤에도 다시 부른다
 function applyScheme() {
-  const sc = termScheme();
-  if (sc) document.documentElement.style.setProperty('--term-bg', sc.background); else document.documentElement.style.removeProperty('--term-bg');
+  const root = document.documentElement, sc = termScheme();
+  root.style.removeProperty('--term-bg');
+  root.style.setProperty('--chat-bg', getComputedStyle(root).getPropertyValue('--term-bg').trim() || '#07080a');
+  if (sc) root.style.setProperty('--term-bg', sc.background);
 }
 // Claude Code 는 예전엔 이 터미널에 256색 번호로 색을 찍었다(2.1.29x 부터 diff·요청 줄은 24비트 — 아래 recolorTerm 이 같은 번호의 색으로 바꾼다). 그중 몇 번호를 이 화면에서만 다른 색으로 —
 //  · diff: 22 추가 줄 배경 · 28 추가 단어 · 52 삭제 줄 · 88 삭제 단어 · 77 '+' 글자 · 167 '-' 글자. 기본은 원색에 가까워 너무 진하다 → 차분한 초록/빨강
@@ -3652,7 +3656,7 @@ const SKIN_KEY = 'am.skin';
 function themeLink(t) {
   let link = document.getElementById('user-theme');
   if (!t) { link?.remove(); return; }
-  if (!link) { link = document.createElement('link'); link.rel = 'stylesheet'; link.id = 'user-theme'; document.head.appendChild(link); }
+  if (!link) { link = document.createElement('link'); link.rel = 'stylesheet'; link.id = 'user-theme'; link.addEventListener('load', applyScheme); document.head.appendChild(link); }
   const href = `/themes/${encodeURIComponent(t.id)}/theme.css?v=${encodeURIComponent(t.rev || '')}`;
   if (link.getAttribute('href') !== href) link.setAttribute('href', href); // theme.css 를 고치면 rev 가 바뀌어 다시 읽는다
 }
@@ -4329,6 +4333,7 @@ function setThemeSwitch(light) {
 function applyTheme(light) {
   if (light) document.documentElement.dataset.theme = 'light'; else delete document.documentElement.dataset.theme;
   term.options.theme = termTheme(light); // 터미널도 같이
+  applyScheme(); // 채팅 바탕(--chat-bg)을 새 테마 값으로
   try { light ? localStorage.setItem('am.theme', 'light') : localStorage.removeItem('am.theme'); } catch {}
 }
 setThemeSwitch(document.documentElement.dataset.theme === 'light');
