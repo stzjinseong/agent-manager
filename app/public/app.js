@@ -1933,11 +1933,12 @@ function renderDetail() {
   else if ($('#detail-name').textContent !== w.name) requestAnimationFrame(placeMeters); // 다른 워커로 바꾸면 이름 폭이 달라진다
   $('#term-wrap').style.setProperty('--avatar', avatarColor(w.name) || 'var(--accent)'); // 터미널 테두리 = 워커 색
   $("#detail-name").textContent = w.name; // 상태는 카드 배지·LED 로 보인다
-  // 브랜치는 경로 앞에 — 경로가 길어 줄 끝이 잘려도 보이게
+  // 경로는 막대가 좁아 빼고 툴팁으로 — 브랜치까지만 줄에
   const metaHtml = [w.id, w.model, w.permissionMode, w.sessionId && `session ${w.sessionId.slice(0, 8)}`, w.pid && `pid ${w.pid}`].filter(Boolean).map(esc)
-    .concat(w.branch ? [`<span class="branch${w.branch.detached ? ' detached' : ''}" title="${esc(branchTitle(w.branch))}">${BRANCH_SVG}<span>${esc(w.branch.name)}</span></span>`] : [], w.cwd ? [esc(w.cwd)] : []).join(' · ');
+    .concat(w.branch ? [`<span class="branch${w.branch.detached ? ' detached' : ''}" title="${esc(branchTitle(w.branch))}">${BRANCH_SVG}<span>${esc(w.branch.name)}</span></span>`] : []).join(' · ');
   const meta = $('#detail-meta');
   if (meta._html !== metaHtml) meta.innerHTML = meta._html = metaHtml;
+  meta.title = w.cwd || ''; // 경로는 줄에서 빼고(브랜치까지만) 마우스를 올리면 보이게
   renderMemos(w);
   $('#auto-queue').checked = !state.manualQueue?.[w.name];
   const queueEl = $('#queue');

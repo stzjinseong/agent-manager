@@ -2553,8 +2553,8 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 :root[data-theme="light"] :is(.cv-chip, .cv-perm, .cv-box, .cv-seg) { background: #fff; }
 :root[data-theme="light"] .cv-md pre { background: var(--surface-2); }
 :root[data-theme="light"] .cv-btns button:not(.cv-yes) { background: var(--surface-3); }
-.cv-seg { display: inline-flex; background: var(--surface); border: 1px solid var(--line-2); border-radius: 8px; padding: 2px; }
-.cv-seg button { all: unset; cursor: pointer; padding: 1px 10px; border-radius: 6px; font-size: 12px; color: var(--dim); }
+.cv-seg { flex: none; display: inline-flex; background: var(--surface); border: 1px solid var(--line-2); border-radius: 8px; padding: 2px; }
+.cv-seg button { all: unset; cursor: pointer; white-space: nowrap; padding: 1px 10px; border-radius: 6px; font-size: 12px; color: var(--dim); }
 .cv-seg button.on { background: var(--surface-3); color: var(--text); cursor: default; }
 .cv-seg button:not(.on):hover { color: var(--text); }
 /* 워커 정보(id · 모델 · 권한 · 세션 · 브랜치 · 경로) — 상세 헤더 제목 아래에 있던 줄. 길면 끝을 줄임 */
