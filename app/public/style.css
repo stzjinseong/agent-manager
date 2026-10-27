@@ -2543,7 +2543,16 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
    왼쪽 세로 줄 = 클로드 작업 줄(코랄). 내 요청은 줄에서 빼 오른쪽 말풍선 — 누가 한 말인지 한눈에.
    코랄은 클로드 몫: 클로드 점(캐릭터 실루엣)·이름·작업 줄에만 쓴다 */
 .chat-view { position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column; background: var(--term-bg); color: var(--text); border-radius: 6px; overflow: hidden; font-size: 13.5px; line-height: 1.6; }
-.cv-bar { display: flex; align-items: center; gap: 8px; padding: 2px 4px 8px; border-bottom: 1px solid var(--line); }
+.cv-bar { flex: none; display: flex; align-items: center; gap: 8px; padding: 0 4px 8px; margin-bottom: 8px; border-bottom: 1px solid var(--line); }
+/* 막대가 터미널 위에 늘 붙는다 — 터미널 칸은 남은 높이만(크게 보기는 자기 막대가 있어 숨김) */
+.term-wrap:not(.full) { display: flex; flex-direction: column; }
+.term-wrap:not(.full) > .term-stage { flex: 1; min-height: 0; height: auto; }
+.term-wrap.full > .cv-bar { display: none; }
+/* 라이트: 바탕(#fcfbf7)과 면 색이 거의 같아 말풍선·칩·카드가 묻힌다 — 한 단계 진하게 */
+:root[data-theme="light"] .cv-msg { background: var(--surface-3); }
+:root[data-theme="light"] :is(.cv-chip, .cv-perm, .cv-box, .cv-seg) { background: #fff; }
+:root[data-theme="light"] .cv-md pre { background: var(--surface-2); }
+:root[data-theme="light"] .cv-btns button:not(.cv-yes) { background: var(--surface-3); }
 .cv-seg { display: inline-flex; background: var(--surface); border: 1px solid var(--line-2); border-radius: 8px; padding: 2px; }
 .cv-seg button { all: unset; cursor: pointer; padding: 1px 10px; border-radius: 6px; font-size: 12px; color: var(--dim); }
 .cv-seg button.on { background: var(--surface-3); color: var(--text); cursor: default; }

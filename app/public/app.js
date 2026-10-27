@@ -4965,11 +4965,6 @@ function renderChat() {
   const w = state.workers.find((x) => x.id === selected);
   const list = $('#cv-list');
   if (!w || !chatOpen) return;
-  const st = viewStatus(w);
-  $('#cv-nm').textContent = `${w.id} · ${w.name || ''}`;
-  const stEl = $('#cv-st');
-  stEl.textContent = statusLabel(st);
-  stEl.style.color = `var(--${st === 'waiting' ? 'idle' : st}, var(--dim))`;
   const items = chatData.wid === w.id ? chatData.items : [];
   const html = (items.length ? chatBlocks(items) : `<div class="cv-empty">${_t(chatLoading ? '불러오는 중…' : '아직 대화가 없어요')}</div>`) + chatTail(w);
   if (list._html === html) return;
@@ -5002,14 +4997,29 @@ async function loadChat() {
   renderChat();
 }
 // 상태가 올 때마다(render): 버튼 표시 · 바뀌었으면 가져오기 · 끝줄(상태) 다시 그리기
-function syncChat(w) {
+// 위 막대(CLI | 채팅 · 워커 · 상태)는 터미널에서도 늘 보인다
+function chatBar(w) {
+  const st = viewStatus(w);
+  $('#cv-nm').textContent = `${w.id} · ${w.name || ''}`;
+  const stEl = $('#cv-st');
+  stEl.textContent = statusLabel(st);
+  stEl.style.color = `var(--${st === 'waiting' ? 'idle' : st}, var(--dim))`;
+}
+function chatSeg() {
   for (const b of document.querySelectorAll('.btn-chat')) b.classList.toggle('on', chatOpen);
+  for (const b of document.querySelectorAll('.cv-seg [data-cv]')) b.classList.toggle('on', (b.dataset.cv === 'chat') === chatOpen);
+}
+function syncChat(w) {
+  chatSeg();
+  chatBar(w);
   if (!chatOpen) return;
   if (chatData.wid !== w.id || chatData.key !== w.chatRev) { clearTimeout(chatTimer); chatTimer = setTimeout(loadChat, chatData.wid === w.id ? 120 : 0); }
   renderChat();
 }
 function setChatOpen(on) {
+  if (on === chatOpen) return;
   chatOpen = on;
+  chatSeg();
   try { localStorage.setItem(CHAT_KEY, on ? '1' : '0'); } catch {}
   if (on && diffOpen) setDiffOpen(false);
   $('#chat-view').hidden = !on;
@@ -5020,10 +5030,7 @@ function setChatOpen(on) {
     const w = state.workers.find((x) => x.id === selected);
     if (w) syncChat(w);
     setTimeout(() => chatForm.text.focus(), 0);
-  } else {
-    for (const b of document.querySelectorAll('.btn-chat')) b.classList.remove('on');
-    term.focus();
-  }
+  } else term.focus();
 }
 for (const b of document.querySelectorAll('.btn-chat')) b.onclick = () => setChatOpen(!chatOpen);
 const chatForm = $('#chat-form');
@@ -5062,6 +5069,10 @@ chatForm.text.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape' || chatForm.text.value || !selected) return;
   const w = state.workers.find((x) => x.id === selected);
   if (w && viewStatus(w) === 'working') { e.preventDefault(); api(`/api/workers/${selected}/interrupt`, {}); }
+});
+$('.cv-bar').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-cv]');
+  if (b) setChatOpen(b.dataset.cv === 'chat');
 });
 $('#chat-view').addEventListener('click', (e) => {
   const b = e.target.closest('button');
