@@ -441,6 +441,7 @@ const EN = {
   '아직 대화가 없어요': 'No conversation yet',
   '대기 중 · 클로드가 아직 읽지 않음': 'Waiting · not read by Claude yet',
   '대기열 {n}번': ({ n }) => `Queued #${n}`,
+  '이전 대화 {n}개 더 보기': ({ n }) => `Show ${n} earlier`,
   'Backlog 로 옮기기': 'Move to Backlog',
   '대기열에서 뺐어요': 'Removed from queue',
   '이미 CLI 입력에 넣은 글이라 뺄 수 없어요': 'Already typed into the CLI — can no longer be removed',

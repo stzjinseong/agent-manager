@@ -1979,16 +1979,23 @@ function renderDetail() {
   const html = timelineCache.map((r, i) =>
     `<li class="k-${r.kind}${r.past ? ' past' : ''}" data-i="${i}"${r.kind === 'req' ? ` title="${_t('클릭: 터미널에서 이 요청 위치로 이동')}"` : ''}><time>${fmt(r.t)}</time>${r.tag ? `<span class="tag">${r.tag}</span>` : ''}${esc(r.text)}${r.shot ? shotImg(r.shot, 'tl-shot') : ''}${r.doc ? docCard(r.doc) : ''}${r.kind === 'req' || r.kind === 'queued' || r.kind === 'unqueued' ? attachChips(r.text, 'md') : ''}</li>`).join('');
   if (logEl._html !== html || logEl.dataset.w !== w.id) { // 브라우저가 innerHTML 을 정규화하므로 보낸 글로 비교
-    const stick = logEl.dataset.w !== w.id || logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 40;
+    const stick = logEl.dataset.w !== w.id || logEl._atBottom !== false;
     logEl.dataset.w = w.id;
     logEl.innerHTML = logEl._html = html;
-    if (stick) logEl.scrollTop = logEl.scrollHeight;
     pinFor = null; // 줄을 새로 그렸으니 고정 줄도 새 요소 기준으로
-    updatePin();
+    logEl._settling = true;
+    afterFrame('log', () => {
+      if (stick) logEl.scrollTop = logEl.scrollHeight;
+      logEl._settling = false;
+      if (stick) logEl._atBottom = true;
+      updatePin();
+    });
     markGoneSoon();
   }
   renderAttTab(w);
-  renderProfile(w);
+  // 워커를 바꾼 직후엔 프로파일(차트 · 턴 표 · 숫자 애니메이션, 실측 30~60ms)을 첫 화면이 그려진 뒤로 미룬다 — 채팅 · 타임라인이 먼저 보이게
+  if (profileWid === w.id) renderProfile(w);
+  else { profileWid = w.id; afterFrame('profile', () => setTimeout(() => { const cur = state.workers.find((x) => x.id === selected); if (cur) renderProfile(cur); }, 0)); }
   renderDiffButton(w);
   syncChat(w);
   // 접은 영역 제목줄에 건수를 보여 준다 (펼쳐 있으면 안에 보이므로 비움)
@@ -2241,7 +2248,19 @@ function syncAttach(ta) {
 }
 // ---------- 도구 결과 캡처 보기 ----------
 // 썸네일은 data-shot 에 원본 주소를 달아 두고, 어디서 눌러도(타임라인·카드) 같은 크게 보기를 연다
-const shotImg = (s, cls) => `<img class="${cls}" src="${esc(s.url)}" data-shot="${esc(s.url)}" alt="${_t('캡처')}" loading="lazy" draggable="false" title="${_t('클릭해 크게 보기')}">`;
+// 그린 뒤 위치 맞추기(스크롤 바닥 붙이기 · 고정 줄)는 다음 프레임 직전에 한 번에 — 그리는 도중에 크기를 읽으면 브라우저가
+// 그때마다 배치를 새로 계산했다(워커 전환 한 번에 타임라인 · 채팅 · 이미지 로드마다 30~100ms씩, 실측). 같은 키는 한 번만
+const frameJobs = new Map();
+function afterFrame(key, fn) {
+  if (!frameJobs.size) requestAnimationFrame(() => { const jobs = [...frameJobs.values()]; frameJobs.clear(); for (const f of jobs) { try { f(); } catch (e) { console.error(e); } } });
+  frameJobs.set(key, fn);
+}
+// 목록이 맨 아래를 보고 있는지 — 그릴 때 scrollHeight 를 읽지 않게 스크롤할 때 적어 둔다(el._settling 동안은 우리가 옮기는 중이라 무시)
+function trackBottom(el, near) {
+  el._atBottom = true;
+  el.addEventListener('scroll', () => { if (!el._settling) el._atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < near; }, { passive: true });
+}
+const shotImg = (s, cls) => `<img class="${cls}" src="${esc(s.url)}" data-shot="${esc(s.url)}" alt="${_t('캡처')}" loading="lazy" decoding="async" draggable="false" title="${_t('클릭해 크게 보기')}">`;
 // 같은 워커의 캡처끼리 ←/→ 로 넘겨 본다. 몇 번째인지·찍힌 시각과 보관 한도 안내를 아래에 둔다
 // 뷰어 공통: 'OS 앱으로 열기' · '파일 위치 열기' (이 PC 에서 볼 때만 — 다른 기기면 그 PC 에서 열려 봐야 소용없다).
 // cur() 는 지금 보이는 파일 주소(캡처 넘기기 등). 버튼 줄 클릭은 뷰어의 '바깥 누르면 닫기'로 번지지 않게 막는다
@@ -2393,9 +2412,11 @@ document.addEventListener('click', (e) => {
   openVideo(t.dataset.video);
 }, true);
 // 타임라인 썸네일은 늦게 로드되며 높이가 늘어난다 → 맨 아래를 보던 중이면 바닥을 유지
+// 썸네일마다 크기를 읽으면 그때마다 배치를 다시 계산했다(이미지 수십 장 → 실측 100ms 남짓) → 한 프레임에 한 번
+trackBottom($('#log'), 160);
 $('#log').addEventListener('load', (e) => {
   const logEl = e.currentTarget;
-  if (e.target.tagName === 'IMG' && logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 160) logEl.scrollTop = logEl.scrollHeight;
+  if (e.target.tagName === 'IMG' && logEl._atBottom) afterFrame('log-img', () => { if (logEl._atBottom) { logEl._settling = true; logEl.scrollTop = logEl.scrollHeight; logEl._settling = false; } });
 }, true);
 document.addEventListener('click', (e) => {
   const t = e.target.closest?.('[data-shot]');
@@ -2433,6 +2454,7 @@ const turnInput = (t) => t.input + t.cacheWrite + t.cacheRead;
 
 let profileSig = '';
 let profileTurns = [];
+let profileWid = null;
 function renderProfile(w, force) {
   const p = w.profile;
   // lite 프로필(전체 값 도착 전)에는 차트 · 턴 목록 재료가 없다 — 빈 안내로 바꿨다 되돌리지 않고 다음 렌더를 기다린다
@@ -2518,7 +2540,8 @@ function tweenText(el, oldText) {
   if (!all.length || all.length !== olds.length) return;
   all.forEach((x, i) => { x.from = olds[i]; });
   if (all.every((x) => x.from === x.to)) return;
-  el.classList.remove('tw-on'); void el.offsetWidth; el.classList.add('tw-on');
+  // 강조 애니메이션 다시 걸기 — offsetWidth 로 되감으면 그리는 도중 배치를 새로 계산해(워커 전환 때 15~65ms) 다음 프레임에 붙인다
+  el.classList.remove('tw-on'); afterFrame(el, () => el.classList.add('tw-on'));
   const t0 = performance.now(), dur = 700;
   const fmt = (x, v) => { const s = v.toFixed(x.dec); return x.comma ? Number(s).toLocaleString('en-US', { minimumFractionDigits: x.dec, maximumFractionDigits: x.dec }) : s; };
   const step = (now) => {
@@ -5005,15 +5028,18 @@ function chatItemHtml(x) {
   return h;
 }
 // 이어지는 도구는 칩 한 줄로, 이어지는 답 글은 이름표 하나 아래로 묶는다
-function chatBlocks(items) {
-  const out = [];
+// limit: 끝에서 그만큼의 묶음만 그린다(renderChat 의 chatWin) — 앞이 잘렸으면 맨 위에 '이전 대화' 줄
+function chatBlocks(items, limit = Infinity) {
+  let out = [];
   for (const x of items) {
     const last = out.at(-1);
     if (x.k === 't') { if (last?.k === 't') last.list.push(x); else out.push({ k: 't', list: [x] }); }
     else if (x.k === 'a') { if (last?.k === 'a') last.list.push(x); else out.push({ k: 'a', list: [x] }); }
     else out.push({ k: x.k, x });
   }
-  return out.map((b) => {
+  const cut = Math.max(0, out.length - limit);
+  if (cut) out = out.slice(cut);
+  return (cut ? `<button type="button" class="cv-older" data-older="1">${_t('이전 대화 {n}개 더 보기', { n: cut })}</button>` : '') + out.map((b) => {
     if (b.k === 't') {
       const id = b.list[0].seq, open = chatUnfold.has(id) || b.list.length <= CHIP_FOLD + 1;
       const shown = open ? b.list : b.list.slice(0, CHIP_FOLD);
@@ -5059,24 +5085,53 @@ function renderChat() {
   const waitActs = (x) => x.qi >= 0
     ? `<span class="cv-wait-acts" data-src="${x.src}" data-qi="${x.qi}"><button type="button" class="cv-wq" data-wq="tomemo" title="${_t('Backlog 로 옮기기')}" aria-label="${_t('Backlog 로 옮기기')}">${UNDO_SVG}</button><button type="button" class="cv-wq" data-wq="unqueue" title="${_t('삭제')}" aria-label="${_t('삭제')}">${X_SVG}</button></span>`
     : '';
-  const html = (items.length || waiting.length ? chatBlocks(items) : `<div class="cv-empty">${_t(chatLoading ? '불러오는 중…' : '아직 대화가 없어요')}</div>`)
+  if (list._wid !== w.id) chatWin = CHAT_WIN; // 워커를 바꾸면 다시 최근 것만
+  const html = (items.length || waiting.length ? chatBlocks(items, chatWin) : `<div class="cv-empty">${_t(chatLoading ? '불러오는 중…' : '아직 대화가 없어요')}</div>`)
     + (waiting.length ? `<div class="cv-wait-sep"><span>${_t('대기 중 · 클로드가 아직 읽지 않음')} ${waiting.length}</span></div>` : '')
     + waiting.map((x) => `<div class="cv-ev cv-u cv-pending"${x.qi >= 0 ? '' : ` title="${_t('이미 CLI 입력에 넣은 글이라 뺄 수 없어요')}"`}><div class="cv-lab">${waitActs(x)}<b>${_t('나')}</b>${esc(x.label)}</div><div class="cv-msg">${esc(x.text)}${chatAtt({ text: x.text })}</div></div>`).join('')
     + chatTail(w);
   if (list._html === html) return;
-  const stick = list.scrollHeight - list.scrollTop - list.clientHeight < 60;
+  const stick = list._wid !== w.id || list._atBottom !== false, older = chatOlder;
+  const fromBottom = older ? list.scrollHeight - list.scrollTop : 0; // 앞에 붙일 때만 읽는다(드묾)
   list.innerHTML = list._html = html;
   for (const a of list.querySelectorAll('.cv-md a[href]')) { a.target = '_blank'; a.rel = 'noopener'; }
-  if (stick || list._wid !== w.id) list.scrollTop = list.scrollHeight;
+  chatOlder = false;
   list._wid = w.id;
+  list._settling = true;
+  afterFrame('chat', () => {
+    if (stick) list.scrollTop = list.scrollHeight;
+    else if (older) list.scrollTop = list.scrollHeight - fromBottom; // 앞에 붙였으면 보던 줄을 그 자리에
+    list._settling = false;
+    if (stick) list._atBottom = true;
+  });
 }
+// 대화를 처음엔 끝 CHAT_WIN 묶음만 그린다 — 300개를 다 그리면 배치 계산만 60~130ms(실측 묶음 130~180개 · 요소 1.8~2.8k)라
+// 워커를 바꿀 때와 작업 중 새 글이 올 때마다 화면이 멈췄다. 맨 위까지 올리거나 '이전 대화' 를 누르면 앞으로 더 붙인다
+const CHAT_WIN = 40, CHAT_MORE = 80;
+let chatWin = CHAT_WIN, chatOlder = false;
+function chatShowOlder() {
+  const list = $('#cv-list');
+  if (!list.querySelector('[data-older]')) return;
+  chatWin += CHAT_MORE; chatOlder = true;
+  renderChat();
+}
+trackBottom($('#cv-list'), 60);
+$('#cv-list').addEventListener('scroll', (e) => { if (!e.currentTarget._settling && e.currentTarget.scrollTop < 80) chatShowOlder(); }, { passive: true });
+$('#cv-list').addEventListener('click', (e) => { if (e.target.closest('[data-older]')) chatShowOlder(); });
+const chatCache = new Map(), CHAT_CACHE_N = 8; // 워커 id → chatData
 async function loadChat() {
   const w = state.workers.find((x) => x.id === selected);
   if (!w || !chatOpen) return;
-  const same = chatData.wid === w.id, key = w.chatRev;
-  const q = same && chatData.gen ? `?gen=${encodeURIComponent(chatData.gen)}&since=${chatData.rev}` : '';
-  chatLoading = !same;
-  if (!same) { chatData = { wid: w.id, gen: null, rev: 0, key: null, items: [] }; renderChat(); }
+  const key = w.chatRev;
+  // 워커를 바꾸면 그 워커의 지난 대화(chatCache)를 곧장 그리고 바뀐 것만 받는다 — 매번 통째로(~100KB) 받고 그리느라
+  // 돌아온 워커도 채팅이 뜨기까지 250ms 남짓 걸렸다
+  if (chatData.wid !== w.id) {
+    const c = chatCache.get(w.id);
+    chatData = c || { wid: w.id, gen: null, rev: 0, key: null, items: [] };
+    chatLoading = !c;
+    renderChat();
+  }
+  const q = chatData.gen ? `?gen=${encodeURIComponent(chatData.gen)}&since=${chatData.rev}` : '';
   let d;
   try { d = await (await fetch(`/api/workers/${w.id}/chat${q}`)).json(); } catch { chatLoading = false; return; }
   chatLoading = false;
@@ -5089,6 +5144,8 @@ async function loadChat() {
     if (chatData.items.length > 300) chatData.items.splice(0, chatData.items.length - 300);
   }
   Object.assign(chatData, { wid: w.id, gen: d.gen, rev: d.rev, key });
+  chatCache.delete(w.id); chatCache.set(w.id, chatData); // 최근에 본 순서 — 오래된 것부터 버린다
+  if (chatCache.size > CHAT_CACHE_N) chatCache.delete(chatCache.keys().next().value);
   chatSettle(w.id);
   if (chatHtml.size > 2000) chatHtml.clear();
   renderChat();

@@ -2708,5 +2708,7 @@ button.cv-more:hover { color: var(--text); }
 :root[data-theme="light"] .cv-quote { background: #fff; }
 
 /* 아직 클로드가 읽지 않은 글 위 구분선 — 점선 + 가운데 글 */
+.cv-older { display: block; margin: 2px auto 12px; padding: 4px 12px; border: 1px solid var(--line-2); border-radius: 999px; background: none; color: var(--dim); font: inherit; font-size: 11px; cursor: pointer; }
+.cv-older:hover { color: var(--text); background: var(--line); }
 .cv-wait-sep { display: flex; align-items: center; gap: 10px; margin: 6px 0 10px; color: var(--faint); font-size: 11px; }
 .cv-wait-sep::before, .cv-wait-sep::after { content: ""; flex: 1; border-top: 1px dashed var(--line-2); }
