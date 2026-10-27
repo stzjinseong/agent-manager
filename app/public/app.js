@@ -4934,14 +4934,17 @@ $('#diff-clear').addEventListener('click', async () => {
   diffSel = null; diffExpanded = new Set(); diffFollow = true;
   loadDiff();
 });
+// 채팅 보기에서 diff 를 열었으면 닫을 때 채팅 보기로 돌아간다(저장해 둔 보기 설정도 채팅 그대로)
+let diffFromChat = false;
 function setDiffOpen(on) {
-  if (on && chatOpen) setChatOpen(false); // 채팅 보기와 diff 는 같은 자리 — 하나만
+  if (on && chatOpen) { diffFromChat = true; setChatOpen(false, true); } // 채팅 보기와 diff 는 같은 자리 — 하나만
   diffOpen = on;
   $('#diff-view').hidden = !on;
   $('#term-wrap').classList.toggle('diffing', on);
   const w = state.workers.find((x) => x.id === selected);
   if (w) renderDiffButton(w);
   if (on) { term.blur(); diffKey = ''; $('.term-stage').scrollLeft = 0; loadDiff(); } // 터치 기기의 확대 보기는 옆으로 밀려 있을 수 있다
+  else if (diffFromChat) { diffFromChat = false; setChatOpen(true); }
   else term.focus();
 }
 // ---------- 채팅 보기 (터미널 자리) ----------
@@ -5196,12 +5199,15 @@ function syncChat(w) {
   if (chatData.wid !== w.id || chatData.key !== w.chatRev) { clearTimeout(chatTimer); chatTimer = setTimeout(loadChat, chatData.wid === w.id ? 120 : 0); }
   renderChat();
 }
-function setChatOpen(on) {
+function setChatOpen(on, keepPref = false) {
+  if (!keepPref) { // 직접 CLI/채팅을 고르면 그 선택대로 — diff 를 닫아도 채팅으로 돌아가지 않는다
+    diffFromChat = false;
+    try { localStorage.setItem(CHAT_KEY, on ? '1' : '0'); } catch {}
+  }
   if (on === chatOpen) return;
   chatOpen = on;
   chatSeg();
   sendChatView();
-  try { localStorage.setItem(CHAT_KEY, on ? '1' : '0'); } catch {}
   if (on && diffOpen) setDiffOpen(false);
   $('#chat-view').hidden = !on;
   $('#term-wrap').classList.toggle('chatting', on);
