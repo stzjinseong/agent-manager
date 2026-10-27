@@ -1236,6 +1236,8 @@ body.resizing-term { cursor: row-resize; user-select: none; }
   box-shadow: 0 0 14px color-mix(in srgb, var(--avatar, var(--accent)) 22%, transparent);
   transition: border-color .25s, box-shadow .25s;
 }
+/* 채팅 보기에선 캐릭터 색 테두리를 끈다 — 클로드 쪽은 코랄 줄로 이미 구분되고, 색이 둘이면 시끄럽다. 두께는 그대로(밀림 방지) */
+.term-wrap.chatting:not(.full) { border-color: var(--line); box-shadow: none; }
 /* 선택한 워커 카드도 같은 색 테두리 — 어느 카드의 터미널을 보고 있는지 한눈에. 2px 은 레이아웃이 밀리지 않게
    border 1px + 바깥 1px 링(box-shadow)으로 만든다. 상태별 그림자(.s-working 등)보다 뒤에 둬야 이긴다 */
 .node.sel {
