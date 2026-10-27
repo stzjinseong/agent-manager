@@ -5041,9 +5041,14 @@ function renderChat() {
   const list = $('#cv-list');
   if (!w || !chatOpen) return;
   const items = chatData.wid === w.id ? chatData.items : [];
+  // 아직 클로드가 읽지 않은 글(보낸 직후 · 작업 사이에 전달 · Tasks 대기열) — 대화 끝에 '대기 중' 구분선 아래로 모은다.
+  // 대기열(w.queue)은 채팅에서 보낸 흐린 말풍선과 같은 글이면 한 번만
   const pend = chatPending.filter((x) => x.wid === w.id);
-  const html = (items.length || pend.length ? chatBlocks(items) : `<div class="cv-empty">${_t(chatLoading ? '불러오는 중…' : '아직 대화가 없어요')}</div>`)
-    + pend.map((x) => `<div class="cv-ev cv-u cv-pending"><div class="cv-lab"><b>${_t('나')}</b>${_t(x.label)}</div><div class="cv-msg">${esc(x.text)}${chatAtt({ text: x.text })}</div></div>`).join('')
+  const queued = (w.queue || []).map((t, i) => ({ text: t, norm: chatNorm(t), label: _t('대기열 {n}번', { n: i + 1 }) })).filter((q) => !pend.some((p) => p.norm === q.norm));
+  const waiting = [...pend.map((x) => ({ ...x, label: _t(x.label) })), ...queued];
+  const html = (items.length || waiting.length ? chatBlocks(items) : `<div class="cv-empty">${_t(chatLoading ? '불러오는 중…' : '아직 대화가 없어요')}</div>`)
+    + (waiting.length ? `<div class="cv-wait-sep"><span>${_t('대기 중 · 클로드가 아직 읽지 않음')} ${waiting.length}</span></div>` : '')
+    + waiting.map((x) => `<div class="cv-ev cv-u cv-pending"><div class="cv-lab"><b>${_t('나')}</b>${esc(x.label)}</div><div class="cv-msg">${esc(x.text)}${chatAtt({ text: x.text })}</div></div>`).join('')
     + chatTail(w);
   if (list._html === html) return;
   const stick = list.scrollHeight - list.scrollTop - list.clientHeight < 60;
