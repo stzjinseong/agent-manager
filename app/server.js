@@ -363,11 +363,21 @@ async function confirmInterrupt(w) {
 // '보내는 중'에 남고, 다음에 보낸 글이 그 뒤에 붙어 섞였다(실측 17:29: 'ㄴㅁㅇ' 중단 → 'ㄴㅁㅇㅁㄴㅇㄴㅁ', 'ㄴㅁㅇasd').
 // 입력창에 방금 보낸 글이 돌아와 있으면 Ctrl+C 로 비우고(글이 있을 때 Ctrl+C = 입력 지우기) 화면의 채팅 입력칸으로 돌려준다
 const restoreNorm = (t) => String(t || '').replace(/\[Image #\d+\]/g, '').replace(/(?:[A-Za-z]:[\\/]|\/)[^\s"'<>|]*?\.(?:png|jpe?g|gif|webp|bmp|svg)/gi, '').replace(/\s+/g, '');
-async function restoreAfterEsc(w, at = Date.now()) {
+async function restoreAfterEsc(w, at = Date.now(), unsent = null) {
   if (!workers.has(w.id) || w.status === 'exited') return false;
   const last = w.log?.findLast((l) => l.kind === 'assign' && at - l.t < 120_000)?.text;
   if (!last) return false;
   const cli = await cliDraft(w);
+  // 그사이 받아 간 기록(UserPromptSubmit → 'working: 글')이 있으면 받은 글이다 — 대화에 들어갔으니 돌려주지 않는다
+  const key = restoreNorm(unsent).slice(0, 10);
+  const accepted = unsent && w.log.some((l) => l.kind === 'status' && l.t >= at - 15_000 && l.text.startsWith('working: ') && restoreNorm(l.text.slice(9)).startsWith(key));
+  if (cli.state === 'empty' && unsent && key && !accepted) { // 받기 전에 멈춘 글 — 입력창엔 없으니 비울 것 없이 돌려주기만
+    w.sentPrompt = null;
+    pushLog(w, 'status', '중단 — Claude 가 받기 전에 멈춘 글을 채팅 입력칸으로 돌려줌');
+    broadcast({ type: 'restored', id: w.id, text: unsent });
+    emitState();
+    return true;
+  }
   if (cli.state !== 'draft') return false;
   const a = restoreNorm(last), c = restoreNorm(cli.text), k = Math.min(20, a.length, c.length);
   if (!k || a.slice(0, k) !== c.slice(0, k)) return false; // 사람이 CLI 에서 직접 쓰던 다른 글이면 건드리지 않는다
@@ -2344,8 +2354,11 @@ const server = http.createServer(async (req, res) => {
       w.term.write('\x1b'); nowToQueue(w, false); pushLog(w, 'status', '관리자가 중단(Esc)'); emitState(); setTimeout(() => scheduleProfile(w), 700);
       // 채팅 보기에서 멈췄으면(body.from === 'chat') CLI 입력창에 되돌아온 글을 채팅 입력칸으로 — CLI 에서 멈췄으면 CLI 에 그대로 둔다.
       // Claude Code 가 글을 되돌려 놓는 데 시간이 걸릴 때가 있어 1.5초 · 3.5초 두 번 본다
+      // unsent: Esc 때 아직 Claude Code 가 받지 않은 글(UserPromptSubmit 전 — sendPrompt 의 sentPrompt). 이런 글은 보낸 것이 아니라
+      // CLI 입력창에도 돌아오지 않는다 → 마지막 확인까지 입력창이 비어 있으면 그대로 채팅 입력칸으로 돌려준다
       const fromChat = body.from === 'chat', sentAt = Date.now();
-      setTimeout(async () => { await confirmInterrupt(w); if (fromChat && !(await restoreAfterEsc(w, sentAt))) setTimeout(() => restoreAfterEsc(w, sentAt), 2000); }, 1500);
+      const unsent = w.sentPrompt && sentAt - w.sentPrompt.at < 15_000 ? w.sentPrompt.text : null;
+      setTimeout(async () => { await confirmInterrupt(w); if (fromChat && !(await restoreAfterEsc(w, sentAt))) setTimeout(() => restoreAfterEsc(w, sentAt, unsent), 2000); }, 1500);
     }
     // 대기열에서 빼기(unqueue) · 나중에 할 작업으로 되돌리기(tomemo). 화면이 본 번호와 글이 둘 다 맞는 항목만 —
     // 그사이 CLI 로 나갔으면(dispatchQueued 가 앞에서 꺼냄) 번호가 밀리므로 글로 다시 찾고, 없으면 409(이미 전송).

@@ -5146,7 +5146,10 @@ function renderChat() {
   const waiting = [...pendRows, ...rest('now', () => _t('작업 사이에 전달')), ...rest('q', (i) => _t('대기열 {n}번', { n: i + 1 }))];
   const waitActs = (x) => x.qi >= 0
     ? `<span class="cv-wait-acts" data-src="${x.src}" data-qi="${x.qi}"><button type="button" class="cv-wq" data-wq="tomemo" title="${_t('Backlog 로 옮기기')}" aria-label="${_t('Backlog 로 옮기기')}">${UNDO_SVG}</button><button type="button" class="cv-wq" data-wq="unqueue" title="${_t('삭제')}" aria-label="${_t('삭제')}">${X_SVG}</button></span>`
-    : '';
+    // 서버에 없는 흐린 말풍선인데 클로드가 쉬고 있으면(멈춤 · 전달 실패 등으로 남은 것) 지우기 · 입력칸으로 되돌리기 — 화면에만 있는 것이라 서버엔 묻지 않는다
+    : x.at && viewStatus(w) !== 'working' && Date.now() - x.at > 5000
+      ? `<span class="cv-wait-acts" data-local="${x.at}"><button type="button" class="cv-wq" data-wq="back" title="${_t('입력칸으로 되돌리기')}" aria-label="${_t('입력칸으로 되돌리기')}">${UNDO_SVG}</button><button type="button" class="cv-wq" data-wq="drop" title="${_t('지우기')}" aria-label="${_t('지우기')}">${X_SVG}</button></span>`
+      : '';
   if (list._wid !== w.id) chatWin = CHAT_WIN; // 워커를 바꾸면 다시 최근 것만
   const html = (items.length || waiting.length ? chatBlocks(items, chatWin) : `<div class="cv-empty">${_t(chatLoading ? '불러오는 중…' : '아직 대화가 없어요')}</div>`)
     + (waiting.length ? `<div class="cv-wait-sep"><span>${_t('대기 중 · 클로드가 아직 읽지 않음')} ${waiting.length}</span></div>` : '')
@@ -5423,6 +5426,14 @@ $('#cv-list').addEventListener('click', async (e) => {
   const b = e.target.closest('[data-wq]');
   const w = b && state.workers.find((x) => x.id === selected);
   if (!w) return;
+  if (b.parentElement.dataset.local) { // 화면에만 남은 흐린 말풍선
+    const at = Number(b.parentElement.dataset.local), k = chatPending.findIndex((p) => p.wid === w.id && p.at === at);
+    if (k < 0) return;
+    const [p] = chatPending.splice(k, 1);
+    if (b.dataset.wq === 'back') { chatForm.text.value = chatForm.text.value ? `${p.text}\n${chatForm.text.value}` : p.text; chatForm.text.dispatchEvent(new Event('input', { bubbles: true })); chatForm.text.focus(); }
+    $('#cv-list')._html = ''; renderChat();
+    return;
+  }
   const box = b.parentElement, now = box.dataset.src === 'now', key = now ? 'nowQ' : 'queue';
   const op = b.dataset.wq, i = Number(box.dataset.qi), text = w[key]?.[i];
   if (text == null) return toast(_t('이미 CLI 로 보낸 지시라 옮기지 못했어요'));
