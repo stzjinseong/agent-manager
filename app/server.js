@@ -1202,8 +1202,11 @@ function workerView(w, full) {
   // ask: 결정 대기 중인 권한 요청·질문 문구 — 채팅 보기의 권한 카드에 쓴다
   const q = asks.get(w.id); // 채팅에서 답할 질문(붙잡은 PreToolUse)
   if (full) return { ...base, ask: w.status === 'decision' ? notice || null : null, askQ: q ? { id: q.id, questions: q.input.questions } : null, profile: tx && profileSummary(tx, approvalWaits) };
-  const { log, past, atts, ...lite } = base;
-  return { ...lite, lite: true, profile: tx && profileLite(tx) };
+  // 카드에는 캡처가 마지막 한 장만 보인다(app.js recentMedia) — 목록 전부(최근 50장)를 워커마다 실으면 꺼진 워커가 많을 때
+  // 상태 한 번이 277KB 중 약 200KB 가 캡처 목록이었고, 작업 중엔 초당 1~2번 오가 받을 때마다 화면이 ~140ms 멈췄다(실측 30명).
+  // 상세를 연 워커(full)는 전부 그대로 — 첨부 탭·캡처 넘겨 보기가 쓴다
+  const { log, past, atts, shots, ...lite } = base;
+  return { ...lite, shots: shots?.length ? shots.slice(-1) : [], lite: true, profile: tx && profileLite(tx) };
 }
 
 function publicState(sel = null) {
