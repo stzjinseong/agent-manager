@@ -11,6 +11,7 @@ import { execSync, execFile, spawn as spawnProcess } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import WebSocket, { WebSocketServer } from 'ws';
 import { createRequire } from 'node:module';
+import { slashCommands } from './slashcmds.js';
 import { createProfile, readProfile, profileSummary, profileLite, runningSubagents, editLog, trimHunks, pruneEdits, clearEdits } from './profile.js';
 import { snapshot, changedSince, readBlob } from './shelldiff.js';
 import { createProgress, isCommit } from './progress.js';
@@ -1906,6 +1907,13 @@ const server = http.createServer(async (req, res) => {
     if (Object.keys(ans).length !== qs.size) return json(res, 400, { error: '모든 질문에 답해 주세요' });
     releaseAsk(qm[1], ans);
     return json(res, 200, { ok: true });
+  }
+  // 채팅 입력칸 / 자동 완성 — 그 워커의 작업 폴더 기준 명령 목록(slashcmds.js)
+  const sm = req.method === 'GET' && p.match(/^\/api\/workers\/(W\d+)\/commands$/);
+  if (sm) {
+    const w = workers.get(sm[1]);
+    if (!w) return json(res, 404, { error: '워커가 없습니다' });
+    return json(res, 200, { commands: slashCommands(w.cwd) });
   }
   // 채팅 보기: 트랜스크립트에서 모은 대화 목록. gen 이 같으면 since(rev) 뒤에 생기거나 바뀐 것만, 다르면(새 세션·다시 읽음) 전부
   const cm = req.method === 'GET' && p.match(/^\/api\/workers\/(W\d+)\/chat$/);

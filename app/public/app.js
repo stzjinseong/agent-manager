@@ -5244,6 +5244,73 @@ $('#cv-acts').addEventListener('keydown', (e) => {
   const bs = [...$('#cv-acts').querySelectorAll('[data-send]')], i = bs.indexOf(document.activeElement);
   bs[(i + 1) % bs.length].focus();
 });
+// ---------- 채팅 입력칸 / 자동 완성 (CLI 처럼) ----------
+// 맨 앞이 / 이고 아직 띄어쓰기 전이면 명령 목록을 입력칸 위에 띄운다. 목록은 워커 작업 폴더 기준(server slashcmds.js)으로 1분 담아 둔다.
+// ↑↓ 고르기 · Tab 채우기(인자를 더 쓸 때) · Enter 채우고 바로 보내기(CLI 와 같음) · Esc 닫기. 이름이 앞에서 맞는 것(짧은 것부터) 먼저, 그다음 이름·설명에 들어 있는 것
+const SLASH_SRC = { builtin: '기본', project: '프로젝트', user: '내 명령', plugin: '플러그인' };
+let slashList = { wid: null, at: 0, items: [] }, slashLoading = null, slashMenu = { items: [], i: 0, open: false };
+async function slashCommandsFor(wid) {
+  if (slashList.wid === wid && Date.now() - slashList.at < 60_000) return slashList.items;
+  slashLoading ??= fetch(`/api/workers/${wid}/commands`).then((r) => r.json()).then((d) => { slashList = { wid, at: Date.now(), items: d.commands || [] }; return slashList.items; })
+    .catch(() => []).finally(() => { slashLoading = null; });
+  return slashLoading;
+}
+const slashQuery = (ta) => { const m = ta.value.slice(0, ta.selectionStart).match(/^\/(\S*)$/); return m ? m[1].toLowerCase() : null; };
+function slashClose() {
+  slashMenu.open = false;
+  $('#cv-slash').hidden = true;
+}
+function slashPaint() {
+  const box = $('#cv-slash'), { items, i } = slashMenu;
+  box.innerHTML = items.map((x, k) => `<button type="button" class="cv-sl${k === i ? ' on' : ''}" data-k="${k}" tabindex="-1"><b>/${esc(x.name)}</b><span>${esc(x.desc || '')}</span><small>${_t(SLASH_SRC[x.src] || '')}</small></button>`).join('');
+  box.hidden = false;
+  box.querySelector('.on')?.scrollIntoView({ block: 'nearest' });
+}
+async function slashUpdate() {
+  const ta = chatForm.text, q = slashQuery(ta);
+  if (q == null || !selected) return slashClose();
+  const wid = selected, all = await slashCommandsFor(wid);
+  if (selected !== wid || slashQuery(ta) !== q) return; // 기다리는 사이 글이 바뀌었으면 다음 입력에 맡긴다
+  const head = all.filter((x) => x.name.toLowerCase().startsWith(q)).sort((a, b) => a.name.length - b.name.length); // 짧은 이름부터(/c → /clear)
+  const rest = q ? all.filter((x) => !head.includes(x) && (x.name.toLowerCase().includes(q) || (x.desc || '').toLowerCase().includes(q))) : [];
+  const items = [...head, ...rest].slice(0, 50);
+  if (!items.length) return slashClose();
+  const keep = slashMenu.open ? slashMenu.items[slashMenu.i]?.name : null;
+  slashMenu = { items, i: Math.max(0, items.findIndex((x) => x.name === keep)), open: true };
+  slashPaint();
+}
+function slashFill(send) {
+  const ta = chatForm.text, x = slashMenu.items[slashMenu.i];
+  if (!x) return;
+  const after = ta.value.slice(ta.selectionStart).replace(/^\S*/, '');
+  ta.value = `/${x.name}${after.startsWith(' ') ? '' : ' '}${after.trimStart()}`;
+  const at = x.name.length + 2;
+  ta.setSelectionRange(at, at);
+  slashClose();
+  chatGrow();
+  ta.focus();
+  if (send) chatForm.requestSubmit();
+}
+chatForm.text.addEventListener('input', slashUpdate);
+chatForm.text.addEventListener('click', slashUpdate);
+chatForm.text.addEventListener('blur', () => setTimeout(() => { if (document.activeElement !== chatForm.text) slashClose(); }, 150));
+// 입력칸의 다른 키 처리(Enter 보내기 · Tab 버튼 이동 · Esc 중단)보다 먼저 받는다
+chatForm.text.addEventListener('keydown', (e) => {
+  if (!slashMenu.open || e.isComposing) return;
+  const n = slashMenu.items.length;
+  const take = () => { e.preventDefault(); e.stopImmediatePropagation(); };
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { take(); slashMenu.i = (slashMenu.i + (e.key === 'ArrowDown' ? 1 : n - 1)) % n; slashPaint(); }
+  else if (e.key === 'Tab' && !e.shiftKey) { take(); slashFill(false); }
+  else if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) { take(); slashFill(true); }
+  else if (e.key === 'Escape') { take(); slashClose(); }
+}, true);
+$('#cv-slash').addEventListener('mousedown', (e) => e.preventDefault()); // 누르는 동안 입력칸 포커스를 잃지 않게
+$('#cv-slash').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-k]');
+  if (!b) return;
+  slashMenu.i = Number(b.dataset.k);
+  slashFill(false);
+});
 // 빈 칸에서 Esc = 작업 중단(터미널의 Esc 와 같음)
 chatForm.text.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape' || chatForm.text.value || !selected) return;
