@@ -1931,10 +1931,6 @@ function renderDetail() {
   if (!w) return;
   if (wasHidden) requestAnimationFrame(() => { fitTerm(); placeMeters(); });
   else if ($('#detail-name').textContent !== w.name) requestAnimationFrame(placeMeters); // 다른 워커로 바꾸면 이름 폭이 달라진다
-  const av = $('#detail-avatar');
-  if (!av.firstChild) av.innerHTML = clawdSVG('head');
-  av.className = `detail-avatar s-${viewStatus(w)}`;
-  av.style.setProperty('--avatar', avatarColor(w.name) || 'var(--accent)');
   $('#term-wrap').style.setProperty('--avatar', avatarColor(w.name) || 'var(--accent)'); // 터미널 테두리 = 워커 색
   $("#detail-name").textContent = w.name; // 상태는 카드 배지·LED 로 보인다
   // 브랜치는 경로 앞에 — 경로가 길어 줄 끝이 잘려도 보이게
