@@ -5325,7 +5325,7 @@ chatForm.text.addEventListener('input', chatGrow);
 acceptFiles(chatForm.text);
 onEnterKey(chatForm.text, () => chatForm.requestSubmit());
 // 보내기 세 갈래(입력칸 오른쪽 버튼): 바로 전송(작업 중이어도 지금 CLI 에) · Tasks(업무 지시와 같음 — 쉬면 바로, 작업 중이면 대기열) ·
-// Backlog(나중에 할 작업 — 자동 실행 안 됨). 입력칸 Enter 는 바로 전송. 입력칸에서 Tab 이면 세 버튼을 차례로(마지막 다음은 첫 버튼), 버튼에서 Shift+Tab 이면 입력칸으로
+// Backlog(나중에 할 작업 — 자동 실행 안 됨). 입력칸 Enter 는 바로 전송. 입력칸에서 Tab 이면 세 버튼을 차례로(마지막 다음은 첫 버튼), Shift+Tab 은 반대 방향, 입력칸으로는 /
 async function chatSend(mode) {
   const ta = chatForm.text, text = ta.value.trim();
   const w = state.workers.find((x) => x.id === selected);
@@ -5386,10 +5386,9 @@ chatForm.text.addEventListener('keydown', (e) => {
 $('#cv-acts').addEventListener('keydown', (e) => {
   if (e.key !== 'Tab') return;
   e.preventDefault();
-  if (e.shiftKey) return chatForm.text.focus();
-  // 세 버튼 안에서 돈다 — 마지막에서 Tab 이면 첫 버튼으로(밖으로 빠지지 않게)
+  // 세 버튼 안에서 돈다 — Tab 은 다음(마지막에서 첫 버튼으로), Shift+Tab 은 반대로. 입력칸으로는 / 로 돌아간다
   const bs = [...$('#cv-acts').querySelectorAll('[data-send]')], i = bs.indexOf(document.activeElement);
-  bs[(i + 1) % bs.length].focus();
+  bs[(i + (e.shiftKey ? bs.length - 1 : 1)) % bs.length].focus();
 });
 // ---------- 채팅 입력칸 / 자동 완성 (CLI 처럼) ----------
 // 맨 앞이 / 이고 아직 띄어쓰기 전이면 명령 목록을 입력칸 위에 띄운다. 목록은 워커 작업 폴더 기준(server slashcmds.js)으로 1분 담아 둔다.
