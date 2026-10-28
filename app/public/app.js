@@ -5107,8 +5107,8 @@ function chatBlocks(items, limit = Infinity) {
     return chatItemHtml(b.x);
   }).join('');
 }
-// 끝줄: 결정 대기면 권한 카드, 작업 중이면 '생각 중'
-function chatTail(w) {
+// 끝줄: 결정 대기면 권한 카드, 작업 중이면 '생각 중', 클로드 답으로 끝나고 쉬면 '응답 완료'
+function chatTail(w, items, waiting) {
   const st = viewStatus(w);
   if (st === 'decision' && w.askQ) return ''; // 질문은 입력칸 위 카드(#cv-ask)로
   if (st === 'decision') {
@@ -5120,7 +5120,10 @@ function chatTail(w) {
     return `<div class="cv-ev cv-p"><span class="cv-dot"></span><div class="cv-perm"><div class="cv-q">${q}</div>${w.ask ? `<code>${esc(w.ask.replace(/^권한 요청\s*/, '').replace(/\s*— 터미널에서 선택하세요$/, ''))}</code>` : ''}<div class="cv-btns">${btns}</div></div></div>`;
   }
   if (st === 'working') return `<div class="cv-ev cv-a cv-think"><span class="cv-dot"></span><div class="cv-sys"><span class="cv-typing"><i></i><i></i><i></i></span> ${_t('생각 중')}</div></div>`;
-  return '';
+  // 중단 · 오류로 끝났으면 그 줄이 이미 끝을 말한다 — 답(a) · 도구(t)로 끝났을 때만
+  const last = items[items.length - 1];
+  if (waiting || !last || (last.k !== 'a' && last.k !== 't')) return '';
+  return `<div class="cv-end"><span>✓ ${_t('응답 완료')}${last.ts ? ` · ${chatTime(last.ts)}` : ''}</span></div>`;
 }
 function renderChat() {
   const w = state.workers.find((x) => x.id === selected);
@@ -5149,7 +5152,7 @@ function renderChat() {
   const html = (items.length || waiting.length ? chatBlocks(items, chatWin) : `<div class="cv-empty">${_t(chatLoading ? '불러오는 중…' : '아직 대화가 없어요')}</div>`)
     + (waiting.length ? `<div class="cv-wait-sep"><span>${_t('대기 중 · 클로드가 아직 읽지 않음')} ${waiting.length}</span></div>` : '')
     + waiting.map((x) => `<div class="cv-ev cv-u cv-pending"${x.qi >= 0 ? '' : ` title="${_t('이미 CLI 입력에 넣은 글이라 뺄 수 없어요')}"`}><div class="cv-lab">${waitActs(x)}<b>${_t('나')}</b>${esc(x.label)}</div><div class="cv-msg">${esc(x.text)}${chatAtt({ text: x.text })}</div></div>`).join('')
-    + chatTail(w);
+    + chatTail(w, items, waiting.length);
   if (list._html === html) return;
   const stick = list._wid !== w.id || list._atBottom !== false, older = chatOlder;
   const fromBottom = older ? list.scrollHeight - list.scrollTop : 0; // 앞에 붙일 때만 읽는다(드묾)

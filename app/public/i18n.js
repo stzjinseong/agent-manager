@@ -438,6 +438,7 @@ const EN = {
   'CLI 에서 고르기': 'Choose in CLI',
   'CLI 에서 답하기': 'Answer in CLI',
   '생각 중': 'Thinking',
+  '응답 완료': 'Done',
   '아직 대화가 없어요': 'No conversation yet',
   '대기 중 · 클로드가 아직 읽지 않음': 'Waiting · not read by Claude yet',
   '대기열 {n}번': ({ n }) => `Queued #${n}`,

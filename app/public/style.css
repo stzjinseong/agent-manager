@@ -2735,6 +2735,9 @@ button.cv-more:hover { color: var(--text); }
 .cv-older:hover { color: var(--text); background: var(--line); }
 .cv-wait-sep { display: flex; align-items: center; gap: 10px; margin: 6px 0 10px; color: var(--faint); font-size: 11px; }
 .cv-wait-sep::before, .cv-wait-sep::after { content: ""; flex: 1; border-top: 1px dashed var(--line-2); }
+/* 클로드가 답을 마치고 쉬는 중 — 대화 끝 가운데 표시 */
+.cv-end { display: flex; align-items: center; gap: 10px; margin: 8px 0 4px; color: var(--faint); font-size: 11px; }
+.cv-end::before, .cv-end::after { content: ""; flex: 1; border-top: 1px solid var(--line-2); }
 @media (hover: none) { .cv-box .cv-kbd-hint { display: none !important; } } /* 터치 기기엔 / 키가 없다 */
 /* 채팅 보기 CLI 엿보기(app.js cliPeek) — CLI 가 메뉴 · 선택창을 띄우면 채팅 칸을 위쪽 절반으로 줄여 아래에 깔린 실제 터미널을 드러낸다.
    막대는 채팅 칸 맨 아래(터미널 바로 위)에 붙고, 접어 두면 채팅은 원래 크기로 돌아가고 막대만 남는다 */
