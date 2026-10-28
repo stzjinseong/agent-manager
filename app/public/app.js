@@ -5415,6 +5415,7 @@ async function chatSend(mode) {
   const ta = chatForm.text, text = ta.value.trim();
   const w = state.workers.find((x) => x.id === selected);
   if (!text || !w || ta.readOnly) return;
+  histRemember(text, w.id);
   if (mode === 'memo') {
     const r = await api('/api/memos', { role: w.name, op: 'add', text });
     if (r?.error) return;
@@ -5566,6 +5567,73 @@ $('#cv-slash').addEventListener('click', (e) => {
   slashMenu.i = Number(b.dataset.k);
   slashFill(false);
 });
+// ---------- 입력 기록 (입력칸에서 ↑) ----------
+// 커서가 첫 줄에 있을 때 ↑ 를 누르면 지난번에 보낸 글을 목록으로 — ↑↓ 로 고르고 Enter · Tab 이면 입력칸에 그대로 넣고 닫는다.
+// Esc 는 목록만 닫는다(클로드 중단으로 번지지 않게). 재료: 이 브라우저에서 채팅으로 보낸 글(localStorage, 워커 상관없이 최근 HIST_MAX 개)
+// + 지금 워커의 대화 기록에 있는 내 글(CLI 에서 직접 친 것 포함). 같은 글은 한 번만, 최근 것이 입력칸 바로 위(맨 아래)
+const HIST_KEY = 'am.chatHist', HIST_MAX = 200, HIST_TEXT = 4000;
+function histLoad() { try { const a = JSON.parse(localStorage.getItem(HIST_KEY) || '[]'); return Array.isArray(a) ? a : []; } catch { return []; } }
+function histRemember(text, wid) {
+  const list = histLoad().filter((x) => x.t !== text);
+  list.unshift({ t: text.slice(0, HIST_TEXT), w: wid, at: Date.now() });
+  try { localStorage.setItem(HIST_KEY, JSON.stringify(list.slice(0, HIST_MAX))); } catch {}
+}
+function histItems() {
+  const seen = new Set(), out = [];
+  const mine = chatData.wid === selected ? chatData.items.filter((x) => x.k === 'u' && x.text).map((x) => ({ t: x.text, w: selected, at: x.ts + clockSkew })) : [];
+  for (const x of [...histLoad(), ...mine].sort((a, b) => b.at - a.at)) {
+    const k = x.t.trim();
+    if (!k || seen.has(k)) continue;
+    seen.add(k); out.push(x);
+    if (out.length >= HIST_MAX) break;
+  }
+  return out.reverse(); // 오래된 것이 위, 최근 것이 맨 아래(입력칸 바로 위)
+}
+const histBox = el('<div class="cv-slash cv-hist" id="cv-hist" role="listbox" hidden></div>');
+$('#cv-slash').after(histBox);
+let histMenu = { open: false, items: [], i: 0 };
+function histPaint() {
+  const fmt = (t) => fmtDate(t, DATE_MD_HM);
+  histBox.innerHTML = histMenu.items.map((x, k) => `<button type="button" class="cv-sl cv-hi${k === histMenu.i ? ' on' : ''}" data-k="${k}" role="option"><span>${esc(x.t.replace(/\s+/g, ' ').slice(0, 300))}</span><small>${x.w && x.w !== selected ? `${esc(x.w)} · ` : ''}${fmt(x.at)}</small></button>`).join('');
+  histBox.hidden = false;
+  histBox.querySelector('.on')?.scrollIntoView({ block: 'nearest' });
+}
+function histOpen() {
+  const items = histItems();
+  if (!items.length) return false;
+  histMenu = { open: true, items, i: items.length - 1 };
+  histPaint();
+  return true;
+}
+function histClose() { if (!histMenu.open) return; histMenu.open = false; histBox.hidden = true; histBox.innerHTML = ''; }
+function histFill() {
+  const x = histMenu.items[histMenu.i], ta = chatForm.text;
+  histClose();
+  if (!x) return;
+  ta.value = x.t;
+  ta.setSelectionRange(x.t.length, x.t.length);
+  ta.dispatchEvent(new Event('input', { bubbles: true })); // 크기 · 첨부 · / 목록이 새 글에 맞게
+  ta.focus();
+}
+// / 목록 처리보다도 먼저 받는다(목록이 열려 있을 때만 키를 가로챈다)
+chatForm.text.addEventListener('keydown', (e) => {
+  if (e.isComposing || e.altKey || e.ctrlKey || e.metaKey) return;
+  const ta = chatForm.text, take = () => { e.preventDefault(); e.stopImmediatePropagation(); };
+  if (!histMenu.open) {
+    // 커서가 첫 줄에 있고 / 목록이 닫혀 있을 때만 — 여러 줄 글에서 ↑ 는 원래대로 윗줄로
+    if (e.key === 'ArrowUp' && !e.shiftKey && !slashMenu.open && !ta.value.slice(0, ta.selectionStart).includes('\n') && histOpen()) take();
+    return;
+  }
+  const n = histMenu.items.length;
+  if (e.key === 'ArrowUp') { take(); histMenu.i = Math.max(0, histMenu.i - 1); histPaint(); }
+  else if (e.key === 'ArrowDown') { take(); if (histMenu.i >= n - 1) histClose(); else { histMenu.i++; histPaint(); } } // 맨 아래(최근)에서 ↓ = 닫기
+  else if ((e.key === 'Enter' && !e.shiftKey) || (e.key === 'Tab' && !e.shiftKey)) { take(); histFill(); }
+  else if (e.key === 'Escape') { take(); histClose(); }
+  else if (!['Shift', 'Control', 'Alt', 'Meta', 'CapsLock'].includes(e.key)) histClose(); // 다른 글자를 치면 목록만 닫고 그대로 입력
+}, true);
+chatForm.text.addEventListener('blur', () => setTimeout(() => { if (document.activeElement !== chatForm.text) histClose(); }, 150));
+histBox.addEventListener('mousedown', (e) => e.preventDefault());
+histBox.addEventListener('click', (e) => { const b = e.target.closest('[data-k]'); if (!b) return; histMenu.i = Number(b.dataset.k); histFill(); });
 // ---------- 채팅 내용 드래그 → 물어보기 · 복사 ----------
 // 대화 목록에서 글을 고르면 고른 곳 위에 작은 버튼을 띄운다. 물어보기 = 고른 글을 인용(> …)으로 입력칸 맨 위에 넣고
 // 그 아래에 커서 — 이어서 질문을 쓰면 된다(쓰던 글이 있으면 그 앞에). 입력칸에 넣기 = 고른 글 그대로 커서 자리에. 복사 = 클립보드. 선택이 풀리면(새 메시지로 목록이 다시 그려질 때 포함) 버튼도 닫는다

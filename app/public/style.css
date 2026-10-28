@@ -2710,6 +2710,10 @@ button.cv-more:hover { color: var(--text); }
 .cv-sl:not(.cv-sl-hint).on, .cv-sl:not(.cv-sl-hint):hover { background: var(--surface-3); }
 /* 인자 힌트 한 줄('/명령 ' 뒤) — 고르는 목록이 아니라 안내라 눌림 표시 없음 */
 .cv-sl-hint { cursor: default; }
+/* 입력 기록 목록(입력칸 ↑) — / 목록과 같은 상자. 글 한 줄 + 오른쪽에 시각(다른 워커에서 보낸 글이면 워커 이름도) */
+.cv-sl.cv-hi { grid-template-columns: minmax(0, 1fr) auto; }
+.cv-hi span { color: var(--text-2); font-size: 12.5px; }
+.cv-hi.on span { color: var(--text); }
 .cv-sl-hint i { font-style: normal; font-family: var(--mono); color: var(--accent-hi); margin-right: 4px; }
 .cv-sl-hint span { white-space: normal; }
 .cv-sl.on b { color: var(--accent-hi); }
