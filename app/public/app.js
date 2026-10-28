@@ -5396,9 +5396,12 @@ for (const b of document.querySelectorAll('.btn-chat')) b.onclick = () => setCha
 const chatForm = $('#chat-form');
 function chatGrow() {
   const ta = chatForm.text;
+  // 30줄까지 늘어난다(예전 180px ≈ 8~9줄). 창이 낮으면 화면 높이의 70% 까지 — 대화 목록이 다 가려지지 않게
+  const cs = getComputedStyle(ta), lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.5;
+  const max = Math.min(Math.round(lh * 30 + parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom)), Math.round(innerHeight * 0.7));
   ta.style.height = 'auto';
-  ta.style.height = `${Math.min(ta.scrollHeight, 180)}px`;
-  ta.style.overflowY = ta.scrollHeight > 180 ? 'auto' : 'hidden';
+  ta.style.height = `${Math.min(ta.scrollHeight, max)}px`;
+  ta.style.overflowY = ta.scrollHeight > max ? 'auto' : 'hidden';
   syncAttach(ta);
 }
 chatForm.text.addEventListener('input', chatGrow);
