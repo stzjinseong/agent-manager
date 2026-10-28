@@ -1330,7 +1330,11 @@ function resolveDecision(did, decision) {
 // 워커 하나를 화면에 보낼 모양으로. full: 상세 패널을 연 워커 — 타임라인(log · past) · 프로필 전부.
 // 나머지는 카드 · 비교 표에 쓰는 것만(lite). 화면이 안 쓰는 필드(lastPrompt · todos · currentTool 등)는 아무 워커에도 안 보낸다.
 // 예전엔 모든 워커를 전부 실어 상태 한 번이 1.1MB · 만들기 약 250ms 였다(워커 20개, log 490KB · profile 280KB 실측)
-const chatGenOf = (tx) => (tx?.chat ? `${path.basename(tx.path, '.jsonl')}:${tx.chatGen}` : null);
+// 세대에 서버 기동 id 를 넣는다 — 대화 번호(seq)는 서버가 기록을 다시 읽으며 새로 매기므로 재시작 전후가 같다는 보장이 없다
+// (기록을 읽는 규칙이 바뀌면 한 줄만 더 잡혀도 뒤가 하나씩 밀림). 세대가 같으면 화면이 바뀐 것만 받아 번호로 합쳐서, 같은 글이
+// 다른 번호로 한 번 더 붙어 두 번 보였다. 재시작하면 화면이 통째로 다시 받는다
+const BOOT_ID = Date.now().toString(36);
+const chatGenOf = (tx) => (tx?.chat ? `${path.basename(tx.path, '.jsonl')}:${BOOT_ID}.${tx.chatGen}` : null);
 function workerView(w, full) {
   const { term, tx, approvalWaits, pot, lastPrompt, lastMessage, todos, notice, currentTool, subTool, ptySize, sentPrompt, seedAt, bootInputAt, dirSent, cacheJudged, modelAt, liteCache, ...rest } = w;
   // chatRev: 채팅 보기가 바뀐 것을 알아채는 표시(내용은 열 때 /chat 으로 가져간다)
