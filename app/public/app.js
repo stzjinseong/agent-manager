@@ -5399,8 +5399,11 @@ function chatGrow() {
   // 30줄까지 늘어난다(예전 180px ≈ 8~9줄). 창이 낮으면 화면 높이의 70% 까지 — 대화 목록이 다 가려지지 않게
   const cs = getComputedStyle(ta), lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.5;
   const max = Math.min(Math.round(lh * 30 + parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom)), Math.round(innerHeight * 0.7));
-  ta.style.height = 'auto';
-  ta.style.height = `${Math.min(ta.scrollHeight, max)}px`;
+  // 스크롤될 만큼 길면 보내기 버튼을 아랫줄로 내려 입력칸을 상자 폭 전부로 — 스크롤바가 버튼 왼쪽 어중간한 자리에 섰다(cv-tall)
+  const box = ta.closest('.cv-box');
+  const fit = () => { ta.style.height = 'auto'; ta.style.height = `${Math.min(ta.scrollHeight, max)}px`; return ta.scrollHeight > max; };
+  box.classList.remove('cv-tall');
+  if (fit()) { box.classList.add('cv-tall'); fit(); }
   ta.style.overflowY = ta.scrollHeight > max ? 'auto' : 'hidden';
   syncAttach(ta);
 }

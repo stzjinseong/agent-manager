@@ -2653,6 +2653,7 @@ button.cv-more:hover { color: var(--text); }
 /* 칸 안의 글상자엔 공통 포커스 링(코랄 3px)을 끈다 — 링이 바깥 상자 안쪽에 한 겹 더 생겨 겹쳐 보였다. 포커스는 바깥 상자 테두리만 진하게 */
 .cv-box textarea:focus { border: 0; box-shadow: none; outline: none; }
 .cv-box textarea { flex: 1; min-width: 0; resize: none; border: 0; outline: 0; background: none; color: var(--text); font: inherit; padding: 4px 0; overflow-y: hidden; }
+.cv-box.cv-tall textarea { flex-basis: 100%; } /* 길어져 스크롤되면 입력칸이 상자 폭 전부, 버튼은 아랫줄 오른쪽(app.js chatGrow) */.cv-box.cv-tall .cv-acts { margin-left: auto; }
 .cv-box .att-live { order: -1; flex-basis: 100%; }
 /* 입력칸이 비었고 포커스가 없을 때만: '메시지 보내기' 자리에 '/ 눌러 입력' 안내(app.js — 입력칸 밖에서 / 를 누르면 여기로).
    글이 비면 첨부 줄(.att-live)도 비어 입력칸이 늘 첫 줄 — 상자 여백(6px) + 입력칸 여백(4px) 자리에 겹쳐 둔다 */
