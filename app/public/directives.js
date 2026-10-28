@@ -166,7 +166,7 @@
   // ---------- 상세 패널: 이 워커에 붙은 헤더 ----------
   // 붙이기는 헤더 버튼 창(모든 워커 / 골라서)에서만 한다 — 여기는 붙은 것을 보여 주고 떼기 · 고치기만
   const bar = el(`<div class="dv-bar"><div class="dv-chips"></div><span class="dv-state"></span></div>`);
-  document.querySelector('#sec-task')?.prepend(bar); // Tasks 제목 위, 예약 목록(schedule.js)보다 앞
+  document.querySelector('#term-wrap > .cv-bar')?.after(bar); // 터미널 · 채팅 위 'CLI | 채팅' 막대 바로 아래 — 막대를 한 줄 늘린 것처럼
   bar.addEventListener('click', (e) => {
     const w = cur(), c = e.target.closest('[data-id]');
     if (!w || !c) return;
@@ -198,6 +198,7 @@
       st.textContent = w.status === 'exited' ? '' : w.dirPending ? T(mine.length ? '다음 메시지에 전달' : '다음 메시지에 해제 전달') : mine.length ? T('✓ 전달됨') : '';
       st.className = `dv-state${w.dirPending ? ' wait' : ''}`;
       st.title = w.dirPending ? T('바뀐 헤더는 이 워커가 다음 메시지를 받을 때 함께 넘어가요') : T('이 세션에 지금 헤더가 전달됐어요');
+      bar.hidden = !mine.length && !out.length && !st.textContent; // 붙은 헤더가 없으면 빈 줄로 막대를 늘리지 않는다
     }
     if (!back.hidden) { texts(); renderList(); }
   };

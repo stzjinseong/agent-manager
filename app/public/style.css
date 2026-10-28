@@ -2502,8 +2502,10 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 .dv-rc-all { display: inline-flex; align-items: center; gap: 3px; }
 .dv-rc-all .dv-g { width: 12px; height: 12px; }
 .dv-rc-all + .dv-rc { margin-left: 6px; } /* '모든 워커' 와 역할 칩 사이를 조금 띄워 구분 */
-.dv-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0 0 6px; }
-.dv-bar[hidden] { display: none; }
+/* 'CLI | 채팅' 막대 아래 한 줄 — 같은 바탕으로 이어 붙여 막대가 아래로 늘어난 것처럼(막대의 아래 선은 이 줄 아래로) */
+.dv-bar { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: -8px -8px 8px; padding: 0 12px 8px; background: var(--chat-bg, var(--term-bg)); border-bottom: 1px solid var(--line); }
+.dv-bar[hidden], .term-wrap.full > .dv-bar { display: none; }
+.cv-bar:has(+ .dv-bar:not([hidden])) { border-bottom: 0; }
 .dv-chips { display: contents; }
 .dv-chip { display: inline-flex; align-items: center; gap: 3px; max-width: 100%; font-size: 11.5px; padding: 1px 2px 1px 8px; border-radius: 11px; cursor: pointer; color: var(--text); background: rgb(var(--ink) / .06); border: 1px solid rgb(var(--ink) / .1); }
 .dv-chip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
