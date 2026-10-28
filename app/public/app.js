@@ -1880,32 +1880,27 @@ document.body.append(dockTraces);
 let dockTraceSig = '';
 function drawDockTraces() {
   const mark = $('.brand-mark');
-  // 아무 워커도 움직이지 않으면(작업 중 · 백그라운드 · 결정 대기 없음) 선을 그리지 않는다 — 헤더 아래가 늘 선으로 덮여 있지 않게
-  const busy = state.workers.some((w) => ['working', 'waiting', 'decision'].includes(viewStatus(w))) || state.decisions.length > 0;
-  const on = busy && $('#floor').hidden && mark?.classList.contains('mgr-on') && !document.body.classList.contains('term-full');
+  // 움직이는 워커(작업 중 · 백그라운드 · 결정 대기)의 칩에만 선을 긋는다 — 쉬는 칩까지 모두 이으면 좁은 띠가 선으로 어지러웠다
+  const on = $('#floor').hidden && mark?.classList.contains('mgr-on') && !document.body.classList.contains('term-full');
   const lr = on && $('#dock-list').getBoundingClientRect();
   const chips = on ? [...document.querySelectorAll('#dock-list .dchip')].map((c) => {
-    const r = c.getBoundingClientRect(), w = state.workers.find((x) => x.id === c.dataset.id);
-    return { tx: Math.round(r.left + r.width / 2), ty: Math.round(r.top) - 1, st: c.classList.contains('socket') ? 'socket' : w ? viewStatus(w) : 'socket' };
-  }).filter((o) => o.tx >= lr.left + 6 && o.tx <= lr.right - 6) : [];
+    const r = c.getBoundingClientRect(), w = !c.classList.contains('socket') && state.workers.find((x) => x.id === c.dataset.id);
+    return { tx: Math.round(r.left + r.width / 2), ty: Math.round(r.top) - 1, st: w ? viewStatus(w) : 'socket' };
+  }).filter((o) => ['working', 'waiting', 'decision'].includes(o.st) && o.tx >= lr.left + 6 && o.tx <= lr.right - 6) : [];
   const mr = on && mark.getBoundingClientRect();
   const sig = chips.length ? `${Math.round(mr.left)},${Math.round(mr.bottom)}|` + chips.map((o) => `${o.tx},${o.ty},${o.st}`).join('|') : '';
   if (sig === dockTraceSig) return;
   dockTraceSig = sig;
   if (!sig) { dockTraces.innerHTML = ''; return; }
-  // 선마다 곡선으로 그으면 좁은 띠(약 29px)에서 긴 가로선이 같은 높이로 겹쳐 읽기 어려웠다 → 선마다 자기 차선(높이)을 준다.
-  // 로고 아래에서 내려와 자기 차선을 따라 가로로 가다 칩 위로 꺾여 내려간다. 서로 건너지 않게,
-  // 먼 칩일수록 출발점은 오른쪽 · 차선은 위(로고 쪽), 가까운 칩일수록 출발점은 왼쪽 · 차선은 아래(칩 쪽)
+  // 펼친 화면(drawTraces)과 같은 S 곡선 — 로고 아래 가장자리에 출발점을 칩 x 순서대로 펼쳐 두고 칩 위쪽 가운데로.
+  // 띠가 낮아(약 29px) 곡선의 당김은 높이의 절반으로 둔다(펼친 화면의 최소 20px 을 쓰면 위아래로 넘친다)
   chips.sort((a, b) => a.tx - b.tx);
   const n = chips.length, cx = mr.left + mr.width / 2, ay = Math.round(mr.bottom) + 1;
-  const top = Math.min(...chips.map((o) => o.ty)), lo = ay + 4, hi = top - 4;
-  const gap = n > 1 ? Math.min(5, (hi - lo) / (n - 1)) : 0, span = Math.min(mr.width - 6, (n - 1) * 5);
+  const span = Math.min(mr.width - 6, (n - 1) * 8);
   dockTraces.innerHTML = chips.map((o, i) => {
     const ax = Math.round(cx - span / 2 + (n > 1 ? (span * i) / (n - 1) : span / 2));
-    const ly = Math.round(n > 1 ? hi - (hi - lo - gap * (n - 1)) / 2 - gap * i : (lo + hi) / 2); // i 가 클수록(먼 칩) 위 차선
-    // 꺾이는 두 모서리는 둥글게(반지름 최대 5px — 차선 · 세로 길이가 짧으면 그만큼 줄인다)
-    const sx = Math.sign(o.tx - ax) || 1, r = Math.max(0, Math.min(5, ly - ay, o.ty - ly, Math.abs(o.tx - ax) / 2));
-    const d = `M${ax} ${ay} V${ly - r} Q${ax} ${ly} ${ax + sx * r} ${ly} H${o.tx - sx * r} Q${o.tx} ${ly} ${o.tx} ${ly + r} V${o.ty}`;
+    const k = Math.max(2, Math.round((o.ty - ay) / 2));
+    const d = `M${ax} ${ay} C${ax} ${ay + k} ${o.tx} ${o.ty - k} ${o.tx} ${o.ty}`;
     return `<g class="${o.st === 'socket' ? 't-socket' : `t-${o.st}`}"><path class="base" d="${d}"/><path class="flow" d="${d}"/><circle class="pad" cx="${o.tx}" cy="${o.ty}" r="2.5"/></g>`;
   }).join('');
 }
