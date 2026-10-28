@@ -5436,6 +5436,7 @@ async function chatSend(mode) {
     const l = $('#cv-list'); l.scrollTop = l.scrollHeight;
   }
   ta.value = '';
+  slashClose(); histClose(); // 값만 비우면 input 이 안 나서 / 목록(인자 힌트 · 마우스로 보낸 경우)이 떠 있었다
   chatGrow();
   ta.focus();
 }

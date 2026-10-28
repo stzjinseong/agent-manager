@@ -156,14 +156,16 @@ function promptText(e) {
     : Array.isArray(c) && c.length && c.every((b) => b.type === 'text' || b.type === 'image')
       ? (c.some((b) => b.type === 'text') ? c.filter((b) => b.type === 'text').map((b) => b.text).join('\n') : '(이미지)') : null;
   if (text == null) return null;
+  // 슬래시 명령은 '<command-message>이름</command-message><command-name>/이름</command-name>' 처럼 command-message 가 앞에 올 때가
+  // 있다(스킬 · 커스텀 명령) — 아래에서 거르면 채팅 보기에 내 글이 안 보였다. command-name 이 있으면 '/이름 인자' 로 살린다
+  const cmd = text.match(/<command-name>([^<]+)<\/command-name>/);
+  if (cmd) { const args = text.match(/<command-args>([^<]*)<\/command-args>/); return `${cmd[1]} ${args?.[1] || ''}`.trim() || null; }
   if (/^<(local-command-stdout|local-command-stderr|command-message|system-reminder)/.test(text)) return null;
   // 백그라운드 작업 완료 알림도 모델 턴을 일으키므로 턴으로 세되, 사람 질문과 구분되게 표시
   if (text.startsWith('<task-notification>')) {
     const sum = text.match(/<summary>([^<]*)<\/summary>/);
     return `🔔 ${sum ? sum[1] : '백그라운드 작업 알림'}`;
   }
-  const cmd = text.match(/<command-name>([^<]+)<\/command-name>/);
-  if (cmd) { const args = text.match(/<command-args>([^<]*)<\/command-args>/); text = `${cmd[1]} ${args?.[1] || ''}`.trim(); }
   return text.trim() || null;
 }
 
