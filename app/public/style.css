@@ -455,8 +455,8 @@ body.card-drag .node-add { opacity: .25; transition: opacity .2s; }
 .att-tab:not([hidden]) + .detail { margin-top: 0 !important; border-top-left-radius: 0; }
 .detail-head { position: relative; display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 /* 역할 이름은 오른쪽 버튼(diff · 크게 · 중단 · 제거)과 같은 높이 칸에 아래쪽을 맞춰 둔다 */
-.detail-title { display: flex; flex-direction: column; justify-content: flex-end; min-width: 0; flex: 1; height: var(--dt-h, 34px); }
-.detail-title strong { font-size: 20px; line-height: 1; padding-bottom: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.detail-title { display: flex; flex-direction: column; justify-content: center; min-width: 0; flex: 1; height: var(--dt-h, 34px); }
+.detail-title strong { font-size: 20px; line-height: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* ---------- 미터: 컨텍스트 · 5시간 · 주간 (오른쪽 — 보통은 '크게' 버튼 왼쪽, 크게 보기에선 '닫기' 버튼 왼쪽) ----------
    CLI 에서 ▓░ 글자로 그린 막대처럼 점무늬 — 채운 쪽은 밝은 면에 작은 구멍(▓), 빈 쪽은 흐린 점(░) */
 .meters { display: flex; align-items: center; gap: 14px; min-width: 0; overflow: hidden; font-size: 11.5px; color: var(--text-2); }
