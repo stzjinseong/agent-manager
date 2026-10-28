@@ -2,13 +2,13 @@
 
 **English** | [한국어](README.ko.md)
 
-A dashboard for **managing multiple Claude Code sessions (workers) from a single browser page** on your own PC.
-Hand out tasks, watch their progress, and review what they changed and what it cost.
+A dashboard for running **multiple Claude Code sessions (workers) on your PC from a single browser page**.
+Hand out tasks, follow them as a chat, and review what they changed and what it cost.
 
 ![Clawdgotchi overview](docs/screenshots/en/overview.png)
 
-- Each worker is the same `claude` CLI you already use, so your slash commands, skills, MCP servers and settings all work as usual.
-- A **local-only** tool that listens on `127.0.0.1` only (no remote access · the only outside connection is the update check).
+- Each worker is the same `claude` CLI you already use — your slash commands, skills, MCP servers and settings all work as usual.
+- A **local-only** tool listening on `127.0.0.1` only. The only outside connection is the update check.
 - Restarting the dashboard **does not disconnect workers** — they reattach automatically.
 
 ## Installation
@@ -21,97 +21,86 @@ git clone https://github.com/stzjinseong/agent-manager.git
 
 Open `claude` in the cloned folder and run the command below — it checks everything and installs for you.
 
-#### macOS
+| | Install | Run |
+|---|---|---|
+| macOS | `/setup --mac` | `Launch.app`, or `agent-manager` in a terminal |
+| Windows | `/setup --windows` | `Launch.vbs`, or `agent-manager` in PowerShell |
 
-1. Install: `/setup --mac`
-2. Run: open `Launch.app`, or type `agent-manager` in a terminal!
+> On macOS, if a security warning appears the first time you open `Launch.app`, **right-click → Open** it in Finder.
 
-> If a security warning appears the first time you open `Launch.app`, **right-click → Open** it in Finder.
+## At a glance
 
-#### Windows
+| | |
+|---|---|
+| **Worker cards** | Status (Working · Needs you · Done · Idle), cost and git branch, grouped by repo |
+| **Chat view** | Read and reply as a conversation instead of a terminal. Questions and permission prompts show up as cards |
+| **Tasks · Backlog** | Tasks are sent now (queued while busy); Backlog holds ideas for later |
+| **Headers** | Rules sent to every worker (or chosen roles) — e.g. "Commit when done" |
+| **diff** | Files a worker changed, per request — including shell commands and subagents |
+| **Session profile** | Tokens · estimated cost · context · cache hit rate · time per tool |
 
-1. Install: `/setup --windows`
-2. Run: open `Launch.vbs`, or type `agent-manager` in PowerShell!
-
-## How to use
+## Usage
 
 ### 1. Launch a worker
 
-Click the **Add worker** card at the end of the worker cards (or the **+** at the end of the chip row when minimized), pick a role name and a working folder, then **Launch**.
+Click the **Add worker** card at the end of the card row, set a role name and working folder, then **Launch**.
 With **Save role** on, the card stays in **Standby** after the worker closes, so you can bring it back with **▶ Launch**.
 
-![Launch a worker](docs/screenshots/en/new-worker.png)
+### 2. Give work and follow along — Chat / CLI
 
-Each card shows the worker's status (Working · Needs you · Done · Idle), what it is doing now, to-do progress, cost and the git branch of its working folder at a glance.
-Drag cards to reorder them, and double-click a name to rename it.
+Click a card to open that worker below. Switch views with **CLI | Chat** at the top left.
 
-### 2. Give tasks and watch
+![Chat view](docs/screenshots/en/chat.png)
 
-Click a card to open that worker's terminal below. Click it again to close.
+- **Send now** sends right away (while busy, it goes in when the current tool finishes), **Tasks** queues it, **Backlog** saves it as a note.
+- Messages Claude hasn't read yet sit dimmed under the **Waiting** line — you can remove them or move them to Backlog.
+- When Claude finishes, **✓ Done** appears at the end of the conversation. Press **Esc** to interrupt anytime.
+- `/` autocompletes slash commands, **↑** brings back what you sent.
 
-![Worker details](docs/screenshots/en/detail.png)
+Switch to CLI for the regular Claude Code terminal.
 
-- **Tasks** — sent right away. While the worker is busy they queue up and go in one by one.
-- **Later** — notes for things to do later. They are sent only when you press the **▶ button**. Drag one onto another worker's card (or chip when minimized) to move it there.
-- **Timeline** — requests, tool calls and completions. Click a request to jump to it in the terminal.
-- You can also type in the terminal directly. **⛶ Expand** makes it bigger, and **⏸ Interrupt** sends Esc.
+![CLI view](docs/screenshots/en/cli.png)
 
-When a permission approval is needed, the card turns to **Needs you** and a dot appears on the browser tab icon.
+When a permission prompt comes up, the card turns **Needs you** and the browser tab icon gets a dot.
 
-### 3. Review changes (diff)
+### 3. Always-on rules — Headers
 
-Click **diff** to see the file changes the worker made, grouped by request.
-It covers files Claude edited directly as well as files changed by shell commands and subagents (shell commands only in git repositories).
+Write rules your workers should always follow in 📋 **Headers** at the top. Each one applies to all workers or only to chosen roles,
+and is attached once per session with the first message (edits go with the next message). Attached headers show as chips under the CLI/Chat bar.
+
+![Headers](docs/screenshots/en/headers.png)
+
+### 4. Review changes — diff
+
+Click **diff** to see changed files, grouped by request.
 
 ![diff view](docs/screenshots/en/diff.png)
 
-### 4. Check tokens and cost
+### 5. Tokens and cost — Session profile
 
-When a worker is open, the **Session profile** appears below it: total tokens, estimated cost, context, cache hit rate and per-turn usage.
-Hover over an **ⓘ icon** to learn what each metric means and how to use it.
-The bar at the top shows **⏱ time until the cache expires**, the context, and your account's 5-hour and weekly usage limits — hover over any of them for details.
+The **Session profile** under the worker shows total tokens, estimated cost, context, cache hit rate and per-tool usage.
+Hover **ⓘ** for what each metric means and how to use it. The bar above the worker shows time left until the cache expires and your account's 5-hour and weekly limits.
 
 ![Session profile](docs/screenshots/en/profile.png)
 
-### 5. Tidy up the screen
+### 6. Tidy up and customize
 
-- **▴ Minimize** — collapse the cards into one row under the header. Click a chip to open that worker.
-- **Collapse the right panel** — drag the line on its left edge all the way right to leave just a `‹` strip and widen the terminal. Click the strip to bring it back.
-- **🌐** — switch between 한국어 / English.
-- **🌙 / ☀** — dark / light mode.
-- **⬇ Updates** — a dot appears when there is a new Clawdgotchi release or Claude Code version. Click to check again and see how to update.
+**▴ Minimize** folds the cards into a single row of chips. Click a chip to open that worker.
 
-![Minimized view and language menu](docs/screenshots/en/minimized.png)
+![Minimized](docs/screenshots/en/minimized.png)
 
-![Light mode](docs/screenshots/en/light.png)
-
-### 6. Customize — your own characters and themes
-
-Pick a character and a theme from 👕 **Customize** in the header. Each browser remembers its choice.
-
-- **Characters** — **+ Add character** turns an uploaded image into your own character. Background removal and trimming are automatic, and you can add stage 1–5 images the manager switches to as it grows. Uploaded images are stored in `data/characters/`.
-- **Themes** — **+ Make a theme** copies the example into a new theme right away, or writes a request so a Claude worker builds one in the style you describe. A theme is a folder `themes/<name>/` (`theme.css` · `theme.json`); see [themes/README.md](themes/README.md) for how to make one (written in Korean).
-
-Characters and themes stay on this computer and are never committed (`.gitignore`). They survive updates.
+- 👕 **Customize** — characters (upload your own), themes, fonts and CLI colors. [How to make a theme](themes/README.md)
+- ⏱ **Schedule** — send instructions to a role at set times and days.
+- 📊 **Usage report** · 🌐 English/한국어 · 🌙/☀ dark/light · ⬇ update alerts
 
 ## Good to know
 
-### Input keys
-
-In the terminal (CLI) and in every input box, **Enter adds a new line and Alt(⌥)/⌘ + Enter sends**.
-
-| Where | New line | Send / confirm | Other |
+| Where | Send | New line | Other |
 |---|---|---|---|
-| Terminal (CLI) | Enter | Alt(⌥)/⌘ + Enter (also confirms choices such as permission prompts) | Ctrl+C: copy if text is selected, otherwise interrupt · Ctrl+V: paste · Right-click: copy/paste |
-| Tasks | Enter | Alt(⌥)/⌘ + Enter | Queued if the worker is busy |
-| Later | Enter | Alt(⌥)/⌘ + Enter (add) | While editing: Alt(⌥)/⌘ + Enter to save · Esc to cancel |
-| Rename a worker | — | Enter | Esc to cancel |
+| Chat input · Tasks · Backlog | Enter | Shift/Ctrl + Enter | Esc to interrupt · `/` commands · ↑ history |
+| Terminal (CLI) | Enter | Shift/Ctrl + Enter | Ctrl+C: copies the selection if any, otherwise interrupts |
 
-Drag files or images onto the terminal or an input box, or paste them, to attach them.
-
-### Other
-
-- Use the **⏻** button to shut down just the server (workers keep running) or the workers too.
-- After updating, click **↻ Restart now** when it appears. Workers keep running.
-- Costs are estimates at API prices and differ from your actual bill on a subscription.
-- Built for Chrome. In other browsers a **⚠** appears in the header — click it to open the dashboard in Chrome.
+- Drag files or images onto the input or terminal, or paste them, to attach.
+- **⏻** stops just the server (workers keep running) or the workers too. After an update, click **↻ Restart now** — workers stay as they are.
+- Costs are estimates at API prices. On a subscription, your actual bill differs.
+- Built for Chrome. In other browsers a **⚠** appears in the header; click it to open in Chrome.
