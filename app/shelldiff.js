@@ -51,6 +51,37 @@ export async function snapshot(cwd) {
   return run;
 }
 
+// 파일을 쓸 수 없는 명령인가 — 그런 명령은 전후를 찍지 않는다. 찍는 사이에 다른 쪽(Unity 에디터 저장 · 같은 저장소의 다른 워커 ·
+// 사람)이 바꾼 파일이 그 명령의 수정으로 잡혔다(실측: Explore 의 grep · git log 몇 초 사이에 에디터가 저장한 프리팹 +6/−438 이 diff 에 뜸).
+// 확실할 때만 true — 모르는 명령 · 출력 돌리기(>) · 명령 치환($( ) · ``) · heredoc 이 하나라도 있으면 false(예전처럼 찍는다)
+const READ_CMDS = new Set(['cd', 'pushd', 'popd', 'ls', 'dir', 'cat', 'head', 'tail', 'wc', 'grep', 'egrep', 'fgrep', 'rg', 'find', 'file',
+  'stat', 'du', 'df', 'echo', 'printf', 'pwd', 'which', 'where', 'type', 'whoami', 'date', 'sort', 'uniq', 'cut', 'tr', 'jq', 'diff', 'cmp',
+  'basename', 'dirname', 'realpath', 'readlink', 'test', '[', 'true', 'false', 'sleep', 'tree', 'nl', 'column', 'md5sum', 'sha1sum', 'sha256sum']);
+const READ_GIT = new Set(['log', 'show', 'diff', 'status', 'grep', 'blame', 'rev-parse', 'ls-files', 'ls-tree', 'describe', 'cat-file',
+  'rev-list', 'shortlog', 'merge-base', 'name-rev', 'for-each-ref', 'whatchanged']);
+const WRITE_OPTS = /^(-delete|-exec|-execdir|-ok|-okdir|-fprint\w*|-fls|--output(=.*)?)$/; // find · git diff --output
+const OUT_FILE = new Set(['sort', 'tree']); // -o 파일 로 쓴다(grep -o 는 읽기라 이 둘만)
+export function isReadOnlyCommand(cmd) {
+  if (!cmd || /\$\(|`|<<|<\(|>\(/.test(cmd)) return false;
+  // 버리는 출력 돌리기(2>/dev/null · >/dev/null · 2>&1 · &>/dev/null)만 지우고, 남은 > 가 있으면 쓰는 명령
+  const s = cmd.replace(/(\d|&)?>>?\s*\/dev\/null\b|\d>&\d/g, ' ');
+  if (s.includes('>')) return false;
+  for (const seg of s.split(/&&|\|\||[;|&\n]/)) {
+    const words = (seg.match(/"[^"]*"|'[^']*'|\S+/g) || []).map((x) => x.replace(/^(["'])(.*)\1$/, '$2')).filter((x) => !/^[(){}]$/.test(x));
+    while (words.length && /^\w+=/.test(words[0])) words.shift(); // VAR=값 명령
+    if (!words.length) continue;
+    const [name, ...args] = words;
+    if (!READ_CMDS.has(name) && name !== 'git') return false;
+    if (args.some((a) => WRITE_OPTS.test(a) || (OUT_FILE.has(name) && /^-o/.test(a)))) return false;
+    if (name === 'git') {
+      let i = 0;
+      while (i < args.length && args[i].startsWith('-')) i += args[i] === '-C' || args[i] === '-c' ? 2 : 1; // git -C 폴더 · -c 키=값 · --no-pager
+      if (!READ_GIT.has(args[i])) return false;
+    }
+  }
+  return true;
+}
+
 // 명령 전(pre) → 지금. 같은 저장소에서 그 사이 끝난 다른 명령이 있으면 그 명령 뒤부터 (같은 변경을 두 번 세지 않게)
 // → [{ file(절대 경로), kind: 'create'|'edit'|'delete', binary, hunks }]
 export async function changedSince(pre) {

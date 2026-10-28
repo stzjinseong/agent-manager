@@ -13,7 +13,7 @@ import WebSocket, { WebSocketServer } from 'ws';
 import { createRequire } from 'node:module';
 import { slashCommands } from './slashcmds.js';
 import { createProfile, readProfile, profileSummary, profileLite, runningSubagents, editLog, trimHunks, pruneEdits, clearEdits } from './profile.js';
-import { snapshot, changedSince, readBlob } from './shelldiff.js';
+import { snapshot, changedSince, readBlob, isReadOnlyCommand } from './shelldiff.js';
 import { createProgress, isCommit } from './progress.js';
 import { createUserProfile } from './userprofile.js';
 import { createRoleStats } from './rolestats.js';
@@ -973,7 +973,8 @@ async function shellHook(w, ev) {
       // 다음 도구(Edit 등)가 파일을 쓰기 전에 찍어야 그 수정이 셸 변경으로 섞이지 않는다 → 응답 전에 기다린다
       const stale = [...pending].filter(([id, x]) => x.scope === scope && id !== ev.tool_use_id).map(([id]) => closeShell(w, id));
       if (stale.length) await withTimeout(Promise.all(stale), 3000);
-      if (ev.tool_name === 'Bash' && !ev.tool_input?.run_in_background) {
+      // 읽기만 하는 명령은 찍지 않는다 — 그 사이 다른 쪽이 바꾼 파일이 이 명령의 수정으로 잡혔다(shelldiff.js isReadOnlyCommand)
+      if (ev.tool_name === 'Bash' && !ev.tool_input?.run_in_background && !isReadOnlyCommand(String(ev.tool_input?.command || ''))) {
         const pre = await withTimeout(snapshot(ev.cwd || w.cwd), 5000); // 훅 제한(10초) 안에 (앞 명령 닫기 3초 + 5초) — 못 찍으면 이 명령은 건너뛴다
         if (pre) pending.set(ev.tool_use_id, { pre, scope, cmd: String(ev.tool_input?.command || ''), agent: ev.agent_id ? (ev.agent_type || 'subagent') : null, txPath: ev.transcript_path });
       }
