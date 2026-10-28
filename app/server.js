@@ -893,17 +893,37 @@ const MAX_SHELL_LOAD = 2000; // 읽을 때 안전판 — 그 이상은 어차피
 const SHELL_KEEP_DAYS = 30;
 const shellFile = (txPath) => path.join(SHELL_DIR, `${path.basename(txPath, '.jsonl')}.jsonl`);
 const shellLines = new Map(); // 파일 경로 → 디스크에 쌓인 줄 수
-function openProfile(txPath) {
+// cold: 꺼진 워커의 트랜스크립트는 처음엔 읽지 않는다 — 카드는 저장해 둔 요약(liteCache)으로 그리고, 대화 · diff · 상세를 열 때
+// warmProfile 이 읽는다. 재시작마다 꺼진 워커 32명의 기록 590MB 를 전부 읽어 기동 직후 이벤트 루프가 ~3.4초 막히고
+// 서버 메모리가 1.2GB 였다(실측, 살아 있는 워커 몫은 2MB)
+function openProfile(txPath, cold = false) {
   const p = createProfile(txPath);
   p.chat = []; // 채팅 보기용 대화 목록을 켠다(profile.js chatPush)
   p.diffClearedAt = config.diffCleared[path.basename(txPath, '.jsonl')] || 0; // diff 목록을 비운 세션이면 그 뒤 수정만
-  try {
-    const lines = fs.readFileSync(shellFile(txPath), 'utf8').split('\n').filter(Boolean);
-    shellLines.set(shellFile(txPath), lines.length);
-    p.shellEdits = lines.map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean).slice(-MAX_SHELL_LOAD);
-  } catch {}
+  if (cold) { p.cold = true; return p; }
+  loadShellEdits(p);
   return p;
 }
+function loadShellEdits(p) {
+  try {
+    const lines = fs.readFileSync(shellFile(p.path), 'utf8').split('\n').filter(Boolean);
+    shellLines.set(shellFile(p.path), lines.length);
+    p.shellEdits = lines.map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean).slice(-MAX_SHELL_LOAD);
+  } catch {}
+}
+// 프로필을 쓰기 직전에 부른다 — cold 면 그 자리에서 셸 수정 기록 · 트랜스크립트를 읽는다. 마지막으로 쓴 시각은 내리기(coldSweep) 기준
+function warmProfile(w) {
+  const tx = w.tx;
+  if (!tx) return null;
+  tx.usedAt = Date.now();
+  if (!tx.cold) return tx;
+  delete tx.cold;
+  loadShellEdits(tx);
+  try { readProfile(tx); } catch {}
+  return tx;
+}
+// 카드에 싣는 요약 — cold 면 저장해 둔 것
+const liteOf = (w) => (w.tx.cold ? w.liteCache || null : profileLite(w.tx));
 // 보관 기준으로 줄인 뒤, 디스크 파일이 남은 기록의 두 배(+100줄)보다 길면 남은 것만으로 다시 쓴다
 function compactShellFile(p) {
   pruneEdits(p);
@@ -1175,7 +1195,7 @@ function trackTasks(w, ev) {
 
 // 트랜스크립트는 훅 이벤트마다 증분으로 읽고, 작업 중에는 2초마다 한 번 더 읽는다 (스트리밍 중 토큰 반영)
 function scheduleProfile(w) {
-  if (!w.tx || w.tx.timer) return;
+  if (!w.tx || w.tx.cold || w.tx.timer) return;
   w.tx.timer = setTimeout(() => {
     w.tx.timer = null;
     if (readProfile(w.tx)) { setModel(w, w.tx.model, w.tx.modelAt); drainShots(w); roleStats.cost(w, w.tx.path, txCost(w.tx), w.tx.turns[0]?.start); emitState(); }
@@ -1208,6 +1228,24 @@ function seedHistory(w) {
 }
 // 작업 중이거나, 턴은 끝났어도 백그라운드 서브에이전트가 돌고 있으면 계속 읽는다
 setInterval(() => { for (const w of workers.values()) if (w.status === 'working' || w.status === 'decision' || (w.status !== 'exited' && w.tx && runningSubagents(w.tx))) scheduleProfile(w); }, 2000);
+// 다 본 꺼진 워커는 다시 내린다 — 어느 탭도 상세 · 채팅으로 보고 있지 않고 COLD_AFTER 넘게 안 쓴 것. 요약을 남기고 빈(cold) 프로필로
+// 되돌린다(채팅 세대를 올려 다음에 열 때 화면이 통째로 다시 받게). 하나씩 열어 볼 때마다 메모리가 다시 쌓이지 않게
+const COLD_AFTER = 5 * 60_000;
+function coldSweep() {
+  const open = new Set();
+  for (const ws of sockets) { if (ws.sel) open.add(ws.sel); if (ws.chatSel) open.add(ws.chatSel); }
+  let n = 0;
+  for (const w of workers.values()) {
+    const tx = w.tx;
+    if (w.status !== 'exited' || !tx || tx.cold || tx.timer || open.has(w.id) || Date.now() - (tx.usedAt || 0) < COLD_AFTER) continue;
+    w.liteCache = profileLite(tx);
+    w.tx = Object.assign(openProfile(tx.path, true), { chatGen: tx.chatGen + 1 });
+    n++;
+  }
+  if (n) saveWorkersSoon();
+  return n;
+}
+setInterval(coldSweep, 60_000);
 
 function hasPending(workerId) {
   for (const d of decisions.values()) if (d.workerId === workerId) return true;
@@ -1293,17 +1331,17 @@ function resolveDecision(did, decision) {
 // 예전엔 모든 워커를 전부 실어 상태 한 번이 1.1MB · 만들기 약 250ms 였다(워커 20개, log 490KB · profile 280KB 실측)
 const chatGenOf = (tx) => (tx?.chat ? `${path.basename(tx.path, '.jsonl')}:${tx.chatGen}` : null);
 function workerView(w, full) {
-  const { term, tx, approvalWaits, pot, lastPrompt, lastMessage, todos, notice, currentTool, subTool, ptySize, sentPrompt, seedAt, bootInputAt, dirSent, cacheJudged, modelAt, ...rest } = w;
+  const { term, tx, approvalWaits, pot, lastPrompt, lastMessage, todos, notice, currentTool, subTool, ptySize, sentPrompt, seedAt, bootInputAt, dirSent, cacheJudged, modelAt, liteCache, ...rest } = w;
   // chatRev: 채팅 보기가 바뀐 것을 알아채는 표시(내용은 열 때 /chat 으로 가져간다)
   const base = { ...rest, branch: branchOf.get(w.cwd) || null, dirPending: directives.pending(config.directives, w), chatRev: chatGenOf(tx) && `${chatGenOf(tx)}#${tx.chatRev}` };
   // ask: 결정 대기 중인 권한 요청·질문 문구 — 채팅 보기의 권한 카드에 쓴다
   const q = asks.get(w.id); // 채팅에서 답할 질문(붙잡은 PreToolUse)
-  if (full) return { ...base, ask: w.status === 'decision' ? notice || null : null, askQ: q ? (q.kind === 'plan' ? { id: q.id, kind: 'plan', plan: String(q.input.plan || '').slice(0, 40_000) } : { id: q.id, questions: q.input.questions }) : null, profile: tx && profileSummary(tx, approvalWaits) };
+  if (full) return { ...base, ask: w.status === 'decision' ? notice || null : null, askQ: q ? (q.kind === 'plan' ? { id: q.id, kind: 'plan', plan: String(q.input.plan || '').slice(0, 40_000) } : { id: q.id, questions: q.input.questions }) : null, profile: tx && profileSummary(warmProfile(w), approvalWaits) };
   // 카드에는 캡처가 마지막 한 장만 보인다(app.js recentMedia) — 목록 전부(최근 50장)를 워커마다 실으면 꺼진 워커가 많을 때
   // 상태 한 번이 277KB 중 약 200KB 가 캡처 목록이었고, 작업 중엔 초당 1~2번 오가 받을 때마다 화면이 ~140ms 멈췄다(실측 30명).
   // 상세를 연 워커(full)는 전부 그대로 — 첨부 탭·캡처 넘겨 보기가 쓴다
   const { log, past, atts, shots, ...lite } = base;
-  return { ...lite, shots: shots?.length ? shots.slice(-1) : [], lite: true, profile: tx && profileLite(tx) };
+  return { ...lite, shots: shots?.length ? shots.slice(-1) : [], lite: true, profile: tx && liteOf(w) };
 }
 
 function publicState(sel = null) {
@@ -1427,7 +1465,7 @@ function onHostHello({ ptys }) {
   for (const rec of saved) {
     if (workers.has(rec.id)) continue;
     const p = alive.get(rec.id);
-    const w = { ...rec, term: hostTerm(rec.id, rec.ptySize || null, (s) => { w.ptySize = s; }), tx: rec.txPath ? openProfile(rec.txPath) : null };
+    const w = { ...rec, term: hostTerm(rec.id, rec.ptySize || null, (s) => { w.ptySize = s; }), tx: null };
     if (rec.txPath) userProfile.note(rec.txPath, w);
     delete w.txPath;
     delete w.shellPending; // 예전 버전이 워커 객체에 두어 {} 로 저장된 것
@@ -1437,6 +1475,8 @@ function onHostHello({ ptys }) {
     w.dispatchAt = 0;
     if (!p || p.exited) w.status = 'exited';
     else { w.pid = p.pid; pushLog(w, 'status', '관제 서버 재시작 — 워커 다시 연결'); }
+    // 꺼진 워커는 요약이 저장돼 있으면 읽지 않는다(cold). 요약이 없던 예전 기록은 이번에 한 번 읽어 두고 coldSweep 이 요약을 남긴다
+    if (rec.txPath) w.tx = openProfile(rec.txPath, w.status === 'exited' && Boolean(rec.liteCache));
     // 완료 시각 기록(doneAt) 이전에 끝난 워커도 '확인 안 한 완료'로 보이게 마지막 갱신 시각으로 채운다
     if (w.status === 'done' && !w.doneAt) w.doneAt = w.updatedAt || Date.now();
     w.nowQ ||= []; // 작업 중이 아니면 들고 있던 바로 전송 글을 넣을 틈(PostToolUse)이 다시 오지 않는다 → 대기열 맨 앞으로
@@ -1871,7 +1911,7 @@ function forgetWorker(w) {
 
 function saveWorkersNow() {
   clearTimeout(saveTimer); saveTimer = null;
-  const list = [...workers.values()].map(({ term, tx, ...w }) => ({ ...w, txPath: tx?.path || null }));
+  const list = [...workers.values()].map(({ term, tx, liteCache, ...w }) => ({ ...w, txPath: tx?.path || null, liteCache: tx ? liteOf({ tx, liteCache }) : null }));
   try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(WORKERS_PATH, JSON.stringify(list)); } catch {}
 }
 
@@ -2040,7 +2080,7 @@ const server = http.createServer(async (req, res) => {
   if (cm) {
     const w = workers.get(cm[1]);
     if (!w) return json(res, 404, { error: '워커가 없습니다' });
-    const tx = w.tx, gen = chatGenOf(tx);
+    const tx = warmProfile(w), gen = chatGenOf(tx);
     if (!gen) return json(res, 200, { gen: null, rev: 0, full: true, items: [] });
     const q = url.searchParams, since = Number(q.get('since')) || 0;
     const full = q.get('gen') !== gen;
@@ -2053,7 +2093,7 @@ const server = http.createServer(async (req, res) => {
     const w = workers.get(dm[1]);
     if (!w) return json(res, 404, { error: '워커가 없습니다' });
     const rel = (f) => { const r = path.relative(w.cwd || ROOT, f); return r && !r.startsWith('..') && !path.isAbsolute(r) ? r : f; };
-    const log = w.tx ? editLog(w.tx) : { files: [], requests: [] };
+    const log = w.tx ? editLog(warmProfile(w)) : { files: [], requests: [] };
     const shellTracked = Boolean(await snapshotRepo(w.cwd));
     return json(res, 200, { cwd: w.cwd, shellTracked, files: log.files.map((x) => ({ ...x, rel: rel(x.file) })), requests: log.requests });
   }
@@ -2061,7 +2101,7 @@ const server = http.createServer(async (req, res) => {
   // diff 화면의 그림 전/후 — 셸 수정 기록(img)에 남은 blob 만 꺼낸다(기록에 없는 경로·저장소는 받지 않는다)
   const im = req.method === 'GET' && p.match(/^\/api\/workers\/(W\d+)\/diff-image$/);
   if (im) {
-    const ed = workers.get(im[1])?.tx?.shellEdits.find((x) => x.id === url.searchParams.get('edit'));
+    const iw = workers.get(im[1]), ed = iw?.tx && warmProfile(iw).shellEdits.find((x) => x.id === url.searchParams.get('edit'));
     const side = url.searchParams.get('side'), spec = ed?.img && (side === 'before' || side === 'after') ? ed.img[side] : null;
     const type = spec && IMAGE_TYPES[path.extname(ed.file).slice(1).toLowerCase()];
     const buf = type && await readBlob(ed.img.root, spec);
@@ -2385,6 +2425,7 @@ const server = http.createServer(async (req, res) => {
     // diff 목록 비우기(🗑) — 이 세션의 지금까지 수정을 목록에서 뺀다. 시각은 세션(트랜스크립트)별로 config 에 남겨 재시작해도 비운 채로.
     // 셸 수정 기록 파일도 지운다(서버가 쌓는 기록이라 트랜스크립트처럼 다시 읽을 원본이 따로 없다). 오래된 세션 기록은 최근 200개만
     if (m[2] === 'diffclear' && w.tx) {
+      warmProfile(w);
       const at = Date.now(), key = path.basename(w.tx.path, '.jsonl');
       clearEdits(w.tx, at);
       fs.rmSync(shellFile(w.tx.path), { force: true }); shellLines.delete(shellFile(w.tx.path));
