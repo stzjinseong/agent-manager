@@ -160,7 +160,9 @@ function promptText(e) {
   // 있다(스킬 · 커스텀 명령) — 아래에서 거르면 채팅 보기에 내 글이 안 보였다. command-name 이 있으면 '/이름 인자' 로 살린다
   const cmd = text.match(/<command-name>([^<]+)<\/command-name>/);
   if (cmd) { const args = text.match(/<command-args>([^<]*)<\/command-args>/); return `${cmd[1]} ${args?.[1] || ''}`.trim() || null; }
-  if (/^<(local-command-stdout|local-command-stderr|command-message|system-reminder)/.test(text)) return null;
+  if (/^<(local-command-stdout|local-command-stderr|command-message)/.test(text)) return null;
+  // 끼워 넣은 알림(system-reminder 블록뿐)은 버리되, 사람이 그 태그로 시작하는 글을 보낸 것은 살린다 — 버리면 흐린 말풍선이 지워지지 않고 남았다
+  if (text.startsWith('<system-reminder') && !text.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, '').trim()) return null;
   // 백그라운드 작업 완료 알림도 모델 턴을 일으키므로 턴으로 세되, 사람 질문과 구분되게 표시
   if (text.startsWith('<task-notification>')) {
     const sum = text.match(/<summary>([^<]*)<\/summary>/);
@@ -232,10 +234,12 @@ function apply(p, e, line) {
   // 채팅이 이걸 안 읽어 그 글이 대화에 안 보였고, 흐린 말풍선은 다음 요청이 들어올 때 대신 지워져 '감쪽같이 사라진' 것처럼 보였다
   if (e.type === 'attachment' && e.attachment?.type === 'queued_command' && e.attachment.commandMode === 'prompt') {
     const pr = e.attachment.prompt;
-    const text = (typeof pr === 'string' ? pr : Array.isArray(pr) ? pr.filter((b) => b.type === 'text').map((b) => b.text).join(' ') : '').trim();
     const img = Array.isArray(pr) ? pr.filter((b) => b.type === 'image').length : 0;
+    // 글 없이 그림만 보낸 것도 user 메시지와 같게 '(이미지)' — 예전엔 항목이 안 생겨 흐린 말풍선이 10분 남았다
+    const text = (typeof pr === 'string' ? pr : Array.isArray(pr) ? pr.filter((b) => b.type === 'text').map((b) => b.text).join(' ') : '').trim() || (img ? '(이미지)' : '');
+    // 같은 글이 user 메시지와 이 첨부로 두 번 기록될 때만 거른다. 첨부끼리 같은 글은 정말 두 번 보낸 것(같은 글을 10초 안에 다시 보냄) — 거르면 두 번째 말풍선이 남았다
     const dup = p.chat?.findLast((x) => x.k === 'u');
-    if (p.chat && text && !text.includes('<task-notification>') && !(dup && dup.text === text.slice(0, CHAT_TEXT) && Math.abs(dup.ts - ts) < 10_000)) chatPush(p, { k: 'u', ts, text: text.slice(0, CHAT_TEXT), img });
+    if (p.chat && text && !text.includes('<task-notification>') && !(dup && !dup.q && dup.text === text.slice(0, CHAT_TEXT) && Math.abs(dup.ts - ts) < 10_000)) chatPush(p, { k: 'u', ts, text: text.slice(0, CHAT_TEXT), img, q: 1 });
     return;
   }
   if (e.type === 'user') {

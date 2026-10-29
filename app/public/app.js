@@ -5036,8 +5036,13 @@ const chatUnfold = new Set(); // 펼친 도구 묶음(첫 칩 seq)
 // 보낸 글은 기록(트랜스크립트)에 남아야 목록에 생겨 몇 초 늦게 보였다 — 보내자마자 흐린 말풍선으로 먼저 띄우고,
 // 기록에 같은 글의 요청이 들어오면 지운다(공백 빼고 비교). 대기열로 간 Tasks 는 투입될 때까지 '대기열'로 남는다. 10분이 지나면 버린다
 let chatPending = [];
-// 비교용: Claude Code 는 붙인 그림 경로를 [Image #N] 으로 바꿔 기록한다 → 경로·[Image #N]·공백을 빼고 비교 · 붙여넣기 감싸개(<pasted_content …>)도 기록에만 생기므로 뺀다
-const chatNorm = (t) => String(t || '').replace(/<\/?pasted_content[^>]*>/g, '').replace(/\[Image #\d+\]/g, '').replace(/(?:[A-Za-z]:[\\/]|\/)[^\s"'<>|]*?\.(?:png|jpe?g|gif|webp|bmp|svg)/gi, '').replace(/\s+/g, '');
+// 비교용: 보낸 글과 기록된 글이 달라지는 곳을 양쪽에서 같게 맞춘다 — 공백 · 한글 조합형(NFC) ·
+//  붙인 그림 경로 ↔ [Image #N](경로에 공백이 있어도 통째로) · 그림만 보내면 기록은 '(이미지)' ·
+//  기록에만 생기는 감싸개(<pasted_content …> 붙여넣기 · <bash-input> 셸 모드)와 셸 모드의 앞 '!'
+const chatNorm = (t) => String(t || '').normalize('NFC').replace(/<\/?(?:pasted_content|bash-input)[^>]*>/g, '').replace(/\[Image #\d+\]/g, '')
+  .replace(/(?<![^\s"'])(?:[A-Za-z]:[\\/]|\/)[^"'<>|\r\n]*?\.(?:png|jpe?g|gif|webp|bmp|svg)(?=[\s"']|$)/gi, '').replace(/^\s*!/, '').replace(/\s+/g, '').replace(/^\(이미지\)$/, '');
+// 흐린 말풍선을 띄울 글 — 슬래시 명령은 기록에 다른 모양(명령 이름 · 인자)으로 남아 띄우지 않는다
+const chatPendable = (t) => !/^\/[\w:-]/.test(String(t).trim());
 // 기록에 들어온 요청 하나가 흐린 말풍선 하나를 지운다 — 같은 글이 먼저, 없으면 앞부분(12자)이 같은 것(글이 조금 바뀌어 기록됨)
 function chatSettle(wid) {
   const now = Date.now();
@@ -5440,7 +5445,7 @@ async function chatSend(mode) {
     const busy = viewStatus(w) === 'working';
     // 슬래시 명령(/model 등)은 대화 기록에 내 글로 남지 않을 때가 많아 흐린 말풍선이 지워지지 않았다 — 작업 중이면 서버 대기(nowQ ·
     // 대기열) 줄로 보이고, 쉬고 있으면 곧장 CLI 에서 실행되므로 말풍선을 따로 만들지 않는다
-    if (!/^\/[\w:-]/.test(text.trim())) chatPending.push({ wid: w.id, text, mode, norm: chatNorm(text), at: Date.now(), label: mode === 'now' ? (busy ? '작업 사이에 전달' : '보내는 중…') : busy ? '대기열' : '보내는 중…' });
+    if (chatPendable(text)) chatPending.push({ wid: w.id, text, mode, norm: chatNorm(text), at: Date.now(), label: mode === 'now' ? (busy ? '작업 사이에 전달' : '보내는 중…') : busy ? '대기열' : '보내는 중…' });
     $('#cv-list')._html = ''; renderChat();
     const l = $('#cv-list'); l.scrollTop = l.scrollHeight;
   }
