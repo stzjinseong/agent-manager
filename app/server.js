@@ -22,6 +22,7 @@ import * as directives from './directives.js';
 import { L } from './cli-lang.js';
 import { createUpdates } from './updates.js';
 import { gitBranch } from './branch.js';
+import { ensureToken, hostOk, callerOk, TOKEN_HEADER } from './auth.js';
 import { chromePath, openInChrome } from './chrome.js';
 const { Terminal: HeadlessTerminal } = createRequire(import.meta.url)('@xterm/headless');
 
@@ -34,6 +35,7 @@ const DECISION_HOLD_MS = 590_000; // 훅 timeout(600s) 직전에 놓아 터미�
 // 권한 요청을 대시보드(페이지 상단 결정함)에서 허용/거부할지. 끄면 터미널 선택창에서 고르고 카드엔 '결정 대기'만 보인다
 const REMOTE_DECISIONS = process.env.AM_REMOTE_DECISIONS === '1';
 fs.mkdirSync(DATA_DIR, { recursive: true });
+const AUTH_TOKEN = ensureToken(); // 훅 · 상태줄 · PTY 호스트가 들고 오는 비밀값 (auth.js)
 
 const IS_WIN = process.platform === 'win32';
 const IS_MAC = process.platform === 'darwin';
@@ -264,7 +266,7 @@ function renameRole(from, to, worker) {
 function pickFolder(start) {
   if (IS_MAC) {
     // macOS: AppleScript 폴더 선택 창 (취소하면 osascript 가 오류로 끝나 null)
-    const def = start && fs.existsSync(start) ? ` default location (POSIX file "${String(start).replace(/"/g, '\\"')}")` : '';
+    const def = start && fs.existsSync(start) ? ` default location (POSIX file "${String(start).replace(/[\\"]/g, '\\$&')}")` : '';
     const script = `POSIX path of (choose folder with prompt "워커 작업 폴더 선택"${def})`;
     return new Promise((resolve) => {
       execFile('osascript', ['-e', script], { encoding: 'utf8' }, (err, out) => resolve(err ? null : out.trim().replace(/\/$/, '') || null));
@@ -275,7 +277,8 @@ function pickFolder(start) {
     'Add-Type -AssemblyName System.Windows.Forms',
     '$f=New-Object System.Windows.Forms.FolderBrowserDialog',
     '$f.Description="워커 작업 폴더 선택"',
-    start ? `$f.SelectedPath='${String(start).replace(/'/g, "''")}'` : '',
+    // 시작 폴더는 스크립트에 끼워 넣지 않고 환경변수로 — PowerShell 은 ‘ ’ 같은 유니코드 따옴표도 작은따옴표로 읽어 이스케이프를 빠져나갔다
+    start ? '$f.SelectedPath=$env:AM_PICK_START' : '',
     // 서버(백그라운드 프로세스)가 띄운 창은 Windows 포그라운드 잠금 때문에 브라우저 뒤에 숨었다 — 누르면 아이콘만 깜빡이고 창이 안 보였다.
     // 보이지 않는 맨 위 창을 실제로 띄워 앞으로 끌어온 뒤(Alt 키 한 번 = 잠금 풀기 관례) 그 창을 주인으로 대화상자를 연다
     'Add-Type -Name W -Namespace AM -MemberDefinition \'[DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h); [DllImport("user32.dll")] public static extern void keybd_event(byte k, byte s, uint f, UIntPtr e);\'',
@@ -287,7 +290,7 @@ function pickFolder(start) {
     '$o.Close()',
   ].filter(Boolean).join(';');
   return new Promise((resolve) => {
-    execFile('powershell.exe', ['-NoProfile', '-STA', '-Command', script], { encoding: 'utf8', windowsHide: true }, (err, out) => resolve(err ? null : out.trim() || null));
+    execFile('powershell.exe', ['-NoProfile', '-STA', '-Command', script], { encoding: 'utf8', windowsHide: true, env: { ...process.env, AM_PICK_START: String(start || '') } }, (err, out) => resolve(err ? null : out.trim() || null));
   });
 }
 
@@ -1119,7 +1122,7 @@ function onHook(w, ev, res) {
         setStatus(w, 'decision', `권한 요청 ${summary}`);
         break;
       }
-      const did = `D${++decisionSeq}`;
+      const did = `D${++decisionSeq}-${crypto.randomBytes(6).toString('hex')}`; // 순번만이면 추측해 몰래 승인할 수 있었다
       const d = {
         id: did, workerId: w.id, kind: 'permission', tool: ev.tool_name, input: ev.tool_input,
         toolUseId: ev.tool_use_id, summary: summarizeTool(ev.tool_name, ev.tool_input), createdAt: Date.now(), res,
@@ -1411,6 +1414,7 @@ function broadcast(msg) {
 // ---------- PTY 호스트 연결 ----------
 // ptyhost.js 는 별도 상주 프로세스. 없으면 띄우고(detached — 이 서버가 꺼져도 남는다), 접속해서 워커 터미널을 다룬다.
 const PTY_PORT = Number(process.env.AM_PTY_PORT || 7787);
+const PTY_HOST_VERSION = 3; // ptyhost.js VERSION — 3: 접속 토큰
 let host = null;
 let snapSeq = 0;
 const snapWaiters = new Map(); // 스냅샷 요청 번호 → 요청한 브라우저 소켓
@@ -1443,7 +1447,7 @@ function startHost() {
 
 function openHost() {
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket(`ws://127.0.0.1:${PTY_PORT}`);
+    const ws = new WebSocket(`ws://127.0.0.1:${PTY_PORT}`, { headers: { [TOKEN_HEADER]: AUTH_TOKEN } });
     ws.once('error', reject);
     ws.once('message', (raw) => {
       const hello = JSON.parse(raw);
@@ -1457,7 +1461,16 @@ function openHost() {
 
 async function connectHost() {
   for (let i = 0; i < 40; i++) {
-    try { const hello = await openHost(); onHostHello(hello); return; }
+    try {
+      const hello = await openHost();
+      // 토큰 검사가 없는 옛 호스트(버전 3 미만)는 돌고 있는 워커가 없을 때 내리고 새로 띄운다 — 끊기면 close 에서 다시 접속하며 startHost.
+      // 워커가 돌고 있으면 끊지 않는다(워커가 같이 죽는다). 다음에 워커 없이 서버를 켤 때 바뀐다
+      if ((hello.version || 0) < PTY_HOST_VERSION) {
+        if (!hello.ptys.some((x) => !x.exited)) { hostSend({ op: 'shutdown' }); return; }
+        console.log(L('PTY 호스트가 옛 버전입니다 — 워커를 모두 끈 뒤 서버를 다시 켜면 새 버전으로 바뀝니다', 'The PTY host is outdated — stop all workers and restart the server to update it'));
+      }
+      onHostHello(hello); return;
+    }
     catch { if (i === 0) startHost(); await new Promise((r) => setTimeout(r, 250)); }
   }
   throw new Error(L('PTY 호스트에 접속할 수 없습니다', 'Cannot connect to the PTY host'));
@@ -1942,11 +1955,12 @@ const STATIC = {
   '/vendor/addon-unicode11.js': ['node_modules/@xterm/addon-unicode11/lib/addon-unicode11.js', 'text/javascript'],
 };
 
+const BODY_LIMIT = 16 * 1024 * 1024; // 붙여 넣은 긴 글도 넉넉히 — 끝없는 본문으로 메모리를 채우지 못하게만
 function readBody(req) {
   return new Promise((resolve) => {
-    let b = '';
-    req.on('data', (c) => (b += c));
-    req.on('end', () => { try { resolve(b ? JSON.parse(b) : {}); } catch { resolve({}); } });
+    let b = '', size = 0;
+    req.on('data', (c) => { size += c.length; if (size <= BODY_LIMIT) b += c; });
+    req.on('end', () => { if (size > BODY_LIMIT) return resolve({}); try { resolve(b ? JSON.parse(b) : {}); } catch { resolve({}); } });
   });
 }
 
@@ -1956,6 +1970,9 @@ function json(res, code, obj) {
 }
 
 const server = http.createServer(async (req, res) => {
+  // 이 PC 의 주소로 온 요청만(DNS rebinding 차단), 쓰기는 대시보드 화면이나 토큰을 든 훅 · 상태줄만(CSRF 차단) — auth.js
+  if (!hostOk(req.headers.host, PORT)) { res.writeHead(403); return res.end(); }
+  if (req.method !== 'GET' && req.method !== 'HEAD' && !callerOk(req, PORT, AUTH_TOKEN)) { res.writeHead(403); return res.end(); }
   const url = new URL(req.url, `http://${req.headers.host}`);
   const p = url.pathname;
 
@@ -2456,7 +2473,7 @@ const server = http.createServer(async (req, res) => {
     return json(res, 200, { ok: true });
   }
 
-  if (req.method === 'POST' && (m = p.match(/^\/api\/decisions\/(D\d+)$/))) {
+  if (req.method === 'POST' && (m = p.match(/^\/api\/decisions\/(D\d+-[0-9a-f]+)$/))) {
     const body = await readBody(req);
     const ok = resolveDecision(m[1], body.behavior === 'pass' ? null : { behavior: body.behavior === 'allow' ? 'allow' : 'deny', message: body.message });
     return json(res, ok ? 200 : 404, { ok });
@@ -2465,7 +2482,8 @@ const server = http.createServer(async (req, res) => {
   res.writeHead(404); res.end();
 });
 
-const wss = new WebSocketServer({ server, path: '/ws' });
+// 웹소켓은 출처 제한(CORS)을 받지 않아 아무 웹사이트나 붙어 터미널에 입력할 수 있었다 — 대시보드 화면(Origin)만 받는다
+const wss = new WebSocketServer({ server, path: '/ws', verifyClient: ({ req }) => hostOk(req.headers.host, PORT) && callerOk(req, PORT, AUTH_TOKEN) });
 wss.on('connection', (ws) => {
   sockets.add(ws);
   ws.send(JSON.stringify({ type: 'state', state: publicState() }));

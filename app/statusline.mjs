@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
+import { readToken, TOKEN_HEADER } from './auth.js';
 
 const worker = process.env.AGENT_MANAGER_WORKER;
 const port = process.env.AGENT_MANAGER_PORT || '7788';
@@ -22,7 +23,7 @@ process.stdin.on('end', async () => {
   if (worker && (data.rate_limits || model)) {
     try {
       await fetch(`http://127.0.0.1:${port}/statusline?w=${worker}`, {
-        method: 'POST', headers: { 'content-type': 'application/json' },
+        method: 'POST', headers: { 'content-type': 'application/json', [TOKEN_HEADER]: readToken() || '' },
         body: JSON.stringify({ rate_limits: data.rate_limits, session_id: data.session_id, model }),
         signal: AbortSignal.timeout(500),
       });

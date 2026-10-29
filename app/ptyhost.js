@@ -19,20 +19,21 @@ import pty from '@lydell/node-pty';
 import { WebSocketServer } from 'ws';
 import { createRequire } from 'node:module';
 import { L } from './cli-lang.js';
+import { ensureToken, readToken, tokenOk, TOKEN_HEADER } from './auth.js';
 
 const require = createRequire(import.meta.url);
 const { Terminal } = require('@xterm/headless');
 const { SerializeAddon } = require('@xterm/addon-serialize');
 const { Unicode11Addon } = require('@xterm/addon-unicode11');
 
-const VERSION = 2; // 2: clearScrollback
+const VERSION = 3; // 2: clearScrollback · 3: 접속 토큰(auth.js)
 const PORT = Number(process.env.AM_PTY_PORT || 7787);
 const IDLE_EXIT_MS = 60_000; // 워커도 접속한 서버도 없으면 스스로 종료 (고아 방지)
 
 // npm run stop-workers → 떠 있는 호스트에 종료 명령만 보내고 끝낸다 (모든 워커 종료)
 if (process.argv.includes('--shutdown')) {
   const { default: WebSocket } = await import('ws');
-  const ws = new WebSocket(`ws://127.0.0.1:${PORT}`);
+  const ws = new WebSocket(`ws://127.0.0.1:${PORT}`, { headers: { [TOKEN_HEADER]: readToken() || '' } });
   ws.on('open', () => { ws.send(JSON.stringify({ op: 'shutdown' })); console.log(L('워커 호스트 종료 요청 보냄', 'Sent shutdown request to the worker host')); setTimeout(() => process.exit(0), 500); });
   ws.on('error', () => { console.log(L('실행 중인 워커 호스트 없음', 'No worker host is running')); process.exit(0); });
   await new Promise(() => {});
@@ -105,7 +106,10 @@ function handle(msg) {
 }
 
 const server = http.createServer((req, res) => { res.writeHead(404); res.end(); });
-const wss = new WebSocketServer({ server });
+// 받는 건 토큰을 든 우리 서버(server.js)와 --shutdown 뿐 — 브라우저(Origin 이 붙는다)는 어떤 출처든 거절한다.
+// 인증이 없을 땐 아무 웹사이트나 붙어 spawn 으로 임의 프로그램을 실행할 수 있었다. 토큰은 접속마다 파일에서 다시 읽는다(지워져 새로 만들어져도 통하게)
+ensureToken();
+const wss = new WebSocketServer({ server, verifyClient: ({ req }) => !req.headers.origin && tokenOk(req.headers[TOKEN_HEADER], readToken()) });
 wss.on('connection', (ws) => {
   clients.add(ws);
   send(ws, {
