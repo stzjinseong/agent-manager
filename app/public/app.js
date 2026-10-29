@@ -5036,8 +5036,8 @@ const chatUnfold = new Set(); // 펼친 도구 묶음(첫 칩 seq)
 // 보낸 글은 기록(트랜스크립트)에 남아야 목록에 생겨 몇 초 늦게 보였다 — 보내자마자 흐린 말풍선으로 먼저 띄우고,
 // 기록에 같은 글의 요청이 들어오면 지운다(공백 빼고 비교). 대기열로 간 Tasks 는 투입될 때까지 '대기열'로 남는다. 10분이 지나면 버린다
 let chatPending = [];
-// 비교용: Claude Code 는 붙인 그림 경로를 [Image #N] 으로 바꿔 기록한다 → 경로·[Image #N]·공백을 빼고 비교
-const chatNorm = (t) => String(t || '').replace(/\[Image #\d+\]/g, '').replace(/(?:[A-Za-z]:[\\/]|\/)[^\s"'<>|]*?\.(?:png|jpe?g|gif|webp|bmp|svg)/gi, '').replace(/\s+/g, '');
+// 비교용: Claude Code 는 붙인 그림 경로를 [Image #N] 으로 바꿔 기록한다 → 경로·[Image #N]·공백을 빼고 비교 · 붙여넣기 감싸개(<pasted_content …>)도 기록에만 생기므로 뺀다
+const chatNorm = (t) => String(t || '').replace(/<\/?pasted_content[^>]*>/g, '').replace(/\[Image #\d+\]/g, '').replace(/(?:[A-Za-z]:[\\/]|\/)[^\s"'<>|]*?\.(?:png|jpe?g|gif|webp|bmp|svg)/gi, '').replace(/\s+/g, '');
 // 기록에 들어온 요청 하나가 흐린 말풍선 하나를 지운다 — 같은 글이 먼저, 없으면 앞부분(12자)이 같은 것(글이 조금 바뀌어 기록됨)
 function chatSettle(wid) {
   const now = Date.now();
