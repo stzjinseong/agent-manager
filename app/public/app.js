@@ -2394,12 +2394,13 @@ function openShot(url, single) { // single: { cap } — 결과물 그림 한 장
   show();
 }
 // 결과물 글 보기 — 크게 보기(.shot-view)와 같은 어두운 바탕 위 글 패널. 바깥·Esc 로 닫는다.
-// md 는 marked 로 서식을 입히고 DOMPurify 로 거른다(처음 열 때만 CDN 에서 불러옴 — 못 불러오면 원문 그대로). 2MB 넘으면 앞부분만
+// md 는 marked 로 서식을 입히고 DOMPurify 로 거른다(처음 열 때만 불러옴 — 못 불러오면 원문 그대로). 2MB 넘으면 앞부분만
 const TEXT_MAX = 2 << 20;
 let mdLibs = null;
 function loadMdLibs() {
   const js = (src) => new Promise((ok, no) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = no; document.head.append(s); });
-  mdLibs ??= Promise.all([js('https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js'), js('https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js')])
+  // 저장소에 넣어 둔 사본(public/vendor) — CDN 에서 받으면 그 파일이 바뀌었을 때 대시보드 안에서 그대로 실행됐다(무결성 확인 없음)
+  mdLibs ??= Promise.all([js('/vendor/marked.min.js'), js('/vendor/purify.min.js')])
     .catch((e) => { mdLibs = null; throw e; });
   return mdLibs;
 }

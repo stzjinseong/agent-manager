@@ -1953,6 +1953,9 @@ const STATIC = {
   '/vendor/xterm.css': ['node_modules/@xterm/xterm/css/xterm.css', 'text/css'],
   '/vendor/addon-fit.js': ['node_modules/@xterm/addon-fit/lib/addon-fit.js', 'text/javascript'],
   '/vendor/addon-unicode11.js': ['node_modules/@xterm/addon-unicode11/lib/addon-unicode11.js', 'text/javascript'],
+  // 마크다운 렌더 — npm 패키지(marked 12.0.2 · dompurify 3.1.6)에서 꺼낸 사본. 업데이트가 npm install 없이 되므로 의존성 대신 저장소에 둔다
+  '/vendor/marked.min.js': ['public/vendor/marked.min.js', 'text/javascript'],
+  '/vendor/purify.min.js': ['public/vendor/purify.min.js', 'text/javascript'],
 };
 
 const BODY_LIMIT = 16 * 1024 * 1024; // 붙여 넣은 긴 글도 넉넉히 — 끝없는 본문으로 메모리를 채우지 못하게만
