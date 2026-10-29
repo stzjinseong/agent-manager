@@ -5112,7 +5112,7 @@ function chatBlocks(items, limit = Infinity) {
     return chatItemHtml(b.x);
   }).join('');
 }
-// 끝줄: 결정 대기면 권한 카드, 작업 중이면 '생각 중', 클로드 답으로 끝나고 쉬면 '응답 완료'
+// 끝줄: 결정 대기면 권한 카드, 작업 중이면 '생각 중', 백그라운드 대기면 '백그라운드 작업 N개 진행 중', 클로드 답으로 끝나고 쉬면 '응답 완료'
 function chatTail(w, items, waiting) {
   const st = viewStatus(w);
   if (st === 'decision' && w.askQ) return ''; // 질문은 입력칸 위 카드(#cv-ask)로
@@ -5125,6 +5125,8 @@ function chatTail(w, items, waiting) {
     return `<div class="cv-ev cv-p"><span class="cv-dot"></span><div class="cv-perm"><div class="cv-q">${q}</div>${w.ask ? `<code>${esc(w.ask.replace(/^권한 요청\s*/, '').replace(/\s*— 터미널에서 선택하세요$/, ''))}</code>` : ''}<div class="cv-btns">${btns}</div></div></div>`;
   }
   if (st === 'working') return `<div class="cv-ev cv-a cv-think"><span class="cv-dot"></span><div class="cv-sys"><span class="cv-typing"><i></i><i></i><i></i></span> ${_t('생각 중')}</div></div>`;
+  // 턴은 끝났지만 백그라운드 작업(서브에이전트 · run_in_background · Monitor)이 남았다 — '응답 완료'로 보이면 멈춘 줄 안다
+  if (st === 'waiting') return `<div class="cv-ev cv-a cv-think"><span class="cv-dot"></span><div class="cv-sys"><span class="cv-typing"><i></i><i></i><i></i></span> ${_t('백그라운드 작업 {n}개 진행 중 · 끝나면 이어서 답해요', { n: w.profile?.bgRunning || 1 })}</div></div>`;
   // 중단 · 오류로 끝났으면 그 줄이 이미 끝을 말한다 — 답(a) · 도구(t)로 끝났을 때만
   const last = items[items.length - 1];
   if (waiting || !last || (last.k !== 'a' && last.k !== 't')) return '';

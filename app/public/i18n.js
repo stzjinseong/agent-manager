@@ -439,6 +439,7 @@ const EN = {
   'CLI 에서 답하기': 'Answer in CLI',
   '생각 중': 'Thinking',
   '응답 완료': 'Done',
+  '백그라운드 작업 {n}개 진행 중 · 끝나면 이어서 답해요': (v) => `${v.n} background task${v.n === 1 ? '' : 's'} running · Claude will continue when done`,
   '아직 대화가 없어요': 'No conversation yet',
   '대기 중 · 클로드가 아직 읽지 않음': 'Waiting · not read by Claude yet',
   '대기열 {n}번': ({ n }) => `Queued #${n}`,
