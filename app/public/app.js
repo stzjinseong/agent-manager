@@ -5126,7 +5126,16 @@ function chatTail(w, items, waiting) {
   }
   if (st === 'working') return `<div class="cv-ev cv-a cv-think"><span class="cv-dot"></span><div class="cv-sys"><span class="cv-typing"><i></i><i></i><i></i></span> ${_t('생각 중')}</div></div>`;
   // 턴은 끝났지만 백그라운드 작업(서브에이전트 · run_in_background · Monitor)이 남았다 — '응답 완료'로 보이면 멈춘 줄 안다
-  if (st === 'waiting') return `<div class="cv-ev cv-a cv-think"><span class="cv-dot"></span><div class="cv-sys"><span class="cv-typing"><i></i><i></i><i></i></span> ${_t('백그라운드 작업 {n}개 진행 중 · 끝나면 이어서 답해요', { n: w.profile?.bgRunning || 1 })}</div></div>`;
+  // 고른 워커는 프로필 전부(subagents · bgTasks)를 받으니 이름까지, 아니면 개수만
+  if (st === 'waiting') {
+    const p = w.profile || {};
+    const jobs = [
+      ...(p.subagents || []).filter((s) => s.running).map((s) => ({ kind: s.type, name: s.description, since: s.start })),
+      ...(p.bgTasks || []).map((b) => ({ kind: _t(b.kind === 'monitor' ? '감시' : '백그라운드 명령'), name: b.desc || b.id, since: b.startedAt })),
+    ];
+    const list = jobs.length ? `<ul class="cv-bg">${jobs.map((j) => `<li><b>${esc(j.kind)}</b><span title="${esc(j.name || '')}">${esc(j.name || '—')}</span>${j.since ? `<em data-since="${j.since}"></em>` : ''}</li>`).join('')}</ul>` : '';
+    return `<div class="cv-ev cv-a cv-think"><span class="cv-dot"></span><div class="cv-sys"><span class="cv-typing"><i></i><i></i><i></i></span> ${_t('백그라운드 작업 {n}개 진행 중 · 끝나면 이어서 답해요', { n: jobs.length || p.bgRunning || 1 })}${list}<div class="cv-bg-hint">${_t('기다리는 동안 다른 요청을 보내도 돼요')}</div></div></div>`;
+  }
   // 중단 · 오류로 끝났으면 그 줄이 이미 끝을 말한다 — 답(a) · 도구(t)로 끝났을 때만
   const last = items[items.length - 1];
   if (waiting || !last || (last.k !== 'a' && last.k !== 't')) return '';
@@ -5165,6 +5174,7 @@ function renderChat() {
   const fromBottom = older ? list.scrollHeight - list.scrollTop : 0; // 앞에 붙일 때만 읽는다(드묾)
   list.innerHTML = list._html = html;
   for (const a of list.querySelectorAll('.cv-md a[href]')) { a.target = '_blank'; a.rel = 'noopener'; }
+  for (const n of list.querySelectorAll('[data-since]')) n.textContent = dur(Number(n.dataset.since)); // 다음 tick 까지 비어 있지 않게
   chatOlder = false;
   chatReveal(list, w.id, items);
   list._wid = w.id;
