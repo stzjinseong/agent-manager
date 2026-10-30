@@ -927,14 +927,16 @@ const hasThumb = (e) => [...(e.dataTransfer?.types || [])].includes(THUMB_TYPE);
 // 드롭 영역 공통: 파일(OS)이나 타임라인 썸네일이 끌려 오면 테두리 강조. onPath: 썸네일을 놓았을 때 받은 경로
 function dropZone(zone, onFiles, onPath) {
   const ok = (e) => hasFiles(e) || (onPath && hasThumb(e));
+  // 안쪽 드롭 영역이 이미 받은 것(defaultPrevented)은 바깥 영역이 다시 받지 않는다 — 채팅 입력칸은 #term-wrap 안에 있어서
+  // 입력칸에 놓은 그림이 터미널 쪽에서도 한 번 더 올라가 CLI 입력줄에 [Image #N] 으로 붙었고, 그 글 때문에 채팅 전송이 거절됐다
   zone.addEventListener('dragover', (e) => {
-    if (!ok(e)) return;
+    if (!ok(e) || e.defaultPrevented) return;
     e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; zone.classList.add('dropping');
   });
   zone.addEventListener('dragleave', (e) => { if (!zone.contains(e.relatedTarget)) zone.classList.remove('dropping'); });
   zone.addEventListener('drop', async (e) => {
     zone.classList.remove('dropping');
-    if (!ok(e)) return;
+    if (!ok(e) || e.defaultPrevented) return;
     e.preventDefault();
     if (hasThumb(e)) {
       const r = await api('/api/file-path', { url: e.dataTransfer.getData(THUMB_TYPE) });
@@ -962,7 +964,9 @@ document.addEventListener('dragover', (e) => { if (hasFiles(e) && !e.defaultPrev
 document.addEventListener('drop', (e) => { if (hasFiles(e)) e.preventDefault(); });
 // 터미널: 경로를 붙여넣기로 보낸다 (이미지는 Claude 입력칸에 [Image #N] 으로 붙고, 그 밖의 파일은 경로 그대로)
 const termInsert = (p) => selected && term.paste(`${p} `);
-dropZone($('#term-wrap'), (files) => attachFiles(files, termInsert), termInsert);
+// 채팅 보기에서는 입력칸 밖(대화 목록 등)에 놓아도 터미널이 아니라 채팅 입력칸으로 — 터미널은 가려져 있어 붙은 줄 모른다
+const termDrop = (p) => (chatOpen ? insertAtCursor(chatForm.text, p) : termInsert(p));
+dropZone($('#term-wrap'), (files) => attachFiles(files, termDrop), termDrop);
 // 터미널에서 Ctrl+V 로 클립보드 파일 붙여넣기 — xterm 보다 먼저 가로챈다(텍스트 붙여넣기는 그대로 둔다)
 $('#term').addEventListener('paste', (e) => {
   const files = droppedFiles(e.clipboardData);
