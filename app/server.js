@@ -1148,6 +1148,7 @@ function onHook(w, ev, res) {
       w.currentTool = null;
       progress.drop(w);
       roleStats.end(w, 'failed');
+      rereadAfterTurn(w);
       setStatus(w, 'idle', `API 오류로 턴이 끝남 (${err})`);
       nowToQueue(w, RETRYABLE_STOP.has(err));
       if (RETRYABLE_STOP.has(err)) afterTurn(w);
@@ -1164,6 +1165,7 @@ function onHook(w, ev, res) {
       roleStats.end(w, 'done');
       setTimeout(() => judgeCache(w), 1500); // 마지막 응답이 트랜스크립트에 다 쓰일 시간을 준다
       setStatus(w, 'done', '턴 완료');
+      rereadAfterTurn(w);
       nowToQueue(w, true);
       afterTurn(w);
       break;
@@ -1208,6 +1210,12 @@ function scheduleProfile(w) {
     checkInterrupted(w);
     if (w.seedAt) seedHistory(w);
   }, 300);
+}
+
+// 턴이 끝난 뒤 몇 번 더 읽는다 — 마지막 답 줄이 Stop 훅보다 늦게 트랜스크립트에 쓰이는 일이 잦다(격리 서버 실측: 5턴 중 3턴은
+// done 순간 채팅에 마지막 답이 없었다). 쉬는 동안은 훅도 2초 읽기도 없어, 다음 사건이 올 때까지 채팅 보기에서 마지막 답이 빠져 있었다
+function rereadAfterTurn(w) {
+  for (const ms of [1000, 3000, 8000]) setTimeout(() => { if (workers.has(w.id)) scheduleProfile(w); }, ms);
 }
 
 // ---------- 이어 붙인 세션의 지난 요청 → 타임라인 ----------
