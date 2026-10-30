@@ -1582,6 +1582,7 @@ function drainShots(w) {
 
 // ---------- 첨부 이미지 보관 ----------
 const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
+const THEME_PHOTO_DIR = path.join(DATA_DIR, 'theme-photos'), THEME_PHOTO_RE = /^\d{14}-[0-9a-f]{8}\.(png|jpg|gif|webp)$/;
 
 // ---------- 사용자 테마 ----------
 // 프로젝트 최상위 themes/<id>/ 폴더 하나 = 테마 하나(themes/README.md). 저장소에는 README 와 예시(_example)만 있고
@@ -1650,6 +1651,7 @@ function listThemes() {
       mode: meta.mode === 'light' || meta.mode === 'dark' ? meta.mode : '',
       terminal: meta.terminal && typeof meta.terminal === 'object' ? { dark: term(meta.terminal.dark), light: term(meta.terminal.light) } : undefined,
       ...(colors.length && { colors, palettes }),
+      ...(meta.photo === true && { photo: true }), // 꾸미기 메뉴에 배경 사진 고르기를 띄운다(app.js skinColorsHTML)
       rev: Math.round(fs.statSync(path.join(dir, 'theme.css')).mtimeMs).toString(36),
     });
   }
@@ -2249,6 +2251,30 @@ const server = http.createServer(async (req, res) => {
       json(res, 200, { path: file });
     });
     return;
+  }
+
+  // 테마 배경 사진(theme.json photo: true 인 테마의 꾸미기 메뉴에서 올림) — 첨부(data/uploads, 7일 정리)와 따로 data/theme-photos 에 두고
+  // 최근 12장만 남긴다. 어떤 사진을 쓰는지는 브라우저가 기억한다(am.skin.photo)
+  if (req.method === 'POST' && p === '/api/theme-photo') {
+    const ext = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' }[String(req.headers['content-type'] || '').split(';')[0]];
+    if (!ext) { req.resume(); return json(res, 415, { error: '그림(png · jpg · gif · webp)만 올릴 수 있습니다' }); }
+    const chunks = []; let size = 0, tooBig = false;
+    req.on('data', (c) => { size += c.length; if (size > UPLOAD_LIMIT) tooBig = true; else chunks.push(c); });
+    req.on('end', () => {
+      if (tooBig) return json(res, 413, { error: '20MB 를 넘는 파일은 첨부할 수 없습니다' });
+      fs.mkdirSync(THEME_PHOTO_DIR, { recursive: true });
+      const name = `${new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)}-${crypto.randomBytes(4).toString('hex')}.${ext}`;
+      fs.writeFileSync(path.join(THEME_PHOTO_DIR, name), Buffer.concat(chunks));
+      try { for (const old of fs.readdirSync(THEME_PHOTO_DIR).filter((n) => THEME_PHOTO_RE.test(n)).sort().reverse().slice(12)) fs.unlinkSync(path.join(THEME_PHOTO_DIR, old)); } catch {}
+      json(res, 200, { url: `/theme-photos/${name}` });
+    });
+    return;
+  }
+  if (req.method === 'GET' && p.startsWith('/theme-photos/')) {
+    const name = p.slice('/theme-photos/'.length), full = path.join(THEME_PHOTO_DIR, name);
+    if (!THEME_PHOTO_RE.test(name) || !fs.existsSync(full)) return json(res, 404, {});
+    res.writeHead(200, { 'content-type': IMAGE_TYPES[docExt(name)], 'cache-control': 'max-age=31536000, immutable' }); // 이름이 내용마다 새로 지어져 바뀌지 않는다
+    return fs.createReadStream(full).pipe(res);
   }
 
   // 사용자 테마 — 목록, 테마 폴더 안 파일(theme.css · 그림 · 글꼴)

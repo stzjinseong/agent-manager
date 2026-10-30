@@ -3820,10 +3820,45 @@ const SKIN_COLORS_KEY = 'am.skin.colors', HEX6 = /^#[0-9a-f]{6}$/i;
 function skinColorsAll() { try { const j = JSON.parse(localStorage.getItem(SKIN_COLORS_KEY) || '{}'); return j && typeof j === 'object' ? j : {}; } catch { return {}; } }
 const skinColors = (t) => { const c = t?.colors?.length && skinColorsAll()[t.id]; return c && typeof c === 'object' ? c : {}; };
 function applySkinColors() {
-  const st = document.documentElement.style, t = curTheme(), sel = skinColors(t);
+  const root = document.documentElement, st = root.style, t = curTheme(), sel = skinColors(t);
   for (const x of userThemes) for (const c of x.colors || []) st.removeProperty(c.var); // 다른 테마 · 기본값으로 돌아가면 걷는다
   for (const c of t?.colors || []) if (HEX6.test(sel[c.var] || '')) st.setProperty(c.var, sel[c.var]);
+  // 배경 사진: theme.css 가 html[data-photo] 일 때 --skin-photo(url) · --skin-photo-blur · --skin-photo-dim 으로 그린다
+  const ph = skinPhoto(t);
+  for (const v of ['--skin-photo', '--skin-photo-blur', '--skin-photo-dim']) st.removeProperty(v);
+  delete root.dataset.photo;
+  if (ph) { st.setProperty('--skin-photo', `url("${ph.url}")`); st.setProperty('--skin-photo-blur', `${ph.blur}px`); st.setProperty('--skin-photo-dim', String(ph.dim)); root.dataset.photo = '1'; }
 }
+// 테마 배경 사진 — theme.json photo: true 인 테마. 사진은 서버 data/theme-photos 에 올리고(/api/theme-photo), 무엇을 쓰는지 · 흐림 · 어둡기는
+// 테마별로 브라우저에 기억(am.skin.photo = { 테마 id: { url, blur(px), dim(0~.8) } }). index.html 머리 스크립트가 첫 화면부터 넣는다
+const SKIN_PHOTO_KEY = 'am.skin.photo', PHOTO_URL = /^\/theme-photos\/[\w.-]+$/;
+function skinPhotoAll() { try { const j = JSON.parse(localStorage.getItem(SKIN_PHOTO_KEY) || '{}'); return j && typeof j === 'object' ? j : {}; } catch { return {}; } }
+function skinPhoto(t) {
+  const p = t?.photo && skinPhotoAll()[t.id];
+  if (!p || !PHOTO_URL.test(p.url || '')) return null;
+  return { url: p.url, blur: Math.min(40, Math.max(0, Math.round(+p.blur || 0))), dim: Math.min(0.8, Math.max(0, +p.dim || 0)) };
+}
+function saveSkinPhoto(id, p) {
+  const all = skinPhotoAll();
+  if (p) all[id] = p; else delete all[id];
+  try { localStorage.setItem(SKIN_PHOTO_KEY, JSON.stringify(all)); } catch {}
+  applySkinColors();
+}
+const photoInput = el('<input type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden>');
+document.body.append(photoInput);
+photoInput.addEventListener('change', async () => {
+  const f = photoInput.files?.[0], t = curTheme();
+  photoInput.value = '';
+  if (!f || !t?.photo) return;
+  try {
+    const r = await fetch('/api/theme-photo', { method: 'POST', headers: { 'content-type': f.type }, body: f });
+    const j = await r.json();
+    if (!r.ok || !PHOTO_URL.test(j.url || '')) throw new Error(srvText(j.error) || r.status);
+    const prev = skinPhoto(t);
+    saveSkinPhoto(t.id, { url: j.url, blur: prev?.blur ?? 16, dim: prev?.dim ?? 0.3 });
+    if (!charPop.hidden) renderCharPop();
+  } catch (e) { toast(`${_t('사진을 올리지 못했어요')} — ${e.message || e}`); }
+});
 function saveSkinColors(id, colors) {
   const all = skinColorsAll();
   if (colors && Object.keys(colors).length) all[id] = colors; else delete all[id];
@@ -3840,7 +3875,12 @@ function skinColorsHTML(t) {
   const pals = (t.palettes || []).map((p, i) => `<button class="skin-pal${palOn(t, p) ? ' on' : ''}" data-pal="${i}" title="${esc(p.name)}" aria-label="${esc(p.name)}"
     style="background:linear-gradient(135deg, ${t.colors.map((c) => p.colors[c.var]).filter(Boolean).join(', ')})"></button>`).join('');
   const picks = t.colors.map((c) => `<label class="skin-cc" title="${esc(c.label)}"><input type="color" data-cvar="${esc(c.var)}" value="${skinColorNow(t, c.var)}"><span>${esc(c.label)}</span></label>`).join('');
-  return `<div class="skin-colors">${pals ? `<div class="skin-pals">${pals}</div>` : ''}<div class="skin-cust">${picks}<button class="skin-reset" data-pal-reset title="${_t('기본값')}">↺</button></div></div>`;
+  const ph = t.photo && skinPhoto(t), light = document.documentElement.dataset.theme === 'light';
+  const photo = !t.photo ? '' : `<div class="skin-photo"><span class="skin-ph-lab">${_t('배경 사진')}</span>${ph ? `<span class="skin-ph-th" style="background-image:url('${ph.url}')"></span>` : ''}
+    <button class="skin-ph-btn" data-photo-pick>${ph ? _t('바꾸기') : _t('사진 고르기…')}</button>${ph ? `<button class="skin-reset" data-photo-del title="${_t('사진 빼기')}">✕</button>` : ''}</div>${!ph ? '' : `
+    <label class="skin-rng"><span>${_t('흐림')}</span><input type="range" min="0" max="40" step="1" data-photo-k="blur" value="${ph.blur}"></label>
+    <label class="skin-rng"><span>${light ? _t('밝게') : _t('어둡게')}</span><input type="range" min="0" max="80" step="1" data-photo-k="dim" value="${Math.round(ph.dim * 100)}"></label>`}`;
+  return `<div class="skin-colors">${pals ? `<div class="skin-pals">${pals}</div>` : ''}<div class="skin-cust">${picks}<button class="skin-reset" data-pal-reset title="${_t('기본값')}">↺</button></div>${photo}</div>`;
 }
 // ---------- 내 테마 만들기 안내 ----------
 // ① 예시를 복사해 새 테마 폴더 만들기(바로 적용) · themes 폴더 열기 ② 원하는 느낌을 적으면 워커에게 줄 요청문 만들기(복사 · 입력칸에 넣기)
@@ -4109,6 +4149,8 @@ charPop.addEventListener('click', async (e) => {
     await loadChars();
     return;
   }
+  if (e.target.closest('[data-photo-pick]')) { photoInput.click(); return; }
+  if (e.target.closest('[data-photo-del]') && curTheme()) { e.stopPropagation(); saveSkinPhoto(curTheme().id, null); renderCharPop(); return; } // 다시 그려도 메뉴는 열어 둔다(아래 조합과 같은 이유)
   const pal = e.target.closest('[data-pal], [data-pal-reset]'), t = curTheme();
   if (pal && t) { // 메뉴는 열어 둔다 — 여러 개 눌러 비교. 다시 그리면 누른 버튼이 문서에서 떨어져 '바깥 클릭'으로 닫히므로 전파를 막는다
     e.stopPropagation();
@@ -4131,6 +4173,8 @@ charPop.addEventListener('click', async (e) => {
 document.addEventListener('click', (e) => { if (!charPop.hidden && !e.target.closest('.char-wrap')) setCharPop(false); });
 // 색 직접 고르기: 끌어 고르는 동안(input) 바로 칠하고, 다른 색은 지금 보이는 값으로 함께 저장. 메뉴를 다시 그리면 색 선택 창이 닫히므로 조합 표시만 고친다
 charPop.addEventListener('input', (e) => {
+  const k = e.target.dataset?.photoK, ph = skinPhoto(curTheme());
+  if (k && ph) { saveSkinPhoto(curTheme().id, { ...ph, [k]: k === 'dim' ? e.target.value / 100 : +e.target.value }); return; }
   const v = e.target.dataset?.cvar, t = curTheme();
   if (!v || !t?.colors || !HEX6.test(e.target.value)) return;
   saveSkinColors(t.id, { ...Object.fromEntries(t.colors.map((c) => [c.var, skinColorNow(t, c.var)])), [v]: e.target.value.toLowerCase() });

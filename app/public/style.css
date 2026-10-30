@@ -1897,6 +1897,16 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 .skin-cc input::-webkit-color-swatch { border: 0; border-radius: 4px; }
 .skin-reset { margin-left: auto; align-self: center; width: 26px; height: 26px; padding: 0; border-radius: 7px; border: 1px solid var(--line-2); background: none; color: var(--text-2); cursor: pointer; }
 .skin-reset:hover { background: var(--surface-3); color: var(--text); }
+/* 배경 사진(theme.json photo) — 미리보기 · 고르기 · 빼기, 아래에 흐림 · 어둡게(라이트는 밝게) 끌개 */
+.skin-photo { display: flex; align-items: center; gap: 6px; padding-top: 8px; border-top: 1px solid var(--line); }
+.skin-ph-lab { font-size: 11px; color: var(--dim); margin-right: auto; white-space: nowrap; }
+.skin-ph-th { width: 40px; height: 26px; border-radius: 6px; background: center / cover no-repeat; box-shadow: inset 0 0 0 1px rgb(var(--ink) / .2); }
+.skin-ph-btn { font: inherit; font-size: 12px; padding: 3px 9px; border-radius: 7px; border: 1px solid var(--line-2); background: none; color: var(--text); cursor: pointer; white-space: nowrap; }
+.skin-ph-btn:hover { background: var(--surface-3); }
+.skin-photo .skin-reset { margin-left: 0; }
+.skin-rng { display: grid; grid-template-columns: 44px 1fr; align-items: center; gap: 6px; font-size: 11px; color: var(--dim); }
+.skin-rng input { padding: 0; border: 0; background: none; accent-color: var(--accent); }
+.skin-rng input:focus { box-shadow: none; }
 
 /* 사용자 테마용 배경 층 — 기본은 비어 있고, 테마 CSS 가 .theme-bg(::before/::after 포함)를 꾸민다 (themes/README.md) */
 .theme-bg { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }

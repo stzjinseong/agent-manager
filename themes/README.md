@@ -40,6 +40,7 @@ themes/
 | `terminal.dark` / `terminal.light` | 그 모드일 때 터미널(xterm) 색. `background` `foreground` `cursor` `selectionBackground` `red` `brightBlue` … |
 | `colors` | 사용자가 꾸미기 메뉴에서 바꿀 수 있는 색. `[{ "var": "--my-c1", "label": "배경" }, …]` (8개까지). theme.css 에서 그 변수를 쓰고 기본값을 정해 두세요 |
 | `palettes` | `colors` 의 색 조합 견본. `[{ "name": "오로라", "colors": { "--my-c1": "#10b981" } }, …]` — 값은 `#rrggbb` 만 |
+| `photo` | `true` 면 꾸미기 메뉴에서 배경 사진을 올리고 흐림 · 어둡기를 고를 수 있어요. 고르면 `html[data-photo]` 와 `--skin-photo`(url) · `--skin-photo-blur` · `--skin-photo-dim`(0~0.8) 이 붙으니 theme.css 에서 `.theme-bg::after` 등에 쓰세요(예: `glass/theme.css`). 사진은 `data/theme-photos` 에 최근 12장까지 남아요 |
 
 ## theme.css 쓰는 법
 

@@ -31,6 +31,10 @@
     {
       "var": "--glass-accent",
       "label": "강조"
+    },
+    {
+      "var": "--glass-tint",
+      "label": "유리"
     }
   ],
   "palettes": [
@@ -40,7 +44,8 @@
         "--glass-c1": "#8b5cf6",
         "--glass-c2": "#22d3ee",
         "--glass-c3": "#f472b6",
-        "--glass-accent": "#a78bfa"
+        "--glass-accent": "#a78bfa",
+        "--glass-tint": "#ffffff"
       }
     },
     {
@@ -49,7 +54,8 @@
         "--glass-c1": "#10b981",
         "--glass-c2": "#22d3ee",
         "--glass-c3": "#3b82f6",
-        "--glass-accent": "#34d399"
+        "--glass-accent": "#34d399",
+        "--glass-tint": "#ffffff"
       }
     },
     {
@@ -58,7 +64,8 @@
         "--glass-c1": "#0ea5e9",
         "--glass-c2": "#6366f1",
         "--glass-c3": "#14b8a6",
-        "--glass-accent": "#38bdf8"
+        "--glass-accent": "#38bdf8",
+        "--glass-tint": "#ffffff"
       }
     },
     {
@@ -67,7 +74,8 @@
         "--glass-c1": "#f97316",
         "--glass-c2": "#f43f5e",
         "--glass-c3": "#facc15",
-        "--glass-accent": "#fb923c"
+        "--glass-accent": "#fb923c",
+        "--glass-tint": "#ffffff"
       }
     },
     {
@@ -76,7 +84,8 @@
         "--glass-c1": "#ec4899",
         "--glass-c2": "#a855f7",
         "--glass-c3": "#f9a8d4",
-        "--glass-accent": "#f472b6"
+        "--glass-accent": "#f472b6",
+        "--glass-tint": "#ffffff"
       }
     },
     {
@@ -85,8 +94,20 @@
         "--glass-c1": "#64748b",
         "--glass-c2": "#94a3b8",
         "--glass-c3": "#cbd5e1",
-        "--glass-accent": "#94a3b8"
+        "--glass-accent": "#94a3b8",
+        "--glass-tint": "#ffffff"
+      }
+    },
+    {
+      "name": "샌드",
+      "colors": {
+        "--glass-c1": "#c49a74",
+        "--glass-c2": "#e9d8c3",
+        "--glass-c3": "#8c6a50",
+        "--glass-accent": "#e0653a",
+        "--glass-tint": "#f6ece0"
       }
     }
-  ]
+  ],
+  "photo": true
 }
