@@ -265,8 +265,11 @@
 }
 :root[data-skin="glass"] .term-wrap.chatting :is(.chat-view, .cv-bar, .dv-bar) { background: transparent; }
 /* 채팅 화면은 원래 불투명 바탕으로 같은 칸의 터미널을 덮는다 — 비우면 뒤 터미널 글자가 비쳐 겹친다. 채팅인 동안은 터미널을 감춘다
-   (visibility — 칸 크기 · xterm 버퍼는 그대로라 CLI 로 돌아오면 바로 보인다) */
-:root[data-skin="glass"] .term-wrap.chatting #term { visibility: hidden; }
+   (visibility — 칸 크기 · xterm 버퍼는 그대로라 CLI 로 돌아오면 바로 보인다).
+   단 CLI 선택창을 채팅 아래 절반에 보여 줄 때(.cli-peek — 선택창 · 권한 질문)는 터미널이 보여야 한다 — 감췄더니 아래가 텅 비었다.
+   그때 위 절반 채팅은 원래처럼 불투명하게 덮어 내려 둔 터미널 윗부분이 비치지 않게 */
+:root[data-skin="glass"] .term-wrap.chatting:not(.cli-peek) #term { visibility: hidden; }
+:root[data-skin="glass"] .term-wrap.chatting.cli-peek .chat-view { background: var(--chat-bg, var(--term-bg)); }
 :root[data-skin="glass"] .term-wrap.chatting .cv-dot { background: var(--glass-solid); }   /* 시간선이 점 안으로 비치지 않게 */
 /* 채팅 안 카드 · 말풍선 · 입력 상자 — 한 층 앞(l2) */
 :root[data-skin="glass"] .term-wrap.chatting :is(.cv-msg, .cv-chip, .cv-perm, .cv-box, .cv-ask-card) {
