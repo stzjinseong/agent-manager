@@ -1,0 +1,18 @@
+{
+  "name": "글래스",
+  "swatch": "radial-gradient(circle at 25% 30%, #8b5cf6 0 22%, transparent 45%), radial-gradient(circle at 80% 75%, #22d3ee 0 18%, transparent 45%), linear-gradient(135deg, #f472b6, #6366f1)",
+  "terminal": {
+    "dark": {
+      "background": "#0c0e1f",
+      "foreground": "#e8eaff",
+      "cursor": "#a78bfa",
+      "selectionBackground": "#a78bfa44"
+    },
+    "light": {
+      "background": "#f6f6fc",
+      "foreground": "#1e1f3a",
+      "cursor": "#7c3aed",
+      "selectionBackground": "#7c3aed33"
+    }
+  }
+}
