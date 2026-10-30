@@ -211,6 +211,15 @@
   box-shadow: inset 0 1px 0 var(--glass-l3-hi), var(--glass-l3-shadow);
 }
 :root[data-skin="glass"] .tip { color: var(--text); }
+/* 상단 알림 띠(재시작 안내 · 하루 요약) — 헤더 아래 기판 위에 겹쳐 뜨는데 기본 바탕이 --surface(유리 6%)라 뒤 카드와 겹쳐 읽히지 않았다.
+   l3 유리 위에 띠 색을 한 겹 얹는다(재시작 안내 = 결정 대기 호박색) */
+:root[data-skin="glass"] .top-stack > * {
+  background: var(--glass-l3-bg); backdrop-filter: var(--glass-l3-blur); -webkit-backdrop-filter: var(--glass-l3-blur);
+  box-shadow: inset 0 1px 0 var(--glass-l3-hi), var(--glass-l3-shadow);
+}
+:root[data-skin="glass"] .stale-bar {
+  background: linear-gradient(color-mix(in srgb, var(--decision) 14%, transparent), color-mix(in srgb, var(--decision) 14%, transparent)), var(--glass-l3-bg);
+}
 
 /* l4 모달 — 뒤 화면은 scrim 으로 한 단계 가라앉힌다 */
 :root[data-skin="glass"] .modal {
