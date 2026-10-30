@@ -262,15 +262,19 @@
 :root[data-skin="glass"] :is(input, textarea, select) { background: color-mix(in srgb, var(--bg) 55%, transparent); }
 :root[data-skin="glass"][data-theme="light"] :is(input, textarea, select) { background: color-mix(in srgb, var(--glass-tint) 62%, transparent); }
 
-/* 5) 미확인 카드의 도는 빛 테두리(style.css .unseen) — 기본은 카드 바탕(padding-box)이 불투명하다는 전제로 테두리 층(border-box)을
-   그 아래 깐다. 유리 카드는 바탕이 비쳐 빛 줄기가 카드 안까지 사선으로 보였다 → 카드 바탕 밑에 불투명 바탕 한 겹을 더 깐다 */
-:root[data-skin="glass"] :is(.node, .dchip).unseen {
-  background:
-    var(--unseen-bg) padding-box,
-    linear-gradient(var(--bg), var(--bg)) padding-box,
-    conic-gradient(from var(--unseen-ang), var(--halo-dim) 0turn, var(--halo-dim) .3turn, var(--halo-tail) .42turn, var(--halo) .48turn .5turn, var(--halo-dim) .51turn,
-      var(--halo-dim) .8turn, var(--halo-tail) .92turn, var(--halo) .98turn 1turn) border-box !important;
+/* 5) 미확인 카드의 도는 빛 테두리(style.css .unseen) — 기본은 카드 바탕(padding-box) 아래 테두리 층(border-box)으로 그려 바탕이 불투명해야 한다.
+   유리 카드는 바탕이 비쳐 빛 줄기가 카드 안까지 보였고, 불투명 바탕을 깔면 유리가 막혀 미확인 카드(대개 완료)만 어두운 회색판이 됐다.
+   → 카드 바탕은 유리 그대로, 빛은 ::after 에 그리고 mask 로 테두리 2px 만 남긴다. .unseen 은 선택(.sel — ::after 를 쓴다)과 같이 붙지 않는다(app.js unseenOnCard) */
+:root[data-skin="glass"] :is(.node, .dchip).unseen { position: relative; background: var(--glass-l2-bg) !important; }
+:root[data-skin="glass"] :is(.node, .dchip).unseen::after {
+  content: ""; position: absolute; inset: -2px; padding: 2px; border-radius: inherit; pointer-events: none;
+  background: conic-gradient(from var(--unseen-ang), var(--halo-dim) 0turn, var(--halo-dim) .3turn, var(--halo-tail) .42turn, var(--halo) .48turn .5turn, var(--halo-dim) .51turn,
+    var(--halo-dim) .8turn, var(--halo-tail) .92turn, var(--halo) .98turn 1turn);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  animation: unseen-spin 4.2s linear infinite;
 }
+@media (prefers-reduced-motion: reduce) { :root[data-skin="glass"] :is(.node, .dchip).unseen::after { animation: none; } }
 
 /* 6) 내용 안에서 덮는 줄 — 타임라인 고정 요청 · 대기열/메모 머리 줄 · 넓힌 옆 패널은 불투명하게(비치면 아래 글자와 겹친다) */
 :root[data-skin="glass"] :is(.queue .qh, .memos li.mh, .side.cover) { background: var(--glass-solid); }
