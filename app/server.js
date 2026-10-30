@@ -831,9 +831,13 @@ const retryText = new Map(); // 워커 id → 마지막으로 투입에 실패�
 const confirmTimers = new Map(); // 워커 id → setTimeout (draftTimers 와 같은 이유로 워커 밖에 둔다)
 // bracketed paste 로 넣어야 여러 줄 지시가 줄마다 전송되지 않는다.
 // 끝이 \ 이면 Claude Code 가 뒤따르는 Enter 를 줄바꿈으로 바꿔 전송되지 않고 입력창에 남았다 — 공백을 하나 붙여 막는다
+// 그림 경로가 있으면 Claude Code 가 붙여 넣은 경로를 [Image #N] 으로 바꾸는 동안(파일을 읽어 첨부 — 비동기) 들어온 Enter 를 놓쳐
+// 지시가 입력창에 남았다(실측 10-30 14:49 W103: 그림 1장 + 글 → '[Image #5]문서 미리보기도…' 가 입력창에 그대로). 그림 수만큼 늦게 누른다
+const IMG_PATH_RE = /(?:[A-Za-z]:[\\/]|\/)[^\s"'<>|]*?\.(?:png|jpe?g|gif|webp|bmp)/gi;
 function pasteInput(w, text) {
   w.term.write(`\x1b[200~${text}${/\\$/.test(text) ? ' ' : ''}\x1b[201~`);
-  setTimeout(() => w.term.write('\r'), 120);
+  const imgs = (text.match(IMG_PATH_RE) || []).length;
+  setTimeout(() => w.term.write('\r'), imgs ? Math.min(2000, 500 + imgs * 300) : 120);
 }
 function sendPrompt(w, text) {
   pasteInput(w, text);
@@ -864,8 +868,21 @@ async function confirmPrompt(w, at) {
     setStatus(w, 'idle', cli.state === 'blocked' ? `명령 실행 — CLI 선택창을 확인하세요 (${sent.text.trim().split(/\s/)[0]})` : `명령 실행 (${sent.text.trim().split(/\s/)[0]})`);
     return;
   }
-  if (cli.state === 'draft' && cli.text.replace(/\s+/g, '').includes(sent.text.replace(/\s+/g, '').slice(0, 20))) {
-    // Enter 만 먹히지 않아 지시가 입력창에 그대로 있다 — 그 글이 곧 '쓰던 글'이니 사람이 보내거나 지우면 된다
+  // 입력창에 보낸 지시가 그대로 있는가 — 그림 경로는 입력창에서 [Image #N] 으로 바뀌므로 둘 다 빼고 비교한다(restoreNorm).
+  // 원문 앞 20자로 비교하던 때는 경로로 시작하는 지시를 못 알아봐 '안 들어감'으로 보고 대기열에 되돌렸고, 입력창이 빌 때까지 영영 기다렸다
+  const sentN = restoreNorm(sent.text), cliN = restoreNorm(cli.text);
+  const inBox = cli.state === 'draft' && (sentN ? cliN.includes(sentN.slice(0, 20)) : /\[Image #\d+\]/.test(cli.text) && !cliN);
+  if (inBox && !sent.enterRetried) {
+    // Enter 만 먹히지 않았다 — 입력창의 글이 곧 보낸 지시이니 Enter 를 한 번 더 누르고 다시 확인한다
+    w.term.write('\r');
+    w.status = 'working';
+    w.sentPrompt = { ...sent, at: Date.now(), enterRetried: true };
+    pushLog(w, 'notice', '업무 지시가 CLI 입력창에 남아 Enter 를 다시 눌렀습니다');
+    confirmTimers.set(w.id, setTimeout(() => confirmPrompt(w, w.sentPrompt.at), PROMPT_CONFIRM_MS));
+    return;
+  }
+  if (inBox) {
+    // 다시 눌러도 그대로 — 그 글이 곧 '쓰던 글'이니 사람이 보내거나 지우면 된다
     setStatus(w, 'idle', '업무 지시가 CLI 입력창에 남아 있음 — Enter 로 보내거나 지우세요');
     return;
   }
