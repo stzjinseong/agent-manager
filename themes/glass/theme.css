@@ -75,11 +75,12 @@
   /* 라이트 유리가 흰 판으로만 보이던 것: 흰 층을 겹겹이 쌓아(기판 28% + 카드 70%) 비칠 색이 사라졌고, 배경도 옅은 파스텔이라
      비칠 거리 · 흐릴 무늬가 없었고, 흰 테두리 · 하이라이트가 흰 바탕에 묻혔다. → 배경은 진하게, 유리는 옅게, 가장자리는 남색 실선 +
      빛 사선(광택)으로, 흐림에 채도 · 밝기를 더해 뒤 색이 유리를 지나며 물들게 */
-  --bg: color-mix(in srgb, var(--glass-tint) 30%, #e2e5f4);
+  /* 바탕은 흰색이 아니라 중간 톤 — 위에 흰 유리가 몇 겹 쌓여도 흰색으로 꽉 차지 않게(실측: 채팅 바탕 #ffffff) */
+  --bg: color-mix(in srgb, var(--glass-c1) 16%, color-mix(in srgb, var(--glass-tint) 20%, #cbd0e6));
   --floor: color-mix(in srgb, var(--glass-tint) 16%, transparent);
-  --surface: color-mix(in srgb, var(--glass-tint) 40%, transparent);
-  --surface-2: color-mix(in srgb, var(--glass-tint) 48%, transparent);
-  --surface-3: color-mix(in srgb, var(--glass-tint) 56%, transparent);
+  --surface: color-mix(in srgb, var(--glass-tint) 30%, transparent);
+  --surface-2: color-mix(in srgb, var(--glass-tint) 36%, transparent);
+  --surface-3: color-mix(in srgb, var(--glass-tint) 44%, transparent);
   --btn-hover: color-mix(in srgb, var(--glass-tint) 92%, transparent);
   --sel-a: color-mix(in srgb, var(--glass-tint) 90%, transparent); --sel-b: color-mix(in srgb, var(--glass-accent) 14%, rgb(255 255 255 / .75));
   --term-bg: #f6f6fc;
@@ -94,32 +95,34 @@
   --accent: color-mix(in srgb, var(--glass-accent) 72%, #000);   /* 밝은 바탕에서 읽히게 진하게 */
   --accent-hi: color-mix(in srgb, var(--glass-accent) 85%, #000);
   --copper: color-mix(in srgb, var(--glass-c2) 70%, #000);
-  --glass-solid: color-mix(in srgb, var(--glass-tint) 55%, #fbfbff);
+  /* 라이트는 가장 진한 층도 참고 이미지 패널 수준(흰색 50% 안팎 + 강한 흐림)까지만 — 불투명한 층이 섞이면 거기서 유리가 끊겼다 */
+  --glass-solid: color-mix(in srgb, var(--glass-tint) 62%, transparent);
   --photo-veil: 255 255 255;               /* 라이트는 하얗게 */
   /* 층 토큰 — 라이트: 흰 유리가 앞으로 올수록 진해진다. 테두리는 흰 빛 + 아주 옅은 남색 그림자 */
   --glass-sheen: linear-gradient(135deg, rgb(255 255 255 / .55), rgb(255 255 255 / 0) 42%);   /* 왼쪽 위에서 비스듬히 비치는 빛 */
   --glass-l1-bg: var(--glass-sheen), color-mix(in srgb, var(--glass-tint) 15%, transparent);
-  --glass-l1-blur: blur(24px) saturate(190%) brightness(1.03);
+  --glass-l1-blur: blur(24px) saturate(190%);
   --glass-l1-line: rgb(255 255 255 / .7);
   --glass-l1-hi: rgb(255 255 255 / .85);
   --glass-l1-shadow: 0 0 0 1px rgb(60 50 140 / .09), 0 10px 32px color-mix(in srgb, var(--glass-c1) 16%, rgb(60 50 140 / .10));
   --glass-l2-bg: var(--glass-sheen), linear-gradient(160deg, color-mix(in srgb, var(--glass-tint) 42%, transparent), color-mix(in srgb, var(--glass-tint) 20%, transparent));
-  --glass-l2-blur: blur(18px) saturate(200%) brightness(1.04);
+  --glass-l2-blur: blur(18px) saturate(200%);
   --glass-l2-line: rgb(255 255 255 / .8);
   --glass-l2-hi: #fff;
   --glass-l2-shadow: 0 0 0 1px rgb(60 50 140 / .11), 0 12px 30px color-mix(in srgb, var(--glass-c1) 20%, rgb(60 50 140 / .12));
-  --glass-l3-bg: linear-gradient(160deg, color-mix(in srgb, var(--glass-tint) 84%, transparent), color-mix(in srgb, color-mix(in srgb, var(--glass-tint) 80%, #f0f0fa) 74%, transparent));
-  --glass-l3-blur: blur(32px) saturate(200%) brightness(1.05);
+  --glass-l3-bg: var(--glass-sheen), linear-gradient(160deg, color-mix(in srgb, var(--glass-tint) 52%, transparent), color-mix(in srgb, var(--glass-tint) 40%, transparent));
+  --glass-l3-blur: blur(40px) saturate(180%);
   --glass-l3-line: rgb(255 255 255 / .9);
   --glass-l3-hi: #fff;
   --glass-l3-shadow: 0 18px 48px rgb(60 50 140 / .18), 0 0 0 1px rgb(60 50 140 / .06);
-  --glass-l4-bg: linear-gradient(160deg, color-mix(in srgb, var(--glass-tint) 90%, transparent), color-mix(in srgb, color-mix(in srgb, var(--glass-tint) 85%, #f4f4fc) 82%, transparent));
+  --glass-l4-bg: var(--glass-sheen), linear-gradient(160deg, color-mix(in srgb, var(--glass-tint) 60%, transparent), color-mix(in srgb, var(--glass-tint) 48%, transparent));
+  --glass-l4-blur: blur(48px) saturate(180%);
   --glass-l4-line: #fff;
   --glass-l4-hi: #fff;
   --glass-l4-shadow: 0 28px 70px rgb(60 50 140 / .24), 0 0 0 1px rgb(60 50 140 / .07);
   --glass-scrim: rgb(60 50 140 / .14);
   --glass-bar-shadow: 0 6px 20px color-mix(in srgb, var(--glass-c1) 16%, rgb(60 50 140 / .12)), 0 1px 0 rgb(60 50 140 / .10);
-  --glass-chat-bg: color-mix(in srgb, var(--glass-tint) 45%, transparent);
+  --glass-chat-bg: color-mix(in srgb, var(--glass-tint) 24%, transparent);
   --glass-front-bg: rgb(24 25 48 / .92);   /* 라이트는 검은 알약에 흰 글자 */
   --glass-front-fg: #fff;
   --glass-front-shadow: 0 2px 10px rgb(24 25 48 / .25);
@@ -138,7 +141,8 @@
     radial-gradient(60vmax 50vmax at 12% 8%, color-mix(in srgb, var(--glass-c1) 72%, transparent), transparent 62%),
     radial-gradient(55vmax 45vmax at 92% 30%, color-mix(in srgb, var(--glass-c2) 64%, transparent), transparent 62%),
     radial-gradient(60vmax 50vmax at 70% 105%, color-mix(in srgb, var(--glass-c3) 68%, transparent), transparent 62%),
-    var(--bg);
+    radial-gradient(50vmax 40vmax at 45% 55%, color-mix(in srgb, var(--glass-c2) 30%, transparent), transparent 70%),   /* 가운데도 색이 닿게 */
+    linear-gradient(135deg, color-mix(in srgb, var(--glass-c1) 22%, var(--bg)), var(--bg) 50%, color-mix(in srgb, var(--glass-c3) 22%, var(--bg)));
 }
 :root[data-skin="glass"] .theme-bg::before {
   content: ""; position: absolute; width: 46vmax; height: 46vmax; left: 40%; top: 30%; border-radius: 50%;
@@ -294,7 +298,11 @@
 }
 :root[data-skin="glass"] .btn.primary:hover { background: linear-gradient(135deg, var(--accent-hi), color-mix(in srgb, var(--glass-c1) 85%, #000)); }
 :root[data-skin="glass"] :is(input, textarea, select) { background: color-mix(in srgb, var(--bg) 55%, transparent); }
-:root[data-skin="glass"][data-theme="light"] :is(input, textarea, select) { background: color-mix(in srgb, var(--glass-tint) 62%, transparent); }
+:root[data-skin="glass"][data-theme="light"] :is(input, textarea, select) { background: color-mix(in srgb, var(--glass-tint) 40%, transparent); }
+/* 채팅 상자 흐림을 더 세게 — 바탕이 옅어진 만큼 뒤 화면을 더 뭉개야 긴 글이 읽힌다 */
+:root[data-skin="glass"][data-theme="light"] .term-wrap.chatting { backdrop-filter: blur(40px) saturate(180%); -webkit-backdrop-filter: blur(40px) saturate(180%); }
+/* 내용 안에서 덮는 줄(고정 머리 줄 · 넓힌 옆 패널)도 반투명 + 흐림으로 */
+:root[data-skin="glass"][data-theme="light"] :is(.queue .qh, .memos li.mh, .side.cover, .tl-pin) { backdrop-filter: blur(24px) saturate(160%); -webkit-backdrop-filter: blur(24px) saturate(160%); }
 
 /* 5) 미확인 카드의 도는 빛 테두리(style.css .unseen) — 기본은 카드 바탕(padding-box) 아래 테두리 층(border-box)으로 그려 바탕이 불투명해야 한다.
    유리 카드는 바탕이 비쳐 빛 줄기가 카드 안까지 보였고, 불투명 바탕을 깔면 유리가 막혀 미확인 카드(대개 완료)만 어두운 회색판이 됐다.
