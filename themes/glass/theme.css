@@ -1,17 +1,20 @@
 /* 글래스 — 흐릿한 색 덩어리 위에 반투명 유리판을 겹친 글래스모피즘. 다크 · 라이트 둘 다(theme.json 에 mode 없음).
    유리 = 반투명 바탕 + backdrop-filter(흐림·채도) + 밝은 얇은 테두리 + 윗변 하이라이트.
+   색: 배경 색 덩어리 셋(--glass-c1~3)과 강조색(--glass-accent)은 👕 꾸미기 → 테마 → 색에서 바꾼다(theme.json colors · palettes).
+   아래 값은 기본(바이올렛) — 고른 색은 html 의 인라인 style 로 덮인다. 투명도는 color-mix 로 여기서 정한다
    ★ .detail · .floor 에는 backdrop-filter 를 직접 걸지 않는다 — 걸면 그 안의 position:fixed(터미널 크게 보기 .term-wrap.full,
      옆 패널)가 화면이 아니라 패널 기준으로 붙어 깨진다. 대신 ::before 층(z-index:-1)에 유리를 그린다 */
 
 /* 1) 색 토큰 — 다크 */
 :root[data-skin="glass"] {
+  --glass-c1: #8b5cf6; --glass-c2: #22d3ee; --glass-c3: #f472b6; --glass-accent: #a78bfa;
   --bg: #0b0d1c;
   --floor: rgb(255 255 255 / .035);
   --surface: rgb(255 255 255 / .06);
   --surface-2: rgb(255 255 255 / .085);
   --surface-3: rgb(255 255 255 / .11);
   --btn-hover: rgb(255 255 255 / .18);
-  --sel-a: rgb(167 139 250 / .26); --sel-b: rgb(99 102 241 / .14);
+  --sel-a: color-mix(in srgb, var(--glass-accent) 26%, transparent); --sel-b: color-mix(in srgb, var(--glass-c1) 12%, transparent);
   --term-bg: #0c0e1f;
   --tip-bg: rgb(22 24 48 / .92);
   --ink: 220 225 255;
@@ -21,9 +24,9 @@
   --text-2: #c3c7e8;
   --dim: #9096c0;
   --faint: #656b98;
-  --accent: #a78bfa;
-  --accent-hi: #c4b5fd;
-  --copper: #93c5fd;
+  --accent: var(--glass-accent);
+  --accent-hi: color-mix(in srgb, var(--glass-accent) 65%, #fff);
+  --copper: color-mix(in srgb, var(--glass-c2) 60%, #fff);
   --radius: 16px;
   --glass-blur: blur(22px) saturate(160%);
   --glass-hi: rgb(255 255 255 / .16);      /* 윗변 하이라이트 */
@@ -38,7 +41,7 @@
   --surface-2: rgb(255 255 255 / .62);
   --surface-3: rgb(255 255 255 / .7);
   --btn-hover: rgb(255 255 255 / .92);
-  --sel-a: rgb(255 255 255 / .9); --sel-b: rgb(237 233 254 / .75);
+  --sel-a: rgb(255 255 255 / .9); --sel-b: color-mix(in srgb, var(--glass-accent) 14%, rgb(255 255 255 / .75));
   --term-bg: #f6f6fc;
   --tip-bg: rgb(255 255 255 / .94);
   --ink: 40 36 90;
@@ -48,9 +51,9 @@
   --text-2: #4a4c72;
   --dim: #767a9e;
   --faint: #a1a4c4;
-  --accent: #7c3aed;
-  --accent-hi: #8b5cf6;
-  --copper: #6366f1;
+  --accent: color-mix(in srgb, var(--glass-accent) 72%, #000);   /* 밝은 바탕에서 읽히게 진하게 */
+  --accent-hi: color-mix(in srgb, var(--glass-accent) 85%, #000);
+  --copper: color-mix(in srgb, var(--glass-c2) 70%, #000);
   --glass-hi: rgb(255 255 255 / .85);
   --glass-shadow: 0 10px 36px rgb(60 50 140 / .12);
   --glass-solid: #fbfbff;
@@ -59,24 +62,23 @@
 /* 2) 배경 — 크게 흐린 색 덩어리 셋이 아주 천천히 떠다닌다 */
 :root[data-skin="glass"] .theme-bg {
   background:
-    radial-gradient(60vmax 50vmax at 12% 8%, rgb(139 92 246 / .55), transparent 60%),
-    radial-gradient(55vmax 45vmax at 92% 30%, rgb(34 211 238 / .32), transparent 60%),
-    radial-gradient(60vmax 50vmax at 70% 105%, rgb(244 114 182 / .38), transparent 60%),
+    radial-gradient(60vmax 50vmax at 12% 8%, color-mix(in srgb, var(--glass-c1) 55%, transparent), transparent 60%),
+    radial-gradient(55vmax 45vmax at 92% 30%, color-mix(in srgb, var(--glass-c2) 32%, transparent), transparent 60%),
+    radial-gradient(60vmax 50vmax at 70% 105%, color-mix(in srgb, var(--glass-c3) 38%, transparent), transparent 60%),
     #0b0d1c;
 }
 :root[data-skin="glass"][data-theme="light"] .theme-bg {
   background:
-    radial-gradient(60vmax 50vmax at 12% 8%, rgb(167 139 250 / .55), transparent 60%),
-    radial-gradient(55vmax 45vmax at 92% 30%, rgb(103 232 249 / .45), transparent 60%),
-    radial-gradient(60vmax 50vmax at 70% 105%, rgb(249 168 212 / .55), transparent 60%),
+    radial-gradient(60vmax 50vmax at 12% 8%, color-mix(in srgb, var(--glass-c1) 42%, transparent), transparent 60%),
+    radial-gradient(55vmax 45vmax at 92% 30%, color-mix(in srgb, var(--glass-c2) 38%, transparent), transparent 60%),
+    radial-gradient(60vmax 50vmax at 70% 105%, color-mix(in srgb, var(--glass-c3) 42%, transparent), transparent 60%),
     #eef0fb;
 }
 :root[data-skin="glass"] .theme-bg::before {
   content: ""; position: absolute; width: 46vmax; height: 46vmax; left: 40%; top: 30%; border-radius: 50%;
-  background: radial-gradient(circle, rgb(99 102 241 / .45), transparent 65%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--glass-accent) 40%, transparent), transparent 65%);
   filter: blur(40px); animation: glass-drift 38s ease-in-out infinite alternate;
 }
-:root[data-skin="glass"][data-theme="light"] .theme-bg::before { background: radial-gradient(circle, rgb(129 140 248 / .4), transparent 65%); }
 @keyframes glass-drift {
   0% { transform: translate(-30%, -20%) scale(1); }
   50% { transform: translate(10%, 10%) scale(1.15); }
@@ -115,9 +117,11 @@
 
 /* 4) 컨트롤 — 반투명 버튼 · 입력칸, 강조 버튼은 보라→남색 그라데이션 */
 :root[data-skin="glass"] .btn { border-color: var(--line-2); }
-:root[data-skin="glass"] .btn.primary { background: linear-gradient(135deg, #a78bfa, #6366f1); color: #fff; box-shadow: 0 4px 16px rgb(124 58 237 / .35); }
-:root[data-skin="glass"] .btn.primary:hover { background: linear-gradient(135deg, #c4b5fd, #818cf8); }
-:root[data-skin="glass"][data-theme="light"] .btn.primary { background: linear-gradient(135deg, #8b5cf6, #6366f1); }
+:root[data-skin="glass"] .btn.primary {
+  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--glass-c1) 70%, #000)); color: #fff; text-shadow: 0 1px 2px rgb(0 0 0 / .25);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--glass-accent) 35%, transparent);
+}
+:root[data-skin="glass"] .btn.primary:hover { background: linear-gradient(135deg, var(--accent-hi), color-mix(in srgb, var(--glass-c1) 85%, #000)); }
 :root[data-skin="glass"] :is(input, textarea, select) { background: color-mix(in srgb, var(--bg) 55%, transparent); }
 :root[data-skin="glass"][data-theme="light"] :is(input, textarea, select) { background: rgb(255 255 255 / .7); }
 

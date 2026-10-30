@@ -1636,12 +1636,20 @@ function listThemes() {
     try { meta = JSON.parse(fs.readFileSync(path.join(dir, 'theme.json'), 'utf8')) || {}; } catch {}
     const str = (v, n) => (typeof v === 'string' ? v.slice(0, n) : '');
     const term = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).filter(([k, x]) => /^[a-zA-Z]{1,40}$/.test(k) && typeof x === 'string' && x.length <= 40)) : undefined);
+    // 사용자가 바꿀 수 있는 색(colors: CSS 변수 + 이름)과 색 조합(palettes) — 값은 #rrggbb 만. 앱이 html 인라인 style 로 넣는다
+    const CVAR = /^--[a-z0-9-]{1,40}$/i, HEX = /^#[0-9a-f]{6}$/i;
+    const colors = (Array.isArray(meta.colors) ? meta.colors : []).filter((c) => CVAR.test(c?.var || '')).slice(0, 8).map((c) => ({ var: c.var, label: str(c.label, 20) || c.var }));
+    const palettes = !colors.length ? [] : (Array.isArray(meta.palettes) ? meta.palettes : []).slice(0, 16).map((p) => ({
+      name: str(p?.name, 20),
+      colors: Object.fromEntries(colors.map((c) => [c.var, p?.colors?.[c.var]]).filter(([, x]) => typeof x === 'string' && HEX.test(x))),
+    })).filter((p) => Object.keys(p.colors).length);
     out.push({
       id: d.name,
       name: str(meta.name, 40) || d.name,
       swatch: str(meta.swatch, 300),
       mode: meta.mode === 'light' || meta.mode === 'dark' ? meta.mode : '',
       terminal: meta.terminal && typeof meta.terminal === 'object' ? { dark: term(meta.terminal.dark), light: term(meta.terminal.light) } : undefined,
+      ...(colors.length && { colors, palettes }),
       rev: Math.round(fs.statSync(path.join(dir, 'theme.css')).mtimeMs).toString(36),
     });
   }

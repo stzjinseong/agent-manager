@@ -3792,6 +3792,7 @@ function setSkin(id) {
   const root = document.documentElement, t = userThemes.find((x) => x.id === id);
   if (t) root.dataset.skin = t.id; else delete root.dataset.skin;
   themeLink(t);
+  applySkinColors();
   try { t ? localStorage.setItem(SKIN_KEY, t.id) : localStorage.removeItem(SKIN_KEY); } catch {}
   const light = root.dataset.theme === 'light';
   if (t?.mode && (t.mode === 'light') !== light) { applyTheme(t.mode === 'light'); setThemeSwitch(t.mode === 'light'); }
@@ -3806,8 +3807,37 @@ async function loadThemes() {
   try { localStorage.setItem('am.themes', JSON.stringify(list)); } catch {}
   const cur = document.documentElement.dataset.skin;
   if (cur && !curTheme()) setSkin(''); // 폴더가 없어졌으면 오리지널로
-  else if (cur) { themeLink(curTheme()); term.options.theme = termTheme(document.documentElement.dataset.theme === 'light'); }
+  else if (cur) { themeLink(curTheme()); applySkinColors(); term.options.theme = termTheme(document.documentElement.dataset.theme === 'light'); }
   if (!charPop.hidden) renderCharPop();
+}
+// 테마 색 고르기 — theme.json 의 colors(바꿀 CSS 변수)·palettes(색 조합)가 있는 테마는 꾸미기 메뉴에서 색을 바꾼다.
+// 고른 색은 테마별로 브라우저에 기억(am.skin.colors = { 테마 id: { 변수: #rrggbb } })하고 html 인라인 style 로 넣어 theme.css 기본값을 덮는다.
+// 첫 화면은 index.html 머리 스크립트가 같은 값을 미리 넣는다(번쩍임 방지)
+const SKIN_COLORS_KEY = 'am.skin.colors', HEX6 = /^#[0-9a-f]{6}$/i;
+function skinColorsAll() { try { const j = JSON.parse(localStorage.getItem(SKIN_COLORS_KEY) || '{}'); return j && typeof j === 'object' ? j : {}; } catch { return {}; } }
+const skinColors = (t) => { const c = t?.colors?.length && skinColorsAll()[t.id]; return c && typeof c === 'object' ? c : {}; };
+function applySkinColors() {
+  const st = document.documentElement.style, t = curTheme(), sel = skinColors(t);
+  for (const x of userThemes) for (const c of x.colors || []) st.removeProperty(c.var); // 다른 테마 · 기본값으로 돌아가면 걷는다
+  for (const c of t?.colors || []) if (HEX6.test(sel[c.var] || '')) st.setProperty(c.var, sel[c.var]);
+}
+function saveSkinColors(id, colors) {
+  const all = skinColorsAll();
+  if (colors && Object.keys(colors).length) all[id] = colors; else delete all[id];
+  try { localStorage.setItem(SKIN_COLORS_KEY, JSON.stringify(all)); } catch {}
+  applySkinColors();
+}
+// 지금 보이는 색 — 고른 색이 없으면 theme.css 기본값(아직 안 읽혔으면 첫 색 조합)
+function skinColorNow(t, v) {
+  const x = skinColors(t)[v] || getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  return HEX6.test(x) ? x.toLowerCase() : (t.palettes?.[0]?.colors?.[v] || '#888888').toLowerCase();
+}
+const palOn = (t, p) => t.colors.every((c) => !p.colors[c.var] || p.colors[c.var].toLowerCase() === skinColorNow(t, c.var));
+function skinColorsHTML(t) {
+  const pals = (t.palettes || []).map((p, i) => `<button class="skin-pal${palOn(t, p) ? ' on' : ''}" data-pal="${i}" title="${esc(p.name)}" aria-label="${esc(p.name)}"
+    style="background:linear-gradient(135deg, ${t.colors.map((c) => p.colors[c.var]).filter(Boolean).join(', ')})"></button>`).join('');
+  const picks = t.colors.map((c) => `<label class="skin-cc" title="${esc(c.label)}"><input type="color" data-cvar="${esc(c.var)}" value="${skinColorNow(t, c.var)}"><span>${esc(c.label)}</span></label>`).join('');
+  return `<div class="skin-colors">${pals ? `<div class="skin-pals">${pals}</div>` : ''}<div class="skin-cust">${picks}<button class="skin-reset" data-pal-reset title="${_t('기본값')}">↺</button></div></div>`;
 }
 // ---------- 내 테마 만들기 안내 ----------
 // ① 예시를 복사해 새 테마 폴더 만들기(바로 적용) · themes 폴더 열기 ② 원하는 느낌을 적으면 워커에게 줄 요청문 만들기(복사 · 입력칸에 넣기)
@@ -4021,7 +4051,7 @@ function renderCharPop() {
   charPop.insertAdjacentHTML('beforeend', `<div class="pop-h">${_t('테마')}</div>` + skins.map((k) => {
     const on = k.id === cur;
     return `<button class="lang-item skin-item${on ? ' on' : ''}" role="menuitemradio" aria-checked="${on}" data-skin="${esc(k.id)}">
-      <span class="lang-check" aria-hidden="true">${on ? '✓' : ''}</span><span class="skin-sw" style="background:${esc(k.swatch || 'var(--surface-3)')}"></span><span class="char-nm">${esc(k.name)}</span></button>`;
+      <span class="lang-check" aria-hidden="true">${on ? '✓' : ''}</span><span class="skin-sw" style="background:${esc(k.swatch || 'var(--surface-3)')}"></span><span class="char-nm">${esc(k.name)}</span></button>${on && k.colors?.length ? skinColorsHTML(k) : ''}`;
   }).join('') + `<button class="lang-item char-add" data-theme-guide>${_t('+ 테마 만들기')}</button>`);
   const f = fontPrefs();
   charPop.insertAdjacentHTML('beforeend', `<div class="pop-h">${_t('글꼴 · CLI 색')}</div><button class="lang-item char-add" data-font-set>${esc([f.ui, f.term, termScheme()?.name].filter(Boolean).join(' · ') || _t('기본 글꼴'))} — ${_t('바꾸기…')}</button>`);
@@ -4076,6 +4106,11 @@ charPop.addEventListener('click', async (e) => {
     await loadChars();
     return;
   }
+  const pal = e.target.closest('[data-pal], [data-pal-reset]'), t = curTheme();
+  if (pal && t) { // 메뉴는 열어 둔다 — 여러 개 눌러 비교. 다시 그리면 누른 버튼이 문서에서 떨어져 '바깥 클릭'으로 닫히므로 전파를 막는다
+    e.stopPropagation();
+    saveSkinColors(t.id, pal.dataset.pal ? t.palettes[+pal.dataset.pal]?.colors : null); renderCharPop(); charPop.querySelector('.skin-pal.on, [data-pal-reset]')?.focus(); return;
+  }
   const sk = e.target.closest('.skin-item');
   if (sk) {
     if (sk.dataset.skin === (document.documentElement.dataset.skin || '')) return;
@@ -4091,6 +4126,13 @@ charPop.addEventListener('click', async (e) => {
   charBtn.focus();
 });
 document.addEventListener('click', (e) => { if (!charPop.hidden && !e.target.closest('.char-wrap')) setCharPop(false); });
+// 색 직접 고르기: 끌어 고르는 동안(input) 바로 칠하고, 다른 색은 지금 보이는 값으로 함께 저장. 메뉴를 다시 그리면 색 선택 창이 닫히므로 조합 표시만 고친다
+charPop.addEventListener('input', (e) => {
+  const v = e.target.dataset?.cvar, t = curTheme();
+  if (!v || !t?.colors || !HEX6.test(e.target.value)) return;
+  saveSkinColors(t.id, { ...Object.fromEntries(t.colors.map((c) => [c.var, skinColorNow(t, c.var)])), [v]: e.target.value.toLowerCase() });
+  charPop.querySelectorAll('.skin-pal').forEach((b) => b.classList.toggle('on', palOn(t, t.palettes[+b.dataset.pal])));
+});
 document.addEventListener('keydown', (e) => {
   if (charPop.hidden) return;
   if (e.key === 'Escape') { setCharPop(false); charBtn.focus(); }

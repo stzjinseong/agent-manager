@@ -18,6 +18,8 @@
       h.dataset.skin = k;
       var l = document.createElement('link'); l.rel = 'stylesheet'; l.id = 'user-theme'; l.href = '/themes/' + k + '/theme.css';
       document.head.appendChild(l);
+      var cs = (JSON.parse(localStorage.getItem('am.skin.colors') || '{}') || {})[k] || {}; /* 테마 색 고르기(app.js applySkinColors) */
+      for (var v in cs) if (/^--[a-z0-9-]{1,40}$/i.test(v) && /^#[0-9a-f]{6}$/i.test(cs[v])) h.style.setProperty(v, cs[v]);
     }
   } catch (e) {}</script>
   <!-- 화면 언어: 고른 적이 있으면 그것, 아니면 브라우저 첫 언어(한국어면 ko, 그 밖엔 en). 한국어가 아니면 번역이 끝날 때까지

@@ -38,6 +38,8 @@ themes/
 | `swatch` | 메뉴의 작은 견본 — CSS `background` 값 (예: `"linear-gradient(135deg, #111, #4f8cff)"`) |
 | `mode` | `"dark"` 또는 `"light"` — 고를 때 그 모드로 바꿔요. 없으면 지금 모드 그대로 |
 | `terminal.dark` / `terminal.light` | 그 모드일 때 터미널(xterm) 색. `background` `foreground` `cursor` `selectionBackground` `red` `brightBlue` … |
+| `colors` | 사용자가 꾸미기 메뉴에서 바꿀 수 있는 색. `[{ "var": "--my-c1", "label": "배경" }, …]` (8개까지). theme.css 에서 그 변수를 쓰고 기본값을 정해 두세요 |
+| `palettes` | `colors` 의 색 조합 견본. `[{ "name": "오로라", "colors": { "--my-c1": "#10b981" } }, …]` — 값은 `#rrggbb` 만 |
 
 ## theme.css 쓰는 법
 

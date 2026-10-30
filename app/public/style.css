@@ -1884,6 +1884,19 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 .pop-h:not(:first-child) { margin-top: 4px; padding-top: 9px; border-top: 1px solid var(--line); }
 .char-pop .char-add { margin-top: 0; padding-top: 7px; border-top: 0; border-radius: 7px; }
 .skin-sw { flex: none; width: 34px; height: 18px; border-radius: 5px; box-shadow: inset 0 0 0 1px rgb(var(--ink) / .15); }
+/* 테마 색 고르기(app.js skinColorsHTML) — 고른 테마 바로 아래: 색 조합 동그라미 줄 + 색별 직접 고르기 */
+.skin-colors { display: flex; flex-direction: column; gap: 8px; margin: 2px 0 4px 30px; padding: 8px 10px; border-radius: 9px; background: rgb(var(--ink) / .05); }
+.skin-pals { display: flex; flex-wrap: wrap; gap: 5px; }
+.skin-pal { width: 22px; height: 22px; padding: 0; border-radius: 50%; border: 0; cursor: pointer; box-shadow: inset 0 0 0 1px rgb(var(--ink) / .2); transition: transform .1s; }
+.skin-pal:hover { transform: scale(1.1); }
+.skin-pal.on { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent-hi); }
+.skin-cust { display: flex; align-items: flex-start; gap: 8px; }
+.skin-cc { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10.5px; color: var(--dim); cursor: pointer; white-space: nowrap; }
+.skin-cc input { width: 26px; height: 22px; padding: 0; border: 1px solid var(--line-2); border-radius: 6px; background: none; cursor: pointer; }
+.skin-cc input::-webkit-color-swatch-wrapper { padding: 2px; }
+.skin-cc input::-webkit-color-swatch { border: 0; border-radius: 4px; }
+.skin-reset { margin-left: auto; align-self: center; width: 26px; height: 26px; padding: 0; border-radius: 7px; border: 1px solid var(--line-2); background: none; color: var(--text-2); cursor: pointer; }
+.skin-reset:hover { background: var(--surface-3); color: var(--text); }
 
 /* 사용자 테마용 배경 층 — 기본은 비어 있고, 테마 CSS 가 .theme-bg(::before/::after 포함)를 꾸민다 (themes/README.md) */
 .theme-bg { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
