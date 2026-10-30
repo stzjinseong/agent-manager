@@ -62,7 +62,8 @@
   --glass-l4-line: rgb(255 255 255 / .28);
   --glass-l4-hi: rgb(255 255 255 / .30);
   --glass-l4-shadow: 0 28px 80px rgb(2 4 16 / .65);
-  --glass-scrim: rgb(6 8 24 / .45);        /* 모달 뒤 화면을 한 단계 가라앉힌다 */
+  --glass-scrim: rgb(6 8 24 / .45);
+  --glass-bar-shadow: 0 6px 18px rgb(2 4 16 / .38), 0 1px 0 rgb(0 0 0 / .25);   /* 헤더 · 칩 줄 아래 그림자 */        /* 모달 뒤 화면을 한 단계 가라앉힌다 */
   /* 최전면 — 선택된 탭 · 토글: 거의 불투명. 다크는 흰 알약에 진한 글자 */
   --glass-front-bg: rgb(255 255 255 / .92);
   --glass-front-fg: #15162c;
@@ -116,6 +117,7 @@
   --glass-l4-hi: #fff;
   --glass-l4-shadow: 0 28px 70px rgb(60 50 140 / .24), 0 0 0 1px rgb(60 50 140 / .07);
   --glass-scrim: rgb(60 50 140 / .14);
+  --glass-bar-shadow: 0 6px 20px color-mix(in srgb, var(--glass-c1) 16%, rgb(60 50 140 / .12)), 0 1px 0 rgb(60 50 140 / .10);
   --glass-front-bg: rgb(24 25 48 / .92);   /* 라이트는 검은 알약에 흰 글자 */
   --glass-front-fg: #fff;
   --glass-front-shadow: 0 2px 10px rgb(24 25 48 / .25);
@@ -173,7 +175,9 @@
 :root[data-skin="glass"][data-theme="light"] :is(.detail, .att-tab-in) { background: transparent; }
 :root[data-skin="glass"] :is(.topbar, .dock) {
   background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none;
-  border-bottom-color: var(--glass-l1-line); box-shadow: inset 0 -1px 0 var(--line);
+  border-bottom-color: var(--glass-l1-line);
+  /* 아래 판들은 그림자로 떠 있는데 헤더만 밑줄 하나라 평평했다 — 아래로 떨어지는 그림자 + 밑변 빛 선 */
+  box-shadow: inset 0 -1px 0 var(--glass-l1-hi), var(--glass-bar-shadow);
 }
 :root[data-skin="glass"] :is(.topbar, .dock)::before { background: color-mix(in srgb, var(--bg) 45%, transparent); }
 :root[data-skin="glass"][data-theme="light"] :is(.topbar, .dock)::before { background: color-mix(in srgb, var(--glass-tint) 38%, transparent); }
