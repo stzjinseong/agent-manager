@@ -3793,6 +3793,9 @@ function setSkin(id) {
   if (t) root.dataset.skin = t.id; else delete root.dataset.skin;
   themeLink(t);
   applySkinColors();
+  // 채팅 바탕(--chat-bg)은 테마 CSS 가 읽힌 뒤(link load)에 다시 정한다 — 오리지널로 돌아가면 link 를 떼기만 해 load 가 없어
+  // 앞 테마의 바탕이 남았다(글래스 → 오리지널에서 채팅이 남보라). 뗄 때는 여기서 바로
+  if (!t) applyScheme();
   try { t ? localStorage.setItem(SKIN_KEY, t.id) : localStorage.removeItem(SKIN_KEY); } catch {}
   const light = root.dataset.theme === 'light';
   if (t?.mode && (t.mode === 'light') !== light) { applyTheme(t.mode === 'light'); setThemeSwitch(t.mode === 'light'); }
