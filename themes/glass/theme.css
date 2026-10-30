@@ -2,6 +2,8 @@
    유리 = 반투명 바탕 + backdrop-filter(흐림·채도) + 밝은 얇은 테두리 + 윗변 하이라이트.
    색: 배경 색 덩어리 셋(--glass-c1~3)과 강조색(--glass-accent)은 👕 꾸미기 → 테마 → 색에서 바꾼다(theme.json colors · palettes).
    아래 값은 기본(바이올렛) — 고른 색은 html 의 인라인 style 로 덮인다. 투명도는 color-mix 로 여기서 정한다
+   깊이: 앞으로 올수록 밝고 · 덜 비치고 · 더 흐리고 · 테두리가 또렷하고 · 그림자가 크다 — 층 토큰 --glass-l1~l4(아래 1-3).
+     l1 바닥판(기판 · 상세 패널 · 헤더) → l2 카드(워커 카드 · 새 워커 창) → l3 떠 있는 것(팝업 · 툴팁 · 토스트) → l4 모달
    ★ .detail · .floor 에는 backdrop-filter 를 직접 걸지 않는다 — 걸면 그 안의 position:fixed(터미널 크게 보기 .term-wrap.full,
      옆 패널)가 화면이 아니라 패널 기준으로 붙어 깨진다. 대신 ::before 층(z-index:-1)에 유리를 그린다 */
 
@@ -28,10 +30,38 @@
   --accent-hi: color-mix(in srgb, var(--glass-accent) 65%, #fff);
   --copper: color-mix(in srgb, var(--glass-c2) 60%, #fff);
   --radius: 16px;
-  --glass-blur: blur(22px) saturate(160%);
-  --glass-hi: rgb(255 255 255 / .16);      /* 윗변 하이라이트 */
-  --glass-shadow: 0 10px 40px rgb(4 6 24 / .45);
-  --glass-solid: #181a33;                  /* 내용 위를 덮는 층(고정 줄 · 팝업)은 비치면 글자가 겹쳐 읽히지 않는다 — 불투명 */
+  --glass-solid: #181a33;                  /* 내용 안에서 덮는 줄(고정 머리 줄 · 넓힌 옆 패널)은 비치면 글자가 겹친다 — 불투명 */
+}
+/* 1-3) 층 토큰 — 다크. -bg 바탕 · -blur 뒤 흐림 · -line 테두리 · -hi 윗변 하이라이트 · -shadow 그림자 */
+:root[data-skin="glass"] {
+  --glass-l1-bg: rgb(255 255 255 / .04);
+  --glass-l1-blur: blur(24px) saturate(140%);
+  --glass-l1-line: rgb(255 255 255 / .10);
+  --glass-l1-hi: rgb(255 255 255 / .08);
+  --glass-l1-shadow: 0 8px 32px rgb(4 6 24 / .30);
+
+  --glass-l2-bg: linear-gradient(160deg, rgb(255 255 255 / .12), rgb(255 255 255 / .05));
+  --glass-l2-blur: blur(18px) saturate(160%);
+  --glass-l2-line: rgb(255 255 255 / .16);
+  --glass-l2-hi: rgb(255 255 255 / .16);
+  --glass-l2-shadow: 0 10px 30px rgb(4 6 24 / .40);
+
+  --glass-l3-bg: linear-gradient(160deg, rgb(78 82 128 / .72), rgb(44 47 84 / .78));
+  --glass-l3-blur: blur(32px) saturate(180%);
+  --glass-l3-line: rgb(255 255 255 / .24);
+  --glass-l3-hi: rgb(255 255 255 / .24);
+  --glass-l3-shadow: 0 18px 50px rgb(2 4 16 / .55);
+
+  --glass-l4-bg: linear-gradient(160deg, rgb(88 92 140 / .78), rgb(48 51 92 / .84));
+  --glass-l4-blur: blur(40px) saturate(180%);
+  --glass-l4-line: rgb(255 255 255 / .28);
+  --glass-l4-hi: rgb(255 255 255 / .30);
+  --glass-l4-shadow: 0 28px 80px rgb(2 4 16 / .65);
+  --glass-scrim: rgb(6 8 24 / .45);        /* 모달 뒤 화면을 한 단계 가라앉힌다 */
+  /* 최전면 — 선택된 탭 · 토글: 거의 불투명. 다크는 흰 알약에 진한 글자 */
+  --glass-front-bg: rgb(255 255 255 / .92);
+  --glass-front-fg: #15162c;
+  --glass-front-shadow: 0 2px 10px rgb(2 4 16 / .45);
 }
 /* 1-2) 라이트 — 흰 유리 */
 :root[data-skin="glass"][data-theme="light"] {
@@ -54,9 +84,28 @@
   --accent: color-mix(in srgb, var(--glass-accent) 72%, #000);   /* 밝은 바탕에서 읽히게 진하게 */
   --accent-hi: color-mix(in srgb, var(--glass-accent) 85%, #000);
   --copper: color-mix(in srgb, var(--glass-c2) 70%, #000);
-  --glass-hi: rgb(255 255 255 / .85);
-  --glass-shadow: 0 10px 36px rgb(60 50 140 / .12);
   --glass-solid: #fbfbff;
+  /* 층 토큰 — 라이트: 흰 유리가 앞으로 올수록 진해진다. 테두리는 흰 빛 + 아주 옅은 남색 그림자 */
+  --glass-l1-bg: rgb(255 255 255 / .28);
+  --glass-l1-line: rgb(255 255 255 / .55);
+  --glass-l1-hi: rgb(255 255 255 / .6);
+  --glass-l1-shadow: 0 6px 24px rgb(60 50 140 / .08);
+  --glass-l2-bg: linear-gradient(160deg, rgb(255 255 255 / .70), rgb(255 255 255 / .45));
+  --glass-l2-line: rgb(255 255 255 / .75);
+  --glass-l2-hi: rgb(255 255 255 / .9);
+  --glass-l2-shadow: 0 8px 26px rgb(60 50 140 / .11);
+  --glass-l3-bg: linear-gradient(160deg, rgb(255 255 255 / .84), rgb(248 248 255 / .74));
+  --glass-l3-line: rgb(255 255 255 / .9);
+  --glass-l3-hi: #fff;
+  --glass-l3-shadow: 0 18px 48px rgb(60 50 140 / .18), 0 0 0 1px rgb(60 50 140 / .06);
+  --glass-l4-bg: linear-gradient(160deg, rgb(255 255 255 / .9), rgb(250 250 255 / .82));
+  --glass-l4-line: #fff;
+  --glass-l4-hi: #fff;
+  --glass-l4-shadow: 0 28px 70px rgb(60 50 140 / .24), 0 0 0 1px rgb(60 50 140 / .07);
+  --glass-scrim: rgb(60 50 140 / .14);
+  --glass-front-bg: rgb(24 25 48 / .92);   /* 라이트는 검은 알약에 흰 글자 */
+  --glass-front-fg: #fff;
+  --glass-front-shadow: 0 2px 10px rgb(24 25 48 / .25);
 }
 
 /* 2) 배경 — 크게 흐린 색 덩어리 셋이 아주 천천히 떠다닌다 */
@@ -86,34 +135,55 @@
 }
 @media (prefers-reduced-motion: reduce) { :root[data-skin="glass"] .theme-bg::before { animation: none; } }
 
-/* 3) 유리판 — 기판 · 상세 패널: ::before 층에 유리를 그린다(위 ★ 참고) */
+/* 3) 층 적용 */
+/* l1 바닥판 — 기판 · 상세 패널: ::before 층에 유리를 그린다(위 ★). 헤더 · 칩 줄도 ::before 로 — 직접 흐리면 그 안의 팝업(l3)이
+   흐림을 헤더 안쪽에만 걸어(backdrop root) 뒤 카드가 그대로 비쳐 보인다 */
 :root[data-skin="glass"] :is(.floor, .detail) {
-  position: relative; background: transparent; border-color: var(--line-2);
-  box-shadow: inset 0 1px 0 var(--glass-hi), var(--glass-shadow);
+  position: relative; background: transparent; border-color: var(--glass-l1-line);
+  box-shadow: inset 0 1px 0 var(--glass-l1-hi), var(--glass-l1-shadow);
 }
-:root[data-skin="glass"] :is(.floor, .detail)::before {
+:root[data-skin="glass"] :is(.floor, .detail, .topbar, .dock)::before {
   content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none;
-  background: var(--floor); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+  background: var(--glass-l1-bg); backdrop-filter: var(--glass-l1-blur); -webkit-backdrop-filter: var(--glass-l1-blur);
 }
-:root[data-skin="glass"] .detail::before { background: var(--surface); }
 :root[data-skin="glass"][data-theme="light"] :is(.detail, .att-tab-in) { background: transparent; }
+:root[data-skin="glass"] :is(.topbar, .dock) {
+  background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none;
+  border-bottom-color: var(--glass-l1-line); box-shadow: inset 0 -1px 0 var(--line);
+}
+:root[data-skin="glass"] :is(.topbar, .dock)::before { background: color-mix(in srgb, var(--bg) 45%, transparent); }
+:root[data-skin="glass"][data-theme="light"] :is(.topbar, .dock)::before { background: rgb(255 255 255 / .45); }
 
-/* 떠 있는 유리 — 위치 기준이 바뀌어도 괜찮은 것만 직접 흐린다 */
-:root[data-skin="glass"] :is(.node, .modal, .toast, .new-panel) {
-  background: linear-gradient(160deg, var(--surface-3), var(--surface));
-  backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
-  border-color: var(--line-2);
-  box-shadow: inset 0 1px 0 var(--glass-hi), var(--glass-shadow);
+/* l2 카드 */
+:root[data-skin="glass"] :is(.node, .new-panel) {
+  background: var(--glass-l2-bg); border-color: var(--glass-l2-line);
+  backdrop-filter: var(--glass-l2-blur); -webkit-backdrop-filter: var(--glass-l2-blur);
+  box-shadow: inset 0 1px 0 var(--glass-l2-hi), var(--glass-l2-shadow);
 }
 :root[data-skin="glass"] .node.sel { background: linear-gradient(160deg, var(--sel-a), var(--sel-b)); }
-:root[data-skin="glass"] :is(.topbar, .dock) {
-  background: color-mix(in srgb, var(--bg) 45%, transparent);
-  backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
-  box-shadow: inset 0 -1px 0 var(--line);
+
+/* l3 떠 있는 것 — 헤더 메뉴 · 업데이트/종료 창 · 최근 폴더 · 상태 팝업 · 툴팁 · 토스트 · 첨부 미리보기 */
+:root[data-skin="glass"] :is(.lang-pop, .upd-pop, .recent-pop, .st-pop, .tip, .toast, .att-peek) {
+  background: var(--glass-l3-bg); border-color: var(--glass-l3-line);
+  backdrop-filter: var(--glass-l3-blur); -webkit-backdrop-filter: var(--glass-l3-blur);
+  box-shadow: inset 0 1px 0 var(--glass-l3-hi), var(--glass-l3-shadow);
 }
-:root[data-skin="glass"] .tip { backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
-:root[data-skin="glass"] .modal-back:not([hidden]) { background: rgb(8 10 30 / .35); backdrop-filter: blur(6px); }
-:root[data-skin="glass"][data-theme="light"] .modal-back:not([hidden]) { background: rgb(60 50 140 / .12); }
+:root[data-skin="glass"] .tip { color: var(--text); }
+
+/* l4 모달 — 뒤 화면은 scrim 으로 한 단계 가라앉힌다 */
+:root[data-skin="glass"] .modal {
+  background: var(--glass-l4-bg); border-color: var(--glass-l4-line);
+  backdrop-filter: var(--glass-l4-blur); -webkit-backdrop-filter: var(--glass-l4-blur);
+  box-shadow: inset 0 1px 0 var(--glass-l4-hi), var(--glass-l4-shadow);
+}
+:root[data-skin="glass"] .modal-back:not([hidden]) { background: var(--glass-scrim); backdrop-filter: blur(6px); }
+
+/* 최전면 — 선택된 탭 · 토글(CLI | 채팅 · 기간 고르기 · diff/채팅 버튼 켜짐). 알약 틀은 l1 유리 */
+:root[data-skin="glass"] :is(.cv-seg, .ur-range) { background: var(--glass-l1-bg); border-color: var(--glass-l1-line); border-radius: 999px; }
+:root[data-skin="glass"] :is(.cv-seg, .ur-range) button { border-radius: 999px; }
+:root[data-skin="glass"] :is(.cv-seg button.on, .ur-range button.on, .btn-diff.on, .btn-chat.on) {
+  background: var(--glass-front-bg); color: var(--glass-front-fg); border-color: transparent; box-shadow: var(--glass-front-shadow);
+}
 
 /* 4) 컨트롤 — 반투명 버튼 · 입력칸, 강조 버튼은 보라→남색 그라데이션 */
 :root[data-skin="glass"] .btn { border-color: var(--line-2); }
@@ -135,8 +205,7 @@
       var(--halo-dim) .8turn, var(--halo-tail) .92turn, var(--halo) .98turn 1turn) border-box !important;
 }
 
-/* 6) 내용 위를 덮는 층 — 타임라인 고정 요청 · 대기열/메모 머리 줄 · 넓힌 옆 패널 · 메뉴 팝업은 불투명하게(비치면 아래 글자와 겹친다) */
-:root[data-skin="glass"] :is(.queue .qh, .memos li.mh, .side.cover, .att-peek) { background: var(--glass-solid); }
+/* 6) 내용 안에서 덮는 줄 — 타임라인 고정 요청 · 대기열/메모 머리 줄 · 넓힌 옆 패널은 불투명하게(비치면 아래 글자와 겹친다) */
+:root[data-skin="glass"] :is(.queue .qh, .memos li.mh, .side.cover) { background: var(--glass-solid); }
 :root[data-skin="glass"] .tl-pin { background: color-mix(in srgb, var(--accent) 16%, var(--glass-solid)); }
 :root[data-skin="glass"] .tl-pin:hover { background: color-mix(in srgb, var(--accent) 24%, var(--glass-solid)); }
-:root[data-skin="glass"] :is(.lang-pop, .st-pop) { background: color-mix(in srgb, var(--glass-solid) 94%, transparent); }
