@@ -237,8 +237,8 @@
   background: linear-gradient(color-mix(in srgb, var(--decision) 14%, transparent), color-mix(in srgb, var(--decision) 14%, transparent)), var(--glass-l3-bg);
 }
 
-/* l4 모달 — 뒤 화면은 scrim 으로 한 단계 가라앉힌다 */
-:root[data-skin="glass"] .modal {
+/* l4 모달 · 문서 미리보기(.tv-panel — 결과물 · 첨부 글 보기, 기본 --surface 라 뒤 화면 글자와 겹쳤다) — 뒤 화면은 scrim 으로 한 단계 가라앉힌다 */
+:root[data-skin="glass"] :is(.modal, .tv-panel) {
   background: var(--glass-l4-bg); border-color: var(--glass-l4-line);
   backdrop-filter: var(--glass-l4-blur); -webkit-backdrop-filter: var(--glass-l4-blur);
   box-shadow: inset 0 1px 0 var(--glass-l4-hi), var(--glass-l4-shadow);
