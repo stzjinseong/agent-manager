@@ -280,6 +280,12 @@
   box-shadow: inset 0 1px 0 var(--glass-l2-hi), 0 0 0 1px rgb(60 50 140 / .07), 0 4px 14px rgb(60 50 140 / .08);
 }
 
+/* 채팅 입력 상자 — 글래스의 입력칸 공통 바탕(아래 4)이 채팅 글상자에도 칠해져 상자 안에 칸이 한 겹 더 생겼는데, 칸 여백이 0 이라
+   '/ 눌러 메시지 보내기' 안내가 칸 왼쪽 끝에 닿았다 → 칸을 왼쪽으로 늘리고(상자 왼쪽 여백 12 → 6px) 칸 안 여백 10px, 안내도 그만큼 */
+:root[data-skin="glass"] .cv-box { padding-left: 6px; }
+:root[data-skin="glass"] .cv-box textarea { padding: 4px 10px; border-radius: 8px; }
+:root[data-skin="glass"] .cv-kbd-hint { left: 16px; }
+
 /* 4) 컨트롤 — 반투명 버튼 · 입력칸, 강조 버튼은 보라→남색 그라데이션 */
 :root[data-skin="glass"] .btn { border-color: var(--line-2); }
 :root[data-skin="glass"] .btn.primary {
