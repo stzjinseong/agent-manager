@@ -161,9 +161,34 @@
   box-shadow: inset 0 1px 0 var(--glass-l2-hi), var(--glass-l2-shadow);
 }
 :root[data-skin="glass"] .node.sel { background: linear-gradient(160deg, var(--sel-a), var(--sel-b)); }
+/* 상태별 빛 · 선택 링 — 위 .node 규칙이 style.css 의 .node.s-working · .node.sel 보다 선택자가 세서 그림자를 통째로 덮었다.
+   같은 빛을 유리 그림자와 합쳐 다시 준다(선택이 상태보다 뒤 — 이긴다) */
+:root[data-skin="glass"] .node:is(.s-working, .s-decision, .s-waiting) {
+  box-shadow: inset 0 1px 0 var(--glass-l2-hi), 0 8px 32px color-mix(in srgb, var(--c) 26%, transparent), var(--glass-l2-shadow);
+  border-color: color-mix(in srgb, var(--c) 30%, var(--glass-l2-line));
+}
+:root[data-skin="glass"] .node.s-decision { box-shadow: inset 0 1px 0 var(--glass-l2-hi), 0 8px 36px color-mix(in srgb, var(--c) 34%, transparent), var(--glass-l2-shadow); }
+:root[data-skin="glass"] .node.sel {
+  border-color: color-mix(in srgb, var(--avatar, var(--accent)) 75%, transparent);
+  box-shadow: inset 0 1px 0 var(--glass-l2-hi), 0 0 0 1px color-mix(in srgb, var(--avatar, var(--accent)) 75%, transparent),
+    0 0 18px color-mix(in srgb, var(--avatar, var(--accent)) 28%, transparent), var(--glass-l2-shadow);
+}
+/* 대기실 슬롯 — 원래 점선 빈 칸. 유리 카드로 칠하지 않고 옅은 바탕 + 점선만 */
+:root[data-skin="glass"] .node.socket {
+  background: color-mix(in srgb, var(--glass-l1-bg) 60%, transparent); border-color: rgb(var(--ink) / .2);
+  backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: none;
+}
+/* 카드 안 무대 — 기본은 검은 그늘이라 라이트 유리 위에선 회색 상자로 보였다 → 옅은 유리 우물 */
+:root[data-skin="glass"][data-theme="light"] .stage {
+  background:
+    radial-gradient(ellipse 60% 70% at 50% 100%, color-mix(in srgb, var(--c) 18%, transparent), transparent 70%),
+    linear-gradient(180deg, rgb(60 50 140 / .07), rgb(255 255 255 / .35));
+  border-color: rgb(255 255 255 / .7);
+}
+:root[data-skin="glass"][data-theme="light"] .node.socket .stage { background: rgb(60 50 140 / .04); }
 
-/* l3 떠 있는 것 — 헤더 메뉴 · 업데이트/종료 창 · 최근 폴더 · 상태 팝업 · 툴팁 · 토스트 · 첨부 미리보기 */
-:root[data-skin="glass"] :is(.lang-pop, .upd-pop, .recent-pop, .st-pop, .tip, .toast, .att-peek) {
+/* l3 떠 있는 것 — 헤더 메뉴 · 업데이트/종료 창 · 최근 폴더 · 상태 팝업 · 툴팁 · 토스트 · 첨부 미리보기 · 채팅 / 명령 · 보낸 글 기록(.cv-slash · .cv-hist) */
+:root[data-skin="glass"] :is(.lang-pop, .upd-pop, .recent-pop, .st-pop, .tip, .toast, .att-peek, .cv-slash) {
   background: var(--glass-l3-bg); border-color: var(--glass-l3-line);
   backdrop-filter: var(--glass-l3-blur); -webkit-backdrop-filter: var(--glass-l3-blur);
   box-shadow: inset 0 1px 0 var(--glass-l3-hi), var(--glass-l3-shadow);
