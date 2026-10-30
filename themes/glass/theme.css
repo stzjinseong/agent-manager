@@ -216,8 +216,8 @@
   box-shadow: inset 0 1px 0 var(--glass-l2-hi), 0 0 0 1px rgb(60 50 140 / .08), 0 6px 18px color-mix(in srgb, var(--glass-c1) 12%, rgb(60 50 140 / .08));
 }
 
-/* l3 떠 있는 것 — 헤더 메뉴 · 업데이트/종료 창 · 최근 폴더 · 상태 팝업 · 툴팁 · 토스트 · 첨부 미리보기 · 채팅 / 명령 · 보낸 글 기록(.cv-slash · .cv-hist) */
-:root[data-skin="glass"] :is(.lang-pop, .upd-pop, .recent-pop, .st-pop, .tip, .toast, .att-peek, .cv-slash) {
+/* l3 떠 있는 것 — 헤더 메뉴 · 업데이트/종료 창 · 최근 폴더 · 상태 팝업 · 툴팁 · 토스트 · 첨부 미리보기 · 채팅 / 명령 · 보낸 글 기록(.cv-slash · .cv-hist) · 채팅 글 선택 메뉴(.cv-quote — 물어보기 · 입력칸에 넣기 · 복사) */
+:root[data-skin="glass"] :is(.lang-pop, .upd-pop, .recent-pop, .st-pop, .tip, .toast, .att-peek, .cv-slash, .cv-quote) {
   background: var(--glass-l3-bg); border-color: var(--glass-l3-line);
   backdrop-filter: var(--glass-l3-blur); -webkit-backdrop-filter: var(--glass-l3-blur);
   box-shadow: inset 0 1px 0 var(--glass-l3-hi), var(--glass-l3-shadow);
