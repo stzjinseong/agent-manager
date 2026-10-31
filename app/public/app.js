@@ -5191,7 +5191,12 @@ try { chatOpen = localStorage.getItem(CHAT_KEY) === '1'; } catch {}
 let chatMarked = null;
 const chatImgSrc = (href) => /^(?:https?:|data:image\/)/i.test(href) || /^\/(?:uploads|shots|docs|api)\//.test(href)
   ? href : `/api/workers/${chatData.wid}/chat-image?src=${encodeURIComponent(href)}`;
+// 경로에 공백 · 괄호가 있으면(Windows 사용자 폴더 'C:\\Users\\홍 길동' · '스크린샷 (1).png') 마크다운이 그림으로 안 읽어 글자 그대로 보였다 —
+// 이 PC 경로로 시작하고 그림 확장자로 끝나는 ![설명](경로) 는 <경로> 로 감싸 준다(서버 chat-image 는 답 원문에서 ](경로 를 찾으므로 그대로 맞는다)
+// 코드(``` 블록 · `한 줄`) 안은 예시 글이라 건드리지 않는다
+const CHAT_IMG_PATH_RE = /(```[\s\S]*?```|`[^`\n]*`)|!\[([^\]\n]*)\]\(((?:[A-Za-z]:[\\/]|\/|~[\\/])[^<>\n]*?\.(?:png|jpe?g|gif|webp|bmp))\)/gi;
 function chatMdParse(text) {
+  text = String(text).replace(CHAT_IMG_PATH_RE, (m, code, alt, p) => code ?? `![${alt}](<${p}>)`);
   chatMarked ??= new marked.Marked({ renderer: {
     image(href, title, alt) {
       if (!href) return false;
