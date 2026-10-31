@@ -5234,6 +5234,17 @@ function chatItemHtml(x) {
   chatHtml.set(k, h);
   return h;
 }
+// 도구 결과 그림(Read 로 연 이미지 · 스크린샷 등) — 서버가 꺼내 둔 캡처(w.shots, 이름 = tool_use id-번호)를 그 도구 칩 묶음 아래에 작게.
+// 누르면 캡처 크게 보기(같은 워커 캡처끼리 넘기기). 보관 한도(최근 50장)를 넘겨 지워진 것은 스스로 빠진다
+function chatShots(tools) {
+  const shots = state.workers.find((w) => w.id === chatData.wid)?.shots;
+  if (!shots?.length) return '';
+  const html = tools.flatMap((x) => x.id ? shots.filter((sh) => sh.name.startsWith(`${x.id}-`)).map((sh) => {
+    const cap = [sh.tool, sh.arg].filter(Boolean).join(' · ');
+    return shotImg(sh, 'cv-shot').replace('<img ', '<img onerror="this.remove()" ').replace(/title="[^"]*"/, `title="${esc(cap)}&#10;${_t('클릭해 크게 보기')}"`);
+  }) : []).join('');
+  return html && `<div class="cv-shots">${html}</div>`;
+}
 // 이어지는 도구는 칩 한 줄로, 이어지는 답 글은 이름표 하나 아래로 묶는다
 // limit: 끝에서 그만큼의 묶음만 그린다(renderChat 의 chatWin) — 앞이 잘렸으면 맨 위에 '이전 대화' 줄
 function chatBlocks(items, limit = Infinity) {
@@ -5251,7 +5262,7 @@ function chatBlocks(items, limit = Infinity) {
       const id = b.list[0].seq, open = chatUnfold.has(id) || b.list.length <= CHIP_FOLD + 1;
       const shown = open ? b.list : b.list.slice(0, CHIP_FOLD);
       const more = open ? '' : `<button type="button" class="cv-chip cv-more" data-unfold="${id}">+${b.list.length - CHIP_FOLD}</button>`;
-      return `<div class="cv-ev cv-t"><span class="cv-dot"></span><div class="cv-chips">${shown.map(chatChip).join('')}${more}</div></div>`;
+      return `<div class="cv-ev cv-t"><span class="cv-dot"></span><div class="cv-body"><div class="cv-chips">${shown.map(chatChip).join('')}${more}</div>${chatShots(b.list)}</div></div>`;
     }
     if (b.k === 'a') return `<div class="cv-ev cv-a"><span class="cv-dot"></span><div class="cv-body"><div class="cv-lab"><b>${_t('클로드')}</b>${chatTime(b.list[0].ts)}</div>${b.list.map((x) => `<div class="cv-ai" data-seq="${x.seq}">${chatItemHtml(x)}</div>`).join('')}</div></div>`;
     return chatItemHtml(b.x);
