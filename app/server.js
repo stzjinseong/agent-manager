@@ -1715,11 +1715,25 @@ function revealPath(target) {
   try { spawnProcess(cmd, args, { detached: true, stdio: 'ignore', windowsVerbatimArguments: true }).on('error', () => {}).unref(); return true; } catch { return false; }
 }
 // 화면의 파일 주소 → 이 PC 의 파일 경로 | null (/docs/W1/id · /uploads/이름 · /shots/id/이름 — 각 GET 경로와 같은 검사)
+// 채팅 보기의 답 속 그림(![설명](경로)) — 그 워커의 클로드 답에 그림 문법으로 적힌 경로만 꺼낸다(아무 파일이나 열리지 않게).
+// 경로는 ~/ · file:// · 작업 폴더 기준 상대 경로도 받는다. 그림 확장자만
+function chatImageFile(w, src) {
+  src = String(src || '');
+  if (!w || !src || src.length > 2000 || !IMAGE_TYPES[docExt(src.replace(/[?#].*$/, ''))]) return null;
+  const tx = w.tx && warmProfile(w);
+  if (!tx?.chat?.some((x) => x.k === 'a' && typeof x.text === 'string' && (x.text.includes(`](${src}`) || x.text.includes(`](<${src}>`)))) return null;
+  let p = src;
+  if (/^file:\/\//i.test(p)) { try { p = fileURLToPath(p); } catch { return null; } }
+  p = p.replace(/^~(?=[\\/])/, os.homedir());
+  const full = path.resolve(w.cwd || ROOT, p);
+  try { return fs.statSync(full).isFile() ? full : null; } catch { return null; }
+}
 function localFileOf(u) {
   let p; try { p = decodeURIComponent(new URL(u, 'http://x').pathname); } catch { return null; }
   let full = null;
   let m = p.match(/^\/docs\/(W\d+)\/([0-9a-f]{12})$/);
   if (m) full = workers.get(m[1])?.docs?.find((x) => x.id === m[2])?.path || null;
+  else if ((m = p.match(/^\/api\/workers\/(W\d+)\/chat-image$/))) { try { full = chatImageFile(workers.get(m[1]), new URL(u, 'http://x').searchParams.get('src')); } catch {} }
   else if ((m = p.match(/^\/uploads\/([^/]+)$/))) { const f = path.join(UPLOAD_DIR, m[1]); if (path.dirname(f) === UPLOAD_DIR) full = f; }
   else if ((m = p.match(/^\/shots\/([\w-]+)\/([\w-]+\.(?:png|jpg|gif|webp))$/))) full = path.join(SHOT_DIR, m[1], m[2]);
   try { return full && fs.statSync(full).isFile() ? full : null; } catch { return null; }
@@ -2158,6 +2172,14 @@ const server = http.createServer(async (req, res) => {
     return json(res, 200, { cwd: w.cwd, shellTracked, files: log.files.map((x) => ({ ...x, rel: rel(x.file) })), requests: log.requests });
   }
 
+  // 채팅 보기: 답 속 그림(chatImageFile 이 답에 적힌 경로인지 확인)
+  const ci = req.method === 'GET' && p.match(/^\/api\/workers\/(W\d+)\/chat-image$/);
+  if (ci) {
+    const full = chatImageFile(workers.get(ci[1]), url.searchParams.get('src'));
+    if (!full) return json(res, 404, { error: '그림이 없습니다' });
+    res.writeHead(200, { 'content-type': IMAGE_TYPES[docExt(full)], 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff' });
+    return fs.createReadStream(full).pipe(res);
+  }
   // diff 화면의 그림 전/후 — 셸 수정 기록(img)에 남은 blob 만 꺼낸다(기록에 없는 경로·저장소는 받지 않는다)
   const im = req.method === 'GET' && p.match(/^\/api\/workers\/(W\d+)\/diff-image$/);
   if (im) {

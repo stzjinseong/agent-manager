@@ -2665,6 +2665,8 @@ button.cv-more:hover { color: var(--text); }
 .cv-md table { border-collapse: collapse; font-size: 12.5px; display: block; overflow-x: auto; }
 .cv-md :is(th, td) { border: 1px solid var(--line-2); padding: 3px 8px; text-align: left; }
 .cv-md a { color: var(--accent-hi); }
+.cv-md img.cv-img { display: block; max-width: min(100%, 480px); max-height: 360px; margin: 6px 0; border: 1px solid var(--line); border-radius: 8px; cursor: zoom-in; background: var(--surface); }
+.cv-md .cv-img-miss { display: inline-block; font-size: 12px; color: var(--text-2); background: var(--surface); border: 1px dashed var(--line-2); border-radius: 6px; padding: 2px 8px; overflow-wrap: anywhere; }
 .cv-md blockquote { color: var(--text-2); margin: 6px 0 6px 2px; padding: 2px 10px; background: var(--surface); border-radius: 6px; }
 .cv-perm { background: var(--surface); border: 1px solid var(--line-2); border-radius: 10px; padding: 10px 12px; }
 .cv-q { font-weight: 600; margin-bottom: 6px; }

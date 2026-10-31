@@ -2334,7 +2334,7 @@ function fileActs(box, cur) {
   bar.addEventListener('pointerdown', (e) => e.stopPropagation());
   (box.querySelector('.tv-head') || box).append(bar);
 }
-function openShot(url, single) { // single: { cap } — 결과물 그림 한 장(넘기기·보관 안내 없음)
+function openShot(url, single) { // single: { cap, kind? } — 결과물(또는 kind) 그림 한 장(넘기기·보관 안내 없음)
   const upload = url.startsWith('/uploads/');
   const id = url.split('/')[2];
   const list = upload || single ? [] : state.workers.find((w) => w.id === id)?.shots || [];
@@ -2369,9 +2369,9 @@ function openShot(url, single) { // single: { cap } — 결과물 그림 한 장
     const s = list[i] || { url, tool: '', arg: '' };
     z = 1; tx = ty = 0; paint();
     $('img', box).src = s.url;
-    $('.cap', box).textContent = single ? `${_t('결과물')} · ${single.cap}` : upload ? `${_t('사람이 첨부')} · data/uploads/${decodeURIComponent(url.slice('/uploads/'.length))}` : [s.tool, s.arg].filter(Boolean).join(' · ');
+    $('.cap', box).textContent = single ? `${_t(single.kind || '결과물')} · ${single.cap}` : upload ? `${_t('사람이 첨부')} · data/uploads/${decodeURIComponent(url.slice('/uploads/'.length))}` : [s.tool, s.arg].filter(Boolean).join(' · ');
     $('.meta', box).textContent = list.length ? `${i + 1} / ${list.length}${s.t ? ` · ${new Date(s.t + clockSkew).toLocaleString(uiLocale(), { hour12: false })}` : ''}` : '';
-    $('.note', box).textContent = single ? _t(LOCAL_VIEW ? '결과물 카드를 Ctrl/⌘+클릭하면 OS 기본 앱으로 엽니다.' : '결과물 카드를 Ctrl/⌘+클릭하면 새 탭에서 엽니다.') : upload ? _t('첨부 원본을 그대로 보여 줍니다 (7일 지나면 정리됨).') : _t('이미지는 최대 {n}장까지 관리됩니다.', { n: state.shotKeep || 50 });
+    $('.note', box).textContent = single?.kind ? '' : single ? _t(LOCAL_VIEW ? '결과물 카드를 Ctrl/⌘+클릭하면 OS 기본 앱으로 엽니다.' : '결과물 카드를 Ctrl/⌘+클릭하면 새 탭에서 엽니다.') : upload ? _t('첨부 원본을 그대로 보여 줍니다 (7일 지나면 정리됨).') : _t('이미지는 최대 {n}장까지 관리됩니다.', { n: state.shotKeep || 50 });
     $('.prev', box).disabled = i <= 0;
     $('.next', box).disabled = i >= list.length - 1;
   };
@@ -2452,7 +2452,7 @@ function openVideo(url, single) { // single: { cap } — 결과물 동영상(첨
     <figure><video controls autoplay playsinline></video><figcaption><div class="cap"></div><div class="note"></div></figcaption></figure></div>`);
   const v = $('video', box);
   v.src = url;
-  $('.cap', box).textContent = single ? `${_t('결과물')} · ${single.cap}` : `${_t('사람이 첨부')} · data/uploads/${decodeURIComponent(url.slice('/uploads/'.length))}`;
+  $('.cap', box).textContent = single ? `${_t(single.kind || '결과물')} · ${single.cap}` : `${_t('사람이 첨부')} · data/uploads/${decodeURIComponent(url.slice('/uploads/'.length))}`;
   $('.note', box).textContent = single ? '' : _t('첨부 원본을 그대로 보여 줍니다 (7일 지나면 정리됨).');
   v.addEventListener('error', () => {
     $('.note', box).innerHTML = `${esc(_t('이 브라우저가 재생할 수 없는 형식입니다.'))} <a href="${esc(url)}" download>${esc(_t('내려받기'))}</a>`;
@@ -2476,6 +2476,18 @@ trackBottom($('#log'), 160);
 $('#log').addEventListener('load', (e) => {
   const logEl = e.currentTarget;
   if (e.target.tagName === 'IMG' && logEl._atBottom) afterFrame('log-img', () => { if (logEl._atBottom) { logEl._settling = true; logEl.scrollTop = logEl.scrollHeight; logEl._settling = false; } });
+}, true);
+// 채팅 보기 답 속 그림 — 결과물 그림처럼 한 장 크게 보기. 못 불러오면(없는 파일 · 답에 없는 경로) 경로를 적은 줄로 바꾼다
+document.addEventListener('error', (e) => {
+  const t = e.target;
+  if (t.tagName !== 'IMG' || !t.classList?.contains('cv-img')) return;
+  t.replaceWith(el(`<span class="cv-img-miss" title="${esc(t.dataset.cvImg || '')}">🖼 ${_t('그림을 불러올 수 없음')} · ${esc(t.dataset.cvImg || '')}</span>`));
+}, true);
+document.addEventListener('click', (e) => {
+  const t = e.target.closest?.('img.cv-img');
+  if (!t) return;
+  e.stopPropagation();
+  openShot(t.getAttribute('src'), { cap: t.dataset.cvImg, kind: '클로드 답 속 그림' });
 }, true);
 document.addEventListener('click', (e) => {
   const t = e.target.closest?.('[data-shot]');
@@ -5155,9 +5167,24 @@ function chatSettle(wid) {
   chatPending = chatPending.filter((p) => !used.has(p));
 }
 try { chatOpen = localStorage.getItem(CHAT_KEY) === '1'; } catch {}
+// 답 속 그림 ![설명](경로) — 터미널은 못 그리지만 채팅 보기에서는 글 사이에 그린다. 이 PC 경로(절대 · ~/ · file:// · 작업 폴더 기준)는
+// 서버(chat-image)가 그 답에 적힌 경로인지 확인하고 꺼내 준다. 앱 주소(/uploads/ 등) · 웹 주소는 그대로
+let chatMarked = null;
+const chatImgSrc = (href) => /^(?:https?:|data:image\/)/i.test(href) || /^\/(?:uploads|shots|docs|api)\//.test(href)
+  ? href : `/api/workers/${chatData.wid}/chat-image?src=${encodeURIComponent(href)}`;
+function chatMdParse(text) {
+  chatMarked ??= new marked.Marked({ renderer: {
+    image(href, title, alt) {
+      if (!href) return false;
+      const src = chatImgSrc(href);
+      return `<img class="cv-img" src="${esc(src)}" data-cv-img="${esc(href)}" alt="${esc(alt || '')}" title="${esc(title || alt || href)}" loading="lazy" decoding="async" draggable="false">`;
+    },
+  } });
+  return chatMarked.parse(text);
+}
 function chatMd(text) {
   if (window.marked && window.DOMPurify) {
-    try { return `<div class="cv-md">${DOMPurify.sanitize(marked.parse(text))}</div>`; } catch {}
+    try { return `<div class="cv-md">${DOMPurify.sanitize(chatMdParse(text), { ADD_ATTR: ['data-cv-img'] })}</div>`; } catch {}
   }
   return `<div class="cv-md cv-plain">${esc(text)}</div>`;
 }
@@ -5311,6 +5338,11 @@ function chatShowOlder() {
   renderChat();
 }
 trackBottom($('#cv-list'), 60);
+// 답 속 그림이 늦게 불러와져도 맨 아래를 보던 중이면 맨 아래로(#log 와 같은 방식)
+$('#cv-list').addEventListener('load', (e) => {
+  const l = e.currentTarget;
+  if (e.target.tagName === 'IMG' && l._atBottom) afterFrame('cv-img', () => { if (l._atBottom) { l._settling = true; l.scrollTop = l.scrollHeight; l._settling = false; } });
+}, true);
 $('#cv-list').addEventListener('scroll', (e) => { if (!e.currentTarget._settling && e.currentTarget.scrollTop < 80) chatShowOlder(); }, { passive: true });
 $('#cv-list').addEventListener('click', (e) => { if (e.target.closest('[data-older]')) chatShowOlder(); });
 const chatCache = new Map(), CHAT_CACHE_N = 8; // 워커 id → chatData
