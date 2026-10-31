@@ -302,7 +302,7 @@
 /* 채팅 상자 흐림을 더 세게 — 바탕이 옅어진 만큼 뒤 화면을 더 뭉개야 긴 글이 읽힌다 */
 :root[data-skin="glass"][data-theme="light"] .term-wrap.chatting { backdrop-filter: blur(40px) saturate(180%); -webkit-backdrop-filter: blur(40px) saturate(180%); }
 /* 내용 안에서 덮는 줄(고정 머리 줄 · 넓힌 옆 패널)도 반투명 + 흐림으로 */
-:root[data-skin="glass"][data-theme="light"] :is(.queue .qh, .memos li.mh, .side.cover, .tl-pin) { backdrop-filter: blur(24px) saturate(160%); -webkit-backdrop-filter: blur(24px) saturate(160%); }
+:root[data-skin="glass"][data-theme="light"] :is(.queue .qh, .side.cover, .tl-pin) { backdrop-filter: blur(24px) saturate(160%); -webkit-backdrop-filter: blur(24px) saturate(160%); }
 
 /* 5) 미확인 카드의 도는 빛 테두리(style.css .unseen) — 기본은 카드 바탕(padding-box) 아래 테두리 층(border-box)으로 그려 바탕이 불투명해야 한다.
    유리 카드는 바탕이 비쳐 빛 줄기가 카드 안까지 보였고, 불투명 바탕을 깔면 유리가 막혀 미확인 카드(대개 완료)만 어두운 회색판이 됐다.
@@ -320,5 +320,8 @@
 
 /* 6) 내용 안에서 덮는 줄 — 타임라인 고정 요청 · 대기열/메모 머리 줄 · 넓힌 옆 패널은 불투명하게(비치면 아래 글자와 겹친다) */
 :root[data-skin="glass"] :is(.queue .qh, .memos li.mh, .side.cover) { background: var(--glass-solid); }
+/* Backlog 건수 줄은 색 띠 대신 투명 + 흐림 — 불투명 띠(다크 남색 · 라이트 흰 62%)가 그라데이션 패널 위에 각진 판으로 떠 보였다.
+   패널 바탕(부드러운 그라데이션)은 흐려도 그대로라 평소엔 띠가 안 보이고, 스크롤로 밑에 지나가는 카드 글자만 뭉개져 겹쳐 읽히지 않는다 */
+:root[data-skin="glass"] .memos li.mh { background: transparent; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
 :root[data-skin="glass"] .tl-pin { background: color-mix(in srgb, var(--accent) 16%, var(--glass-solid)); }
 :root[data-skin="glass"] .tl-pin:hover { background: color-mix(in srgb, var(--accent) 24%, var(--glass-solid)); }
