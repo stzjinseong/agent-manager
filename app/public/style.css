@@ -453,6 +453,14 @@ body.card-drag .node-add { opacity: .25; transition: opacity .2s; }
 .att-peek .cap:empty { display: none; }
 .att-tab-list .att { flex-wrap: nowrap; margin-top: 0; }
 .att-clear { margin: -3px -4px -3px 0; }
+/* 접기(▾) — 접으면 묶음 이름 · 개수만 한 줄로(타일은 숨김). 접힘은 브라우저에 기억(app.js am.attFold). 접힌 묶음 이름을 눌러도 펼친다 */
+.att-fold { flex: none; display: grid; place-items: center; width: 18px; height: 22px; margin: -3px -4px -3px -4px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--dim); cursor: pointer; }
+.att-fold:hover { background: var(--surface-2); color: var(--text-2); }
+.att-fold .chev { font-size: 13px; line-height: 1; transition: transform .2s; }
+.att-tab.folded .att-fold .chev { transform: rotate(-90deg); }
+.att-tab.folded .att-tab-list .att { display: none; }
+.att-tab.folded .att-grp-h { cursor: pointer; }
+.att-tab.folded .att-grp-h:hover { color: var(--text-2); }
 .att-tab:not([hidden]) + .detail { margin-top: 0 !important; border-top-left-radius: 0; }
 .detail-head { position: relative; display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 /* 역할 이름은 오른쪽 버튼(diff · 크게 · 중단 · 제거)과 같은 높이 칸에 아래쪽을 맞춰 둔다 */

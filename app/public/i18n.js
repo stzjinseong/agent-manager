@@ -551,6 +551,7 @@ const EN = {
   '변경 후': 'After',
   '그림을 꺼낼 수 없음': 'Image unavailable',
   '그림을 불러올 수 없음': 'Could not load image',
+  '파일 탭 접기/펼치기': 'Collapse/expand file tab',
   '파일 탭 정리': 'Clear file tab', '파일 탭을 정리할까요?': 'Clear the file tab?', '정리': 'Clear',
   '지금까지의 결과물 · 캡처 · 입력을 이 탭에서 지웁니다. 실제 파일과 타임라인은 그대로이고, 앞으로 생기는 파일부터 다시 쌓입니다.': 'Removes the outputs, captures and inputs so far from this tab. The files and the timeline stay; new files will show up again.',
   '클로드 답 속 그림': 'Image in Claude reply',
