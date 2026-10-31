@@ -274,7 +274,8 @@
    그때 위 절반 채팅은 원래처럼 불투명하게 덮어 내려 둔 터미널 윗부분이 비치지 않게 */
 :root[data-skin="glass"] .term-wrap.chatting:not(.cli-peek) #term { visibility: hidden; }
 :root[data-skin="glass"] .term-wrap.chatting.cli-peek .chat-view { background: var(--chat-bg, var(--term-bg)); }
-:root[data-skin="glass"] .term-wrap.chatting .cv-dot { background: var(--glass-solid); }   /* 시간선이 점 안으로 비치지 않게 */
+/* 시간선이 점 안으로 비치지 않게 — 빈 원 점만. 클로드 캐릭터(.cv-a — 코랄 마스크) · 권한(.cv-p — 결정 색)까지 칠해 캐릭터가 남색 그림자처럼 보였다 */
+:root[data-skin="glass"] .term-wrap.chatting .cv-ev:not(.cv-a, .cv-p) > .cv-dot { background: var(--glass-solid); }
 /* 채팅 안 카드 · 말풍선 · 입력 상자 — 한 층 앞(l2) */
 :root[data-skin="glass"] .term-wrap.chatting :is(.cv-msg, .cv-chip, .cv-perm, .cv-box, .cv-ask-card) {
   background: var(--glass-l2-bg); border-color: var(--glass-l2-line);
