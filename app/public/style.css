@@ -472,7 +472,7 @@ body.card-drag .node-add { opacity: .25; transition: opacity .2s; }
 .att-unfold { display: none; }
 .att-tab.folded .att-tab-in { display: none; }
 /* 접히면 탭은 높이 0 — 펼치기는 상세 패널 윗부분 가운데의 작은 버튼(패널 안쪽에 얹힘) */
-.att-tab.folded .att-unfold { display: grid; position: absolute; left: 50%; top: 5px; translate: -50% 0; width: 36px; height: 14px; }
+.att-tab.folded .att-unfold { display: grid; position: absolute; left: 50%; top: 5px; translate: -50% 0; width: 72px; height: 14px; }
 .att-tab.folded:not([hidden]) + .detail { margin-top: 0 !important; border-top-left-radius: var(--radius); }
 .att-tab:not([hidden]) + .detail { margin-top: 0 !important; border-top-left-radius: 0; }
 .detail-head { position: relative; display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
