@@ -453,14 +453,22 @@ body.card-drag .node-add { opacity: .25; transition: opacity .2s; }
 .att-peek .cap:empty { display: none; }
 .att-tab-list .att { flex-wrap: nowrap; margin-top: 0; }
 .att-clear { margin: -3px -4px -3px 0; }
-/* 접기(▾) — 접으면 묶음 이름 · 개수만 한 줄로(타일은 숨김). 접힘은 브라우저에 기억(app.js am.attFold). 접힌 묶음 이름을 눌러도 펼친다 */
-.att-fold { flex: none; display: grid; place-items: center; width: 18px; height: 22px; margin: -3px -4px -3px -4px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--dim); cursor: pointer; }
-.att-fold:hover { background: var(--surface-2); color: var(--text-2); }
-.att-fold .chev { font-size: 13px; line-height: 1; transition: transform .2s; }
-.att-tab.folded .att-fold .chev { transform: rotate(-90deg); }
-.att-tab.folded .att-tab-list .att { display: none; }
-.att-tab.folded .att-grp-h { cursor: pointer; }
-.att-tab.folded .att-grp-h:hover { color: var(--text-2); }
+/* 접기 — 옆 패널을 접을 때 남는 '‹' 띠(.side-expand)와 같은 모양을 위아래로: 펼친 탭 오른쪽 끝의 세로 띠(‹ 가 위를 향함)를 누르면
+   탭이 통째로 접히고, 그 자리에 가로 띠(‹ 가 아래를 향함)만 남아 누르면 펼친다. 접힘은 브라우저에 기억(app.js am.attFold) */
+:is(.att-fold, .att-unfold) {
+  display: grid; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-2); color: var(--text-2);
+  font-size: 15px; font-weight: 700; line-height: 1; cursor: pointer; transition: background .15s, color .15s, border-color .15s;
+}
+:is(.att-fold, .att-unfold):hover { background: var(--surface-3); color: var(--text); border-color: var(--accent); }
+.att-fold { flex: none; align-self: stretch; width: 12px; margin: -1px -4px -2px 0; }
+/* 꺾쇠는 글자 대신 두 변 테두리로 — '‹' 를 돌리면 글꼴 기준선 탓에 가운데서 비켜났다. 돌린 뒤 꼭짓점 쪽으로 쏠린 만큼 반대로 민다 */
+:is(.att-fold, .att-unfold)::before { content: ""; width: 5px; height: 5px; border: solid currentColor; border-width: 2px 0 0 2px; }
+.att-fold::before { transform: translateY(1.5px) rotate(45deg); }
+.att-unfold::before { transform: translateY(-1.5px) rotate(225deg); }
+.att-unfold { display: none; }
+.att-tab.folded .att-tab-in { display: none; }
+.att-tab.folded .att-unfold { display: grid; width: 160px; height: 12px; margin-bottom: 6px; }
+.att-tab.folded:not([hidden]) + .detail { margin-top: 0 !important; border-top-left-radius: var(--radius); }
 .att-tab:not([hidden]) + .detail { margin-top: 0 !important; border-top-left-radius: 0; }
 .detail-head { position: relative; display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 /* 역할 이름은 오른쪽 버튼(diff · 크게 · 중단 · 제거)과 같은 높이 칸에 아래쪽을 맞춰 둔다 */

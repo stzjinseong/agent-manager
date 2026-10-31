@@ -5111,16 +5111,15 @@ async function loadDiff() {
   diffKey = key;
   renderDiff();
 }
-// ▾ 파일 탭 접기/펼치기 — 접으면 묶음 이름 · 개수만. 브라우저에 기억(워커 공통)
+// 파일 탭 접기/펼치기 — 펼친 탭 오른쪽 세로 띠로 통째로 접고, 접히면 남는 가로 띠로 펼친다. 브라우저에 기억(워커 공통)
 const ATT_FOLD_KEY = 'am.attFold';
 function setAttFold(on) {
   $('#att-tab').classList.toggle('folded', on);
-  $('#att-fold').setAttribute('aria-expanded', String(!on));
   try { localStorage.setItem(ATT_FOLD_KEY, on ? '1' : '0'); } catch {}
 }
 try { if (localStorage.getItem(ATT_FOLD_KEY) === '1') setAttFold(true); } catch {}
-$('#att-fold').addEventListener('click', () => setAttFold(!$('#att-tab').classList.contains('folded')));
-$('#att-tab-list').addEventListener('click', (e) => { if ($('#att-tab').classList.contains('folded') && e.target.closest('.att-grp-h')) setAttFold(false); });
+$('#att-fold').addEventListener('click', () => setAttFold(true));
+$('#att-unfold').addEventListener('click', () => setAttFold(false));
 // 🗑 파일 탭 정리 — 결과물 · 캡처 · 입력 탭을 지금까지 것만 비운다(파일 · 타임라인은 그대로, 서버 attclear)
 $('#att-clear').addEventListener('click', async () => {
   const w = state.workers.find((x) => x.id === selected);
