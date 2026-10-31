@@ -167,6 +167,13 @@
   // 붙이기는 헤더 버튼 창(모든 워커 / 골라서)에서만 한다 — 여기는 붙은 것을 보여 주고 떼기 · 고치기만
   const bar = el(`<div class="dv-bar"><div class="dv-chips"></div><span class="dv-state"></span></div>`);
   document.querySelector('#term-wrap > .cv-bar')?.after(bar); // 터미널 · 채팅 위 'CLI | 채팅' 막대 바로 아래 — 막대를 한 줄 늘린 것처럼
+  // 세로 휠을 가로 스크롤로 — 칩이 한 줄을 넘칠 때만
+  $('.dv-chips', bar).addEventListener('wheel', (e) => {
+    const c = e.currentTarget;
+    if (c.scrollWidth <= c.clientWidth || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+    e.preventDefault();
+    c.scrollLeft += e.deltaY;
+  }, { passive: false });
   bar.addEventListener('click', (e) => {
     const w = cur(), c = e.target.closest('[data-id]');
     if (!w || !c) return;

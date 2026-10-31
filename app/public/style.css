@@ -589,18 +589,18 @@ body.term-full .side-grip { left: -6px; }
 .tl-pin .tag { display: inline-block; font-size: 10.5px; font-weight: 600; padding: 0 6px; margin-right: 6px; border-radius: 4px; line-height: 17px; vertical-align: 1px; background: var(--accent); color: #1a0f0a; }
 .timeline h3 { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--text); letter-spacing: .04em; }
 #log { list-style: none; margin: 0; padding: 0; font-size: 12px; overflow: auto; flex: 1; }
-/* 옆 패널(타임라인·대기열·나중에 할 작업)·세션 프로파일 서브에이전트 목록·diff 요청 목록 스크롤바: 트랙 없이 얇은 둥근 막대, 올리면 조금 진하게.
+/* 옆 패널(타임라인·대기열·나중에 할 작업)·세션 프로파일 서브에이전트 목록·diff 요청 목록·채팅 목록·헤더 칩 줄 스크롤바 — 앱의 스크롤바는 모두 이 모양: 트랙 없이 얇은 둥근 막대, 올리면 조금 진하게.
    크롬 계열은 ::-webkit-scrollbar 로 다듬고(표준 scrollbar-color 를 같이 주면 이 규칙이 무시되므로 주지 않는다),
    그 밖의 브라우저만 표준 속성으로 얇게 */
-:is(#log, .queue, .memos, .subagents, #diff-files, .att-tab-list, .cv-list)::-webkit-scrollbar { width: 10px; height: 10px; }
-:is(#log, .queue, .memos, .subagents, #diff-files, .att-tab-list, .cv-list)::-webkit-scrollbar-track { background: transparent; }
-:is(#log, .queue, .memos, .subagents, #diff-files, .att-tab-list, .cv-list)::-webkit-scrollbar-thumb {
-  background: rgb(var(--ink) / .14); border-radius: 10px; border: 3px solid transparent; background-clip: padding-box; min-height: 32px;
+:is(#log, .queue, .memos, .subagents, #diff-files, .att-tab-list, .cv-list, .dv-chips)::-webkit-scrollbar { width: 10px; height: 10px; }
+:is(#log, .queue, .memos, .subagents, #diff-files, .att-tab-list, .cv-list, .dv-chips)::-webkit-scrollbar-track { background: transparent; }
+:is(#log, .queue, .memos, .subagents, #diff-files, .att-tab-list, .cv-list, .dv-chips)::-webkit-scrollbar-thumb {
+  background: rgb(var(--ink) / .14); border-radius: 10px; border: 3px solid transparent; background-clip: padding-box; min-height: 32px; min-width: 32px;
 }
-:is(#log, .queue, .memos, .subagents, #diff-files, .att-tab-list, .cv-list)::-webkit-scrollbar-thumb:hover { background-color: rgb(var(--ink) / .3); }
-:is(#log, .queue, .memos, .subagents, #diff-files, .att-tab-list, .cv-list)::-webkit-scrollbar-button { display: none; }
+:is(#log, .queue, .memos, .subagents, #diff-files, .att-tab-list, .cv-list, .dv-chips)::-webkit-scrollbar-thumb:hover { background-color: rgb(var(--ink) / .3); }
+:is(#log, .queue, .memos, .subagents, #diff-files, .att-tab-list, .cv-list, .dv-chips)::-webkit-scrollbar-button { display: none; }
 @supports not selector(::-webkit-scrollbar) {
-  #log, .queue, .memos, .subagents, #diff-files, .att-tab-list, .cv-list { scrollbar-width: thin; scrollbar-color: rgb(var(--ink) / .18) transparent; }
+  #log, .queue, .memos, .subagents, #diff-files, .att-tab-list, .cv-list, .dv-chips { scrollbar-width: thin; scrollbar-color: rgb(var(--ink) / .18) transparent; }
 }
 #log li { padding: 5px 0 5px 12px; border-left: 1px solid var(--line-2); position: relative; color: var(--text-2); word-break: break-all; }
 #log li::before { content: ""; position: absolute; left: -3.5px; top: 11px; width: 6px; height: 6px; border-radius: 50%; background: var(--surface-3); }
@@ -2526,10 +2526,12 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 .dv-rc-all .dv-g { width: 12px; height: 12px; }
 .dv-rc-all + .dv-rc { margin-left: 6px; } /* '모든 워커' 와 역할 칩 사이를 조금 띄워 구분 */
 /* 'CLI | 채팅' 막대 아래 한 줄 — 같은 바탕으로 이어 붙여 막대가 아래로 늘어난 것처럼(막대의 아래 선은 이 줄 아래로) */
-.dv-bar { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: -8px -8px 8px; padding: 0 12px 8px; background: var(--chat-bg, var(--term-bg)); border-bottom: 1px solid var(--line); }
+.dv-bar { flex: none; display: flex; align-items: center; gap: 8px; margin: -8px -8px 8px; padding: 0 12px 8px; background: var(--chat-bg, var(--term-bg)); border-bottom: 1px solid var(--line); }
 .dv-bar[hidden], .term-wrap.full > .dv-bar { display: none; }
 .cv-bar:has(+ .dv-bar:not([hidden])) { border-bottom: 0; }
-.dv-chips { display: contents; }
+/* 헤더가 많아도 한 줄 — 넘치면 가로 스크롤(휠도 가로로, directives.js). 스크롤바는 공용 모양(#log 등과 같은 규칙) */
+.dv-chips { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 4px; overflow-x: auto; overflow-y: hidden; }
+.dv-chips > .dv-chip { flex: none; max-width: 240px; }
 .dv-chip { display: inline-flex; align-items: center; gap: 3px; max-width: 100%; font-size: 11.5px; padding: 1px 2px 1px 8px; border-radius: 11px; cursor: pointer; color: var(--text); background: rgb(var(--ink) / .06); border: 1px solid rgb(var(--ink) / .1); }
 .dv-chip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dv-chip.g { color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
@@ -2539,7 +2541,7 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 .dv-chip:hover { border-color: rgb(var(--ink) / .3); }
 .dv-x { font: inherit; font-size: 10px; line-height: 1; width: 16px; height: 16px; border-radius: 50%; border: 0; padding: 0; cursor: pointer; color: var(--dim); background: transparent; }
 .dv-x:hover { color: var(--text); background: rgb(var(--ink) / .1); }
-.dv-state { margin-left: auto; font-size: 11px; color: var(--dim); }
+.dv-state { flex: none; margin-left: auto; font-size: 11px; color: var(--dim); white-space: nowrap; }
 .dv-state.wait { color: var(--accent); }
 
 /* 알림 보관함 (stash.js) */
