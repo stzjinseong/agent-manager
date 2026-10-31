@@ -455,14 +455,15 @@ body.card-drag .node-add { opacity: .25; transition: opacity .2s; }
 .att-peek .cap:empty { display: none; }
 .att-tab-list .att { flex-wrap: nowrap; margin-top: 0; }
 .att-clear { margin: -3px -4px -3px 0; }
-/* 접기 — 옆 패널을 접을 때 남는 '‹' 띠(.side-expand)와 같은 모양을 위아래로: 펼친 탭 오른쪽 끝의 세로 띠(‹ 가 위를 향함)를 누르면
-   탭이 통째로 접히고, 그 자리에 가로 띠(‹ 가 아래를 향함)만 남아 누르면 펼친다. 접힘은 브라우저에 기억(app.js am.attFold) */
+/* 접기 — 펼친 탭 오른쪽 끝의 접기 아이콘(∨, 휴지통처럼 아이콘만)을 누르면 탭이 통째로 접히고, 상세 패널 윗부분 가운데에 작은 펼치기 버튼(옆 패널 '‹' 띠 .side-expand 와 같은 모양)만 남는다. 접힘은 브라우저에 기억(app.js am.attFold) */
 :is(.att-fold, .att-unfold) {
   display: grid; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-2); color: var(--text-2);
   font-size: 15px; font-weight: 700; line-height: 1; cursor: pointer; transition: background .15s, color .15s, border-color .15s;
 }
 :is(.att-fold, .att-unfold):hover { background: var(--surface-3); color: var(--text); border-color: var(--accent); }
-.att-fold { flex: none; align-self: stretch; width: 12px; margin: -1px -4px -2px 0; }
+/* 접기는 옆 휴지통(.diff-clear)처럼 아이콘만 — 띠 모양(테두리 · 바탕)은 펼치기 버튼에만 */
+.att-fold { flex: none; width: 24px; height: 24px; margin: -3px -4px -3px -6px; border: 0; border-radius: 6px; background: none; color: var(--dim); }
+.att-fold:hover { background: var(--surface-3); color: var(--text); border: 0; }
 /* 꺾쇠는 글자 대신 두 변 테두리로 — '‹' 를 돌리면 글꼴 기준선 탓에 가운데서 비켜났다. 돌린 뒤 꼭짓점 쪽으로 쏠린 만큼 반대로 민다 */
 :is(.att-fold, .att-unfold)::before { content: ""; width: 5px; height: 5px; border: solid currentColor; border-width: 2px 0 0 2px; }
 /* 접기 띠는 아래(꺾쇠 ∨ — 탭이 패널 쪽으로 내려앉음), 펼치기 띠는 위(∧ — 탭이 올라옴) */
@@ -470,7 +471,8 @@ body.card-drag .node-add { opacity: .25; transition: opacity .2s; }
 .att-unfold::before { transform: translateY(1.5px) rotate(45deg); }
 .att-unfold { display: none; }
 .att-tab.folded .att-tab-in { display: none; }
-.att-tab.folded .att-unfold { display: grid; flex: 1; height: 12px; margin-bottom: 6px; }
+/* 접히면 탭은 높이 0 — 펼치기는 상세 패널 윗부분 가운데의 작은 버튼(패널 안쪽에 얹힘) */
+.att-tab.folded .att-unfold { display: grid; position: absolute; left: 50%; top: 5px; translate: -50% 0; width: 36px; height: 14px; }
 .att-tab.folded:not([hidden]) + .detail { margin-top: 0 !important; border-top-left-radius: var(--radius); }
 .att-tab:not([hidden]) + .detail { margin-top: 0 !important; border-top-left-radius: 0; }
 .detail-head { position: relative; display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }

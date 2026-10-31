@@ -5111,7 +5111,7 @@ async function loadDiff() {
   diffKey = key;
   renderDiff();
 }
-// 파일 탭 접기/펼치기 — 펼친 탭 오른쪽 세로 띠로 통째로 접고, 접히면 남는 가로 띠로 펼친다. 브라우저에 기억(워커 공통)
+// 파일 탭 접기/펼치기 — 펼친 탭 오른쪽 접기 아이콘으로 통째로 접고, 접히면 상세 패널 윗부분 가운데의 작은 버튼으로 펼친다. 브라우저에 기억(워커 공통)
 const ATT_FOLD_KEY = 'am.attFold';
 function setAttFold(on) {
   $('#att-tab').classList.toggle('folded', on);
