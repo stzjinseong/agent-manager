@@ -2090,6 +2090,9 @@ function renderAttTab(w) {
     items.push({ t: d.t, cat: 'doc', html: `<a class="att-doc" href="${esc(d.url)}" target="_blank" rel="noopener" draggable="false"${docImgAttr(d, ext)} title="${_t('결과물')} · ${esc(d.title ? `${d.title}
 ` : '')}${esc(d.name)}&#10;${docOpenHint(IMG_DOC.has(ext) || VID_DOC.has(ext) || TXT_DOC.has(ext))}"><span class="ic">${DOC_ICON[ext] || '📄'}</span><span class="nm">${esc(d.name)}</span></a>` });
   }
+  // 🗑 정리한 시각(w.attClearedAt) 전 것은 뺀다 — 그 뒤에 생기거나 다시 고친 파일부터 보인다
+  const cut = w.attClearedAt || 0;
+  for (let i = items.length; i--;) if (cut && !(items[i].t > cut)) items.splice(i, 1);
   items.sort((a, b) => b.t - a.t);
   const tab = $('#att-tab'), box = $('#att-tab-list');
   tab.hidden = !items.length;
@@ -5108,6 +5111,13 @@ async function loadDiff() {
   diffKey = key;
   renderDiff();
 }
+// 🗑 파일 탭 정리 — 결과물 · 캡처 · 입력 탭을 지금까지 것만 비운다(파일 · 타임라인은 그대로, 서버 attclear)
+$('#att-clear').addEventListener('click', async () => {
+  const w = state.workers.find((x) => x.id === selected);
+  if (!w) return;
+  if (!(await ask({ title: _t('파일 탭을 정리할까요?'), body: _t('지금까지의 결과물 · 캡처 · 입력을 이 탭에서 지웁니다. 실제 파일과 타임라인은 그대로이고, 앞으로 생기는 파일부터 다시 쌓입니다.'), ok: _t('정리'), danger: true }))) return;
+  api(`/api/workers/${w.id}/attclear`, {});
+});
 // 🗑 diff 목록 비우기 — 이 세션의 지금까지 수정을 목록에서 뺀다(파일은 그대로). 이후 수정부터 다시 쌓인다
 $('#diff-clear').addEventListener('click', async () => {
   const w = state.workers.find((x) => x.id === selected);

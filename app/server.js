@@ -2493,7 +2493,7 @@ const server = http.createServer(async (req, res) => {
     if (!ok) return json(res, 404, { error: '문서가 없습니다 (지워졌거나 옮겨짐)' });
     return json(res, 200, { ok: openPath(d.path) });
   }
-  if (req.method === 'POST' && (m = p.match(/^\/api\/workers\/(W\d+)\/(task|kill|remove|interrupt|unqueue|tomemo|resume|autoqueue|rename|diffclear)$/))) {
+  if (req.method === 'POST' && (m = p.match(/^\/api\/workers\/(W\d+)\/(task|kill|remove|interrupt|unqueue|tomemo|resume|autoqueue|rename|diffclear|attclear)$/))) {
     const w = workers.get(m[1]);
     if (!w) return json(res, 404, { error: 'no worker' });
     const body = await readBody(req);
@@ -2539,6 +2539,13 @@ const server = http.createServer(async (req, res) => {
       config.diffCleared = Object.fromEntries([...Object.entries(config.diffCleared), [key, at]].slice(-200));
       pushLog(w, 'status', 'diff 목록 비움');
       saveConfig(); // emitState 포함
+    }
+    // 파일 탭 정리(🗑) — 결과물 · 캡처 · 입력 탭을 지금 시각까지 비운다(파일 · 타임라인 · 카드는 그대로). 시각만 남겨
+    // 이후에 생기거나 다시 고친 파일부터 다시 보인다(화면 renderAttTab 이 거른다). workers.json 에 같이 저장돼 재시작해도 비운 채로
+    if (m[2] === 'attclear') {
+      w.attClearedAt = Date.now();
+      pushLog(w, 'status', '파일 탭 정리');
+      saveWorkersSoon(); emitState();
     }
     if (m[2] === 'resume') { cancelDispatch(w); dispatchQueued(w, true); } // ▶ 1번 보내기(자동 투입을 끈 역할)
     // 역할별 자동 투입 켜기/끄기. 끄면 투입 대기(남은 초) 중이던 것도 보내지 않는다. 켜는 순간 쉬고 있고 대기열이 있으면 투입 대기를 시작한다

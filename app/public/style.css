@@ -452,6 +452,7 @@ body.card-drag .node-add { opacity: .25; transition: opacity .2s; }
 .att-peek .cap { margin-top: 5px; font-size: 11px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .att-peek .cap:empty { display: none; }
 .att-tab-list .att { flex-wrap: nowrap; margin-top: 0; }
+.att-clear { margin: -3px -4px -3px 0; }
 .att-tab:not([hidden]) + .detail { margin-top: 0 !important; border-top-left-radius: 0; }
 .detail-head { position: relative; display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 /* 역할 이름은 오른쪽 버튼(diff · 크게 · 중단 · 제거)과 같은 높이 칸에 아래쪽을 맞춰 둔다 */
