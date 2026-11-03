@@ -2932,15 +2932,11 @@ function restoreTermScroll(id) {
 // ---------- 워커 전환 연출 ----------
 // 다른 워커를 누르면 새 대화를 불러오는 동안 채팅 · 터미널이 한두 프레임 비어(실측 ~30ms '아직 대화가 없어요') 깜빡여 보였다.
 // → 누르는 순간 지금 보이는 목록(채팅 #cv-list · 터미널 .xterm-screen — DOM 렌더러라 복제된다)을 복제해 바로 옆(같은 부모)에 붙잡아 두고
-// 진짜 화면은 숨긴다. 새 내용이 다 그려지면(loadChat · 기록 scrollback 쓰기 끝 — switchFxReveal) 복제본은 흐려지며 4px 밀려 나가고
-// 진짜 화면은 반대쪽 4px 에서 들어오며 나타난다(0.15초 크로스페이드). 방향은 카드 순서(오른쪽 워커면 왼쪽으로). 0.7초 안에 준비가 안 되면 그냥 드러낸다.
+// 진짜 화면은 숨긴다. 새 내용이 다 그려지면(loadChat · 기록 scrollback 쓰기 끝 — switchFxReveal) 복제본은 흐려지고 진짜 화면은
+// 나타난다(0.15초 크로스페이드 · 움직임 없음 — 카드 순서 방향으로 4px 밀던 것은 뺐다). 0.7초 안에 준비가 안 되면 그냥 드러낸다.
 // 움직임 줄이기면 붙잡기만 하고 연출 없이 바꾼다
-const SWITCH_MS = 150, SWITCH_PX = 4, SWITCH_WAIT_MS = 700;
+const SWITCH_MS = 150, SWITCH_WAIT_MS = 700;
 let switchFx = null;
-function switchOrder() {
-  const sel = $('#floor').hidden ? '#dock-list .dchip' : '#nodes > .node';
-  return [...document.querySelectorAll(sel)].map((n) => n.dataset.id).filter(Boolean);
-}
 function switchFxEnd() {
   if (!switchFx) return;
   clearTimeout(switchFx.timer);
@@ -2955,7 +2951,6 @@ function switchFxStart(from, to) {
   // 글꼴 크기 · 줄 간격(.chat-view 13.5px 등)을 못 받아 글자 · 말풍선이 미세하게 달라져, 겹치는 동안 출렁여 보였다
   const src = chatOpen ? $('#cv-list') : $('#term .xterm-screen');
   if (!src || !src.offsetHeight) return;
-  const order = switchOrder(), dir = Math.sign(order.indexOf(to) - order.indexOf(from)) || 0;
   const r = src.getBoundingClientRect();
   const ghost = src.cloneNode(true);
   for (const x of [ghost, ...ghost.querySelectorAll('[id]')]) x.removeAttribute('id');
@@ -2970,7 +2965,9 @@ function switchFxStart(from, to) {
   ghost.scrollTop = src.scrollTop; // 복제하면 스크롤 위치는 따라오지 않는다
   src.style.opacity = '0';
   const kind = chatOpen ? 'chat' : 'cli';
-  switchFx = { to, kind, ghost, target: src, dir, timer: setTimeout(() => switchFxReveal(to, kind), SWITCH_WAIT_MS) };
+  switchFx = { to, kind, ghost, target: src, timer: setTimeout(() => switchFxReveal(to, kind), SWITCH_WAIT_MS) };
+  // 종료된 워커는 터미널 기록(scrollback)이 오지 않는다 — 기다리면 앞 워커 화면이 0.7초 남았다. 다음 프레임에 바로
+  if (kind === 'cli' && state.workers.find((x) => x.id === to)?.status === 'exited') requestAnimationFrame(() => switchFxReveal(to, kind));
 }
 function switchFxReveal(id, kind) {
   const fx = switchFx;
@@ -2979,10 +2976,8 @@ function switchFxReveal(id, kind) {
   switchFx = null;
   fx.target.style.opacity = '';
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) { fx.ghost.remove(); return; }
-  const ease = 'cubic-bezier(.3,.7,.2,1)', dx = SWITCH_PX * fx.dir;
-  fx.ghost.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: `translateX(${-dx}px)` }], { duration: SWITCH_MS, easing: ease, fill: 'forwards' })
-    .finished.finally(() => fx.ghost.remove());
-  fx.target.animate([{ opacity: 0, transform: `translateX(${dx}px)` }, { opacity: 1, transform: 'none' }], { duration: SWITCH_MS, easing: ease });
+  fx.ghost.animate([{ opacity: 1 }, { opacity: 0 }], { duration: SWITCH_MS, easing: 'ease-out', fill: 'forwards' }).finished.finally(() => fx.ghost.remove());
+  fx.target.animate([{ opacity: 0 }, { opacity: 1 }], { duration: SWITCH_MS, easing: 'ease-out' });
 }
 
 function select(id) {
