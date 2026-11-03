@@ -5735,31 +5735,110 @@ $('#cv-slash').addEventListener('click', (e) => {
   slashMenu.i = Number(b.dataset.k);
   slashFill(false);
 });
-// ---------- /btw 곁질문 창 ----------
+// ---------- /btw 곁질문 창 (BTW) ----------
 // /btw 의 답은 대화 기록에 안 남고 CLI 화면 위 창으로만 뜬다 — 서버가 화면에서 읽어(watchBtw) w.btw 로 보내 주면 채팅 위에 따로 띄운다.
-// 닫으면 CLI 의 답 창도 닫는다(btw-close). 화면에 보이는 만큼만 읽혀 아주 긴 답은 잘릴 수 있다
-var btwSig = ''; // var — render() 가 이 줄보다 먼저 불려도 되게
+// 창 안 입력칸으로 이어서 물을 수 있고(보내면 '/btw 글'), 이번에 연 창에서 주고받은 질문 · 답은 창 안에 쌓인다(브라우저에만 — 닫으면 비움).
+// 머리 줄을 끌어 채팅 화면 안에서 옮긴다(자리는 이 브라우저에 기억). 닫으면 CLI 의 답 창도 닫는다(btw-close).
+// 화면에 보이는 만큼만 읽혀 아주 긴 답은 잘릴 수 있다
+var btwSig = '', btwLog = { wid: null, items: [] }; // var — render() 가 이 줄보다 먼저 불려도 되게
+const BTW_POS_KEY = 'am.btwPos';
+function btwSkeleton(box) {
+  box.innerHTML = `<div class="btw-h" data-btw-drag><b>BTW</b><small>/btw · ${esc(_t('대화 기록에 남지 않아요'))}</small>`
+    + `<span class="btw-acts"><button type="button" data-btw="copy" title="${esc(_t('마지막 답 복사'))}">⧉</button><button type="button" data-btw="close" title="${esc(_t('닫기 (CLI 의 답 창도 닫음)'))}">✕</button></span></div>`
+    + `<div class="btw-list"></div>`
+    + `<form class="btw-form"><textarea rows="1" placeholder="${esc(_t('이어서 BTW 묻기 — Enter 보내기'))}"></textarea><button type="submit" class="btn primary">${esc(_t('보내기'))}</button></form>`;
+  box.dataset.built = '1';
+  btwPlace(box);
+}
+// 저장한 자리(채팅 화면 안 비율 아닌 px — 창 크기가 바뀌면 안쪽으로 당긴다). 없으면 오른쪽 위(CSS 기본)
+function btwPlace(box) {
+  let p = null;
+  try { p = JSON.parse(localStorage.getItem(BTW_POS_KEY) || 'null'); } catch {}
+  if (!p) { box.style.left = box.style.top = ''; box.style.right = ''; return; }
+  const cv = $('#chat-view'), maxX = Math.max(0, cv.clientWidth - box.offsetWidth - 4), maxY = Math.max(0, cv.clientHeight - 60);
+  box.style.right = 'auto';
+  box.style.left = `${Math.min(Math.max(4, p.x), maxX)}px`;
+  box.style.top = `${Math.min(Math.max(4, p.y), maxY)}px`;
+}
 function renderBtw() {
-  const btwBox = $('#cv-btw');
+  const box = $('#cv-btw');
   const w = state.workers.find((x) => x.id === selected), b = w?.btw;
-  const sig = b ? `${w.id}|${b.at}|${b.open}|${b.text}` : '';
+  if (btwLog.wid !== (w?.id || null)) btwLog = { wid: w?.id || null, items: [] };
+  if (b) {
+    const it = btwLog.items.find((x) => x.at === b.at);
+    if (it) Object.assign(it, { text: b.text, open: b.open }); else btwLog.items.push({ at: b.at, q: b.q, text: b.text, open: b.open });
+  } else btwLog.items = [];
+  const sig = `${btwLog.wid}|` + btwLog.items.map((x) => `${x.at}|${x.open}|${x.text}`).join('|');
   if (sig === btwSig) return;
   btwSig = sig;
   cliPeekCheck(); // 답 창이 열리고 닫힐 때 아래 터미널 드러내기도 다시 판단
-  btwBox.hidden = !b;
-  if (!b) { btwBox.innerHTML = ''; return; }
-  const body = b.text ? `<div class="btw-a">${esc(b.text)}</div>` : `<div class="btw-wait">${esc(_t(b.open ? '답 받는 중…' : 'CLI 에서 답 창이 닫혔어요'))}</div>`;
-  btwBox.innerHTML = `<div class="btw-h"><b>${esc(_t('곁질문'))}</b><small>/btw · ${esc(_t('대화 기록에 남지 않아요'))}</small>`
-    + `<span class="btw-acts">${b.text ? `<button type="button" data-btw="copy" title="${esc(_t('답 복사'))}">⧉</button>` : ''}<button type="button" data-btw="close" title="${esc(_t('닫기 (CLI 의 답 창도 닫음)'))}">✕</button></span></div>`
-    + `<div class="btw-q">${esc(b.q)}</div>${body}`;
+  box.hidden = !btwLog.items.length;
+  if (box.hidden) return;
+  if (!box.dataset.built) btwSkeleton(box);
+  $('.btw-list', box).innerHTML = btwLog.items.map((x) => `<div class="btw-q">${esc(x.q)}</div>`
+    + (x.text ? `<div class="btw-a">${esc(x.text)}</div>` : `<div class="btw-wait">${esc(_t(x.open ? '답 받는 중…' : 'CLI 에서 답 창이 닫혔어요'))}</div>`)).join('');
+  const list = $('.btw-list', box);
+  list.scrollTop = list.scrollHeight;
+}
+async function btwAsk(text) {
+  const w = state.workers.find((x) => x.id === selected);
+  text = text.trim();
+  if (!w || !text) return false;
+  const r = await api(`/api/workers/${w.id}/task`, { text: `/btw ${text}`, mode: 'now' });
+  if (r?.rejected) { toast(_t('지금은 CLI 에 넣을 수 없어요 — 입력창에 쓰던 글이나 선택창을 확인하세요'), 3500); return false; }
+  return true;
 }
 $('#cv-btw').addEventListener('click', async (e) => {
   const a = e.target.closest('[data-btw]')?.dataset.btw, w = state.workers.find((x) => x.id === selected);
   if (!a || !w) return;
-  if (a === 'copy') { try { await navigator.clipboard.writeText(w.btw?.text || ''); toast(_t('복사했어요')); } catch {} return; }
+  if (a === 'copy') { try { await navigator.clipboard.writeText(btwLog.items.at(-1)?.text || ''); toast(_t('복사했어요')); } catch {} return; }
   $('#cv-btw').hidden = true;
+  btwLog.items = [];
   await api(`/api/workers/${w.id}/btw-close`, {});
 });
+$('#cv-btw').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const ta = $('.btw-form textarea', e.currentTarget);
+  if (await btwAsk(ta.value)) ta.value = '';
+  ta.focus();
+});
+$('#cv-btw').addEventListener('keydown', (e) => {
+  const ta = e.target.closest?.('.btw-form textarea');
+  if (!ta) return;
+  e.stopPropagation(); // 채팅 입력칸 · 터미널 단축키로 번지지 않게
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); ta.form.requestSubmit(); }
+  if (e.key === 'Escape') { e.preventDefault(); ta.blur(); }
+});
+$('#cv-btw').addEventListener('input', (e) => {
+  const ta = e.target.closest?.('.btw-form textarea');
+  if (!ta) return;
+  ta.style.height = 'auto';
+  ta.style.height = `${Math.min(ta.scrollHeight, 120)}px`;
+});
+// 머리 줄 끌기 — 채팅 화면(#chat-view) 안에서만. 버튼을 누른 건 끌기가 아니다
+$('#cv-btw').addEventListener('pointerdown', (e) => {
+  const h = e.target.closest('[data-btw-drag]');
+  if (!h || e.target.closest('button') || e.button !== 0) return;
+  const box = $('#cv-btw'), cv = $('#chat-view');
+  const b0 = box.getBoundingClientRect();
+  const dx = e.clientX - b0.left, dy = e.clientY - b0.top;
+  h.setPointerCapture(e.pointerId);
+  box.classList.add('dragging');
+  const move = (ev) => {
+    const c = cv.getBoundingClientRect();
+    const x = Math.min(Math.max(0, ev.clientX - dx - c.left), c.width - box.offsetWidth);
+    const y = Math.min(Math.max(0, ev.clientY - dy - c.top), c.height - Math.min(box.offsetHeight, 60));
+    box.style.right = 'auto'; box.style.left = `${x}px`; box.style.top = `${y}px`;
+  };
+  const up = () => {
+    h.removeEventListener('pointermove', move); h.removeEventListener('pointerup', up); h.removeEventListener('pointercancel', up);
+    box.classList.remove('dragging');
+    try { localStorage.setItem(BTW_POS_KEY, JSON.stringify({ x: parseFloat(box.style.left) || 0, y: parseFloat(box.style.top) || 0 })); } catch {}
+  };
+  h.addEventListener('pointermove', move); h.addEventListener('pointerup', up); h.addEventListener('pointercancel', up);
+  e.preventDefault();
+});
+new ResizeObserver(() => { const box = $('#cv-btw'); if (!box.hidden && box.dataset.built) btwPlace(box); }).observe($('#chat-view'));
 
 // ---------- 입력 기록 (입력칸에서 ↑) ----------
 // 커서가 첫 줄에 있을 때 ↑ 를 누르면 지난번에 보낸 글을 목록으로 — ↑↓ 로 고르고 Enter · Tab 이면 입력칸에 그대로 넣고 닫는다.
