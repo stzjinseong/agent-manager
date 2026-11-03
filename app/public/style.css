@@ -294,6 +294,22 @@ body.card-drag > :is(.topbar, section:not(.floor)), body.card-drag .floor > :not
 .repo-head::after { min-width: 28px; } /* 칸 하나짜리 묶음도 선이 보이게 — 모자라면 이름을 … 로 줄인다 */
 .repo-head .rh-n { font: 600 11px/1.5 var(--mono); padding: 0 7px; border-radius: 999px; color: var(--text); background: color-mix(in srgb, var(--repo) 28%, var(--floor)); border: 1px solid color-mix(in srgb, var(--repo) 70%, transparent); }
 body.card-drag .repo-head { opacity: .25; transition: opacity .2s; }
+/* 묶음 머리줄 + : 이 폴더에 워커 바로 추가(app.js openQuickNew) */
+.repo-head .rh-add { width: 20px; height: 20px; padding: 0; border-radius: 6px; font: 600 14px/1 var(--mono); color: var(--text); cursor: pointer;
+  background: var(--floor); border: 1px solid color-mix(in srgb, var(--repo) 70%, transparent); transition: background .15s; }
+.repo-head .rh-add:hover, .repo-head .rh-add.on { background: color-mix(in srgb, var(--repo) 35%, var(--floor)); }
+.qn-pop { position: fixed; z-index: 60; width: min(340px, calc(100vw - 16px)); display: flex; flex-direction: column; gap: 10px; padding: 12px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: 0 10px 30px rgb(0 0 0 / .35); }
+.qn-pop[hidden] { display: none; }
+.qn-ti { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.qn-ti b { font: 600 13px var(--mono); color: var(--text); }
+.qn-ti small { font-size: 11px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
+.qn-row { display: flex; flex-direction: column; gap: 4px; }
+.qn-row > span { font-size: 11.5px; color: var(--text-2); }
+.qn-seg { display: flex; flex-wrap: wrap; gap: 4px; }
+.qn-seg button { padding: 4px 9px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface-2); color: var(--text-2); font-size: 12px; cursor: pointer; }
+.qn-seg button.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 22%, var(--surface-2)); color: var(--text); }
+.qn-act { display: flex; justify-content: flex-end; gap: 6px; }
 .empty { grid-column: 1 / -1; text-align: center; color: var(--dim); padding: 18px 0 6px; }
 /* 워커 추가 카드 — 마지막 워커 다음 자리. 대기실 슬롯(.node.socket)처럼 점선 빈 칸, 누르면 워커 추가 창 */
 .node-add {
@@ -1484,9 +1500,13 @@ html[data-char="clawd-white"] :is(.node, .dchip, .term-wrap) { --avatar: var(--c
 /* ---------- diff 보기: 워커가 고친 파일의 변경 (터미널 자리에 덮어 보여 줌, app.js setDiffOpen) ---------- */
 :root { --d-add: #52d19b; --d-del: #ff8a80; }
 :root[data-theme="light"] { --d-add: #128a55; --d-del: #c93a2f; }
-/* diff 줄 색은 라이트·다크 같은 한 벌 — GitHub 풍(참고 이미지에서 추출): 연한 줄 · 조금 진한 줄 번호 칸 · 진한 기호. 줄이 밝아 글자는 늘 진하게.
-   CLI 터미널(app.js TERM_DIFF)도 같은 값 */
-:root { --dl-add-bg: #e9ffed; --dl-add-num: #d5ffdc; --dl-add-fg: #1a7f37; --dl-del-bg: #fdeeef; --dl-del-num: #fbdce0; --dl-del-fg: #cf222e; --dl-text: #1f2328; --dl-num: #57606a; }
+/* diff 줄 색은 테마를 따른다 — 그 테마의 터미널 바탕(--term-bg)에 더하기/빼기 색(--d-add · --d-del)을 옅게 섞은 줄 · 조금 진한 줄 번호 칸 · 진한 기호,
+   글자는 테마 글자색. (예전엔 GitHub 라이트 한 벌로 고정이라 다크 · 글래스 테마에서도 흰 줄이 떴다.) CLI 터미널(app.js TERM_DIFF)은 따로 */
+:root {
+  --dl-add-bg: color-mix(in srgb, var(--d-add) 14%, var(--term-bg)); --dl-add-num: color-mix(in srgb, var(--d-add) 24%, var(--term-bg)); --dl-add-fg: var(--d-add);
+  --dl-del-bg: color-mix(in srgb, var(--d-del) 14%, var(--term-bg)); --dl-del-num: color-mix(in srgb, var(--d-del) 24%, var(--term-bg)); --dl-del-fg: var(--d-del);
+  --dl-text: var(--text); --dl-num: var(--text-2);
+}
 .d-add { color: var(--d-add); }
 .d-del { color: var(--d-del); }
 .btn-diff b { font-weight: 600; margin-left: 2px; color: var(--accent-hi); }
@@ -2692,8 +2712,8 @@ button.cv-more:hover { color: var(--text); }
    글이 비면 첨부 줄(.att-live)도 비어 입력칸이 늘 첫 줄 — 상자 여백(6px) + 입력칸 여백(4px) 자리에 겹쳐 둔다 */
 .cv-box { position: relative; }
 .cv-kbd-hint { display: none; position: absolute; left: 12px; top: 10px; align-items: center; gap: 6px; color: var(--faint); white-space: nowrap; pointer-events: none; }
-.cv-box:not(:focus-within):has(textarea:placeholder-shown) .cv-kbd-hint { display: inline-flex; }
-@media (hover: hover) { .cv-box:not(:focus-within) textarea:placeholder-shown::placeholder { color: transparent; } } /* 안내가 그 자리에 대신 — 터치 기기는 안내가 없으니 그대로 */
+.cv-box:has(textarea:placeholder-shown) .cv-kbd-hint { display: inline-flex; }
+@media (hover: hover) { .cv-box textarea:placeholder-shown::placeholder { color: transparent; } } /* 포커스가 있어도 비어 있으면 안내가 그 자리에 대신 — 터치 기기는 안내가 없으니 그대로 */
 .cv-kbd-hint kbd { display: inline-grid; place-items: center; min-width: 16px; height: 17px; padding: 0 4px; border: 1px solid var(--line-2); border-bottom-width: 2px; border-radius: 4px; font: 600 10.5px/1 ui-monospace, Consolas, monospace; color: var(--dim); background: var(--surface-2); }
 .cv-box .att-live:empty { display: none; }
 /* 보내기 세 갈래 — 기본(바로 전송, 입력칸 Enter)만 코랄로 채우고 나머지는 옅게. Tab 으로 옮겨 다니므로 포커스 링을 또렷하게 */

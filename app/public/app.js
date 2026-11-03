@@ -1566,7 +1566,7 @@ function renderFloor() {
     if (grouped && it.repo !== prevRepo) {
       let h = repoHeadEls.get(it.repo);
       if (!h) {
-        h = el(`<div class="repo-head"><span class="repo-sw"></span><b></b><span class="rh-n"></span></div>`);
+        h = el(`<div class="repo-head"><span class="repo-sw"></span><b></b><span class="rh-n"></span><button type="button" class="rh-add">+</button></div>`);
         h.dataset.repo = it.repo;
         repoHeadEls.set(it.repo, h);
       }
@@ -1575,6 +1575,8 @@ function renderFloor() {
       $('.rh-n', h).textContent = mine.length;
       h.style.setProperty('--repo', colorOf.get(it.repo));
       h.title = it.cwd || '';
+      h.dataset.cwd = it.cwd || '';
+      $('.rh-add', h).title = _t('이 폴더에 워커 추가 — 모델 · 권한만 고르면 바로 띄움');
       place(h);
       prevRepo = it.repo;
     }
@@ -3273,6 +3275,67 @@ newForm.onsubmit = async (e) => {
   toggleNewPanel(false);
   select(id);
 };
+
+// repo 묶음 머리줄의 + : 그 폴더에 워커를 바로 띄운다. 이름은 폴더 이름(겹치면 뒤에 번호), 고르는 건 모델 · 권한뿐.
+// 마지막에 고른 값은 이 브라우저에 기억
+const QN_MODELS = [['', 'CLI 기본'], ['opus', 'Opus'], ['sonnet', 'Sonnet'], ['haiku', 'Haiku']];
+const QN_PERMS = [['default', '승인 필요'], ['acceptEdits', '편집 자동 허용'], ['plan', '계획 먼저'], ['bypassPermissions', '전부 허용']];
+let qnPop = null, qnCwd = '';
+const qnPrefs = () => { try { return JSON.parse(localStorage.getItem('am.quickNew')) || {}; } catch { return {}; } };
+function qnName(cwd) {
+  const base = (cwd || '').split(/[\\/]/).filter(Boolean).pop() || 'worker';
+  const taken = new Set([...state.workers.map((w) => w.name), ...state.profiles.map((p) => p.name)].map((n) => String(n).toLowerCase()));
+  let name = base;
+  for (let i = 2; taken.has(name.toLowerCase()); i++) name = `${base} ${i}`;
+  return name;
+}
+function closeQuickNew() { if (qnPop) qnPop.hidden = true; document.querySelector('.rh-add.on')?.classList.remove('on'); }
+function openQuickNew(btn, cwd) {
+  if (!qnPop) {
+    const seg = (k, list) => `<div class="qn-seg" data-k="${k}">${list.map(([v, l]) => `<button type="button" data-v="${v}">${esc(_t(l))}</button>`).join('')}</div>`;
+    qnPop = el(`<div class="qn-pop" role="dialog" hidden><div class="qn-ti"><b></b><small></small></div>
+      <div class="qn-row"><span>${esc(_t('모델'))}</span>${seg('model', QN_MODELS)}</div>
+      <div class="qn-row"><span>${esc(_t('권한 모드'))}</span>${seg('perm', QN_PERMS)}</div>
+      <div class="qn-act"><button type="button" class="btn ghost" data-qn="cancel">${esc(_t('취소'))}</button><button type="button" class="btn primary" data-qn="go">${esc(_t('띄우기'))}</button></div></div>`);
+    document.body.append(qnPop);
+    qnPop.addEventListener('click', async (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      const sg = b.closest('.qn-seg');
+      if (sg) { for (const x of sg.children) x.classList.toggle('on', x === b); return; }
+      if (b.dataset.qn === 'cancel') return closeQuickNew();
+      if (b.dataset.qn !== 'go') return;
+      const model = $('[data-k="model"] .on', qnPop)?.dataset.v || '', perm = $('[data-k="perm"] .on', qnPop)?.dataset.v || 'default';
+      try { localStorage.setItem('am.quickNew', JSON.stringify({ model, perm })); } catch {}
+      const name = $('.qn-ti b', qnPop).textContent;
+      closeQuickNew();
+      const r = await api('/api/workers', { name, cwd: qnCwd, args: model ? `--model ${model}` : '', permissionMode: perm, save: true });
+      if (r?.id) select(r.id); else if (r?.error) toast(r.error, 3500);
+    });
+    qnPop.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeQuickNew(); } });
+    document.addEventListener('pointerdown', (e) => { if (qnPop && !qnPop.hidden && !e.target.closest('.qn-pop, .rh-add')) closeQuickNew(); });
+  }
+  qnCwd = cwd;
+  const pr = qnPrefs();
+  for (const [k, v] of [['model', pr.model ?? ''], ['perm', pr.perm || 'default']]) for (const x of $(`[data-k="${k}"]`, qnPop).children) x.classList.toggle('on', x.dataset.v === v);
+  $('.qn-ti b', qnPop).textContent = qnName(cwd);
+  $('.qn-ti small', qnPop).textContent = ltrPath(cwd);
+  $('.qn-ti small', qnPop).title = cwd;
+  qnPop.hidden = false;
+  btn.classList.add('on');
+  const r = btn.getBoundingClientRect(), pw = qnPop.offsetWidth;
+  qnPop.style.left = `${Math.max(8, Math.min(r.left, innerWidth - pw - 8))}px`;
+  qnPop.style.top = `${r.bottom + 6}px`;
+  $('[data-qn="go"]', qnPop).focus();
+}
+$('#nodes').addEventListener('click', (e) => {
+  const b = e.target.closest('.rh-add');
+  if (!b) return;
+  e.stopPropagation();
+  if (b.classList.contains('on')) return closeQuickNew();
+  closeQuickNew();
+  openQuickNew(b, b.closest('.repo-head').dataset.cwd);
+});
 
 // Backlog 입력칸: 쓴 줄 수만큼 높이가 늘고 줄어든다(최소 3줄 = rows,
 // 옆 패널 높이의 30% 까지 늘고 그 뒤로는 칸 안에서 스크롤 — 두 칸이 다 늘어도 기본 높이(580px)에서 목록 자리가 남게).
