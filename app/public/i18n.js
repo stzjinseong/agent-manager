@@ -331,6 +331,7 @@ const EN = {
   '대화 기록에 남지 않아요': "Not saved to the conversation",
   '답 받는 중…': 'Waiting for the answer…',
   'CLI 에서 답 창이 닫혔어요': 'The answer panel was closed in the CLI',
+  '끌어서 크기 조절': 'Drag to resize',
   '마지막 답 복사': 'Copy the last answer',
   '이어서 BTW 묻기 — Enter 보내기': 'Ask another BTW — Enter to send',
   '지금은 CLI 에 넣을 수 없어요 — 입력창에 쓰던 글이나 선택창을 확인하세요': "Can't send to the CLI right now — check its input box or open menu",

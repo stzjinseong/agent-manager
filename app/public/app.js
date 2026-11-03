@@ -5746,7 +5746,8 @@ function btwSkeleton(box) {
   box.innerHTML = `<div class="btw-h" data-btw-drag><b>BTW</b><small>/btw · ${esc(_t('대화 기록에 남지 않아요'))}</small>`
     + `<span class="btw-acts"><button type="button" data-btw="copy" title="${esc(_t('마지막 답 복사'))}">⧉</button><button type="button" data-btw="close" title="${esc(_t('닫기 (CLI 의 답 창도 닫음)'))}">✕</button></span></div>`
     + `<div class="btw-list"></div>`
-    + `<form class="btw-form"><textarea rows="1" placeholder="${esc(_t('이어서 BTW 묻기 — Enter 보내기'))}"></textarea><button type="submit" class="btn primary">${esc(_t('보내기'))}</button></form>`;
+    + `<form class="btw-form"><textarea rows="1" placeholder="${esc(_t('이어서 BTW 묻기 — Enter 보내기'))}"></textarea><button type="submit" class="btn primary">${esc(_t('보내기'))}</button></form>`
+    + `<span class="btw-grip-l" title="${esc(_t('끌어서 크기 조절'))}"></span>`;
   box.dataset.built = '1';
   btwPlace(box);
 }
@@ -5846,6 +5847,28 @@ $('#cv-btw').addEventListener('pointerdown', (e) => {
   };
   h.addEventListener('pointermove', move); h.addEventListener('pointerup', up); h.addEventListener('pointercancel', up);
   e.preventDefault();
+});
+// 왼쪽 아래 손잡이 — 오른쪽 끝은 그대로 두고 왼쪽 끝 · 아래 끝을 움직인다(채팅 화면 안에서만)
+$('#cv-btw').addEventListener('pointerdown', (e) => {
+  const g = e.target.closest('.btw-grip-l');
+  if (!g || e.button !== 0) return;
+  e.preventDefault(); e.stopPropagation();
+  const box = $('#cv-btw'), cv = $('#chat-view'), c = cv.getBoundingClientRect(), b0 = box.getBoundingClientRect();
+  const right = b0.right - c.left, top = b0.top - c.top, minW = 280, minH = 150;
+  g.setPointerCapture(e.pointerId);
+  box.classList.add('dragging');
+  const move = (ev) => {
+    const left = Math.min(Math.max(0, ev.clientX - c.left), right - minW);
+    const h = Math.min(Math.max(minH, ev.clientY - c.top - top), c.height - top - 4);
+    box.style.right = 'auto'; box.style.left = `${left}px`; box.style.top = `${top}px`;
+    box.style.width = `${right - left}px`; box.style.height = `${h}px`;
+  };
+  const up = () => {
+    g.removeEventListener('pointermove', move); g.removeEventListener('pointerup', up); g.removeEventListener('pointercancel', up);
+    box.classList.remove('dragging');
+    btwSave({ x: parseFloat(box.style.left) || 0, y: parseFloat(box.style.top) || 0, w: Math.round(box.offsetWidth), h: Math.round(box.offsetHeight) });
+  };
+  g.addEventListener('pointermove', move); g.addEventListener('pointerup', up); g.addEventListener('pointercancel', up);
 });
 new ResizeObserver(() => { const box = $('#cv-btw'); if (!box.hidden && box.dataset.built) btwPlace(box); }).observe($('#chat-view'));
 function btwSave(part) {
