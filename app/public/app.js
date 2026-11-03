@@ -3049,7 +3049,9 @@ function renderUsage() {
   for (const k in meterTips) delete meterTips[k];
   const m = (key, label, pct, color, tip, dim = false, after = '') => {
     meterTips[key] = tip;
-    return `<span class="mt${dim ? ' dim' : ''}" data-mt="${key}"><span class="mt-l">${_t(label)}</span><span class="mt-bar" style="--p:${pct ?? 0}%;--uc:${color}"><b>${pct == null ? '—' : `${Math.round(pct)}%`}</b></span>${after}</span>`;
+    // 위: 이름 · 숫자(항목 색) · 남은 시간 / 아래: 10칸 픽셀 블록(10% 단위, 반올림)
+    const n = pct == null ? 0 : Math.round(pct), cells = Array.from({ length: 10 }, (_, i) => `<i${i < Math.round(n / 10) ? ' class="on"' : ''}></i>`).join('');
+    return `<span class="mt${dim ? ' dim' : ''}" data-mt="${key}" style="--p:${pct ?? 0}%;--uc:${color}"><span class="mt-top"><span class="mt-l">${_t(label)}</span><b class="mt-pc">${pct == null ? '—' : `${n}%`}</b>${after}</span><span class="mt-bar">${cells}</span></span>`;
   };
   // 초기화까지 남은 시간은 큰 단위 하나로 짧게(32분 · 4시간 · 6일) — 정확한 시각은 마우스를 올리면
   const short = (ms) => { const mins = Math.max(0, Math.floor(ms / 60000)); return mins < 60 ? _t('{m}분', { m: mins }) : mins < 1440 ? _t('{h}시간', { h: Math.floor(mins / 60) }) : _t('{d}일', { d: Math.floor(mins / 1440) }); };

@@ -493,28 +493,19 @@ body.card-drag .node-add { opacity: .25; transition: opacity .2s; }
 /* 역할 이름은 오른쪽 버튼(diff · 크게 · 중단 · 제거)과 같은 높이 칸에 아래쪽을 맞춰 둔다 */
 .detail-title { display: flex; flex-direction: column; justify-content: center; min-width: 0; flex: 1; height: var(--dt-h, 34px); }
 .detail-title strong { font-size: 20px; line-height: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* ---------- 미터: 컨텍스트 · 5시간 · 주간 (오른쪽 — 보통은 '크게' 버튼 왼쪽, 크게 보기에선 '닫기' 버튼 왼쪽) ----------
-   CLI 에서 ▓░ 글자로 그린 막대처럼 점무늬 — 채운 쪽은 밝은 면에 작은 구멍(▓), 빈 쪽은 흐린 점(░) */
+/* ---------- 미터: 컨텍스트 · 5시간 · 주간 (오른쪽 — 보통은 '크게' 버튼 왼쪽, 크게 보기에선 '닫기' 버튼 왼쪽) ---------- */
 .meters { display: flex; align-items: center; gap: 14px; min-width: 0; overflow: hidden; font-size: 11.5px; color: var(--text-2); }
 .meters:empty { display: none; }
 .mt { display: inline-flex; align-items: center; gap: 6px; flex: none; white-space: nowrap; cursor: default; }
 .mt.dim { opacity: .5; }
 .mt-l { color: var(--dim); }
-.mt-bar {
-  position: relative; width: 64px; height: 16px; border-radius: 3px; display: grid; place-items: center;
-  background: radial-gradient(circle, color-mix(in srgb, var(--uc) 42%, transparent) .8px, transparent 1.05px) 0 0 / 3px 3px;
-}
-.mt-bar::before {
-  content: ''; position: absolute; inset: 0 auto 0 0; width: var(--p); border-radius: 3px; transition: width .4s ease-out;
-  background: radial-gradient(circle, color-mix(in srgb, var(--uc) 30%, #000) .55px, transparent .8px) 0 0 / 3px 3px, var(--uc);
-}
-/* % 는 막대 안 가운데. 점무늬·채운/빈 경계 어디에 걸쳐도 읽히게 글자 둘레에 바탕색 테두리 빛 */
-.mt-bar b {
-  position: relative; font-size: 11px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1;
-  text-shadow: 0 0 2px var(--mt-halo), 0 0 2px var(--mt-halo), 0 0 4px var(--mt-halo);
-}
-.meters { --mt-halo: var(--surface); }
-.term-wrap .meters { --mt-halo: var(--term-bg); }
+/* 위 줄: 이름 · 숫자(항목 색) · 남은 시간, 아래 줄: 10칸 픽셀 블록(10% 단위 — 도트 캐릭터와 같은 각진 칸) */
+.mt { flex-direction: column; align-items: stretch; gap: 3px; }
+.mt-top { display: flex; align-items: baseline; gap: 6px; line-height: 1.1; }
+.mt-pc { color: var(--uc); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.mt-bar { height: 5px; display: grid; grid-template-columns: repeat(10, 1fr); gap: 1.5px; }
+.mt-bar i { border-radius: 1px; background: color-mix(in srgb, var(--uc) 16%, rgb(var(--ink) / .08)); transition: background .3s; }
+.mt-bar i.on { background: var(--uc); box-shadow: 0 0 4px color-mix(in srgb, var(--uc) 60%, transparent); }
 /* 항목별 고정 색(사용률에 따라 바꾸지 않는다): 컨텍스트 파랑 · 5시간 주황빛 노랑 · 주간 빨강 */
 :root { --m-ctx: #8cb8ff; --m-5h: #f4b34a; --m-wk: #ff9a8f; }
 :root[data-theme="light"] { --m-ctx: #2a6fd6; --m-5h: #c98500; --m-wk: #d6453b; }
@@ -526,8 +517,7 @@ body.card-drag .node-add { opacity: .25; transition: opacity .2s; }
 .detail-head .meters:is(.y1, .y2) .mt-r, .detail-head .meters.y2 .mt-l { display: none; }
 .detail-head .meters.y3 { display: none; }
 .term-wrap.full .term-bar .meters { flex: 0 1 auto; min-width: 0; margin-left: auto; margin-right: 8px; font-size: 12px; }
-.term-wrap.full .term-bar .mt-bar { height: 18px; }
-.term-wrap.full .term-bar .mt-bar b { font-size: 12px; }
+.term-wrap.full .term-bar .mt-pc { font-size: 12.5px; }
 #detail-meta { color: var(--dim); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .detail-head .btn { flex: none; white-space: nowrap; }
 .detail-head .spacer { display: none; }
