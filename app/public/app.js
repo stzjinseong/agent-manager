@@ -5657,6 +5657,18 @@ $('#cv-list').addEventListener('click', async (e) => {
 });
 $('#cv-acts').addEventListener('click', (e) => { const b = e.target.closest('[data-send]'); if (b) chatSend(b.dataset.send); });
 // 입력칸 Tab → 첫 버튼(사이에 낀 첨부 타일 링크를 건너뛰게 직접 옮긴다)
+// CLI 선택창(재개할 세션 고르기 · 권한 질문 등)을 아래에 드러내 둔 동안(peekOn) 채팅 입력칸이 비었으면 고르는 키를 CLI 로 넘긴다.
+// 선택창이 뜰 때 터미널로 포커스를 옮기지만(setCliPeek), 이미 떠 있는 채 채팅으로 들어오거나 입력칸을 누르면 포커스가 입력칸에 남아
+// 방향키가 보낸 글 기록(↑)으로 가고 CLI 는 그대로였다(실측 11-03 /resume). 넘긴 뒤엔 터미널에 포커스를 줘 이어지는 키도 바로 간다.
+// 입력칸에 글이 있으면 쓰는 중이니 넘기지 않는다. 다른 keydown 보다 먼저 받아야 해 capture 로 단다
+const PEEK_KEYS = { ArrowUp: '\x1b[A', ArrowDown: '\x1b[B', ArrowRight: '\x1b[C', ArrowLeft: '\x1b[D', Enter: '\r', Escape: '\x1b', Tab: '\t' };
+chatForm.text.addEventListener('keydown', (e) => {
+  const seq = PEEK_KEYS[e.key];
+  if (!peekOn || !seq || chatForm.text.value || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey || e.isComposing || termLocked()) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  sendInput(seq);
+  term.focus();
+}, true);
 chatForm.text.addEventListener('keydown', (e) => {
   if (e.key !== 'Tab' || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey || e.isComposing) return;
   e.preventDefault();

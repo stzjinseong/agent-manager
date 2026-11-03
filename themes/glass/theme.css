@@ -269,10 +269,10 @@
 }
 :root[data-skin="glass"] .term-wrap.chatting :is(.chat-view, .cv-bar, .dv-bar) { background: transparent; }
 /* 채팅 화면은 원래 불투명 바탕으로 같은 칸의 터미널을 덮는다 — 비우면 뒤 터미널 글자가 비쳐 겹친다. 채팅인 동안은 터미널을 감춘다
-   (visibility — 칸 크기 · xterm 버퍼는 그대로라 CLI 로 돌아오면 바로 보인다).
+   (opacity — 칸 크기 · xterm 버퍼는 그대로라 CLI 로 돌아오면 바로 보인다. visibility 와 달리 오리지널처럼 덮여 있을 뿐 포커스는 받는다).
    단 CLI 선택창을 채팅 아래 절반에 보여 줄 때(.cli-peek — 선택창 · 권한 질문)는 터미널이 보여야 한다 — 감췄더니 아래가 텅 비었다.
    그때 위 절반 채팅은 원래처럼 불투명하게 덮어 내려 둔 터미널 윗부분이 비치지 않게 */
-:root[data-skin="glass"] .term-wrap.chatting:not(.cli-peek) #term { visibility: hidden; }
+:root[data-skin="glass"] .term-wrap.chatting:not(.cli-peek) #term { opacity: 0; }
 :root[data-skin="glass"] .term-wrap.chatting.cli-peek .chat-view { background: var(--chat-bg, var(--term-bg)); }
 /* 시간선이 점 안으로 비치지 않게 — 빈 원 점만. 클로드 캐릭터(.cv-a — 코랄 마스크) · 권한(.cv-p — 결정 색)까지 칠해 캐릭터가 남색 그림자처럼 보였다 */
 :root[data-skin="glass"] .term-wrap.chatting .cv-ev:not(.cv-a, .cv-p) > .cv-dot { background: var(--glass-solid); }
