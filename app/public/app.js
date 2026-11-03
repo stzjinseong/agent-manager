@@ -4488,6 +4488,8 @@ function updRow(title, x, kind) {
   if (kind === 'app' && x?.url) notes = `<button class="upd-notes" data-notes>${_t(x.newer ? '새 버전 릴리즈 노트 보기' : '릴리즈 노트 보기')}</button>`;
   // Claude Code: 설치된 버전 다음 ~ 최신의 변경 내역(CHANGELOG) — 버전 번호를 알면
   if (kind === 'claude' && (x?.current || x?.latest)) notes = `<button class="upd-notes" data-notes="claude">${_t(x.newer ? '새 버전 릴리즈 노트 보기' : '릴리즈 노트 보기')}</button>`;
+  // 새 버전이 있으면 바로 업데이트 — 이 PC 에 터미널 창을 띄워 claude update 를 돌린다(server.js launchClaudeUpdate)
+  if (kind === 'claude' && x?.newer) notes = `<div class="upd-acts"><button class="upd-notes upd-run" data-claude-update title="${esc(_t('이 PC 에 터미널 창을 띄워 claude update 를 실행해요. 실행 중인 워커가 있으면 실패할 수 있어요 — 그때는 워커를 끄고 다시'))}">${_t('지금 업데이트')}</button>${notes}</div>`;
   return `<div class="upd-row"><div class="upd-top"><b>${title}</b><span class="upd-cur">${esc(cur)}</span></div>${status}${guide}${notes}</div>`;
 }
 function renderUpd() {
@@ -4511,7 +4513,17 @@ function setUpdPop(open) {
 updBtn.addEventListener('click', () => { if (!notesPop.hidden) { setNotesPop(false); return; } setUpdPop(updPop.hidden); });
 document.addEventListener('click', (e) => { if (!updPop.hidden && !e.target.closest('.upd-wrap')) setUpdPop(false); });
 document.addEventListener('keydown', (e) => { if (!updPop.hidden && e.key === 'Escape') { setUpdPop(false); updBtn.focus(); } });
-updPop.addEventListener('click', (e) => { const b = e.target.closest('[data-notes]'); if (b) { setUpdPop(false); setNotesPop(true, b.dataset.notes || 'app'); } });
+updPop.addEventListener('click', async (e) => {
+  const u = e.target.closest('[data-claude-update]');
+  if (u) {
+    u.disabled = true;
+    const r = await api('/api/claude-update', {});
+    toast(_t(r?.ok ? '터미널에서 claude update 를 시작했어요 — 끝나면 서버 + 워커를 다시 켜 주세요' : '터미널을 띄우지 못했어요 — 직접 claude update 를 실행해 주세요'), 4500);
+    u.disabled = false;
+    return;
+  }
+  const b = e.target.closest('[data-notes]'); if (b) { setUpdPop(false); setNotesPop(true, b.dataset.notes || 'app'); }
+});
 
 // ---------- 릴리즈 노트 (업데이트 창 → 릴리즈 노트 보기) ----------
 // 서버가 GitHub 에서 받은 릴리즈 전체(최신 → 과거)를 큰 창에 스크롤로. 본문은 GitHub 이 만든 HTML — 허용한 태그만 남기고

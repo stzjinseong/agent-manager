@@ -1757,6 +1757,25 @@ function openPath(target) {
   try { spawnProcess(cmd, args, { detached: true, stdio: 'ignore' }).on('error', () => {}).unref(); return true; } catch { return false; }
 }
 
+// Claude Code 업데이트 — 이 PC 에 새 터미널 창을 띄워 `claude update` 를 돌린다(진행 · 결과를 사용자가 직접 보게). 창은 끝나도 열어 둔다.
+// Windows: cmd 새 창(start) + /k · macOS: Terminal.app 에 do script · 그 밖: x-terminal-emulator(없으면 실패)
+function launchClaudeUpdate() {
+  const bin = CLAUDE_BIN || 'claude';
+  try {
+    if (IS_WIN) {
+      // start 의 첫 따옴표 인자는 창 제목. cmd /k 뒤 "경로" update — 인자 전체를 node 가 다시 감싸지 않게 그대로 넘긴다
+      spawnProcess('cmd.exe', ['/c', 'start', '"Claude Code update"', 'cmd.exe', '/k', `"${bin}" update`], { detached: true, stdio: 'ignore', windowsVerbatimArguments: true }).on('error', () => {}).unref();
+    } else if (IS_MAC) {
+      const sh = `'${bin.replace(/'/g, `'\\''`)}' update`; // 셸 작은따옴표로 감싼 경로 → AppleScript 문자열 안이라 \ · " 도 이스케이프
+      const as = sh.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      spawnProcess('osascript', ['-e', `tell application "Terminal" to do script "${as}"`, '-e', 'tell application "Terminal" to activate'], { detached: true, stdio: 'ignore' }).on('error', () => {}).unref();
+    } else {
+      spawnProcess('x-terminal-emulator', ['-e', 'sh', '-c', `'${bin.replace(/'/g, `'\\''`)}' update; exec sh`], { detached: true, stdio: 'ignore' }).on('error', () => {}).unref();
+    }
+    return true;
+  } catch { return false; }
+}
+
 // ---------- 사용자 캐릭터 ----------
 // 헤더 👕 에서 올린 그림으로 만든 캐릭터. 브라우저가 여백 자르기·도트 원래 크기 되돌리기를 마친 PNG 를 보내면
 // data/characters/<id>.json(이름·단계별 파일·탭 아이콘) + <id>-<단계>-<rev>.png 로 둔다. 단계 0 = 기본(워커·매니저 시작 모습),
@@ -2213,6 +2232,8 @@ const server = http.createServer(async (req, res) => {
     if (body.save) upsertProfile({ ...body, cwd: w.cwd });
     return json(res, 200, { id: w.id, resumed: !!s });
   }
+
+  if (req.method === 'POST' && p === '/api/claude-update') return json(res, 200, { ok: launchClaudeUpdate() });
 
   if (req.method === 'POST' && p === '/api/profiles/rename') {
     const { from, name } = await readBody(req);
