@@ -2703,6 +2703,7 @@ button.cv-more:hover { color: var(--text); }
 .cv-box { position: relative; }
 .cv-kbd-hint { display: none; position: absolute; left: 12px; top: 10px; align-items: center; gap: 6px; color: var(--faint); white-space: nowrap; pointer-events: none; }
 .cv-box:has(textarea:placeholder-shown) .cv-kbd-hint { display: inline-flex; }
+.cv-box:focus-within .cv-kbd-hint { margin-left: 4px; } /* 커서가 안내 첫 글자(/ 상자)와 같은 자리라 가려졌다 — 포커스 중엔 조금 비켜 커서가 온전히 보이게 */
 @media (hover: hover) { .cv-box textarea:placeholder-shown::placeholder { color: transparent; } } /* 포커스가 있어도 비어 있으면 안내가 그 자리에 대신 — 터치 기기는 안내가 없으니 그대로 */
 .cv-kbd-hint kbd { display: inline-grid; place-items: center; min-width: 16px; height: 17px; padding: 0 4px; border: 1px solid var(--line-2); border-bottom-width: 2px; border-radius: 4px; font: 600 10.5px/1 ui-monospace, Consolas, monospace; color: var(--dim); background: var(--surface-2); }
 .cv-box .att-live:empty { display: none; }
@@ -2725,7 +2726,7 @@ button.cv-more:hover { color: var(--text); }
 
 /* 채팅에서 답하기 — 클로드의 질문 카드(입력칸 위) */
 /* 워커 전환 중 앞 화면 복제본(app.js switchFxStart) — 진짜 화면 위에 잠깐 붙잡아 두었다가 흐려지며 사라진다 */
-.switch-ghost { position: absolute; z-index: 6; margin: 0; pointer-events: none; overflow: hidden; }
+.switch-ghost { position: absolute !important; z-index: 6; margin: 0 !important; pointer-events: none; overflow: hidden !important; } /* 원래 클래스(.xterm .xterm-screen { position: relative } 등)를 그대로 달고 있어 이겨야 한다 */
 .cv-btw { position: absolute; top: 10px; right: 12px; z-index: 7; width: min(440px, calc(100% - 24px)); max-height: calc(100% - 20px); max-width: calc(100% - 8px); min-width: 280px; min-height: 150px; resize: both; overflow: hidden; display: flex; flex-direction: column; gap: 8px;
   padding: 10px 12px 12px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--surface); box-shadow: 0 12px 32px rgb(0 0 0 / calc(.2 + .35 * var(--shade))); }
 /* 오른쪽 아래 모서리를 끌어 크기 조절(resize) — 처음엔 내용 높이(답이 길면 채팅 화면 높이까지) */

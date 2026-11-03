@@ -2931,7 +2931,7 @@ function restoreTermScroll(id) {
 }
 // ---------- 워커 전환 연출 ----------
 // 다른 워커를 누르면 새 대화를 불러오는 동안 채팅 · 터미널이 한두 프레임 비어(실측 ~30ms '아직 대화가 없어요') 깜빡여 보였다.
-// → 누르는 순간 지금 보이는 목록(채팅 #cv-list · 터미널 .xterm-screen — DOM 렌더러라 복제된다)을 복제해 그 자리에 붙잡아 두고
+// → 누르는 순간 지금 보이는 목록(채팅 #cv-list · 터미널 .xterm-screen — DOM 렌더러라 복제된다)을 복제해 바로 옆(같은 부모)에 붙잡아 두고
 // 진짜 화면은 숨긴다. 새 내용이 다 그려지면(loadChat · 기록 scrollback 쓰기 끝 — switchFxReveal) 복제본은 흐려지며 4px 밀려 나가고
 // 진짜 화면은 반대쪽 4px 에서 들어오며 나타난다(0.15초 크로스페이드). 방향은 카드 순서(오른쪽 워커면 왼쪽으로). 0.7초 안에 준비가 안 되면 그냥 드러낸다.
 // 움직임 줄이기면 붙잡기만 하고 연출 없이 바꾼다
@@ -2951,26 +2951,26 @@ function switchFxEnd() {
 function switchFxStart(from, to) {
   switchFxEnd();
   if (!from || from === to || $('#detail').hidden || !$('#diff-view').hidden) return;
-  const wrap = $('#term-wrap');
-  const target = chatOpen ? $('#cv-list') : $('#term');
-  const src = chatOpen ? target : $('#term .xterm-screen');
+  // 숨기는 것 = 복제한 것 자체(채팅 목록 · 터미널 화면). 복제본은 원래 요소와 같은 부모에 붙인다 — 바깥에 붙였더니 부모에만 걸린
+  // 글꼴 크기 · 줄 간격(.chat-view 13.5px 등)을 못 받아 글자 · 말풍선이 미세하게 달라져, 겹치는 동안 출렁여 보였다
+  const src = chatOpen ? $('#cv-list') : $('#term .xterm-screen');
   if (!src || !src.offsetHeight) return;
   const order = switchOrder(), dir = Math.sign(order.indexOf(to) - order.indexOf(from)) || 0;
   const r = src.getBoundingClientRect();
-  const copy = src.cloneNode(true);
-  for (const x of [copy, ...copy.querySelectorAll('[id]')]) x.removeAttribute('id');
-  // 터미널 글자색 · 글꼴 규칙은 바깥 .xterm(렌더러 클래스)에 묶여 있다 — 같은 클래스의 틀로 감싸야 복제본도 같은 모양
-  let ghost = copy;
-  if (!chatOpen) { ghost = document.createElement('div'); ghost.className = $('#term .xterm')?.className || 'xterm'; ghost.append(copy); }
+  const ghost = src.cloneNode(true);
+  for (const x of [ghost, ...ghost.querySelectorAll('[id]')]) x.removeAttribute('id');
   ghost.classList.add('switch-ghost');
-  wrap.append(ghost);
-  // 자리는 붙인 뒤 실제 기준 요소(offsetParent — #term-wrap 은 position: static 이라 그 바깥)를 보고 정한다
-  const op = ghost.offsetParent || document.body, or = op.getBoundingClientRect();
-  Object.assign(ghost.style, { left: `${r.left - or.left - op.clientLeft + op.scrollLeft}px`, top: `${r.top - or.top - op.clientTop + op.scrollTop}px`, width: `${r.width}px`, height: `${r.height}px` });
-  if (chatOpen) ghost.scrollTop = src.scrollTop; // 복제하면 스크롤 위치는 따라오지 않는다
-  target.style.opacity = '0';
+  src.after(ghost);
+  // 자리: 같은 부모라 기준 요소(offsetParent)가 같으면 원래 요소의 offset 을 그대로(터미널은 .xterm 안이 스크롤돼 화면 좌표로 재면 어긋났다).
+  // 기준이 다르면 화면 좌표로 계산
+  const op = ghost.offsetParent || document.body;
+  let x = src.offsetLeft, y = src.offsetTop;
+  if (src.offsetParent !== op) { const or = op.getBoundingClientRect(); x = r.left - or.left - op.clientLeft + op.scrollLeft; y = r.top - or.top - op.clientTop + op.scrollTop; }
+  Object.assign(ghost.style, { left: `${x}px`, top: `${y}px`, width: `${r.width}px`, height: `${r.height}px` });
+  ghost.scrollTop = src.scrollTop; // 복제하면 스크롤 위치는 따라오지 않는다
+  src.style.opacity = '0';
   const kind = chatOpen ? 'chat' : 'cli';
-  switchFx = { to, kind, ghost, target, dir, timer: setTimeout(() => switchFxReveal(to, kind), SWITCH_WAIT_MS) };
+  switchFx = { to, kind, ghost, target: src, dir, timer: setTimeout(() => switchFxReveal(to, kind), SWITCH_WAIT_MS) };
 }
 function switchFxReveal(id, kind) {
   const fx = switchFx;
