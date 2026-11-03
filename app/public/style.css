@@ -511,6 +511,7 @@ body.card-drag .node-add { opacity: .25; transition: opacity .2s; }
 :root[data-theme="light"] { --m-ctx: #2a6fd6; --m-5h: #c98500; --m-wk: #d6453b; }
 /* 초기화까지 남은 시간(↻ 32분) — 막대 오른쪽에 흐리고 작게 */
 .mt-r { color: var(--dim); font-size: 11px; font-variant-numeric: tabular-nums; min-width: 34px; }
+.mt-cache { min-width: 52px; text-align: right; } /* '⏱ 59:44' ↔ '캐시 만료' 가 바뀌어도 폭이 같게 */
 .mt-cache.gone { color: var(--decision); } /* 캐시가 만료됨 — 다음 요청은 캐시를 새로 쓴다 */
 /* 보통 화면: 오른쪽 끝을 터미널(CLI) 오른쪽 가장자리에, 높이는 역할 이름 줄에 맞춘다 — 위치는 app.js placeMeters 가 잰다 */
 .detail-head .meters { position: absolute; right: var(--mt-right, 0px); top: var(--mt-top, 0px); height: var(--mt-h, 20px); }

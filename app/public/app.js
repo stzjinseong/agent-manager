@@ -3053,7 +3053,8 @@ function renderUsage() {
           : _t('다음 요청은 대화 전체를 캐시에 새로 써서 비용이 더 듭니다'),
       };
       parts.push(`<span class="mt-r mt-cache${left <= 0 ? ' gone' : ''}" data-mt="cache">${left > 0 ? `⏱ ${mmss(left)}` : _t('캐시 만료')}</span>`);
-    }
+    } else parts.push('<span class="mt-r mt-cache" aria-hidden="true" style="visibility:hidden">⏱ 0:00</span>');
+    // ↑ 워커를 바꾼 직후엔 캐시 정보가 아직 없다가 한 프레임 뒤에 붙어, 오른쪽 끝에 붙은 미터 묶음이 그 폭(~56px)만큼 덜컹 밀렸다 — 자리를 미리 잡아 둔다
     const ctx = ctxLevel(p), pct = Math.min(100, ctx.pct * 100);
     parts.push(m('ctx', '컨텍스트', pct, 'var(--m-ctx)', {
       title: `${_t('컨텍스트')} ${Math.round(pct)}%`,
