@@ -364,6 +364,8 @@ setFavicon(false);
 // 터미널 색: 다크는 검정 바탕, 라이트는 업무 지시 입력칸과 같은 바탕(--bg #f4f3ef)에 먹색 글자.
 // 워커 CLI 는 다크 테마 색(흰 글자 등)으로 그리지만 아래 minimumContrastRatio 가 밝은 바탕에 맞게 글자색을 어둡게 보정한다.
 // 기본 16색(ANSI)은 밝은 바탕에서 읽히게 진한 쪽으로
+// 라이트 모드는 아직 닫아 둔다 — 토글은 숨김(index.html hidden · 헤드 스크립트가 am.theme 를 지움). 열 때는 true + 두 곳 되돌리기
+const LIGHT_MODE = false;
 // 사용자 테마 목록(프로젝트 themes/ 폴더, 서버 /api/themes) — 터미널 색에도 쓰여 여기서 먼저 꺼낸다. 첫 화면용으로 브라우저에 기억(am.themes)
 let userThemes = [], themeDir = '';
 try { userThemes = JSON.parse(localStorage.getItem('am.themes') || '[]'); } catch {}
@@ -3811,7 +3813,8 @@ function setSkin(id) {
   if (!t) applyScheme();
   try { t ? localStorage.setItem(SKIN_KEY, t.id) : localStorage.removeItem(SKIN_KEY); } catch {}
   const light = root.dataset.theme === 'light';
-  if (t?.mode && (t.mode === 'light') !== light) { applyTheme(t.mode === 'light'); setThemeSwitch(t.mode === 'light'); }
+  // 라이트 모드를 닫아 둔 동안(LIGHT_MODE) 테마가 라이트를 원해도 다크 그대로
+  if (t?.mode && (t.mode === 'light') !== light && (LIGHT_MODE || t.mode !== 'light')) { applyTheme(t.mode === 'light'); setThemeSwitch(t.mode === 'light'); }
   else term.options.theme = termTheme(light);
 }
 // 서버 목록 받기 — 꾸미기 메뉴를 열 때마다 다시 읽어, 서버를 켜 둔 채 themes/ 에 폴더를 넣거나 theme.css 를 고쳐도 반영된다
