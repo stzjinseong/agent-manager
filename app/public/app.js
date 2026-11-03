@@ -1123,7 +1123,7 @@ function connect() {
       const more = termSnap.loadingFull ? termSnap.fromBottom : null; // 맨 위로 올려 전부 불러온 것 — 보던 줄을 그대로 맨 위에
       termSnap = { id: msg.id, partial: Boolean(msg.partial), loadingFull: false, fromBottom: 0, pending: termSnap.id === msg.id && termSnap.pending };
       term.reset();
-      term.write(recolorTerm(msg.data), () => { if (more == null) restoreTermScroll(msg.id); else term.scrollToLine(Math.max(0, term.buffer.active.baseY - more)); switchFxReveal(msg.id, 'cli'); });
+      term.write(recolorTerm(msg.data), () => { if (more == null) restoreTermScroll(msg.id); else term.scrollToLine(Math.max(0, term.buffer.active.baseY - more)); requestAnimationFrame(() => requestAnimationFrame(() => switchFxReveal(msg.id, 'cli'))); });
     }
     else if (msg.type === 'clearScrollback' && msg.id === selected) term.write('\x1b[3J'); // /clear — 이전 대화 기록만 지움
     else if (msg.type === 'restored') chatRestored(msg);
@@ -5409,7 +5409,6 @@ async function loadChat() {
     chatData = c || { wid: w.id, gen: null, rev: 0, key: null, items: [] };
     chatLoading = !c;
     renderChat();
-    if (c) switchFxReveal(w.id, 'chat'); // 지난 대화가 남아 있으면 그걸로 바로 바꾼다(바뀐 것만 뒤에 받음)
   }
   const q = chatData.gen ? `?gen=${encodeURIComponent(chatData.gen)}&since=${chatData.rev}` : '';
   let d;
@@ -5429,7 +5428,9 @@ async function loadChat() {
   chatSettle(w.id);
   if (chatHtml.size > 2000) chatHtml.clear();
   renderChat();
-  switchFxReveal(w.id, 'chat');
+  // 지난 대화(캐시)를 그린 순간 드러냈더니, 그 사이 진행된 대화가 붙고 스크롤이 한 번 더 내려가는 게 보였다(실측 880 → 1018px).
+  // 새로 받은 것까지 그리고 스크롤이 자리 잡은 뒤(2프레임)에 드러낸다
+  requestAnimationFrame(() => requestAnimationFrame(() => switchFxReveal(w.id, 'chat')));
 }
 // 상태가 올 때마다(render): 버튼 표시 · 바뀌었으면 가져오기 · 끝줄(상태) 다시 그리기
 // 서버에 '이 워커를 채팅으로 보는 중'을 알린다 — 그동안 클로드의 질문은 터미널 대신 채팅 카드로 온다(server holdAsk)
