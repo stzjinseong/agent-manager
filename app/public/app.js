@@ -5086,8 +5086,13 @@ function chatShots(tools) {
 }
 // 워커가 만든 결과물(w.docs — Write 로 만든 문서 · 명령으로 생긴 파일 · 답에 적힌 새 파일)을 마지막으로 쓴(고친) 시각 자리에 카드로 끼운다.
 // 결과물은 시각(t)만 있으므로 그 시각 자리(그 뒤 첫 대화 항목 바로 앞) — 없으면 맨 끝. 불러온 대화보다 오래된 것은 뺀다
+// 답 속에 이미 그림(![…](경로))으로 나온 파일은 빼서 같은 그림이 두 번 보이지 않게 한다 — 서버는 답에 적힌 새 파일도 결과물로 잡는다
+const normPath = (p) => String(p).trim().replace(/^file:\/+/i, '').replace(/\\/g, '/').toLowerCase();
+const CHAT_MD_IMG_RE = /!\[[^\]]*\]\(\s*<?([^)>]+?)>?\s*\)/g;
 function chatWithDocs(items) {
-  const docs = (state.workers.find((w) => w.id === chatData.wid)?.docs || []).filter((d) => items.length && d.t >= items[0].ts).sort((a, b) => a.t - b.t);
+  const shown = new Set();
+  for (const x of items) if (x.k === 'a' && x.text?.includes('![')) for (const m of x.text.matchAll(CHAT_MD_IMG_RE)) shown.add(normPath(m[1]));
+  const docs = (state.workers.find((w) => w.id === chatData.wid)?.docs || []).filter((d) => items.length && d.t >= items[0].ts && !shown.has(normPath(d.path))).sort((a, b) => a.t - b.t);
   if (!docs.length) return items;
   const out = [];
   let di = 0;

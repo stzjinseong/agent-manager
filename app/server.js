@@ -294,6 +294,9 @@ function pickFolder(start) {
   });
 }
 
+// 워커 시스템 지시에 덧붙이는 채팅 보기 사용법(한 줄 — PTY 인자로 넘긴다). 채팅은 답 속 ![](경로) 를 그 자리 그림으로 그린다
+// (public/app.js chatMdParse · 서버 chatImageFile 은 답에 나온 경로만 내준다)
+const CHAT_VIEW_PROMPT = '[클로드 키우기 채팅 보기] 사용자는 이 세션을 웹 채팅 화면으로도 본다. 채팅은 답 글의 마크다운 그림 ![설명](절대경로) 를 그 자리에 그림으로 보여 준다(이 PC 의 로컬 파일 · 임시 폴더 파일도 된다). 사용자에게 보여 줄 그림(스크린샷 · 생성한 이미지 · 차트 등)이 있으면 답의 알맞은 자리에 이 형식으로 넣는다. 경로에 공백이나 괄호가 있으면 ![설명](<절대경로>) 로 감싼다. 코드 블록 안에 넣으면 그림이 아니라 글로 보인다.';
 function resolveClaude() {
   if (process.env.AM_CLAUDE) return process.env.AM_CLAUDE;
   if (!IS_WIN) {
@@ -492,6 +495,9 @@ function spawnWorker({ name, cwd, args = '', permissionMode = 'default', resume 
 
   const extra = args.trim() ? args.trim().split(/\s+/) : [];
   if (resume) extra.push('--resume', resume); // 역할의 마지막 세션 이어서 (저장되는 역할 인자에는 넣지 않는다)
+  // 채팅 보기 사용법을 시스템 지시에 덧붙인다 — 예전엔 '그림은 답 속에' 상시 작업 지시(칩)를 켜야만 클로드가 답에 그림을 넣었다.
+  // 사용자 규칙이 아니라 이 앱 화면의 사용법이라 띄울 때 늘 넣는다. 역할 인자에 이미 --append-system-prompt 가 있으면 그쪽을 둔다(뒤 것이 앞을 덮으므로)
+  if (!extra.includes('--append-system-prompt')) extra.push('--append-system-prompt', CHAT_VIEW_PROMPT);
   // 전역 설정이 bypassPermissions 여도 워커는 지정한 모드로 띄운다 — 그래야 권한 요청이 관제탑에 '결정 대기'로 보인다
   if (!PERMISSION_MODES.includes(permissionMode)) permissionMode = 'default';
   // 터미널은 PTY 호스트가 띄우고 붙잡는다 — 이 서버를 재시작해도 워커는 살아 있다
