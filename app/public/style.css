@@ -2745,7 +2745,9 @@ button.cv-more:hover { color: var(--text); }
 .btw-acts button:hover { background: var(--surface-3); color: var(--text); }
 .btw-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
 .btw-q { align-self: flex-end; max-width: 85%; font-size: 12.5px; color: var(--text); padding: 7px 11px; border-radius: 10px; border-top-right-radius: 4px;
-  background: color-mix(in srgb, var(--accent) 22%, var(--surface-2)); white-space: pre-wrap; word-break: break-word; }
+  background: color-mix(in srgb, var(--accent) 22%, var(--surface-2)); white-space: pre-wrap; word-break: break-word;
+  box-shadow: 0 4px 14px rgb(0 0 0 / calc(.12 + .2 * var(--shade))); } /* 메인 채팅 말풍선(글래스 .cv-msg)과 같은 아래 그림자 */
+.btw-list { padding: 2px 2px 8px; } /* 그림자가 목록 가장자리에서 잘리지 않게 */
 /* 답: 메인 채팅 클로드 답처럼 캐릭터 실루엣(코랄 마스크 — style.css .cv-a .cv-dot 과 같은 그림) + 이름 줄 + 글 */
 .btw-a { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 8px; align-items: start; }
 .btw-ico { width: 16px; height: 13px; margin-top: 3px; background: var(--accent);
@@ -2757,14 +2759,16 @@ button.cv-more:hover { color: var(--text); }
 .btw-lab b { color: var(--accent-hi); font-weight: 600; margin-right: 6px; }
 .btw-wait { font-size: 12.5px; color: var(--dim); }
 /* 왼쪽 아래 크기 손잡이(app.js) — 오른쪽 아래는 브라우저 기본 resize 손잡이 */
-.btw-grip-l { position: absolute; left: 0; bottom: 0; width: 14px; height: 14px; cursor: nesw-resize; touch-action: none;
-  background: linear-gradient(45deg, transparent 0 45%, var(--dim) 45% 52%, transparent 52% 64%, var(--dim) 64% 71%, transparent 71%); opacity: .55; border-bottom-left-radius: 12px; }
+.btw-grip-l { position: absolute; left: 0; bottom: 0; width: 14px; height: 14px; cursor: nesw-resize; touch-action: none; opacity: .6;
+  /* 오른쪽 아래 기본 손잡이와 같은 크기 — 모서리 쪽 짧은 사선 두 개(9px 칸, 가장자리에서 2px) */
+  background: linear-gradient(45deg, transparent 0 22%, var(--dim) 22% 30%, transparent 30% 48%, var(--dim) 48% 56%, transparent 56%) left 2px bottom 2px / 9px 9px no-repeat; }
 .btw-grip-l:hover { opacity: 1; }
 /* BTW 플로팅 버튼 — 채팅 입력 상자 바로 위 오른쪽(/ 목록 · 기록 목록이 뜨면 그 아래로 가려진다) */
 .cv-comp { position: relative; }
-.cv-btw-fab { position: absolute; right: 6px; bottom: calc(100% + 10px); z-index: 4; height: 30px; padding: 0 12px; border-radius: 999px; cursor: pointer;
-  font: 700 11.5px/1 var(--mono); letter-spacing: .06em; color: var(--accent-hi); background: var(--surface); border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line-2));
+.cv-btw-fab { position: absolute; right: 6px; bottom: calc(100% + 10px); z-index: 4; width: 40px; height: 40px; padding: 0; border-radius: 50%; cursor: pointer;
+  display: grid; place-items: center; color: var(--accent-hi); background: var(--surface); border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line-2));
   box-shadow: 0 6px 18px rgb(0 0 0 / calc(.15 + .3 * var(--shade))); transition: background .15s, transform .15s, color .15s; }
+.cv-btw-fab svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; stroke-linecap: round; }
 .cv-btw-fab:hover { transform: translateY(-1px); background: color-mix(in srgb, var(--accent) 16%, var(--surface)); }
 .cv-btw-fab.on { color: #fff; background: var(--accent); border-color: var(--accent); }
 .btw-empty { margin: auto 0; padding: 18px 6px; text-align: center; font-size: 12.5px; color: var(--dim); line-height: 1.6; }
