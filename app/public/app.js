@@ -921,10 +921,10 @@ async function attachFiles(files, insert) {
   }
 }
 const hasFiles = (e) => [...(e.dataTransfer?.types || [])].includes('Files');
-// 타임라인 썸네일(캡처·결과물·첨부)을 끌 때 싣는 화면 주소. 놓으면 서버가 이 PC 의 파일 경로로 바꿔 경로만 넣는다(다시 올리지 않음)
+// 채팅 · 파일 탭 썸네일(캡처·결과물·첨부)을 끌 때 싣는 화면 주소. 놓으면 서버가 이 PC 의 파일 경로로 바꿔 경로만 넣는다(다시 올리지 않음)
 const THUMB_TYPE = 'application/x-am-file';
 const hasThumb = (e) => [...(e.dataTransfer?.types || [])].includes(THUMB_TYPE);
-// 드롭 영역 공통: 파일(OS)이나 타임라인 썸네일이 끌려 오면 테두리 강조. onPath: 썸네일을 놓았을 때 받은 경로
+// 드롭 영역 공통: 파일(OS)이나 썸네일이 끌려 오면 테두리 강조. onPath: 썸네일을 놓았을 때 받은 경로
 function dropZone(zone, onFiles, onPath) {
   const ok = (e) => hasFiles(e) || (onPath && hasThumb(e));
   // 안쪽 드롭 영역이 이미 받은 것(defaultPrevented)은 바깥 영역이 다시 받지 않는다 — 채팅 입력칸은 #term-wrap 안에 있어서
@@ -947,18 +947,20 @@ function dropZone(zone, onFiles, onPath) {
     if (files.length) onFiles(files);
   });
 }
-// 타임라인 썸네일 끌기 시작 — 썸네일은 카드 끌기와 겹치지 않게 draggable=false 로 그려지므로, 누르는 순간 이 칸에서만 끌 수 있게 바꾼다
-const THUMB_SEL = '.tl-shot, .tl-doc, .att-img, .att-file, .att-vid';
+// 채팅 · 파일 탭 썸네일 끌기 시작 — 썸네일은 카드 끌기와 겹치지 않게 draggable=false 로 그려지므로, 누르는 순간 이 칸에서만 끌 수 있게 바꾼다
+const THUMB_SEL = '.cv-shot, .tl-doc, .att-img, .att-file, .att-vid';
 const thumbUrl = (t) => t.dataset.shot || t.dataset.video || t.getAttribute('href') || t.getAttribute('src') || '';
-$('#log').addEventListener('mousedown', (e) => { const t = e.target.closest(THUMB_SEL); if (t) t.draggable = true; }, true);
-$('#log').addEventListener('dragstart', (e) => {
-  const t = e.target.closest?.(THUMB_SEL);
-  if (!t || !thumbUrl(t)) return;
-  e.dataTransfer.setData(THUMB_TYPE, thumbUrl(t));
-  e.dataTransfer.effectAllowed = 'copy';
-  document.body.classList.add('thumb-drag');
-});
-$('#log').addEventListener('dragend', () => document.body.classList.remove('thumb-drag'));
+for (const box of [$('#cv-list'), $('#att-tab-list')]) {
+  box.addEventListener('mousedown', (e) => { const t = e.target.closest(THUMB_SEL); if (t) t.draggable = true; }, true);
+  box.addEventListener('dragstart', (e) => {
+    const t = e.target.closest?.(THUMB_SEL);
+    if (!t || !thumbUrl(t)) return;
+    e.dataTransfer.setData(THUMB_TYPE, thumbUrl(t));
+    e.dataTransfer.effectAllowed = 'copy';
+    document.body.classList.add('thumb-drag');
+  });
+  box.addEventListener('dragend', () => document.body.classList.remove('thumb-drag'));
+}
 // 드롭 영역 밖에 파일을 놓으면 브라우저가 그 파일을 열어 화면이 바뀌어 버린다(html 등) → 막고 '놓을 수 없음' 표시
 document.addEventListener('dragover', (e) => { if (hasFiles(e) && !e.defaultPrevented) { e.preventDefault(); e.dataTransfer.dropEffect = 'none'; } });
 document.addEventListener('drop', (e) => { if (hasFiles(e)) e.preventDefault(); });
@@ -1974,11 +1976,11 @@ function renderHint() {
   box.innerHTML = kind === 'create'
     ? `<div class="hint-art create"><span class="hint-slot"><span class="avatar">${clawdSVG()}</span></span><span class="hint-plus">+</span></div>
        <h2>${_t('워커를 생성해보세요!')}</h2>
-       <p>${state.profiles.length ? _t('대기실 카드의 <b>▶ 투입</b>이나 ') : ''}${_t('<b>+ 워커 추가</b>로 첫 Claude 를 투입하면 여기서 터미널·Tasks·타임라인을 볼 수 있어요.')}</p>
+       <p>${state.profiles.length ? _t('대기실 카드의 <b>▶ 투입</b>이나 ') : ''}${_t('<b>+ 워커 추가</b>로 첫 Claude 를 투입하면 여기서 터미널·채팅·Tasks 를 볼 수 있어요.')}</p>
        <button class="btn primary" data-hint="new">${_t('+ 워커 추가')}</button>`
     : `<div class="hint-art click"><span class="avatar">${clawdSVG()}</span><span class="hint-ring"></span>${CURSOR_SVG}</div>
        <h2>${_t('워커를 클릭해보세요!')}</h2>
-       <p>${_t(min ? '위의 워커 칩을 누르면 여기에 그 워커의 터미널·Tasks·타임라인이 열려요.' : '위의 워커 카드를 누르면 여기에 그 워커의 터미널·Tasks·타임라인이 열려요.')}</p>`;
+       <p>${_t(min ? '위의 워커 칩을 누르면 여기에 그 워커의 터미널·채팅·Tasks 가 열려요.' : '위의 워커 카드를 누르면 여기에 그 워커의 터미널·채팅·Tasks 가 열려요.')}</p>`;
 }
 $('#hint').addEventListener('click', (e) => { if (e.target.closest('[data-hint="new"]')) toggleNewPanel(); });
 
@@ -2029,29 +2031,9 @@ function renderDetail() {
     : '';
   // 상태가 올 때마다 통째로 바꾸면 썸네일이 다시 로드되고 누르는 중인 타일이 사라진다 → 바뀐 때만
   if (queueEl._html !== queueHtml) { queueEl.innerHTML = queueEl._html = queueHtml; tickQueueCountdown(); }
-  const fmt = (t) => fmtDate(t + clockSkew, TIME_HMS);
-  timelineCache = timelineRows(w.log, w.shots, w.docs, w.past);
-  // CLI 처럼 아래로 갈수록 최신. 맨 아래를 보고 있었거나 워커를 바꿨으면 새 줄을 따라 내려가고,
-  // 위로 올려 지난 기록을 보는 중이면 그 자리를 지킨다
-  const logEl = $('#log');
-  const html = timelineCache.map((r, i) =>
-    `<li class="k-${r.kind}${r.past ? ' past' : ''}" data-i="${i}"${r.kind === 'req' ? ` title="${_t('클릭: 터미널에서 이 요청 위치로 이동')}"` : ''}><time>${fmt(r.t)}</time>${r.tag ? `<span class="tag">${r.tag}</span>` : ''}${esc(r.text)}${r.shot ? shotImg(r.shot, 'tl-shot') : ''}${r.doc ? docCard(r.doc) : ''}${r.kind === 'req' || r.kind === 'queued' || r.kind === 'unqueued' ? attachChips(r.text, 'md') : ''}</li>`).join('');
-  if (logEl._html !== html || logEl.dataset.w !== w.id) { // 브라우저가 innerHTML 을 정규화하므로 보낸 글로 비교
-    const stick = logEl.dataset.w !== w.id || logEl._atBottom !== false;
-    logEl.dataset.w = w.id;
-    logEl.innerHTML = logEl._html = html;
-    pinFor = null; // 줄을 새로 그렸으니 고정 줄도 새 요소 기준으로
-    logEl._settling = true;
-    afterFrame('log', () => {
-      if (stick) logEl.scrollTop = logEl.scrollHeight;
-      logEl._settling = false;
-      if (stick) logEl._atBottom = true;
-      updatePin();
-    });
-    markGoneSoon();
-  }
+  reqRows = timelineRows(w.log, w.past); // 파일 탭이 요청 글 속 첨부를 읽는다
   renderAttTab(w);
-  // 워커를 바꾼 직후엔 프로파일(차트 · 턴 표 · 숫자 애니메이션, 실측 30~60ms)을 첫 화면이 그려진 뒤로 미룬다 — 채팅 · 타임라인이 먼저 보이게
+  // 워커를 바꾼 직후엔 프로파일(차트 · 턴 표 · 숫자 애니메이션, 실측 30~60ms)을 첫 화면이 그려진 뒤로 미룬다 — 채팅이 먼저 보이게
   if (profileWid === w.id) renderProfile(w);
   else { profileWid = w.id; afterFrame('profile', () => setTimeout(() => { const cur = state.workers.find((x) => x.id === selected); if (cur) renderProfile(cur); }, 0)); }
   renderDiffButton(w);
@@ -2071,7 +2053,7 @@ function renderAttTab(w) {
   const catOf = (url) => url.startsWith('/shots/') ? 'shot' : url.startsWith('/docs/') ? 'doc' : 'in';
   const add = (t, text, clipped) => { for (const f of uploadsIn(text, clipped)) if (!seen.has(f.url)) { seen.add(f.url); items.push({ t, cat: catOf(f.url), html: attTile(f) }); } };
   for (const a of [...(w.atts || [])].reverse()) add(a.t, a.ref, false); // 최신부터 — 같은 파일은 가장 최근 시각 하나만
-  for (const r of timelineCache) {
+  for (const r of reqRows) {
     if (r.kind !== 'req' && r.kind !== 'queued' && r.kind !== 'unqueued') continue;
     add(r.t, r.text, true);
   }
@@ -2134,12 +2116,29 @@ $('#att-tab-list').addEventListener('mouseout', (e) => { if (attPeek._for && !at
 addEventListener('scroll', peekHide, true);
 document.addEventListener('pointerdown', peekHide, true);
 
-// 타임라인 정리: 사용자 요청을 한 줄로 모아 강조한다.
+// 요청 기록 정리(파일 탭이 요청 글 속 첨부를 찾는 데 쓴다): 사용자 요청을 한 줄로 모은다.
 //  · 대시보드 지시는 'assign' 과 곧이어 오는 'working: 같은 글' 두 줄로 찍힌다 → 한 줄('요청')
 //  · 터미널에서 직접 친 요청은 'working: …' 만 찍힌다 → '요청'
 //  · 감시·백그라운드 완료 알림으로 생긴 턴('working: <task-notification>…')은 요청이 아니다 → '알림'
 //  · 'queue' 는 대기열에 들어간 지시 → '대기열' · 'unqueue' 는 대기열에서 지운 지시 → '대기열에서 제거'
-function timelineRows(log, shots = [], docs = [], past = []) {
+const normText = (s) => String(s).replace(/\s+/g, ' ').trim();
+// 첨부 이미지: 보낸 글에는 파일 경로가, 터미널에는 Claude 가 바꾼 '[Image #N]' 이 찍힌다 → 양쪽 다 지우고 비교
+const IMG_RE = /\[Image #\d+\]|"[^"]*\.(?:png|jpe?g|gif|webp|bmp)"|(?:[A-Za-z]:)?[\\/]\S*\.(?:png|jpe?g|gif|webp|bmp)\b/gi;
+const stripImg = (s) => normText(String(s).replace(IMG_RE, ' '));
+// 비교는 공백을 모두 뺀 글자끼리 — Claude 는 요청을 화면 폭에 맞춰 직접 줄을 끊고(들여쓰기 2칸) 원래 줄바꿈도 그대로 찍어서,
+// 줄이 어디서 끊겼는지와 상관없이 같은 요청이면 같게 나오도록
+// 터미널은 `코드` 의 백틱을 빼고 그리고, 붙여넣기 감싸개 태그(<pasted_content …>)는 보이지 않으므로 양쪽에서 지운다
+const compact = (s) => stripImg(String(s).replace(/<\/?pasted_content[^>]*>/g, ' ')).replace(/[\s`]+/g, '');
+// 대시보드 지시 로그와 훅이 받은 프롬프트 로그가 같은 요청인지. 첨부 이미지는 한쪽이 파일 경로, 한쪽이 '[Image #N]' 이라
+// 글자 그대로는 달라서 같은 지시가 두 줄로 찍혔다 → compact 로 비교. 둘 다 서버에서 300자로 잘리는데 훅 쪽은 앞에
+// 'working: ' 이 붙어 9자 먼저 끊기므로, 긴 지시도 맞도록 짧은 쪽이 긴 쪽의 앞부분이면 같은 요청으로 본다
+function sameReq(a, b) {
+  const x = compact(a), y = compact(b);
+  if (!x || !y) return x === y; // 이미지만 보낸 지시끼리만 — 빈 글이 아무 요청에나 붙지 않게
+  return x.length <= y.length ? y.startsWith(x) : x.startsWith(y);
+}
+let reqRows = [];
+function timelineRows(log, past = []) {
   const rows = [];
   for (const l of log) {
     if (l.kind === 'assign') { rows.push({ t: l.t, kind: 'req', tag: _t('요청'), text: l.text }); continue; }
@@ -2163,16 +2162,12 @@ function timelineRows(log, shots = [], docs = [], past = []) {
     }
     rows.push({ t: l.t, kind: l.kind, text: srvText(l.text) });
   }
-  // 도구 결과 캡처: 그 시각 자리에 썸네일 줄로 끼운다 (로그와 캡처는 같은 시계 — 둘 다 이 PC 의 시각)
-  for (const s of shots || []) rows.push({ t: s.t, kind: 'shot', tag: _t('📷 캡처'), text: [s.tool, s.arg].filter(Boolean).join(' · '), shot: s });
-  // 워커가 쓴 결과물 문서: 마지막으로 쓴(고친) 시각 자리에 카드 줄로
-  for (const d of docs || []) rows.push({ t: d.t, kind: 'doc', tag: _t('📄 결과물'), text: '', doc: d });
   // 이어 붙인 세션의 지난 요청(서버가 대화 기록에서 채워 타임라인 한도와 따로 보관 — w.past): 맨 앞 것 바로 위에 머리 줄
   if (past?.length) {
     rows.push({ t: past[0].t - 1, kind: 'pastnote', text: _t('지난 세션 요청 {n}개 — 대화 기록에서 불러옴', { n: past.length }) });
     for (const p of past) rows.push({ t: p.t, kind: 'req', past: true, tag: _t('지난 요청'), text: p.text });
   }
-  if (shots?.length || docs?.length || past?.length) rows.sort((a, b) => a.t - b.t); // 안정 정렬이라 같은 시각의 로그 순서는 그대로
+  if (past?.length) rows.sort((a, b) => a.t - b.t); // 안정 정렬이라 같은 시각의 로그 순서는 그대로
   return rows;
 }
 // 카드·최소화 칩에 띄울 최근 캡처·결과물 문서 — 이번(또는 마지막) 턴에 나온 것만
@@ -2472,13 +2467,6 @@ document.addEventListener('click', (e) => {
   if (!t) return;
   e.stopPropagation(); // 카드 선택·타임라인 요청 이동으로 번지지 않게
   openVideo(t.dataset.video);
-}, true);
-// 타임라인 썸네일은 늦게 로드되며 높이가 늘어난다 → 맨 아래를 보던 중이면 바닥을 유지
-// 썸네일마다 크기를 읽으면 그때마다 배치를 다시 계산했다(이미지 수십 장 → 실측 100ms 남짓) → 한 프레임에 한 번
-trackBottom($('#log'), 160);
-$('#log').addEventListener('load', (e) => {
-  const logEl = e.currentTarget;
-  if (e.target.tagName === 'IMG' && logEl._atBottom) afterFrame('log-img', () => { if (logEl._atBottom) { logEl._settling = true; logEl.scrollTop = logEl.scrollHeight; logEl._settling = false; } });
 }, true);
 // 채팅 보기 답 속 그림 — 결과물 그림처럼 한 장 크게 보기. 못 불러오면(없는 파일 · 답에 없는 경로) 경로를 적은 줄로 바꾼다
 document.addEventListener('error', (e) => {
@@ -3114,7 +3102,7 @@ document.addEventListener('mousemove', () => {
 
 // ---------- 휴지통: 칩을 끌기 시작하면 위에 뜨고, 놓으면 제거 ----------
 // 놓는 곳이 둘이다 — '세션만 종료'(카드는 대기실로)와 '제거'(세션 종료 + 카드 지움). 세션이 이미 끝난 카드(대기실·종료된 워커)는 '제거'만 뜬다.
-// 워커 칩 '제거'는 실행 중이면 세션도 종료하고, 대기실 칩은 저장된 역할 삭제와 같다. 모두 확인을 받는다
+// 워커 칩 '제거'는 실행 중이면 세션도 종료하고, 대기실 칩은 저장된 역할 삭제와 같다. 끌어 놓으면 확인 없이 바로(터치 메뉴는 확인)
 const trashEl = $('#trash');
 const liveCard = (n) => !n.classList.contains('socket') && state.workers.some((w) => w.id === n.dataset.id && w.status !== 'exited');
 function showTrash(n) { trashEl.classList.toggle('two', liveCard(n)); trashEl.classList.add('show'); }
@@ -3125,25 +3113,25 @@ for (const bin of trashEl.querySelectorAll('.bin')) {
   bin.addEventListener('drop', (e) => {
     e.preventDefault();
     const n = dragEl || dockDrag; // 카드 또는 최소화 칩
-    if (n) bin.dataset.drop === 'end' ? endSession(n) : removeCard(n);
+    if (n) bin.dataset.drop === 'end' ? endSession(n, false) : removeCard(n, false); // 놓은 곳이 곧 고른 것 — 확인 없이 바로
   });
 }
 // 세션만 종료 — 카드는 남아 대기실로 돌아간다(저장된 역할이 있으면 ▶ 투입으로 이어받기)
-async function endSession(n) {
+async function endSession(n, confirm = true) {
   const w = state.workers.find((x) => x.id === n.dataset.id);
   if (!w || w.status === 'exited') return;
-  if (!(await ask({ title: _t('"{name}" 세션을 종료할까요?', { name: w.name }), body: _t('실행 중인 Claude 세션만 끝냅니다. 카드는 대기실에 남아 다시 투입할 수 있어요.'), ok: _t('세션 종료'), danger: true }))) return;
+  if (confirm && !(await ask({ title: _t('"{name}" 세션을 종료할까요?', { name: w.name }), body: _t('실행 중인 Claude 세션만 끝냅니다. 카드는 대기실에 남아 다시 투입할 수 있어요.'), ok: _t('세션 종료'), danger: true }))) return;
   await api(`/api/workers/${w.id}/kill`);
 }
 // 카드·칩 제거 — 휴지통에 놓거나 터치 기기의 카드 메뉴에서
-async function removeCard(n) {
+async function removeCard(n, confirm = true) {
   if (n.classList.contains('socket')) {
     // 대기실 카드 한 장이 같은 이름의 종료된 워커 기록들을 대신 보여 주고 있었다 → 역할과 함께 그 기록도 지운다(서버). 미리 알려 준다
     const name = n.dataset.profile;
     if (!name) return;
     const past = state.workers.filter((w) => w.name === name && w.status === 'exited');
     const body = _t('"{name}" 역할을 목록에서 지울까요?', { name }) + (past.length ? `\n${_t('지난 기록(종료된 워커 {n}개: {ids})도 함께 지웁니다. 대화 기록은 남아 claude --resume 으로 이어받을 수 있어요.', { n: past.length, ids: past.map((w) => w.id).join(', ') })}` : '');
-    if (!(await ask({ title: _t('저장된 역할 삭제'), body, ok: _t('삭제'), danger: true }))) return;
+    if (confirm && !(await ask({ title: _t('저장된 역할 삭제'), body, ok: _t('삭제'), danger: true }))) return;
     await api('/api/profiles/delete', { name });
     if (past.some((w) => w.id === selected)) { selected = null; render(); }
     return;
@@ -3151,7 +3139,7 @@ async function removeCard(n) {
   const w = state.workers.find((x) => x.id === n.dataset.id);
   if (!w) return;
   const running = w.status !== 'exited';
-  if (!(await ask({ title: _t('"{name}" 워커를 제거할까요?', { name: w.name }), body: _t(running ? '목록에서 지웁니다. 실행 중인 Claude 세션도 종료됩니다.' : '목록에서 지웁니다.'), ok: _t('제거'), danger: true }))) return;
+  if (confirm && !(await ask({ title: _t('"{name}" 워커를 제거할까요?', { name: w.name }), body: _t(running ? '목록에서 지웁니다. 실행 중인 Claude 세션도 종료됩니다.' : '목록에서 지웁니다.'), ok: _t('제거'), danger: true }))) return;
   await api(`/api/workers/${w.id}/remove`);
   if (selected === w.id) { selected = null; render(); }
 }
@@ -3310,7 +3298,7 @@ newForm.onsubmit = async (e) => {
 
 const taskForm = $('#task-form');
 // 업무 지시·나중에 할 작업 입력칸: 쓴 줄 수만큼 높이가 늘고 줄어든다(최소 3줄 = rows,
-// 옆 패널 높이의 30% 까지 늘고 그 뒤로는 칸 안에서 스크롤 — 두 칸이 다 늘어도 기본 높이(580px)에서 타임라인 최소 높이(120px)가 남게).
+// 옆 패널 높이의 30% 까지 늘고 그 뒤로는 칸 안에서 스크롤 — 두 칸이 다 늘어도 기본 높이(580px)에서 목록 자리가 남게).
 // 코드로 값을 바꾼 뒤에도 불러 준다
 const GROW_MAX = 0.3;
 function autoGrow(ta) {
@@ -4689,165 +4677,6 @@ powerPop.addEventListener('click', async (e) => {
 $('#btn-interrupt').onclick = () => selected && api(`/api/workers/${selected}/interrupt`, { from: chatOpen ? 'chat' : 'cli' });
 
 // 터미널 크게 보기: 브라우저 전체화면 API 는 Esc 로 빠져나가는데 Esc 는 Claude 중단 키라 겹친다 → 창 전체를 덮는 오버레이로
-// ---------- 타임라인 요청 → 터미널 해당 위치로 ----------
-// Claude Code 는 요청을 '> 요청 내용' 으로 대화에 다시 찍는다. 터미널 기록(스크롤백)에서 그 줄을 찾아 스크롤한다.
-// 같은 문구가 여러 번이면 뒤에서부터 순서를 맞춘다 — 오래된 기록이 지워져도(clear 등) 최근 요청은 맞게 찾도록.
-// 못 찾으면(기록이 지워졌거나 범위를 벗어남) 옮기지 않는다.
-let timelineCache = [];
-const normText = (s) => String(s).replace(/\s+/g, ' ').trim();
-// 첨부 이미지: 보낸 글에는 파일 경로가, 터미널에는 Claude 가 바꾼 '[Image #N]' 이 찍힌다 → 양쪽 다 지우고 비교
-const IMG_RE = /\[Image #\d+\]|"[^"]*\.(?:png|jpe?g|gif|webp|bmp)"|(?:[A-Za-z]:)?[\\/]\S*\.(?:png|jpe?g|gif|webp|bmp)\b/gi;
-const stripImg = (s) => normText(String(s).replace(IMG_RE, ' '));
-// 비교는 공백을 모두 뺀 글자끼리 — Claude 는 요청을 화면 폭에 맞춰 직접 줄을 끊고(들여쓰기 2칸) 원래 줄바꿈도 그대로 찍어서,
-// 줄이 어디서 끊겼는지와 상관없이 같은 요청이면 같게 나오도록
-// 터미널은 `코드` 의 백틱을 빼고 그리고, 붙여넣기 감싸개 태그(<pasted_content …>)는 보이지 않으므로 양쪽에서 지운다
-const compact = (s) => stripImg(String(s).replace(/<\/?pasted_content[^>]*>/g, ' ')).replace(/[\s`]+/g, '');
-// 대시보드 지시 로그와 훅이 받은 프롬프트 로그가 같은 요청인지. 첨부 이미지는 한쪽이 파일 경로, 한쪽이 '[Image #N]' 이라
-// 글자 그대로는 달라서 같은 지시가 두 줄로 찍혔다 → compact 로 비교. 둘 다 서버에서 300자로 잘리는데 훅 쪽은 앞에
-// 'working: ' 이 붙어 9자 먼저 끊기므로, 긴 지시도 맞도록 짧은 쪽이 긴 쪽의 앞부분이면 같은 요청으로 본다
-function sameReq(a, b) {
-  const x = compact(a), y = compact(b);
-  if (!x || !y) return x === y; // 이미지만 보낸 지시끼리만 — 빈 글이 아무 요청에나 붙지 않게
-  return x.length <= y.length ? y.startsWith(x) : x.startsWith(y);
-}
-const PROMPT_RE = /^\s?[>›❯]\s?/, CONT_RE = /^ {2}\S/; // 요청 첫 줄 / Claude 가 들여써 이어 찍은 줄
-// 터미널 기록을 한 번 훑어 요청 블록(줄 번호 + 앞 40글자)과 턴 요약 줄(줄 번호 + 시각)을 모은다.
-// 기록이 1만 줄이라 타임라인 줄마다 훑으면 무겁다 → 기록이 바뀐 뒤 처음 물을 때만 다시 훑는다
-const KEY_LEN = 40;
-let termScan = null;
-term.onWriteParsed(() => { termScan = null; });
-function scanTerm() {
-  if (termScan) return termScan;
-  const b = term.buffer.active, prompts = [], dones = [];
-  const row = (j) => b.getLine(j)?.translateToString(true) ?? '';
-  for (let i = 0; i < b.length; i++) {
-    const line = b.getLine(i);
-    if (!line || line.isWrapped) continue;
-    const first = row(i);
-    const dm = DONE_RE.exec(first);
-    if (dm) { dones.push({ line: i, min: doneMinutes(dm) }); continue; }
-    if (!PROMPT_RE.test(first)) continue;
-    // 요청 블록: 프롬프트 줄 + 뒤따르는 줄들 — 자동 줄바꿈(isWrapped), 들여쓴 이어지는 줄, 그 사이 빈 줄.
-    // 들여쓰지 않은 줄(● 응답 등)이 나오면 끝. KEY_LEN 만큼 모이면 더 읽지 않는다
-    let acc = compact(first.replace(PROMPT_RE, ''));
-    for (let j = i + 1; j < b.length && acc.length < KEY_LEN; j++) {
-      const l = b.getLine(j), t = row(j);
-      if (l.isWrapped || CONT_RE.test(t)) { acc += compact(t); continue; }
-      if (!t.trim() && CONT_RE.test(row(j + 1))) continue; // 요청 안의 빈 줄
-      break;
-    }
-    prompts.push({ line: i, acc });
-  }
-  return (termScan = { prompts, dones });
-}
-function findPromptLine(text, fromEnd) {
-  const key = compact(text).slice(0, KEY_LEN);
-  if (key.length < 2) return -1;
-  const hits = scanTerm().prompts.filter((p) => p.acc.startsWith(key)).map((p) => p.line);
-  return hits.length > fromEnd ? hits[hits.length - 1 - fromEnd] : -1;
-}
-// 턴 요약 줄 "✻ Brewed for 2m 2s · done 오후 4:15"(로케일에 따라 4:15 PM) 중 그 시각(분 단위) 이전의 마지막 것
-const DONE_RE = /^✻ .*\bdone\s+(오전|오후|AM|PM)?\s*(\d{1,2}):(\d{2})\s*(AM|PM)?/i;
-function doneMinutes(m) {
-  const pm = /오후|PM/i.test(m[1] || m[4] || ''), am = /오전|AM/i.test(m[1] || m[4] || '');
-  let h = Number(m[2]) % 12;
-  if (pm) h += 12; else if (!am) h = Number(m[2]);
-  return h * 60 + Number(m[3]);
-}
-// 요약 줄엔 날짜가 없어 시각만으로는 어제·오늘을 못 가른다. 예전엔 '그 시각 이전의 마지막 요약 줄'을 골라,
-// 기록에서 밀려난 어제 요청이 오늘 아침 줄로 엉뚱하게 이동했다 → 요청 직전 NEAR_MIN 분 안에 끝난 턴만 인정한다
-// (원래 목적: 앞 턴이 끝나는 바로 그 순간 투입돼 '❯ 요청' 줄이 안 남은 경우)
-const NEAR_MIN = 3;
-function findTurnEndBefore(t) {
-  const d = new Date(t), want = d.getHours() * 60 + d.getMinutes();
-  let best = -1;
-  for (const x of scanTerm().dones) if ((want - x.min + 1440) % 1440 <= NEAR_MIN) best = x.line;
-  return best;
-}
-// 타임라인의 요청 줄 중 터미널 기록에서 이미 밀려나 이동할 수 없는 것은 흐리게 — 누르기 전에 알 수 있게
-function laterSame(i) {
-  const row = timelineCache[i];
-  return timelineCache.slice(i + 1).filter((r) => r.kind === 'req' && normText(r.text) === normText(row.text)).length;
-}
-// Claude Code 가 전체 화면 모드(대체 화면)로 떠 있으면 지난 대화를 Claude 가 화면 안에서 다시 그려, 터미널엔 지금 보이는
-// 한 화면만 있다 — 위로 넘어간 요청 줄은 지워진 게 아니라 찾을 수 없을 뿐이다. 새로 띄우는 워커는 일반 모드(server.js
-// CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN)라 기록이 남는다. 그 전에 띄운 워커만 이 경우
-const termFullscreen = () => term.buffer.active.type === 'alternate';
-const FULLSCREEN_MSG = () => _t('이 워커는 전체 화면 모드로 떠 있어 지난 대화로 이동할 수 없습니다 — 워커를 새로 띄우면 됩니다');
-function markGoneReqs() {
-  if (!selected || $('#detail').hidden) return;
-  const full = termFullscreen();
-  for (const li of $('#log').querySelectorAll('li.k-req')) {
-    const i = Number(li.dataset.i), row = timelineCache[i];
-    if (!row) continue;
-    const gone = findPromptLine(row.text, laterSame(i)) < 0 && findTurnEndBefore(row.t + clockSkew) < 0;
-    li.classList.toggle('gone', gone && !full); // 전체 화면 모드는 만료가 아니라 흐리게 하지 않는다
-    li.title = !gone ? _t('클릭: 터미널에서 이 요청 위치로 이동') : full ? FULLSCREEN_MSG() : _t('만료된 요청이라 처리할 수 없습니다.');
-  }
-}
-let goneTimer = null;
-const markGoneSoon = () => { clearTimeout(goneTimer); goneTimer = setTimeout(markGoneReqs, 400); };
-term.onWriteParsed(markGoneSoon);
-// ---------- 타임라인 상단 고정 요청 ----------
-// 위로 스크롤돼 안 보이게 된 요청 줄 가운데 가장 아래(최근) 것을 타임라인 위에 붙여 보여 준다.
-// 지금 보고 있는 기록이 어떤 요청의 결과인지 알 수 있고, 누르면 그 줄을 누른 것과 같다(터미널에서 그 위치로).
-// 덮어 씌우는 방식이라 목록 레이아웃·스크롤 위치는 바뀌지 않는다
-const pinEl = $('#tl-pin');
-let pinFor = null;
-function updatePin() {
-  const logEl = $('#log');
-  const top = logEl.getBoundingClientRect().top;
-  let hit = null;
-  for (const li of logEl.querySelectorAll('li.k-req')) {
-    if (li.getBoundingClientRect().bottom <= top + 2) hit = li; else break;
-  }
-  if (!hit) { pinEl.hidden = true; pinFor = null; return; }
-  // offsetTop 은 정수로 반올림돼 소수 위치일 때 위로 1px 남짓 틈이 생겨 뒤가 비쳤다 → 실제 위치에서 2px 더 올린다
-  // (숨겨진 동안엔 offsetParent 가 null 이라 부모 .timeline 을 직접 기준으로)
-  const lr = logEl.getBoundingClientRect(), tr = pinEl.parentElement.getBoundingClientRect();
-  pinEl.style.top = `${lr.top - tr.top - 2}px`;
-  // 오른쪽은 목록의 스크롤바 앞에서 멈춘다(스크롤바를 가리지 않게) — clientWidth 는 스크롤바를 뺀 폭
-  pinEl.style.right = `${tr.right - (lr.left + logEl.clientLeft + logEl.clientWidth)}px`;
-  if (pinFor !== hit || pinEl.hidden) {
-    pinFor = hit;
-    const row = timelineCache[Number(hit.dataset.i)];
-    pinEl.innerHTML = `<time>${esc(hit.querySelector('time')?.textContent || '')}</time><span class="tag">${_t('요청')}</span><span class="tx">${esc(row?.text || '')}</span>`;
-  }
-  pinEl.classList.toggle('gone', hit.classList.contains('gone'));
-  pinEl.hidden = false;
-}
-$('#log').addEventListener('scroll', updatePin, { passive: true });
-new ResizeObserver(() => updatePin()).observe($('#log'));
-// 누르면 타임라인도 그 요청 줄이 맨 위에 오게 스크롤하고, 터미널은 그 요청 위치로
-pinEl.addEventListener('click', () => {
-  const li = pinFor;
-  if (!li?.isConnected) return;
-  const logEl = $('#log');
-  logEl.scrollTo({ top: logEl.scrollTop + li.getBoundingClientRect().top - logEl.getBoundingClientRect().top, behavior: 'smooth' });
-  li.click();
-});
-
-$('#log').addEventListener('click', (e) => {
-  const li = e.target.closest('li.k-req');
-  if (!li) return;
-  const i = Number(li.dataset.i), row = timelineCache[i];
-  if (!row) return;
-  // 이 요청 뒤에 같은 문구 요청이 몇 번 더 있었나 = 터미널에서 끝에서 몇 번째인가
-  let line = findPromptLine(row.text, laterSame(i));
-  if (line < 0) {
-    // 앞 턴이 끝나는 바로 그 순간 투입된 요청은 Claude 가 '❯ 요청' 줄을 남기지 않는 경우가 있다 →
-    // 그 시각 직전에 끝난 턴의 요약 줄(✻ … · done 오후 4:15)로 대신 이동
-    line = findTurnEndBefore(row.t + clockSkew);
-    if (line < 0) { toast(termFullscreen() ? FULLSCREEN_MSG() : _t('만료된 요청이라 처리할 수 없습니다.'), termFullscreen() ? 5000 : 3200); return; }
-    toast(_t('요청 줄이 터미널에 남지 않아 그 무렵(직전 턴 종료) 위치로 이동했습니다'), 2800);
-  }
-  // 요청 줄이 터미널 맨 위에 오게 — 이미 보이고 있어도 옮긴다. 끝에 가까워 맨 위로 못 올리면 맨 아래까지만(xterm 이 baseY 로 자른다)
-  term.scrollToLine(Math.min(line, term.buffer.active.baseY));
-  term.selectLines(line, line); // 잠깐 강조
-  clearTimeout(findPromptLine.t);
-  findPromptLine.t = setTimeout(() => term.clearSelection(), 1600);
-});
-
 // ---------- 세션 프로파일 접기/펼치기 (브라우저에 기억) ----------
 const PROFILE_KEY = 'am.profileCollapsed';
 function setProfileCollapsed(on) {
@@ -4913,14 +4742,12 @@ function setSideExtra(px) {
   // 변수는 #detail 에 둔다 — 옆 패널(덮개 폭)과 크게 보기 터미널 제목줄(닫기 버튼이 덮개 가장자리를 따라감)이 함께 쓴다
   const host = $('#detail');
   if (extra > 0) host.style.setProperty('--side-extra', `${extra}px`); else host.style.removeProperty('--side-extra');
-  requestAnimationFrame(() => updatePin());
   return extra;
 }
 // 접기/펼치기 — 클래스는 #detail 에 둔다(평소 화면은 격자 칸 폭, 크게 보기는 터미널 오른쪽 끝이 함께 바뀐다)
 function setSideMin(on) {
   $('#detail').classList.toggle('side-min', on);
   if (on) setSideExtra(0);
-  requestAnimationFrame(() => updatePin());
 }
 const saveSide = (mode) => {
   try {
@@ -4971,9 +4798,8 @@ const resetSide = () => { const m = sideMode(); sideMin[m] = false; setSideMin(f
 sideGrip.addEventListener('dblclick', resetSide);
 $('#side-expand').addEventListener('click', resetSide);
 
-// ---------- 옆 패널 영역 높이 조절 (업무 지시 · 나중에 할 작업 · 타임라인 사이 가로선 끌기) ----------
-// 끈 영역(가로선 위쪽)에 높이를 주고, 남는 자리는 타임라인이 갖는다. 영역마다 브라우저에 기억 · 더블클릭: 기본(내용 크기)
-const SIDE_LOG_MIN = 80; // 타임라인이 최소한 남길 높이
+// ---------- 옆 패널 영역 높이 조절 (업무 지시 · Backlog 사이 가로선 끌기) ----------
+// 끈 영역(가로선 위쪽)에 높이를 주고, 남는 자리는 Backlog 가 갖는다. 브라우저에 기억 · 더블클릭: 기본(내용 크기)
 function setSecH(sec, h) {
   if (h == null) { sec.classList.remove('sized'); sec.style.removeProperty('--sec-h'); return; }
   sec.classList.add('sized');
@@ -4997,7 +4823,7 @@ for (const handle of document.querySelectorAll('.side-resizer')) {
     e.preventDefault();
     handle.setPointerCapture(e.pointerId);
     const startY = e.clientY, startH = sec.getBoundingClientRect().height;
-    const minH = secMinH(sec), maxH = Math.max(startH, startH + $('.timeline').getBoundingClientRect().height - SIDE_LOG_MIN);
+    const rest = $('#sec-memo'), minH = secMinH(sec), maxH = Math.max(startH, startH + (rest.classList.contains('collapsed') ? 0 : rest.getBoundingClientRect().height - secMinH(rest)));
     handle.classList.add('dragging'); document.body.classList.add('resizing-term');
     const move = (ev) => setSecH(sec, Math.max(minH, Math.min(maxH, startH + (ev.clientY - startY))));
     const up = () => {
@@ -5012,7 +4838,7 @@ for (const handle of document.querySelectorAll('.side-resizer')) {
   handle.addEventListener('dblclick', () => { setSecH(sec, null); try { localStorage.removeItem(key); } catch {} });
 }
 
-// ---------- 옆 패널 영역 접기 (업무 지시 · 나중에 할 작업 · 타임라인 제목줄 클릭) ----------
+// ---------- 옆 패널 영역 접기 (업무 지시 · Backlog 제목줄 클릭) ----------
 // 영역마다 브라우저에 기억. 접은 영역 아래 가로선(높이 조절)은 쓸 일이 없어 숨긴다
 const SEC_FOLD_KEY = (id) => `am.secFold.${id}`;
 function setSecCount(id, text) {
@@ -5024,7 +4850,7 @@ function setSecFolded(sec, on, save = true) {
   sec.classList.toggle('collapsed', on);
   sec.querySelector('.sec-toggle').setAttribute('aria-expanded', String(!on));
   for (const r of document.querySelectorAll('.side-resizer')) {
-    r.classList.toggle('off', $('#' + r.dataset.sec).classList.contains('collapsed') || $('#sec-log').classList.contains('collapsed'));
+    r.classList.toggle('off', $('#' + r.dataset.sec).classList.contains('collapsed') || $('#sec-memo').classList.contains('collapsed'));
   }
   if (save) try { on ? localStorage.setItem(SEC_FOLD_KEY(sec.id), '1') : localStorage.removeItem(SEC_FOLD_KEY(sec.id)); } catch {}
   const w = state?.workers?.find((x) => x.id === selected);
@@ -5258,6 +5084,20 @@ function chatShots(tools) {
   }) : []).join('');
   return html && `<div class="cv-shots">${html}</div>`;
 }
+// 워커가 만든 결과물(w.docs — Write 로 만든 문서 · 명령으로 생긴 파일 · 답에 적힌 새 파일)을 마지막으로 쓴(고친) 시각 자리에 카드로 끼운다.
+// 결과물은 시각(t)만 있으므로 그 시각 자리(그 뒤 첫 대화 항목 바로 앞) — 없으면 맨 끝. 불러온 대화보다 오래된 것은 뺀다
+function chatWithDocs(items) {
+  const docs = (state.workers.find((w) => w.id === chatData.wid)?.docs || []).filter((d) => items.length && d.t >= items[0].ts).sort((a, b) => a.t - b.t);
+  if (!docs.length) return items;
+  const out = [];
+  let di = 0;
+  for (const x of items) {
+    if (di < docs.length && docs[di].t < x.ts) { const list = []; while (di < docs.length && docs[di].t < x.ts) list.push(docs[di++]); out.push({ k: 'd', list }); }
+    out.push(x);
+  }
+  if (di < docs.length) out.push({ k: 'd', list: docs.slice(di) });
+  return out;
+}
 // 이어지는 도구는 칩 한 줄로, 이어지는 답 글은 이름표 하나 아래로 묶는다
 // limit: 끝에서 그만큼의 묶음만 그린다(renderChat 의 chatWin) — 앞이 잘렸으면 맨 위에 '이전 대화' 줄
 function chatBlocks(items, limit = Infinity) {
@@ -5266,6 +5106,7 @@ function chatBlocks(items, limit = Infinity) {
     const last = out.at(-1);
     if (x.k === 't') { if (last?.k === 't') last.list.push(x); else out.push({ k: 't', list: [x] }); }
     else if (x.k === 'a') { if (last?.k === 'a') last.list.push(x); else out.push({ k: 'a', list: [x] }); }
+    else if (x.k === 'd') out.push(x);
     else out.push({ k: x.k, x });
   }
   const cut = Math.max(0, out.length - limit);
@@ -5277,6 +5118,7 @@ function chatBlocks(items, limit = Infinity) {
       const more = open ? '' : `<button type="button" class="cv-chip cv-more" data-unfold="${id}">+${b.list.length - CHIP_FOLD}</button>`;
       return `<div class="cv-ev cv-t"><span class="cv-dot"></span><div class="cv-body"><div class="cv-chips">${shown.map(chatChip).join('')}${more}</div>${chatShots(b.list)}</div></div>`;
     }
+    if (b.k === 'd') return `<div class="cv-ev cv-d"><span class="cv-dot"></span><div class="cv-body"><div class="cv-lab"><b>${_t('📄 결과물')}</b>${chatTime(b.list.at(-1).t)}</div><div class="cv-docs">${b.list.map(docCard).join('')}</div></div></div>`;
     if (b.k === 'a') return `<div class="cv-ev cv-a"><span class="cv-dot"></span><div class="cv-body"><div class="cv-lab"><b>${_t('클로드')}</b>${chatTime(b.list[0].ts)}</div>${b.list.map((x) => `<div class="cv-ai" data-seq="${x.seq}">${chatItemHtml(x)}</div>`).join('')}</div></div>`;
     return chatItemHtml(b.x);
   }).join('');
@@ -5334,7 +5176,7 @@ function renderChat() {
       ? `<span class="cv-wait-acts" data-local="${x.at}"><button type="button" class="cv-wq" data-wq="back" title="${_t('입력칸으로 되돌리기')}" aria-label="${_t('입력칸으로 되돌리기')}">${UNDO_SVG}</button><button type="button" class="cv-wq" data-wq="drop" title="${_t('지우기')}" aria-label="${_t('지우기')}">${X_SVG}</button></span>`
       : '';
   if (list._wid !== w.id) chatWin = CHAT_WIN; // 워커를 바꾸면 다시 최근 것만
-  const html = (items.length || waiting.length ? chatBlocks(items, chatWin) : `<div class="cv-empty">${_t(chatLoading ? '불러오는 중…' : '아직 대화가 없어요')}</div>`)
+  const html = (items.length || waiting.length ? chatBlocks(chatWithDocs(items), chatWin) : `<div class="cv-empty">${_t(chatLoading ? '불러오는 중…' : '아직 대화가 없어요')}</div>`)
     + (waiting.length ? `<div class="cv-wait-sep"><span>${_t('대기 중 · 클로드가 아직 읽지 않음')} ${waiting.length}</span></div>` : '')
     + waiting.map((x) => `<div class="cv-ev cv-u cv-pending"${x.qi >= 0 ? '' : ` title="${_t('이미 CLI 입력에 넣은 글이라 뺄 수 없어요')}"`}><div class="cv-lab">${waitActs(x)}<b>${_t('나')}</b>${esc(x.label)}</div><div class="cv-msg">${esc(x.text)}${chatAtt({ text: x.text })}</div></div>`).join('')
     + chatTail(w, items, waiting.length);
@@ -5386,7 +5228,7 @@ function chatShowOlder() {
   renderChat();
 }
 trackBottom($('#cv-list'), 60);
-// 답 속 그림이 늦게 불러와져도 맨 아래를 보던 중이면 맨 아래로(#log 와 같은 방식)
+// 답 속 그림이 늦게 불러와져도 맨 아래를 보던 중이면 맨 아래로
 $('#cv-list').addEventListener('load', (e) => {
   const l = e.currentTarget;
   if (e.target.tagName === 'IMG' && l._atBottom) afterFrame('cv-img', () => { if (l._atBottom) { l._settling = true; l.scrollTop = l.scrollHeight; l._settling = false; } });
@@ -5394,7 +5236,7 @@ $('#cv-list').addEventListener('load', (e) => {
 $('#cv-list').addEventListener('scroll', (e) => { if (!e.currentTarget._settling && e.currentTarget.scrollTop < 80) chatShowOlder(); }, { passive: true });
 $('#cv-list').addEventListener('click', (e) => { if (e.target.closest('[data-older]')) chatShowOlder(); });
 // ---------- 채팅 상단 고정 요청 ----------
-// 위로 스크롤돼 가려진 내 요청(.cv-u — 대기 중 말풍선 제외) 가운데 가장 아래(최근) 것을 목록 맨 위에 덮어 보여 준다(타임라인 updatePin 과 같은 생각).
+// 위로 스크롤돼 가려진 내 요청(.cv-u — 대기 중 말풍선 제외) 가운데 가장 아래(최근) 것을 목록 맨 위에 덮어 보여 준다.
 // 지금 보는 답이 어떤 요청에 대한 것인지 알 수 있고, 누르면 그 요청이 목록 맨 위에 오게 스크롤하고 잠깐 강조한다
 const cvPin = $('#cv-pin');
 let cvPinFor = null, cvPinRaf = 0;
