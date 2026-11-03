@@ -174,7 +174,7 @@
     box.querySelectorAll('[data-k]').forEach((x) => { x.textContent = T(x.dataset.k); });
     $('.gr-x', box).setAttribute('aria-label', T('닫기'));
     form.text.placeholder = T('정해 둔 시각에 이 역할의 워커에 보낼 지시');
-    $('.sc-foot', box).textContent = T('이 PC 시각 기준 · 클로드 키우기가 켜져 있을 때만 돌아요 · 작업 중이면 대기열로 · 5시간 한도 90% 이상이면 건너뜀 · CLI 입력창이 막혀 있으면 1분마다 다시(10번)');
+    $('.sc-foot', box).textContent = T('이 PC 시각 기준 · 클로드 키우기가 켜져 있을 때만 돌아요 · 작업 중이면 턴이 끝난 뒤 · 5시간 한도 90% 이상이면 건너뜀 · CLI 입력창이 막혀 있으면 1분마다 다시(10번)');
   }
 
   window.openSchedules = (preset) => {
@@ -196,8 +196,8 @@
 
   // ---------- 상세 패널: 이 역할의 예약 ----------
   const mini = el(`<div class="sc-mini"><div class="sc-mini-list"></div></div>`);
-  // Tasks 제목 위 — directives.js 가 나중에 헤더 칩 줄을 맨 앞에 끼우므로 순서는 헤더 칩 · 예약 · 제목 · 입력창
-  document.querySelector('#sec-task .side-h')?.before(mini);
+  // Backlog 제목 위
+  document.querySelector('#sec-memo .sec-toggle')?.before(mini);
   mini.addEventListener('click', (e) => { if (e.target.closest('.sc-mini-item')) window.openSchedules({ role: state.workers.find((x) => x.id === selected)?.name }); });
 
   window.renderSchedules = () => {

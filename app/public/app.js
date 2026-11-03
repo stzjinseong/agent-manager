@@ -1450,7 +1450,6 @@ function updateNode(node, w) {
     (window.roleLevelChip?.(w.name) || '') + // 역할 레벨 (growth.js) — 누르면 성장 기록
     `<span title="${_t(running ? '이번 턴 경과' : '마지막 갱신')}">⏱ <em data-since="${running ? w.turnStartedAt : w.updatedAt}"></em></span>` +
     `<span title="${_t('도구 사용 횟수')}">⚙ ${w.toolCount}</span>` +
-    (w.queue.length ? `<span class="q" title="${_t(w.dispatchAt ? '곧 다음 지시 투입' : '대기 중인 지시')}">${w.dispatchAt ? '⏳' : ''}📥 ${w.queue.length}</span>` : '') +
     (w.profile?.turnCount ? `<span title="${_t('추정 비용 (API 환산)')}">$ ${fmtUsd(w.profile.total.cost).slice(1)}</span>` : '');
   // 이번(또는 마지막) 턴에 나온 최근 캡처를 무대 왼쪽 아래에 작게. 주소가 같으면 다시 그리지 않는다(깜빡임 방지)
   const { shot: showShot, doc: showDoc } = recentMedia(w);
@@ -1976,31 +1975,18 @@ function renderHint() {
   box.innerHTML = kind === 'create'
     ? `<div class="hint-art create"><span class="hint-slot"><span class="avatar">${clawdSVG()}</span></span><span class="hint-plus">+</span></div>
        <h2>${_t('워커를 생성해보세요!')}</h2>
-       <p>${state.profiles.length ? _t('대기실 카드의 <b>▶ 투입</b>이나 ') : ''}${_t('<b>+ 워커 추가</b>로 첫 Claude 를 투입하면 여기서 터미널·채팅·Tasks 를 볼 수 있어요.')}</p>
+       <p>${state.profiles.length ? _t('대기실 카드의 <b>▶ 투입</b>이나 ') : ''}${_t('<b>+ 워커 추가</b>로 첫 Claude 를 투입하면 여기서 터미널·채팅·Backlog 를 볼 수 있어요.')}</p>
        <button class="btn primary" data-hint="new">${_t('+ 워커 추가')}</button>`
     : `<div class="hint-art click"><span class="avatar">${clawdSVG()}</span><span class="hint-ring"></span>${CURSOR_SVG}</div>
        <h2>${_t('워커를 클릭해보세요!')}</h2>
-       <p>${_t(min ? '위의 워커 칩을 누르면 여기에 그 워커의 터미널·채팅·Tasks 가 열려요.' : '위의 워커 카드를 누르면 여기에 그 워커의 터미널·채팅·Tasks 가 열려요.')}</p>`;
+       <p>${_t(min ? '위의 워커 칩을 누르면 여기에 그 워커의 터미널·채팅·Backlog 가 열려요.' : '위의 워커 카드를 누르면 여기에 그 워커의 터미널·채팅·Backlog 가 열려요.')}</p>`;
 }
 $('#hint').addEventListener('click', (e) => { if (e.target.closest('[data-hint="new"]')) toggleNewPanel(); });
 
 // ---------- 상세 ----------
-// 대기열 머리줄 — 투입 대기 남은 초·자동 투입 꺼짐
-// 대기열 ↩ 되돌리기·✕ 빼기 아이콘 — 메모 카드의 수정·보내기와 같은 버튼 모양(.memo-ic)
+// ↩ 되돌리기·✕ 빼기 아이콘(채팅 대기 줄 · Backlog) — 메모 카드의 수정·보내기와 같은 버튼 모양(.memo-ic)
 const UNDO_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>';
 const X_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
-const QH_SEND = () => ` <button data-resume title="${_t('맨 위 지시를 지금 투입')}">${_t('▶ 1번 보내기')}</button>`;
-function queueHead(w) {
-  const n = w.queue.length, idle = !['working', 'decision'].includes(w.status);
-  if (w.dispatchAt) return `<div class="qh held soon" title="${_t('보내지 않으려면 위의 자동 투입 체크를 해제하세요')}">${_t('{s}초 뒤 1번 투입 · 대기 {n}건', { n, s: `<span class="cd" data-at="${w.dispatchAt}"></span>` })}</div>`;
-  if (state.manualQueue?.[w.name]) return `<div class="qh held" title="${_t('자동 투입이 꺼져 있어 ▶ 를 눌러야 한 건씩 투입됩니다')}">${_t('자동 투입 꺼짐 · 대기 {n}건', { n })}${idle ? QH_SEND() : ''}</div>`;
-  return `<div class="qh held calm" title="${_t('현재 턴이 끝나면 위에서부터 투입')}">${_t('대기 중인 지시 {n}건', { n })}</div>`;
-}
-// 투입 대기 남은 초 — 상태가 안 바뀌어도 매초 줄어들게(새로 그린 직후에도 비지 않게 renderDetail 끝에서도 부른다)
-function tickQueueCountdown() {
-  for (const c of document.querySelectorAll('#queue .cd')) c.textContent = Math.max(0, Math.ceil((Number(c.dataset.at) + clockSkew - Date.now()) / 1000));
-}
-setInterval(tickQueueCountdown, 250);
 function renderDetail() {
   const w = state.workers.find((x) => x.id === selected);
   const wasHidden = $('#detail').hidden;
@@ -2024,13 +2010,6 @@ function renderDetail() {
   if (meta._html !== metaHtml) meta.innerHTML = meta._html = metaHtml;
   meta.title = w.cwd || ''; // 경로는 줄에서 빼고(브랜치까지만) 마우스를 올리면 보이게
   renderMemos(w);
-  $('#auto-queue').checked = !state.manualQueue?.[w.name];
-  const queueEl = $('#queue');
-  const queueHtml = w.queue.length ? queueHead(w) +
-      w.queue.map((q, i) => `<div class="qi"><span class="n">${i + 1}</span><span class="tx"><span class="qt">${esc(q)}</span>${attachChips(q, 'sm')}</span><button class="btn mini ghost memo-ic" data-tomemo="${i}" title="${_t('Backlog 로 되돌리기')}" aria-label="${_t('Backlog 로 되돌리기')}">${UNDO_SVG}</button><button class="btn mini ghost memo-ic" data-unqueue="${i}" title="${_t('큐에서 빼기')}" aria-label="${_t('큐에서 빼기')}">${X_SVG}</button></div>`).join('')
-    : '';
-  // 상태가 올 때마다 통째로 바꾸면 썸네일이 다시 로드되고 누르는 중인 타일이 사라진다 → 바뀐 때만
-  if (queueEl._html !== queueHtml) { queueEl.innerHTML = queueEl._html = queueHtml; tickQueueCountdown(); }
   reqRows = timelineRows(w.log, w.past); // 파일 탭이 요청 글 속 첨부를 읽는다
   renderAttTab(w);
   // 워커를 바꾼 직후엔 프로파일(차트 · 턴 표 · 숫자 애니메이션, 실측 30~60ms)을 첫 화면이 그려진 뒤로 미룬다 — 채팅이 먼저 보이게
@@ -2040,7 +2019,6 @@ function renderDetail() {
   syncChat(w);
   // 접은 영역 제목줄에 건수를 보여 준다 (펼쳐 있으면 안에 보이므로 비움)
   const memoN = (state.memos?.[w.name] || []).length;
-  setSecCount('sec-task', w.queue.length ? _t('대기 {n}', { n: w.queue.length }) : '');
   setSecCount('sec-memo', memoN ? _t('{n}건', { n: memoN }) : '');
 }
 
@@ -2924,7 +2902,7 @@ function select(id) {
     send(attachMsg(id));
     // 터치 기기: 입력칸에 바로 포커스를 주면 화면 키보드가 터미널을 가린다 — 대신 열린 상세 화면으로 내려 준다(카드 아래에 있어 안 보인다)
     if (TOUCH) $('#detail').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    else if (!document.querySelector('input.rename')) $('#task-form').text.focus();
+    else if (!document.querySelector('input.rename') && chatOpen) chatForm.text.focus();
   });
 }
 
@@ -3296,13 +3274,12 @@ newForm.onsubmit = async (e) => {
   select(id);
 };
 
-const taskForm = $('#task-form');
-// 업무 지시·나중에 할 작업 입력칸: 쓴 줄 수만큼 높이가 늘고 줄어든다(최소 3줄 = rows,
+// Backlog 입력칸: 쓴 줄 수만큼 높이가 늘고 줄어든다(최소 3줄 = rows,
 // 옆 패널 높이의 30% 까지 늘고 그 뒤로는 칸 안에서 스크롤 — 두 칸이 다 늘어도 기본 높이(580px)에서 목록 자리가 남게).
 // 코드로 값을 바꾼 뒤에도 불러 준다
 const GROW_MAX = 0.3;
 function autoGrow(ta) {
-  if (!ta.matches('.task-form textarea, .memo-form textarea')) return;
+  if (!ta.matches('.memo-form textarea')) return;
   ta.style.height = 'auto';
   const sideH = $('.side').clientHeight || innerHeight;
   const max = Math.max(ta.offsetHeight, Math.round(Math.min(sideH, innerHeight) * GROW_MAX));
@@ -3311,7 +3288,7 @@ function autoGrow(ta) {
   ta.style.overflowY = h > max ? 'auto' : 'hidden';
   syncAttach(ta);
 }
-for (const ta of document.querySelectorAll('.task-form textarea, .memo-form textarea')) ta.addEventListener('input', () => autoGrow(ta));
+for (const ta of document.querySelectorAll('.memo-form textarea')) ta.addEventListener('input', () => autoGrow(ta));
 // 업무 지시 칸: 파일 드롭·붙여넣기 → 커서 위치에 경로 삽입
 function insertAtCursor(ta, text) {
   const s = ta.selectionStart ?? ta.value.length, e = ta.selectionEnd ?? s;
@@ -3332,34 +3309,7 @@ function acceptFiles(ta) {
     attachFiles(files, (p) => insertAtCursor(ta, p));
   });
 }
-acceptFiles(taskForm.text);
 acceptFiles($('#memo-form').text);
-taskForm.onsubmit = async (e) => {
-  e.preventDefault();
-  const text = taskForm.text.value.trim();
-  if (!text || !selected) return;
-  const to = selected, ta = taskForm.text;
-  // 서버가 CLI 입력창을 읽어 보는 동안(server.js cliDraft) 글을 비워 두면 플레이스홀더가 비쳤다가 실패 시 글이 되돌아온다 —
-  // 답이 올 때까지 글을 그대로 두고 잠가 두었다가, 보냈으면 비운다
-  if (ta.readOnly) return;
-  ta.readOnly = true;
-  const r = await api(`/api/workers/${to}/task`, { text });
-  ta.readOnly = false;
-  // 쉬는 워커의 CLI 입력창에 쓰던 글이 있거나 입력창이 아닌 화면(선택창·! 셸 모드)이면 서버가 보내지 않는다(대기열에도 안 넣음 — server.js assignTask).
-  // 흔들림 = 전송 실패: 글은 입력 칸에 남겨 두고 알린다
-  if (r?.rejected) {
-    toast(r.rejected === 'starting' ? _t('전송 실패 — 워커가 아직 시작 중입니다. 준비되면 다시 보내세요') : r.rejected === 'blocked'
-      ? _t('전송 실패 — CLI 가 입력 대기 화면이 아닙니다(선택창, ! 셸 모드 등). 입력창으로 돌아온 뒤 다시 보내세요')
-      : _t('전송 실패 — CLI 입력창에 쓰던 글이 있습니다. 그 글을 보내거나 지운 뒤 다시 보내세요') + (r.seen ? ` · ${_t('감지한 글')}: "${r.seen}"` : ''), r.seen ? 8000 : 4500);
-    shake(ta);
-    return;
-  }
-  if (r?.error) return;
-  ta.value = '';
-  autoGrow(ta);
-  ta.focus();
-  flyToWorker(to, ta, 'task');
-};
 function shake(node) {
   node.classList.remove('shake');
   void node.offsetWidth; // 연달아 막혀도 매번 다시 흔들리게
@@ -3368,10 +3318,9 @@ function shake(node) {
 }
 // 입력 칸 공통 키(키 세트는 아래 '전송·개행 키 세트'): 업무 지시·메모가 같은 함수를 써서 키 동작이 어긋나지 않게 한다
 const submitOnEnter = (form) => onEnterKey(form.text, () => form.requestSubmit());
-submitOnEnter(taskForm);
 // ---------- 메모 (역할별, 자동 실행 안 됨) ----------
 let memoSig = '';
-// 메모 카드의 수정(연필)·Tasks 로 보내기(종이비행기) 아이콘 — 같은 모양의 버튼(.memo-ic)
+// 메모 카드의 수정(연필)·바로 보내기(종이비행기) 아이콘 — 같은 모양의 버튼(.memo-ic)
 const MEMO_EDIT_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"/></svg>';
 const MEMO_SEND_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3 10 14M21 3l-7 18-4-7-7-4 18-7z"/></svg>';
 // 수정 중: 저장(체크)·취소(엑스) — 같은 모양의 아이콘 버튼
@@ -3386,7 +3335,7 @@ function renderMemos(w) {
   const fmt = (t) => fmtDate(t + clockSkew, DATE_MD_HM);
   $('#memos').innerHTML = list.length
     ? `<li class="mh">${_t('{n}건', { n: list.length })}</li>` + list.map((m) => `<li data-id="${m.id}" draggable="true" title="${_t('워커 카드에 끌어다 놓으면 그 워커의 Backlog 로 옮겨집니다')}"><span class="mt">${esc(m.text)}</span>${attachChips(m.text, 'sm')}
-        <span class="ma"><time>${fmt(m.createdAt)}</time><button class="btn mini ghost memo-ic" data-memo="edit" title="${_t('내용 수정')}" aria-label="${_t('내용 수정')}">${MEMO_EDIT_SVG}</button><button class="btn mini ghost memo-ic" data-memo="send" title="${_t('Tasks 로 보내기 (작업 중이면 대기열)')}" aria-label="${_t('Tasks 로 보내기')}">${MEMO_SEND_SVG}</button><button class="btn mini ghost memo-ic" data-memo="remove" title="${_t('삭제')}" aria-label="${_t('삭제')}">${X_SVG}</button></span></li>`).join('')
+        <span class="ma"><time>${fmt(m.createdAt)}</time><button class="btn mini ghost memo-ic" data-memo="edit" title="${_t('내용 수정')}" aria-label="${_t('내용 수정')}">${MEMO_EDIT_SVG}</button><button class="btn mini ghost memo-ic" data-memo="send" title="${_t('바로 보내기 (작업 중이면 작업 사이에 전달)')}" aria-label="${_t('Tasks 로 보내기')}">${MEMO_SEND_SVG}</button><button class="btn mini ghost memo-ic" data-memo="remove" title="${_t('삭제')}" aria-label="${_t('삭제')}">${X_SVG}</button></span></li>`).join('')
     : ''; // 비어 있으면 아무것도 두지 않는다 — 업무 지시처럼 입력칸에서 섹션이 끝나 타임라인과의 간격이 같다
 }
 // 수정: 본문 자리에 입력칸을 띄운다. 키 세트의 전송 키로 저장 · Esc 취소 — 추가 칸과 같은 키
@@ -3659,22 +3608,6 @@ dockList.addEventListener('dragleave', (e) => {
   if (c && !c.contains(e.relatedTarget)) c.classList.remove('dropping');
 });
 
-$('#queue').addEventListener('click', (e) => {
-  if (e.target.closest('[data-resume]') && selected) { api(`/api/workers/${selected}/resume`, {}); return; }
-  // ✕ 빼기 · ↩ 나중에 할 작업으로 — 번호와 함께 글도 보내, 그사이 CLI 로 나간 지시면 서버가 거절한다(두 번 실행 방지)
-  const b = e.target.closest('[data-unqueue], [data-tomemo]');
-  const w = b && selected && state.workers.find((x) => x.id === selected);
-  if (!w) return;
-  const op = b.dataset.tomemo != null ? 'tomemo' : 'unqueue', i = Number(b.dataset.tomemo ?? b.dataset.unqueue);
-  b.disabled = true;
-  fetch(`/api/workers/${w.id}/${op}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ index: i, text: w.queue[i] }) })
-    .then((r) => { if (r.status === 409) toast(_t('이미 CLI 로 보낸 지시라 옮기지 못했어요')); else if (op === 'tomemo' && r.ok) toast(_t('Backlog 로 옮겼어요')); })
-    .catch(() => { b.disabled = false; });
-});
-
-// 역할별 대기열 자동 투입 켜기/끄기 (server.js config.manualQueue)
-$('#auto-queue').addEventListener('change', (e) => { if (selected) api(`/api/workers/${selected}/autoqueue`, { on: e.target.checked }); });
-
 // ---------- 다크/라이트 테마 ----------
 // 고른 테마는 브라우저에 기억한다(첫 그리기 전 적용은 index.html 머리의 짧은 스크립트). 터미널은 두 테마 모두 어둡다
 // 좌우 스위치: 왼쪽 다크(🌙) · 오른쪽 라이트(☀), 기본 다크. 손잡이가 물방울처럼 — 움찔했다가 길게 늘어나 미끄러지고,
@@ -3722,7 +3655,6 @@ function applyKeyHints() {
   const k = KEY_SETS.find((x) => x.id === keySet);
   const hint = (verb) => `${_t(verb)} : ${k.send}\n${_t('개행')} : ${k.newline}\n${_t('*CLI에서도 동일하게 작동')}`;
   // 터치 기기는 화면 키보드에 Alt·⌘ 가 없다 — 입력칸 오른쪽 아래 버튼으로 보낸다(Enter 는 줄바꿈)
-  taskForm.text.placeholder = TOUCH ? _t('지시를 적고 ↑ 를 누르면 보냅니다') : hint('전송');
   $('#memo-form').text.placeholder = TOUCH ? _t('적고 + 를 누르면 추가됩니다') : hint('추가');
   $('#cv-keys').textContent = TOUCH ? _t('↑ 를 누르면 보냅니다') : `${_t('전송')} ${k.send} · ${_t('개행')} ${k.newline}`;
 }
@@ -4080,8 +4012,9 @@ themeModal.addEventListener('click', async (e) => {
     try { await navigator.clipboard.writeText(themePrompt()); toast(_t('요청문을 복사했어요 — 워커 입력칸에 붙여넣으세요')); }
     catch { tgFail(_t('복사하지 못했어요')); }
   } else if (a === 'send') {
-    const ta = taskForm?.text;
+    const ta = chatForm?.text;
     if (!selected || !ta || $('#detail').hidden) return tgFail(_t('먼저 워커 카드를 눌러 열어 주세요'));
+    if (!chatOpen) setChatOpen(true);
     ta.value = ta.value.trim() ? `${ta.value.trimEnd()}\n${themePrompt()}` : themePrompt();
     ta.dispatchEvent(new Event('input'));
     themeModal.hidden = true;
@@ -5173,7 +5106,7 @@ function renderChat() {
   };
   const pendRows = pend.map((x) => ({ ...x, label: _t(x.label), ...qOf(x.norm, x.mode === 'now' ? ['now', 'q'] : ['q', 'now']) }));
   const rest = (src, label) => lists[src].map((t, i) => ({ text: t, norm: chatNorm(t), src, qi: i, label: label(i) })).filter((q) => !claimed[src].has(q.qi));
-  const waiting = [...pendRows, ...rest('now', () => _t('작업 사이에 전달')), ...rest('q', (i) => _t('대기열 {n}번', { n: i + 1 }))];
+  const waiting = [...pendRows, ...rest('now', () => _t('작업 사이에 전달')), ...rest('q', () => _t('턴이 끝나면 전달'))];
   const waitActs = (x) => x.qi >= 0
     ? `<span class="cv-wait-acts" data-src="${x.src}" data-qi="${x.qi}"><button type="button" class="cv-wq" data-wq="tomemo" title="${_t('Backlog 로 옮기기')}" aria-label="${_t('Backlog 로 옮기기')}">${UNDO_SVG}</button><button type="button" class="cv-wq" data-wq="unqueue" title="${_t('삭제')}" aria-label="${_t('삭제')}">${X_SVG}</button></span>`
     // 서버에 없는 흐린 말풍선인데 클로드가 쉬고 있으면(멈춤 · 전달 실패 등으로 남은 것) 지우기 · 입력칸으로 되돌리기 — 화면에만 있는 것이라 서버엔 묻지 않는다
@@ -5488,8 +5421,8 @@ function chatGrow() {
 chatForm.text.addEventListener('input', chatGrow);
 acceptFiles(chatForm.text);
 onEnterKey(chatForm.text, () => chatForm.requestSubmit());
-// 보내기 세 갈래(입력칸 오른쪽 버튼): 바로 전송(작업 중이어도 지금 CLI 에) · Tasks(업무 지시와 같음 — 쉬면 바로, 작업 중이면 대기열) ·
-// Backlog(나중에 할 작업 — 자동 실행 안 됨). 입력칸 Enter 는 바로 전송. 입력칸에서 Tab 이면 세 버튼을 차례로(마지막 다음은 첫 버튼), Shift+Tab 은 반대 방향, 입력칸으로는 /
+// 보내기 두 갈래(입력칸 오른쪽 버튼): 바로 전송(작업 중이어도 지금 CLI 에) · Backlog(나중에 할 작업 — 자동 실행 안 됨, ▶ 로 바로 전송).
+// 입력칸 Enter 는 바로 전송. 입력칸에서 Tab 이면 두 버튼을 차례로(마지막 다음은 첫 버튼), Shift+Tab 은 반대 방향, 입력칸으로는 /
 async function chatSend(mode) {
   const ta = chatForm.text, text = ta.value.trim();
   const w = state.workers.find((x) => x.id === selected);
@@ -5501,7 +5434,7 @@ async function chatSend(mode) {
     flyToWorker(w.id, ta, 'memo');
   } else {
     ta.readOnly = true;
-    const r = await api(`/api/workers/${w.id}/task`, mode === 'now' ? { text, mode: 'now' } : { text });
+    const r = await api(`/api/workers/${w.id}/task`, { text, mode: 'now' });
     ta.readOnly = false;
     if (r?.rejected) {
       toast(r.rejected === 'starting' ? _t('전송 실패 — 워커가 아직 시작 중입니다. 준비되면 다시 보내세요') : r.rejected === 'blocked'
@@ -5515,7 +5448,7 @@ async function chatSend(mode) {
     const busy = viewStatus(w) === 'working';
     // 슬래시 명령(/model 등)은 대화 기록에 내 글로 남지 않을 때가 많아 흐린 말풍선이 지워지지 않았다 — 작업 중이면 서버 대기(nowQ ·
     // 대기열) 줄로 보이고, 쉬고 있으면 곧장 CLI 에서 실행되므로 말풍선을 따로 만들지 않는다
-    if (chatPendable(text)) chatPending.push({ wid: w.id, text, mode, norm: chatNorm(text), at: Date.now(), label: mode === 'now' ? (busy ? '작업 사이에 전달' : '보내는 중…') : busy ? '대기열' : '보내는 중…' });
+    if (chatPendable(text)) chatPending.push({ wid: w.id, text, mode, norm: chatNorm(text), at: Date.now(), label: busy ? '작업 사이에 전달' : '보내는 중…' });
     $('#cv-list')._html = ''; renderChat();
     const l = $('#cv-list'); l.scrollTop = l.scrollHeight;
   }
@@ -5525,7 +5458,7 @@ async function chatSend(mode) {
   ta.focus();
 }
 chatForm.onsubmit = (e) => { e.preventDefault(); chatSend('now'); };
-// 대기 중인 글 빼기 · Backlog 로 — Tasks 칸의 ✕ · ↩ 와 같은 API(번호 + 글, 그사이 CLI 로 나갔으면 409)
+// 대기 중인 글 빼기 · Backlog 로 — 번호 + 글을 보내 그사이 CLI 로 나갔으면 서버가 거절(409)
 $('#cv-list').addEventListener('click', async (e) => {
   const b = e.target.closest('[data-wq]');
   const w = b && state.workers.find((x) => x.id === selected);
@@ -5574,7 +5507,7 @@ chatForm.text.addEventListener('keydown', (e) => {
 $('#cv-acts').addEventListener('keydown', (e) => {
   if (e.key !== 'Tab') return;
   e.preventDefault();
-  // 세 버튼 안에서 돈다 — Tab 은 다음(마지막에서 첫 버튼으로), Shift+Tab 은 반대로. 입력칸으로는 / 로 돌아간다
+  // 두 버튼 안에서 돈다 — Tab 은 다음(마지막에서 첫 버튼으로), Shift+Tab 은 반대로. 입력칸으로는 / 로 돌아간다
   const bs = [...$('#cv-acts').querySelectorAll('[data-send]')], i = bs.indexOf(document.activeElement);
   bs[(i + (e.shiftKey ? bs.length - 1 : 1)) % bs.length].focus();
 });
@@ -6032,7 +5965,7 @@ async function memoMenu(li) {
   const lis = [...$('#memos').querySelectorAll('li[data-id]')], i = lis.indexOf(li);
   const others = cardOrder().filter((n) => n !== w.name); // 끌어 놓기처럼 대기실 역할에도 옮길 수 있다
   const key = await sheet($('.mt', li)?.textContent.slice(0, 80) || '', [
-    { key: 'send', label: _t('Tasks 로 보내기') },
+    { key: 'send', label: _t('바로 보내기') },
     { key: 'edit', label: _t('내용 수정') },
     { key: 'up', label: _t('↑ 위로'), disabled: i <= 0 },
     { key: 'down', label: _t('↓ 아래로'), disabled: i >= lis.length - 1 },

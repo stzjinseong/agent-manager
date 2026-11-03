@@ -1037,7 +1037,7 @@ body.term-full::before {
 
 /* ---------- 파일 첨부 ---------- */
 /* 채팅 · 파일 탭 썸네일을 끄는 동안 놓을 수 있는 곳(터미널 · 업무 지시 · 나중에 할 작업 입력칸)을 흐린 점선으로 미리 보여 준다 */
-body.thumb-drag :is(#term-wrap, .task-form textarea, .memo-form textarea):not(.dropping) { outline: 1px dashed color-mix(in srgb, var(--accent) 55%, transparent); outline-offset: -4px; }
+body.thumb-drag :is(#term-wrap, .memo-form textarea):not(.dropping) { outline: 1px dashed color-mix(in srgb, var(--accent) 55%, transparent); outline-offset: -4px; }
 #cv-list :is(.cv-shot, .tl-doc, .att-img, .att-file, .att-vid), #att-tab-list :is(.att-img, .att-file, .att-vid, .tl-doc) { -webkit-user-drag: element; }
 .dropping { outline: 2px dashed var(--accent) !important; outline-offset: -4px; background-color: color-mix(in srgb, var(--accent) 8%, transparent) !important; }
 .toast {

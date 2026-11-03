@@ -686,7 +686,7 @@ setInterval(async () => {
 // ▶ 재개를 기다렸는데, 멈추는 일이 잦아 모두 뺐다. 턴이 끝나면(중단 포함) 늘 이어서 투입한다
 const DISPATCH_GRACE_MS = 3000;
 const dispatchTimers = new Map(); // 워커 id → setTimeout (draftTimers 와 같은 이유로 워커 밖에 둔다)
-const manualQueue = (w) => Boolean(config.manualQueue?.[w.name]);
+const manualQueue = () => false; // Tasks(대기열 직접 쓰기 · 자동 투입 끄기)를 없앴다 — 남은 대기열(턴 사이에 못 넣은 바로 전송 글 · 예약 실행)은 늘 이어서 투입
 function afterTurn(w) {
   if (!w.queue.length) return;
   scheduleDispatch(w);
@@ -1528,6 +1528,12 @@ function onHostHello({ ptys }) {
     if (rec.txPath) w.tx = openProfile(rec.txPath, w.status === 'exited' && Boolean(rec.liteCache));
     // 완료 시각 기록(doneAt) 이전에 끝난 워커도 '확인 안 한 완료'로 보이게 마지막 갱신 시각으로 채운다
     if (w.status === 'done' && !w.doneAt) w.doneAt = w.updatedAt || Date.now();
+    // Tasks 를 없애며 한 번만: 예전 대기열에 쌓여 있던 지시는 그 역할의 Backlog 로 옮긴다(이제 대기열을 보고 고를 칸이 없다)
+    if (!config.queueToMemo && w.queue?.length) {
+      (config.memos[w.name] ||= []).push(...w.queue.map((text, i) => ({ id: `m${Date.now().toString(36)}${i}${Math.random().toString(36).slice(2, 5)}`, text, createdAt: Date.now() })));
+      pushLog(w, 'status', `Tasks 대기열 ${w.queue.length}건을 Backlog 로 옮김`);
+      w.queue = [];
+    }
     w.nowQ ||= []; // 작업 중이 아니면 들고 있던 바로 전송 글을 넣을 틈(PostToolUse)이 다시 오지 않는다 → 대기열 맨 앞으로
     if (w.nowQ.length && w.status !== 'working') w.queue.unshift(...w.nowQ.splice(0));
     if (w.docs) w.docs = w.docs.filter((d) => isDocCandidate(d.path)); // 규칙이 바뀌기 전에 잡힌 이 앱 자체 파일 등을 정리
@@ -1536,6 +1542,7 @@ function onHostHello({ ptys }) {
     if (w.tx) scheduleProfile(w);
     if (resumeDispatch && w.status !== 'exited') scheduleDispatch(w);
   }
+  if (!config.queueToMemo) { config.queueToMemo = true; saveConfig(); }
   for (const id of [...workers.keys(), ...alive.keys()]) seq = Math.max(seq, Number(String(id).replace(/\D/g, '')) || 0);
   const before = JSON.stringify(config.sessions);
   for (const w of [...workers.values()].sort((a, b) => (a.updatedAt || 0) - (b.updatedAt || 0))) noteWorkerSession(w, false);
@@ -2214,7 +2221,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   // 기판 칩 순서 — 역할 이름 기준이라 서버를 다시 켜도, 대기실 슬롯↔워커 전환에도 자리가 유지된다
-  // 메모: 역할별로 적어 두는 할 일 목록. 자동 실행되지 않고, ▶ 지시를 누른 항목만 업무 지시(즉시 또는 대기열)로 넘어간다
+  // 메모(Backlog): 역할별로 적어 두는 할 일 목록. 자동 실행되지 않고, ▶ 를 누른 항목만 채팅 '바로 전송'과 같게 보낸다(작업 중이면 작업 사이에 끼워 넣음)
   if (req.method === 'POST' && p === '/api/memos') {
     const body = await readBody(req);
     const { role, op, text, id, workerId, to } = body;
@@ -2232,7 +2239,7 @@ const server = http.createServer(async (req, res) => {
       const m = list.find((x) => x.id === id), w = workers.get(workerId);
       if (!m || !w) return json(res, 404, { error: '메모나 워커가 없습니다' });
       if (w.status === 'exited') return json(res, 409, { error: '종료된 워커에는 지시할 수 없습니다' });
-      const r = await assignTask(w, m.text);
+      const r = await sendNow(w, m.text);
       // CLI 에 쓰던 글이 있는 등 보내지 못했으면 메모를 그대로 둔다
       if (r.rejected) return json(res, 409, { error: r.rejected === 'starting' ? '워커가 아직 시작 중이라 보내지 못했습니다' : r.rejected === 'blocked' ? 'CLI 가 입력 대기 화면이 아니어서 보내지 못했습니다' : 'CLI 입력창에 쓰던 글이 있어 보내지 못했습니다' + (r.seen ? ` [감지: "${r.seen}"]` : '') });
       config.memos[role] = list.filter((x) => x.id !== id);

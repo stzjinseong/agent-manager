@@ -201,7 +201,7 @@
             <div class="cv-list" id="cv-list"></div>
             <div class="cv-pin" id="cv-pin" hidden title="클릭: 이 요청으로 이동" data-i18n-attr="title"></div>
             <div class="cv-ask" id="cv-ask" hidden></div>
-            <form class="cv-comp" id="chat-form"><div class="cv-slash" id="cv-slash" role="listbox" hidden></div><div class="cv-box"><textarea name="text" rows="1" placeholder="메시지 보내기" data-i18n-attr="placeholder"></textarea><span class="cv-kbd-hint" aria-hidden="true"><kbd>/</kbd><span data-i18n>눌러 메시지 보내기</span></span><span class="cv-acts" id="cv-acts"><button type="button" class="cv-act cv-main" data-send="now" title="바로 전송 — 작업 중이어도 대기열을 건너뛰고 지금 CLI 에 넣음 (입력칸 Enter)" data-i18n-attr="title" data-i18n>바로 전송</button><button type="button" class="cv-act" data-send="task" title="Tasks — 쉬고 있으면 바로, 작업 중이면 대기열에" data-i18n-attr="title">Tasks</button><button type="button" class="cv-act" data-send="memo" title="Backlog — 자동 실행 안 됨 · ▶ 로 나중에 투입" data-i18n-attr="title">Backlog</button></span></div>
+            <form class="cv-comp" id="chat-form"><div class="cv-slash" id="cv-slash" role="listbox" hidden></div><div class="cv-box"><textarea name="text" rows="1" placeholder="메시지 보내기" data-i18n-attr="placeholder"></textarea><span class="cv-kbd-hint" aria-hidden="true"><kbd>/</kbd><span data-i18n>눌러 메시지 보내기</span></span><span class="cv-acts" id="cv-acts"><button type="button" class="cv-act cv-main" data-send="now" title="바로 전송 — 작업 중이어도 지금 CLI 에 넣음 (입력칸 Enter)" data-i18n-attr="title" data-i18n>바로 전송</button><button type="button" class="cv-act" data-send="memo" title="Backlog — 자동 실행 안 됨 · ▶ 를 누르면 바로 전송" data-i18n-attr="title">Backlog</button></span></div>
               <div class="cv-hint"><span id="cv-keys"></span><span data-i18n>Esc 중단</span><span data-i18n>/ 명령도 그대로 보냄</span></div></form>
             <div class="cv-peek" id="cv-peek" hidden><span class="cv-peek-dot"></span><b data-i18n>CLI 가 입력을 기다려요</b><span class="cv-peek-help" data-i18n>아래 터미널에서 고르세요 — 방향키 · Enter · Esc</span><button type="button" data-peek="1" data-i18n>접기</button></div>
           </div>
@@ -233,19 +233,8 @@
       <aside class="side">
         <div class="side-grip" id="side-grip" title="왼쪽으로 끌어 넓히기(터미널 위를 덮음) · 오른쪽 끝까지 끌면 접기 · 더블클릭: 기본 폭" data-i18n-attr="title"><i></i></div>
         <button type="button" class="side-expand" id="side-expand" title="옆 패널 펼치기" data-i18n-attr="title,aria-label" aria-label="옆 패널 펼치기">‹</button>
-        <div class="side-sec" id="sec-task">
-          <h3 class="side-h sec-toggle" role="button" tabindex="0" aria-expanded="true" title="클릭해서 접기/펼치기" data-i18n-attr="title"><span class="chev">▾</span><span data-i18n>Tasks</span> <small data-i18n>바로 투입 · 작업 중이면 대기열에 쌓임</small><span class="sec-count"></span></h3>
-          <form id="task-form" class="task-form">
-            <textarea name="text" rows="3"></textarea>
-            <!-- 터치 기기에서만 보이는 전송 버튼 — 화면 키보드엔 Alt·⌘ 가 없다 -->
-            <button type="submit" class="form-send" title="보내기" aria-label="보내기" data-i18n-attr="title,aria-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5.5 11.5 12 5l6.5 6.5"/></svg></button>
-          </form>
-          <label class="auto-q" title="끄면 턴이 끝나도 대기열을 보내지 않습니다 — ▶ 를 눌러 한 건씩 투입. 켜 두면 보내기 전 3초 기다립니다" data-i18n-attr="title"><input type="checkbox" id="auto-queue" checked> <span data-i18n>턴이 끝나면 대기열 자동 투입</span></label>
-          <div class="queue" id="queue"></div>
-        </div>
-        <div class="side-resizer" data-sec="sec-task" title="위아래로 끌어 높이 조절 · 더블클릭: 기본 높이" data-i18n-attr="title"><i></i></div>
         <div class="memo side-sec" id="sec-memo">
-          <h3 class="sec-toggle" role="button" tabindex="0" aria-expanded="true" title="클릭해서 접기/펼치기" data-i18n-attr="title"><span class="chev">▾</span><span data-i18n>Backlog</span> <small data-i18n>자동 실행 안 됨 · ▶ 지시를 눌러야 투입</small><span class="sec-count"></span></h3>
+          <h3 class="sec-toggle" role="button" tabindex="0" aria-expanded="true" title="클릭해서 접기/펼치기" data-i18n-attr="title"><span class="chev">▾</span><span data-i18n>Backlog</span> <small data-i18n>자동 실행 안 됨 · ▶ 를 누르면 바로 전송</small><span class="sec-count"></span></h3>
           <form id="memo-form" class="memo-form">
             <textarea name="text" rows="3"></textarea>
             <button type="submit" class="form-send" title="추가" aria-label="추가" data-i18n-attr="title,aria-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
