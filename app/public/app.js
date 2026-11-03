@@ -5754,8 +5754,12 @@ function btwSkeleton(box) {
 function btwPlace(box) {
   let p = null;
   try { p = JSON.parse(localStorage.getItem(BTW_POS_KEY) || 'null'); } catch {}
-  if (!p) { box.style.left = box.style.top = ''; box.style.right = ''; return; }
-  const cv = $('#chat-view'), maxX = Math.max(0, cv.clientWidth - box.offsetWidth - 4), maxY = Math.max(0, cv.clientHeight - 60);
+  const cv = $('#chat-view');
+  // 끌어 늘린 크기(이 브라우저에 기억) — 채팅 화면보다 크면 줄인다
+  if (p?.w) box.style.width = `${Math.min(p.w, cv.clientWidth - 8)}px`;
+  if (p?.h) box.style.height = `${Math.min(p.h, cv.clientHeight - 20)}px`;
+  if (!p || p.x == null) { box.style.left = box.style.top = ''; box.style.right = ''; return; }
+  const maxX = Math.max(0, cv.clientWidth - box.offsetWidth - 4), maxY = Math.max(0, cv.clientHeight - 60);
   box.style.right = 'auto';
   box.style.left = `${Math.min(Math.max(4, p.x), maxX)}px`;
   box.style.top = `${Math.min(Math.max(4, p.y), maxY)}px`;
@@ -5775,8 +5779,13 @@ function renderBtw() {
   box.hidden = !btwLog.items.length;
   if (box.hidden) return;
   if (!box.dataset.built) btwSkeleton(box);
+  // 질문은 오른쪽 말풍선, 답은 메인 채팅의 클로드 답처럼 — 캐릭터 + 'Claude · 시각' + 마크다운(화면에서 읽은 글이라 줄이 터미널 폭에서 끊겨 있는데,
+  // 마크다운이 문단 안 줄바꿈을 이어 붙여 준다). 기다리는 동안은 캐릭터가 통통 튀는 '생각 중'
   $('.btw-list', box).innerHTML = btwLog.items.map((x) => `<div class="btw-q">${esc(x.q)}</div>`
-    + (x.text ? `<div class="btw-a">${esc(x.text)}</div>` : `<div class="btw-wait">${esc(_t(x.open ? '답 받는 중…' : 'CLI 에서 답 창이 닫혔어요'))}</div>`)).join('');
+    + `<div class="btw-a${x.text ? '' : ' btw-think'}"><span class="btw-ico"></span><div class="btw-ab"><div class="btw-lab"><b>Claude</b>${chatTime(x.at)}</div>`
+    + (x.text ? chatMd(x.text) : x.open ? `<div class="btw-wait"><span class="cv-typing"><i></i><i></i><i></i></span> ${esc(_t('생각 중'))}</div>` : `<div class="btw-wait">${esc(_t('CLI 에서 답 창이 닫혔어요'))}</div>`)
+    + '</div></div>').join('');
+  for (const a of box.querySelectorAll('.cv-md a[href]')) { a.target = '_blank'; a.rel = 'noopener'; }
   const list = $('.btw-list', box);
   list.scrollTop = list.scrollHeight;
 }
@@ -5833,12 +5842,23 @@ $('#cv-btw').addEventListener('pointerdown', (e) => {
   const up = () => {
     h.removeEventListener('pointermove', move); h.removeEventListener('pointerup', up); h.removeEventListener('pointercancel', up);
     box.classList.remove('dragging');
-    try { localStorage.setItem(BTW_POS_KEY, JSON.stringify({ x: parseFloat(box.style.left) || 0, y: parseFloat(box.style.top) || 0 })); } catch {}
+    btwSave({ x: parseFloat(box.style.left) || 0, y: parseFloat(box.style.top) || 0 });
   };
   h.addEventListener('pointermove', move); h.addEventListener('pointerup', up); h.addEventListener('pointercancel', up);
   e.preventDefault();
 });
 new ResizeObserver(() => { const box = $('#cv-btw'); if (!box.hidden && box.dataset.built) btwPlace(box); }).observe($('#chat-view'));
+function btwSave(part) {
+  let p = {};
+  try { p = JSON.parse(localStorage.getItem(BTW_POS_KEY) || '{}') || {}; } catch {}
+  try { localStorage.setItem(BTW_POS_KEY, JSON.stringify({ ...p, ...part })); } catch {}
+}
+// 모서리로 늘리면 브라우저가 width/height 를 인라인으로 넣는다 — 그때만(내용이 늘어 커진 건 빼고) 크기를 기억
+new ResizeObserver(() => {
+  const box = $('#cv-btw');
+  if (box.hidden || !box.dataset.built || !box.style.height || box.classList.contains('dragging')) return;
+  btwSave({ w: Math.round(box.offsetWidth), h: Math.round(box.offsetHeight) });
+}).observe($('#cv-btw'));
 
 // ---------- 입력 기록 (입력칸에서 ↑) ----------
 // 커서가 첫 줄에 있을 때 ↑ 를 누르면 지난번에 보낸 글을 목록으로 — ↑↓ 로 고르고 Enter · Tab 이면 입력칸에 그대로 넣고 닫는다.
