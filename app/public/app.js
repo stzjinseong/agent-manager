@@ -4791,8 +4791,19 @@ function setSideExtra(px) {
   // 변수는 #detail 에 둔다 — 옆 패널(덮개 폭)과 크게 보기 터미널 제목줄(닫기 버튼이 덮개 가장자리를 따라감)이 함께 쓴다
   const host = $('#detail');
   if (extra > 0) host.style.setProperty('--side-extra', `${extra}px`); else host.style.removeProperty('--side-extra');
+  coverCut();
   return extra;
 }
+// 넓힌 옆 패널은 판을 깔지 않는다 — 깔면 넓히기 전(뒤 바탕이 그대로 보이던 칸)과 색이 달라졌다(특히 글래스). 대신 패널 밑으로
+// 들어간 터미널 부분을 mask 로 잘라 내 뒤 바탕이 그대로 보이게 한다. 크게 보기는 옆 패널이 따로 칠해져(style.css) 자르지 않는다
+function coverCut() {
+  const wrap = $('#term-wrap');
+  const on = sideEl.classList.contains('cover') && !document.body.classList.contains('term-full');
+  const cut = on ? Math.max(0, Math.round(wrap.getBoundingClientRect().right - sideEl.getBoundingClientRect().left)) : 0;
+  wrap.classList.toggle('cover-cut', cut > 0);
+  if (cut > 0) wrap.style.setProperty('--cover-cut', `${cut}px`); else wrap.style.removeProperty('--cover-cut');
+}
+new ResizeObserver(() => coverCut()).observe($('#term-wrap'));
 // 접기/펼치기 — 클래스는 #detail 에 둔다(평소 화면은 격자 칸 폭, 크게 보기는 터미널 오른쪽 끝이 함께 바뀐다)
 function setSideMin(on) {
   $('#detail').classList.toggle('side-min', on);
@@ -4920,6 +4931,7 @@ function setTermFull(on) {
   const first = wrap.getBoundingClientRect();
   wrap.classList.toggle('full', on);
   document.body.classList.toggle('term-full', on);
+  coverCut();
   scheduleSelLink();
   // 아이콘만 — 크게(바깥으로 벌린 모서리) ↔ 원래대로(안으로 모은 모서리). 설명은 툴팁
   const fb = $('#btn-full'), tip = _t(on ? '원래 크기로' : '터미널 크게 보기 (다시 누르거나 ✕ 로 복귀)');
@@ -4930,12 +4942,14 @@ function setTermFull(on) {
   // 터미널 글자는 상자가 늘어나는 동안 찌그러져 보여 숨겨 둔다. 예전엔 상자가 다 커진 뒤에야 글자 크기를 맞추고(다시 그리기) 페이드해
   // 옆 패널보다 한참 늦게 보였다 → 새 크기는 클래스를 바꾼 순간 이미 정해지므로(transform 은 배치에 영향 없음) 글자 크기는 바로 맞추고,
   // 상자가 거의 다 커졌을 때(감속 곡선이라 60% 시점이면 크기 차이가 몇 %) 글자를 드러낸다
-  const reveal = () => { clearTimeout(revealTimer); inner.style.opacity = ''; inner.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 110, easing: 'ease-out' }); };
+  // 채팅 보기면 터미널은 채팅에 덮여(글래스는 CSS 로 opacity 0) 안 보인다 — 드러내기 애니메이션(0→1)이 그 감춤을 덮어써 연출 중 CLI 가 비쳤다 → 건드리지 않는다
+  const veil = !chatOpen;
+  const reveal = () => { clearTimeout(revealTimer); inner.style.opacity = ''; if (veil) inner.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 110, easing: 'ease-out' }); };
   const done = () => { placeMeters(); if (!diffOpen) term.focus(); };
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) { requestAnimationFrame(() => { fitTerm(); done(); }); return; }
   const last = wrap.getBoundingClientRect();
   termAnim?.cancel();
-  inner.style.opacity = '0';
+  if (veil) inner.style.opacity = '0';
   termAnim = wrap.animate([
     { transformOrigin: '0 0', transform: `translate(${first.left - last.left}px, ${first.top - last.top}px) scale(${first.width / last.width}, ${first.height / last.height})` },
     { transformOrigin: '0 0', transform: 'none' },
@@ -5737,6 +5751,9 @@ function histPaint() {
   const fmt = (t) => fmtDate(t, DATE_MD_HM);
   histBox.innerHTML = histMenu.items.map((x, k) => `<button type="button" class="cv-sl cv-hi${k === histMenu.i ? ' on' : ''}" data-k="${k}" role="option"><span>${esc(x.t.replace(/\s+/g, ' ').slice(0, 300))}</span><small>${x.w && x.w !== selected ? `${esc(x.w)} · ` : ''}${fmt(x.at)}</small></button>`).join('');
   histBox.hidden = false;
+  // 기록 목록은 / 명령 목록(260px)의 3배까지 — 채팅 화면이 그보다 낮으면 입력칸 위 남은 높이까지(채팅 화면 밖은 잘린다)
+  const cv = histBox.closest('.chat-view'), room = cv ? histBox.getBoundingClientRect().bottom - cv.getBoundingClientRect().top - 8 : 780;
+  histBox.style.maxHeight = `${Math.max(160, Math.min(780, room))}px`;
   histBox.querySelector('.on')?.scrollIntoView({ block: 'nearest' });
 }
 function histOpen() {

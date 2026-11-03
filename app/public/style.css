@@ -559,9 +559,11 @@ body.card-drag .node-add { opacity: .25; transition: opacity .2s; }
 /* 옆 패널 넓히기: 격자 칸(360px)은 그대로 두고 패널만 왼쪽으로 늘려 터미널 위를 덮는다 — 터미널 크기가 안 바뀌니
    워커 터미널(pty) 크기도 그대로다(줄 수가 바뀌면 입력창이 두 벌 남는 문제를 피함). --side-extra = 늘린 폭.
    덮는 동안은 불투명 배경 + 왼쪽 그림자, 왼쪽 안쪽 여백만큼 더 당겨 내용 위치가 튀지 않게 */
-.side.cover {
-  margin-left: calc(-1 * var(--side-extra, 0px) - 14px); padding-left: 14px; z-index: 6;
-  background: var(--surface); box-shadow: -14px 0 24px -12px rgb(0 0 0 / calc(.7 * var(--shade))); border-left: 1px solid var(--line-2);
+.side.cover { margin-left: calc(-1 * var(--side-extra, 0px) - 14px); padding-left: 14px; z-index: 6; }
+/* 덮는 동안 판을 깔지 않는다 — 패널 밑 터미널을 잘라 내(app.js coverCut) 넓히기 전과 같은 바탕이 보이게 */
+.term-wrap.cover-cut {
+  -webkit-mask-image: linear-gradient(to left, transparent var(--cover-cut), #000 var(--cover-cut));
+  mask-image: linear-gradient(to left, transparent var(--cover-cut), #000 var(--cover-cut));
 }
 .side-grip { position: absolute; left: -12px; top: 0; bottom: 0; width: 10px; cursor: col-resize; touch-action: none; z-index: 7; display: grid; place-items: center; }
 .side.cover .side-grip { left: -6px; }
@@ -2718,7 +2720,7 @@ button.cv-more:hover { color: var(--text); }
 .cv-box .att-live:empty { display: none; }
 /* 보내기 세 갈래 — 기본(바로 전송, 입력칸 Enter)만 코랄로 채우고 나머지는 옅게. Tab 으로 옮겨 다니므로 포커스 링을 또렷하게 */
 .cv-acts { flex: none; display: inline-flex; gap: 4px; }
-.cv-box:not(.cv-tall) > .cv-acts { align-self: center; } /* 한 줄일 땐 입력칸 가운데에 — 아래 맞춤(flex-end)이라 버튼(28px)이 입력칸(29.6px)보다 낮아 1.6px 내려앉아 보였다 */
+.cv-box:not(.cv-tall) > .cv-acts { align-self: flex-start; margin-top: .8px; } /* 위에 붙인다 — 여러 줄로 커져도 버튼은 첫 줄 옆. 한 줄일 땐 입력칸(29.6px)과 버튼(28px) 차의 절반만큼 내려 가운데 */
 .cv-act { all: unset; cursor: pointer; height: 28px; padding: 0 10px; border-radius: 8px; display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; white-space: nowrap; color: var(--text-2); background: var(--surface-3); }
 .cv-act:hover { color: var(--text); background: var(--btn-hover); }
 .cv-act.cv-main { background: var(--accent); color: #1a0f0a; }
