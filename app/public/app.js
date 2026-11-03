@@ -3035,7 +3035,7 @@ function renderUsage() {
   const m = (key, label, pct, color, tip, dim = false, after = '') => {
     meterTips[key] = tip;
     // 위: 이름 · 숫자(항목 색) · 남은 시간 / 아래: 10칸 픽셀 블록(10% 단위, 반올림)
-    const n = pct == null ? 0 : Math.round(pct), cells = Array.from({ length: 10 }, (_, i) => `<i${i < Math.round(n / 10) ? ' class="on"' : ''}></i>`).join('');
+    const n = pct == null ? 0 : Math.round(pct), cells = Array.from({ length: 10 }, (_, i) => `<i${i < Math.round(n / 10) ? ' class="on"' : ''} style="--k:${i}"></i>`).join('');
     return `<span class="mt${dim ? ' dim' : ''}" data-mt="${key}" style="--p:${pct ?? 0}%;--uc:${color}"><span class="mt-top"><span class="mt-l">${_t(label)}</span><b class="mt-pc">${pct == null ? '—' : `${n}%`}</b>${after}</span><span class="mt-bar">${cells}</span></span>`;
   };
   // 초기화까지 남은 시간은 큰 단위 하나로 짧게(32분 · 4시간 · 6일) — 정확한 시각은 마우스를 올리면
@@ -3092,8 +3092,15 @@ function renderUsage() {
   };
   parts.push(limit('h5', '5시간', u?.fiveHour, 'var(--m-5h)'), limit('wk', '주간', u?.sevenDay, 'var(--m-wk)'));
   const html = parts.join('');
+  // 캐시 타이머(⏱ 분:초)는 매초 바뀐다 — 그것만 바뀌었으면 그 칸만 고친다. 통째로 다시 그리면 막대 칸의 물결 애니메이션이 매초 처음부터 다시 시작했다
+  const cacheRe = /<span class="mt-r mt-cache[^>]*>[^<]*<\/span>/, key = html.replace(cacheRe, ''), cacheHtml = html.match(cacheRe)?.[0];
   let changed = false;
-  for (const box of boxes) if (box._html !== html) { box.innerHTML = box._html = html; changed = true; }
+  for (const box of boxes) {
+    if (box._html === html) continue;
+    const old = box._key === key && cacheHtml && box.querySelector('.mt-cache');
+    if (old) old.outerHTML = cacheHtml; else { box.innerHTML = html; changed = true; }
+    box._html = html; box._key = key;
+  }
   if (changed) requestAnimationFrame(placeMeters); // 미터 폭이 바뀌었으면 양보 단계를 다시 고른다
   if (mtPt) showMeterTip();
 }

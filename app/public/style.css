@@ -506,6 +506,10 @@ body.card-drag .node-add { opacity: .25; transition: opacity .2s; }
 .mt-bar { height: 5px; display: grid; grid-template-columns: repeat(10, 1fr); gap: 1.5px; }
 .mt-bar i { border-radius: 1px; background: color-mix(in srgb, var(--uc) 16%, rgb(var(--ink) / .08)); transition: background .3s; }
 .mt-bar i.on { background: var(--uc); box-shadow: 0 0 4px color-mix(in srgb, var(--uc) 60%, transparent); }
+/* 물결: 채운 칸이 왼쪽부터 차례로 살짝 밝아지며 튀어 오른다(1.8초 주기 · 칸마다 90ms 늦게). 움직임 줄이기면 멈춤 */
+.mt-bar i.on { animation: mt-wave 1.8s ease-in-out infinite; animation-delay: calc(var(--k) * 90ms); }
+@keyframes mt-wave { 0%, 60%, 100% { filter: none; transform: none; } 25% { filter: brightness(1.55); transform: scaleY(1.35); } }
+@media (prefers-reduced-motion: reduce) { .mt-bar i.on { animation: none; } }
 /* 항목별 고정 색(사용률에 따라 바꾸지 않는다): 컨텍스트 파랑 · 5시간 주황빛 노랑 · 주간 빨강 */
 :root { --m-ctx: #8cb8ff; --m-5h: #f4b34a; --m-wk: #ff9a8f; }
 :root[data-theme="light"] { --m-ctx: #2a6fd6; --m-5h: #c98500; --m-wk: #d6453b; }
