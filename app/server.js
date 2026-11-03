@@ -658,11 +658,38 @@ function btwPanel(rows, q) {
     if ((key && rows[i].includes(key)) || /\/btw\b/.test(rows[i])) { top = i; break; }
     if (/^\s*─{20,}/.test(rows[i])) { top = i; break; }
   }
+  // 질문이 길면 질문 줄이 여러 줄로 꺾인다 — 질문 뒤 첫 빈 줄(4줄 안)까지는 질문으로 보고 건너뛴다
+  if (top >= 0) for (let i = top + 1; i < Math.min(foot, top + 5); i++) if (!rows[i].trim()) { top = i; break; }
   const body = rows.slice(top + 1, foot).map((l) => l.replace(/\s+$/, ''));
   while (body.length && !body[0].trim()) body.shift();
   while (body.length && !body.at(-1).trim()) body.pop();
   const pad = Math.min(99, ...body.filter((l) => l.trim()).map((l) => l.match(/^ */)[0].length)); // 창 안쪽 들여쓰기 걷기
-  return body.map((l) => l.slice(Math.min(pad, l.match(/^ */)[0].length))).join('\n');
+  return unwrapLines(body.map((l) => l.slice(Math.min(pad, l.match(/^ */)[0].length)))).join('\n');
+}
+// 화면 글은 CLI 폭에서 꺾여 있다 — 폭 끝까지 찬 줄만 다음 줄과 잇고(문단 · 목록 항목 이어짐), 원래 줄바꿈(짧은 줄 뒤 · 새 항목 '- ' · '1.' · 'a.' ·
+// 제목 · 빈 줄)은 그대로 둔다. 채팅에선 이 줄 구조 그대로 보여 준다(마크다운으로 그렸더니 'a.' 'b.' 처럼 목록 문법이 아닌 항목이 윗줄에 붙었다).
+// 폭은 화면 칸(한글 · 전각 2칸)으로 세고, 이 답에서 가장 긴 줄 - 14칸 이상이면 꽉 찬 것으로 본다
+const cellWidth = (s) => {
+  let n = 0;
+  for (const ch of s) {
+    const c = ch.codePointAt(0);
+    n += (c >= 0x1100 && c <= 0x115f) || (c >= 0x2e80 && c <= 0xa4cf) || (c >= 0xac00 && c <= 0xd7a3) || (c >= 0xf900 && c <= 0xfaff)
+      || (c >= 0xfe30 && c <= 0xfe4f) || (c >= 0xff00 && c <= 0xff60) || (c >= 0xffe0 && c <= 0xffe6) || (c >= 0x1f300 && c <= 0x1faff) ? 2 : 1;
+  }
+  return n;
+};
+const ITEM_START = /^\s*(?:[-*•·]\s|\d+[.)]\s|[a-zA-Z][.)]\s|#{1,6}\s|>\s|\||```)/;
+function unwrapLines(lines) {
+  const full = Math.max(0, ...lines.map(cellWidth)) - 14;
+  const out = [];
+  let lastW = 0; // 마지막으로 붙인 원래 줄의 폭 — 이어 붙인 줄 전체 길이로 재면 문단 끝 짧은 줄도 꽉 찬 것으로 보인다
+  for (const l of lines) {
+    const prev = out.at(-1);
+    if (prev != null && prev.trim() && l.trim() && !ITEM_START.test(l) && lastW >= full) out[out.length - 1] = `${prev.replace(/\s+$/, '')} ${l.trim()}`;
+    else out.push(l);
+    lastW = cellWidth(l);
+  }
+  return out;
 }
 // 답 창 닫기 — 화면에 창이 실제로 있을 때만 Esc(없을 때 Esc 는 클로드 작업 중단이 된다). 닫았으면 true
 async function closeBtw(w) {

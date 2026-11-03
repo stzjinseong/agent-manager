@@ -524,6 +524,9 @@ function cliScreenBlocked() {
   while (last >= 0 && !rows[last].trim()) last--;
   if (last < 0) return false; // 아직 화면을 못 받음
   peekLast = last;
+  // /btw 답 창('Esc to close')이 떠 있는 화면은 채팅의 BTW 창이 대신 보여 준다 — 아래 터미널을 드러내지 않는다
+  // (서버가 답 창 읽기를 그만둔 뒤 · 다른 워커에 다녀온 뒤에도 CLI 에 창이 남아 있으면 '입력 기다림'으로 잘못 보였다)
+  if (rows.slice(Math.max(0, last - 12), last + 1).some((t) => /Esc to (?:close|dismiss)/i.test(t) && /copy|fork|scroll/i.test(t))) return false;
   const rule = rows.map((t, i) => (/^\s*─{20,}/.test(t) ? i : -1)).filter((i) => i >= 0);
   for (let k = rule.length - 1; k > 0; k--) {
     if (last - rule[k] > 8) break; // 입력창 아래엔 상태줄 · 안내 몇 줄뿐
@@ -2945,6 +2948,9 @@ function switchFxEnd() {
 }
 function switchFxStart(from, to) {
   switchFxEnd();
+  // 앞 워커에서 열어 둔 '아래 터미널 드러냄'(CLI 가 입력을 기다려요)은 바로 닫는다 — 남아 있으면 새 워커 터미널이 잠깐 보였다가
+  // 다시 판정(cliPeekCheck, 0.12초 뒤)하며 닫혔다. 새 워커 화면을 받은 뒤 필요하면 다시 열린다
+  if (peekOn || !$('#cv-peek').hidden) { clearTimeout(peekTimer); peekSince = 0; peekHidden = false; $('#cv-peek').hidden = true; setCliPeek(false); }
   if (!from || from === to || $('#detail').hidden || !$('#diff-view').hidden) return;
   const target = chatOpen ? $('#cv-list') : $('#term .xterm-screen');
   if (!target || !target.offsetHeight) return;
@@ -5820,14 +5826,13 @@ function renderBtw() {
   box.hidden = !open;
   if (!open) return;
   if (!box.dataset.built) btwSkeleton(box);
-  // 질문은 오른쪽 말풍선, 답은 메인 채팅의 클로드 답처럼 — 캐릭터 + 'Claude · 시각' + 마크다운(화면에서 읽은 글이라 줄이 터미널 폭에서 끊겨 있는데,
-  // 마크다운이 문단 안 줄바꿈을 이어 붙여 준다). 기다리는 동안은 캐릭터가 통통 튀는 '생각 중'
+  // 질문은 오른쪽 말풍선, 답은 메인 채팅의 클로드 답처럼 — 캐릭터 + 'Claude · 시각' + CLI 에서 정리된 줄 구조 그대로(서버 unwrapLines 가
+  // 폭 때문에 꺾인 줄만 이어 둔다 · 마크다운으로 그렸더니 'a.' 'b.' 항목이 윗줄에 붙었다). 기다리는 동안은 캐릭터가 통통 튀는 '생각 중'
   $('.btw-list', box).innerHTML = items.length ? items.map((x) => `<div class="btw-q">${esc(x.q)}</div>`
     + `<div class="btw-a${x.text ? '' : ' btw-think'}"><span class="btw-ico"></span><div class="btw-ab"><div class="btw-lab"><b>Claude</b>${chatTime(x.at)}</div>`
-    + (x.text ? chatMd(x.text) : x.open ? `<div class="btw-wait"><span class="cv-typing"><i></i><i></i><i></i></span> ${esc(_t('생각 중'))}</div>` : `<div class="btw-wait">${esc(_t('답을 읽지 못했어요 (CLI 에서 답 창이 닫힘)'))}</div>`)
+    + (x.text ? `<div class="btw-txt">${esc(x.text)}</div>` : x.open ? `<div class="btw-wait"><span class="cv-typing"><i></i><i></i><i></i></span> ${esc(_t('생각 중'))}</div>` : `<div class="btw-wait">${esc(_t('답을 읽지 못했어요 (CLI 에서 답 창이 닫힘)'))}</div>`)
     + '</div></div>').join('')
     : `<div class="btw-empty">${esc(_t('작업을 멈추지 않고 Claude 에게 곁질문해 보세요. 답은 대화 기록에 남지 않아요.'))}</div>`;
-  for (const a of box.querySelectorAll('.cv-md a[href]')) { a.target = '_blank'; a.rel = 'noopener'; }
   const list = $('.btw-list', box);
   list.scrollTop = list.scrollHeight;
 }

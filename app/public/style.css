@@ -2753,6 +2753,7 @@ button.cv-more:hover { color: var(--text); }
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 13'%3E%3Cpath d='M2 0h12v4h2v3h-2v3h-1v3h-2v-3H5v3H3v-3H2V7H0V4h2zM4 3v2h1V3zm7 0v2h1V3z' fill-rule='evenodd'/%3E%3C/svg%3E") center / contain no-repeat; }
 .btw-think .btw-ico { animation: cv-bob 1s ease-in-out infinite; }
 .btw-ab { min-width: 0; font-size: 13px; line-height: 1.6; } /* 말풍선 없이 글만 — 캐릭터 · 이름 줄로 구분 */
+.btw-txt { white-space: pre-wrap; overflow-wrap: anywhere; }
 .btw-lab { font-size: 11px; color: var(--dim); margin-bottom: 2px; }
 .btw-lab b { color: var(--accent-hi); font-weight: 600; margin-right: 6px; }
 .btw-wait { font-size: 12.5px; color: var(--dim); }
