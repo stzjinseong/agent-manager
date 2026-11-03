@@ -1584,7 +1584,6 @@ html[data-char="clawd-white"] :is(.node, .dchip, .term-wrap) { --avatar: var(--c
 .floor-tools .btn:hover { color: var(--text); }
 .floor-tools [hidden], .node-add[hidden] { display: none; } /* .btn·.node-add 의 display 가 hidden 속성을 덮어써서 */
 .floor-tools .floor-add.on { color: var(--accent-hi); }
-.floor-group[aria-pressed="true"] { color: var(--accent-hi); }
 .dock {
   position: sticky; top: var(--topbar-h, 59px); z-index: 9; display: flex; align-items: center; gap: 12px;
   padding: 7px 24px; background: color-mix(in srgb, var(--floor) 88%, transparent);
