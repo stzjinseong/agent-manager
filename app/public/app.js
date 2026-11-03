@@ -1123,7 +1123,7 @@ function connect() {
       const more = termSnap.loadingFull ? termSnap.fromBottom : null; // 맨 위로 올려 전부 불러온 것 — 보던 줄을 그대로 맨 위에
       termSnap = { id: msg.id, partial: Boolean(msg.partial), loadingFull: false, fromBottom: 0, pending: termSnap.id === msg.id && termSnap.pending };
       term.reset();
-      term.write(recolorTerm(msg.data), () => (more == null ? restoreTermScroll(msg.id) : term.scrollToLine(Math.max(0, term.buffer.active.baseY - more))));
+      term.write(recolorTerm(msg.data), () => { if (more == null) restoreTermScroll(msg.id); else term.scrollToLine(Math.max(0, term.buffer.active.baseY - more)); switchFxReveal(msg.id, 'cli'); });
     }
     else if (msg.type === 'clearScrollback' && msg.id === selected) term.write('\x1b[3J'); // /clear — 이전 대화 기록만 지움
     else if (msg.type === 'restored') chatRestored(msg);
@@ -2939,12 +2939,69 @@ function restoreTermScroll(id) {
   }
   term.scrollToLine(Math.max(0, Math.min(b.baseY, at >= 0 ? at : saved.line)));
 }
+// ---------- 워커 전환 연출 ----------
+// 다른 워커를 누르면 새 대화를 불러오는 동안 채팅 · 터미널이 한두 프레임 비어(실측 ~30ms '아직 대화가 없어요') 깜빡여 보였다.
+// → 누르는 순간 지금 보이는 목록(채팅 #cv-list · 터미널 .xterm-screen — DOM 렌더러라 복제된다)을 복제해 그 자리에 붙잡아 두고
+// 진짜 화면은 숨긴다. 새 내용이 다 그려지면(loadChat · 기록 scrollback 쓰기 끝 — switchFxReveal) 복제본은 흐려지며 4px 밀려 나가고
+// 진짜 화면은 반대쪽 4px 에서 들어오며 나타난다(0.15초 크로스페이드). 방향은 카드 순서(오른쪽 워커면 왼쪽으로). 0.7초 안에 준비가 안 되면 그냥 드러낸다.
+// 움직임 줄이기면 붙잡기만 하고 연출 없이 바꾼다
+const SWITCH_MS = 150, SWITCH_PX = 4, SWITCH_WAIT_MS = 700;
+let switchFx = null;
+function switchOrder() {
+  const sel = $('#floor').hidden ? '#dock-list .dchip' : '#nodes > .node';
+  return [...document.querySelectorAll(sel)].map((n) => n.dataset.id).filter(Boolean);
+}
+function switchFxEnd() {
+  if (!switchFx) return;
+  clearTimeout(switchFx.timer);
+  switchFx.ghost.remove();
+  switchFx.target.style.opacity = '';
+  switchFx = null;
+}
+function switchFxStart(from, to) {
+  switchFxEnd();
+  if (!from || from === to || $('#detail').hidden || !$('#diff-view').hidden) return;
+  const wrap = $('#term-wrap');
+  const target = chatOpen ? $('#cv-list') : $('#term');
+  const src = chatOpen ? target : $('#term .xterm-screen');
+  if (!src || !src.offsetHeight) return;
+  const order = switchOrder(), dir = Math.sign(order.indexOf(to) - order.indexOf(from)) || 0;
+  const r = src.getBoundingClientRect();
+  const copy = src.cloneNode(true);
+  for (const x of [copy, ...copy.querySelectorAll('[id]')]) x.removeAttribute('id');
+  // 터미널 글자색 · 글꼴 규칙은 바깥 .xterm(렌더러 클래스)에 묶여 있다 — 같은 클래스의 틀로 감싸야 복제본도 같은 모양
+  let ghost = copy;
+  if (!chatOpen) { ghost = document.createElement('div'); ghost.className = $('#term .xterm')?.className || 'xterm'; ghost.append(copy); }
+  ghost.classList.add('switch-ghost');
+  wrap.append(ghost);
+  // 자리는 붙인 뒤 실제 기준 요소(offsetParent — #term-wrap 은 position: static 이라 그 바깥)를 보고 정한다
+  const op = ghost.offsetParent || document.body, or = op.getBoundingClientRect();
+  Object.assign(ghost.style, { left: `${r.left - or.left - op.clientLeft + op.scrollLeft}px`, top: `${r.top - or.top - op.clientTop + op.scrollTop}px`, width: `${r.width}px`, height: `${r.height}px` });
+  if (chatOpen) ghost.scrollTop = src.scrollTop; // 복제하면 스크롤 위치는 따라오지 않는다
+  target.style.opacity = '0';
+  const kind = chatOpen ? 'chat' : 'cli';
+  switchFx = { to, kind, ghost, target, dir, timer: setTimeout(() => switchFxReveal(to, kind), SWITCH_WAIT_MS) };
+}
+function switchFxReveal(id, kind) {
+  const fx = switchFx;
+  if (!fx || fx.to !== id || fx.kind !== kind) return;
+  clearTimeout(fx.timer);
+  switchFx = null;
+  fx.target.style.opacity = '';
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) { fx.ghost.remove(); return; }
+  const ease = 'cubic-bezier(.3,.7,.2,1)', dx = SWITCH_PX * fx.dir;
+  fx.ghost.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: `translateX(${-dx}px)` }], { duration: SWITCH_MS, easing: ease, fill: 'forwards' })
+    .finished.finally(() => fx.ghost.remove());
+  fx.target.animate([{ opacity: 0, transform: `translateX(${dx}px)` }, { opacity: 1, transform: 'none' }], { duration: SWITCH_MS, easing: ease });
+}
+
 function select(id) {
   markSeen(id); // 카드를 눌렀으면 완료 확인
   // 이미 열려 있는 워커를 다시 누르면 아무것도 하지 않는다 — 터미널을 다시 그리지 않고,
   // 포커스도 옮기지 않는다(옮기면 더블클릭으로 연 이름 입력창의 포커스를 빼앗아 바로 닫혀 버림)
   if (id === selected && !$('#detail').hidden) return;
   if (selected && !$('#detail').hidden) saveTermScroll(selected);
+  switchFxStart(selected, id);
   selected = id;
   restoreFor = id;
   render();
@@ -5365,6 +5422,7 @@ async function loadChat() {
     chatData = c || { wid: w.id, gen: null, rev: 0, key: null, items: [] };
     chatLoading = !c;
     renderChat();
+    if (c) switchFxReveal(w.id, 'chat'); // 지난 대화가 남아 있으면 그걸로 바로 바꾼다(바뀐 것만 뒤에 받음)
   }
   const q = chatData.gen ? `?gen=${encodeURIComponent(chatData.gen)}&since=${chatData.rev}` : '';
   let d;
@@ -5384,6 +5442,7 @@ async function loadChat() {
   chatSettle(w.id);
   if (chatHtml.size > 2000) chatHtml.clear();
   renderChat();
+  switchFxReveal(w.id, 'chat');
 }
 // 상태가 올 때마다(render): 버튼 표시 · 바뀌었으면 가져오기 · 끝줄(상태) 다시 그리기
 // 서버에 '이 워커를 채팅으로 보는 중'을 알린다 — 그동안 클로드의 질문은 터미널 대신 채팅 카드로 온다(server holdAsk)
