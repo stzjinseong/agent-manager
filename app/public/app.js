@@ -5569,7 +5569,7 @@ async function chatSend(mode) {
   const ta = chatForm.text, text = ta.value.trim();
   const w = state.workers.find((x) => x.id === selected);
   if (!text || !w || ta.readOnly) return;
-  histRemember(text, w.id);
+  histRemember(text, w);
   if (mode === 'memo') {
     const r = await api('/api/memos', { role: w.name, op: 'add', text });
     if (r?.error) return;
@@ -5736,19 +5736,24 @@ $('#cv-slash').addEventListener('click', (e) => {
 });
 // ---------- 입력 기록 (입력칸에서 ↑) ----------
 // 커서가 첫 줄에 있을 때 ↑ 를 누르면 지난번에 보낸 글을 목록으로 — ↑↓ 로 고르고 Enter · Tab 이면 입력칸에 그대로 넣고 닫는다.
-// Esc 는 목록만 닫는다(클로드 중단으로 번지지 않게). 재료: 이 브라우저에서 채팅으로 보낸 글(localStorage, 워커 상관없이 최근 HIST_MAX 개)
-// + 지금 워커의 대화 기록에 있는 내 글(CLI 에서 직접 친 것 포함). 같은 글은 한 번만, 최근 것이 입력칸 바로 위(맨 아래)
+// Esc 는 목록만 닫는다(클로드 중단으로 번지지 않게). 재료는 지금 워커의 지금 세션에서 보낸 글만: 이 브라우저에서 채팅으로 보낸 글
+// (localStorage — 워커 id · 세션 id 를 함께 적어 둔다) + 그 세션 대화 기록의 내 글(CLI 에서 직접 친 것 포함). 워커를 띄운 시각(startedAt)
+// 이전 것(이어 붙인 지난 세션)과 다른 워커 · 다른 세션(/clear 뒤)의 글은 뺀다. 같은 글은 한 번만, 최근 것이 입력칸 바로 위(맨 아래)
 const HIST_KEY = 'am.chatHist', HIST_MAX = 200, HIST_TEXT = 4000;
 function histLoad() { try { const a = JSON.parse(localStorage.getItem(HIST_KEY) || '[]'); return Array.isArray(a) ? a : []; } catch { return []; } }
-function histRemember(text, wid) {
-  const list = histLoad().filter((x) => x.t !== text);
-  list.unshift({ t: text.slice(0, HIST_TEXT), w: wid, at: Date.now() });
+function histRemember(text, w) {
+  const list = histLoad().filter((x) => !(x.t === text && x.w === w.id));
+  list.unshift({ t: text.slice(0, HIST_TEXT), w: w.id, s: w.sessionId || null, at: Date.now() });
   try { localStorage.setItem(HIST_KEY, JSON.stringify(list.slice(0, HIST_MAX))); } catch {}
 }
 function histItems() {
   const seen = new Set(), out = [];
-  const mine = chatData.wid === selected ? chatData.items.filter((x) => x.k === 'u' && x.text).map((x) => ({ t: x.text, w: selected, at: x.ts + clockSkew })) : [];
-  for (const x of [...histLoad(), ...mine].sort((a, b) => b.at - a.at)) {
+  const w = state.workers.find((x) => x.id === selected);
+  if (!w) return out;
+  const since = w.startedAt || 0; // 서버 시각
+  const saved = histLoad().filter((x) => x.w === w.id && x.at - clockSkew >= since && (!x.s || !w.sessionId || x.s === w.sessionId));
+  const mine = chatData.wid === w.id ? chatData.items.filter((x) => x.k === 'u' && x.text && x.ts >= since).map((x) => ({ t: x.text, w: w.id, at: x.ts + clockSkew })) : [];
+  for (const x of [...saved, ...mine].sort((a, b) => b.at - a.at)) {
     const k = x.t.trim();
     if (!k || seen.has(k)) continue;
     seen.add(k); out.push(x);
@@ -5761,7 +5766,7 @@ $('#cv-slash').after(histBox);
 let histMenu = { open: false, items: [], i: 0 };
 function histPaint() {
   const fmt = (t) => fmtDate(t, DATE_MD_HM);
-  histBox.innerHTML = histMenu.items.map((x, k) => `<button type="button" class="cv-sl cv-hi${k === histMenu.i ? ' on' : ''}" data-k="${k}" role="option"><span>${esc(x.t.replace(/\s+/g, ' ').slice(0, 300))}</span><small>${x.w && x.w !== selected ? `${esc(x.w)} · ` : ''}${fmt(x.at)}</small></button>`).join('');
+  histBox.innerHTML = histMenu.items.map((x, k) => `<button type="button" class="cv-sl cv-hi${k === histMenu.i ? ' on' : ''}" data-k="${k}" role="option"><span>${esc(x.t.replace(/\s+/g, ' ').slice(0, 300))}</span><small>${fmt(x.at)}</small></button>`).join('');
   histBox.hidden = false;
   // 기록 목록은 / 명령 목록(260px)의 3배까지 — 채팅 화면이 그보다 낮으면 입력칸 위 남은 높이까지(채팅 화면 밖은 잘린다)
   const cv = histBox.closest('.chat-view'), room = cv ? histBox.getBoundingClientRect().bottom - cv.getBoundingClientRect().top - 8 : 780;
