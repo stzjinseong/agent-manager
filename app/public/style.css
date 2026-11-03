@@ -2729,6 +2729,9 @@ button.cv-more:hover { color: var(--text); }
 .cv-btw { position: absolute; top: 10px; right: 12px; z-index: 7; width: min(440px, calc(100% - 24px)); max-height: calc(100% - 20px); max-width: calc(100% - 8px); min-width: 280px; min-height: 150px; resize: both; overflow: hidden; display: flex; flex-direction: column; gap: 8px;
   padding: 10px 12px 12px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--surface); box-shadow: 0 12px 32px rgb(0 0 0 / calc(.2 + .35 * var(--shade))); }
 /* 오른쪽 아래 모서리를 끌어 크기 조절(resize) — 처음엔 내용 높이(답이 길면 채팅 화면 높이까지) */
+/* 창 안에 포커스가 없으면 살짝 반투명 — 뒤 채팅을 가리지 않게. 마우스를 올리거나 · 창 안을 누르거나 · 끌고 있으면 또렷하게 */
+.cv-btw { transition: opacity .2s ease-out; }
+.cv-btw:not(:focus-within, :hover, .dragging) { opacity: .6; }
 .cv-btw.dragging { box-shadow: 0 18px 44px rgb(0 0 0 / calc(.3 + .4 * var(--shade))); }
 .btw-h { display: flex; align-items: baseline; gap: 8px; cursor: grab; user-select: none; touch-action: none;
   margin: 0 -12px; padding: 0 12px 8px; border-bottom: 1px solid var(--line); } /* 머리 줄 아래 얇은 구분선 — 창 좌우 끝까지 */
