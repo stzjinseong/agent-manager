@@ -2930,43 +2930,28 @@ function restoreTermScroll(id) {
   term.scrollToLine(Math.max(0, Math.min(b.baseY, at >= 0 ? at : saved.line)));
 }
 // ---------- 워커 전환 연출 ----------
-// 다른 워커를 누르면 새 대화를 불러오는 동안 채팅 · 터미널이 한두 프레임 비어(실측 ~30ms '아직 대화가 없어요') 깜빡여 보였다.
-// → 누르는 순간 지금 보이는 목록(채팅 #cv-list · 터미널 .xterm-screen — DOM 렌더러라 복제된다)을 복제해 바로 옆(같은 부모)에 붙잡아 두고
-// 진짜 화면은 숨긴다. 새 내용이 다 그려지면(loadChat · 기록 scrollback 쓰기 끝 — switchFxReveal) 복제본은 흐려지고 진짜 화면은
-// 나타난다(0.15초 크로스페이드 · 움직임 없음 — 카드 순서 방향으로 4px 밀던 것은 뺐다). 0.7초 안에 준비가 안 되면 그냥 드러낸다.
-// 움직임 줄이기면 붙잡기만 하고 연출 없이 바꾼다
+// 다른 워커를 누르면 새 대화를 불러오는 동안 채팅 · 터미널이 한두 프레임 비거나(실측 ~30ms '아직 대화가 없어요') 지난 내용이 보였다가
+// 바뀌어 깜빡여 보였다. → 누르는 순간 채팅 목록(#cv-list) · 터미널 화면(.xterm-screen)을 숨기고, 새 내용을 다 그리고 스크롤이 자리 잡으면
+// (loadChat · 기록 scrollback 쓰기 끝 + 2프레임 — switchFxReveal) 0.15초 동안 나타나게 한다. 0.7초 안에 준비가 안 되면 그냥 드러낸다.
+// 앞 화면을 복제해 겹쳐 두는 크로스페이드는 뺐다 — 긴 대화에선 복제본의 스크롤이 원래만큼 안 내려가 앞 워커의 위쪽 대화가 보였고,
+// 두 대화 글자가 겹쳐 어지러웠다(사용자 녹화 프레임 18~21)
 const SWITCH_MS = 150, SWITCH_WAIT_MS = 700;
 let switchFx = null;
 function switchFxEnd() {
   if (!switchFx) return;
   clearTimeout(switchFx.timer);
-  switchFx.ghost.remove();
   switchFx.target.style.opacity = '';
   switchFx = null;
 }
 function switchFxStart(from, to) {
   switchFxEnd();
   if (!from || from === to || $('#detail').hidden || !$('#diff-view').hidden) return;
-  // 숨기는 것 = 복제한 것 자체(채팅 목록 · 터미널 화면). 복제본은 원래 요소와 같은 부모에 붙인다 — 바깥에 붙였더니 부모에만 걸린
-  // 글꼴 크기 · 줄 간격(.chat-view 13.5px 등)을 못 받아 글자 · 말풍선이 미세하게 달라져, 겹치는 동안 출렁여 보였다
-  const src = chatOpen ? $('#cv-list') : $('#term .xterm-screen');
-  if (!src || !src.offsetHeight) return;
-  const r = src.getBoundingClientRect();
-  const ghost = src.cloneNode(true);
-  for (const x of [ghost, ...ghost.querySelectorAll('[id]')]) x.removeAttribute('id');
-  ghost.classList.add('switch-ghost');
-  src.after(ghost);
-  // 자리: 같은 부모라 기준 요소(offsetParent)가 같으면 원래 요소의 offset 을 그대로(터미널은 .xterm 안이 스크롤돼 화면 좌표로 재면 어긋났다).
-  // 기준이 다르면 화면 좌표로 계산
-  const op = ghost.offsetParent || document.body;
-  let x = src.offsetLeft, y = src.offsetTop;
-  if (src.offsetParent !== op) { const or = op.getBoundingClientRect(); x = r.left - or.left - op.clientLeft + op.scrollLeft; y = r.top - or.top - op.clientTop + op.scrollTop; }
-  Object.assign(ghost.style, { left: `${x}px`, top: `${y}px`, width: `${r.width}px`, height: `${r.height}px` });
-  ghost.scrollTop = src.scrollTop; // 복제하면 스크롤 위치는 따라오지 않는다
-  src.style.opacity = '0';
+  const target = chatOpen ? $('#cv-list') : $('#term .xterm-screen');
+  if (!target || !target.offsetHeight) return;
+  target.style.opacity = '0';
   const kind = chatOpen ? 'chat' : 'cli';
-  switchFx = { to, kind, ghost, target: src, timer: setTimeout(() => switchFxReveal(to, kind), SWITCH_WAIT_MS) };
-  // 종료된 워커는 터미널 기록(scrollback)이 오지 않는다 — 기다리면 앞 워커 화면이 0.7초 남았다. 다음 프레임에 바로
+  switchFx = { to, kind, target, timer: setTimeout(() => switchFxReveal(to, kind), SWITCH_WAIT_MS) };
+  // 종료된 워커는 터미널 기록(scrollback)이 오지 않는다 — 기다리지 않고 다음 프레임에
   if (kind === 'cli' && state.workers.find((x) => x.id === to)?.status === 'exited') requestAnimationFrame(() => switchFxReveal(to, kind));
 }
 function switchFxReveal(id, kind) {
@@ -2975,8 +2960,7 @@ function switchFxReveal(id, kind) {
   clearTimeout(fx.timer);
   switchFx = null;
   fx.target.style.opacity = '';
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) { fx.ghost.remove(); return; }
-  fx.ghost.animate([{ opacity: 1 }, { opacity: 0 }], { duration: SWITCH_MS, easing: 'ease-out', fill: 'forwards' }).finished.finally(() => fx.ghost.remove());
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   fx.target.animate([{ opacity: 0 }, { opacity: 1 }], { duration: SWITCH_MS, easing: 'ease-out' });
 }
 

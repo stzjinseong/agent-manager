@@ -2725,8 +2725,6 @@ button.cv-more:hover { color: var(--text); }
 .btn.btn-ic-danger:hover { color: #e0655a; border-color: rgb(224 101 90 / .5); background: rgb(224 101 90 / .1); }
 
 /* 채팅에서 답하기 — 클로드의 질문 카드(입력칸 위) */
-/* 워커 전환 중 앞 화면 복제본(app.js switchFxStart) — 진짜 화면 위에 잠깐 붙잡아 두었다가 흐려지며 사라진다 */
-.switch-ghost { position: absolute !important; z-index: 6; margin: 0 !important; pointer-events: none; overflow: hidden !important; } /* 원래 클래스(.xterm .xterm-screen { position: relative } 등)를 그대로 달고 있어 이겨야 한다 */
 .cv-btw { position: absolute; top: 10px; right: 12px; z-index: 7; width: min(440px, calc(100% - 24px)); max-height: calc(100% - 20px); max-width: calc(100% - 8px); min-width: 280px; min-height: 150px; resize: both; overflow: hidden; display: flex; flex-direction: column; gap: 8px;
   padding: 10px 12px 12px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--surface); box-shadow: 0 12px 32px rgb(0 0 0 / calc(.2 + .35 * var(--shade))); }
 /* 오른쪽 아래 모서리를 끌어 크기 조절(resize) — 처음엔 내용 높이(답이 길면 채팅 화면 높이까지) */
