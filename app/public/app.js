@@ -5746,7 +5746,7 @@ var btwSig = '', btwLogs = {}, btwOpenFor = {}, btwSeenAt = new Set(); // var �
 const BTW_POS_KEY = 'am.btwPos';
 function btwSkeleton(box) {
   box.innerHTML = `<div class="btw-h" data-btw-drag><b>BTW</b><small>/btw · ${esc(_t('대화 기록에 남지 않아요'))}</small>`
-    + `<span class="btw-acts"><button type="button" data-btw="copy" title="${esc(_t('마지막 답 복사'))}">⧉</button><button type="button" data-btw="close" title="${esc(_t('닫기 (CLI 의 답 창도 닫음)'))}">✕</button></span></div>`
+    + `<span class="btw-acts"><button type="button" data-btw="close" title="${esc(_t('닫기 (CLI 의 답 창도 닫음)'))}">✕</button></span></div>`
     + `<div class="btw-list"></div>`
     + `<form class="btw-form"><textarea rows="1" placeholder="${esc(_t('이어서 BTW 묻기 — Enter 보내기'))}"></textarea><button type="submit" class="btn primary">${esc(_t('보내기'))}</button></form>`
     + `<span class="btw-grip-l" title="${esc(_t('끌어서 크기 조절'))}"></span>`;
@@ -5815,7 +5815,6 @@ async function btwAsk(text) {
 $('#cv-btw').addEventListener('click', async (e) => {
   const a = e.target.closest('[data-btw]')?.dataset.btw, w = state.workers.find((x) => x.id === selected);
   if (!a || !w) return;
-  if (a === 'copy') { try { await navigator.clipboard.writeText((btwLogs[w.id] || []).filter((x) => x.text).at(-1)?.text || ''); toast(_t('복사했어요')); } catch {} return; }
   setBtwOpen(false);
   if (w.btw) await api(`/api/workers/${w.id}/btw-close`, {}); // CLI 에 답 창이 떠 있으면 같이 닫는다(이력은 남음)
 });
