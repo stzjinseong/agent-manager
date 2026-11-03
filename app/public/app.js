@@ -3067,7 +3067,7 @@ nodesEl.addEventListener('dragstart', (e) => {
   e.dataTransfer.setData('text/plain', n.dataset.name || '');
   // 드래그 이미지가 찍힌 뒤 흐리게 · 카드와 휴지통 말고는 어둡게(body.card-drag)
   // 바로 놓으면 dragend 가 이 프레임보다 먼저 와 휴지통이 남았다 — 아직 끄는 중일 때만
-  requestAnimationFrame(() => { if (dragEl === n) { n.classList.add('dragging'); trashEl.classList.add('show'); document.body.classList.add('card-drag'); } });
+  requestAnimationFrame(() => { if (dragEl === n) { n.classList.add('dragging'); showTrash(n); document.body.classList.add('card-drag'); } });
 });
 nodesEl.addEventListener('dragover', (e) => {
   if (memoDrag) return memoDragOver(e);
@@ -3094,7 +3094,7 @@ nodesEl.addEventListener('dragleave', (e) => {
 });
 nodesEl.addEventListener('dragend', () => endNodeDrag());
 function endNodeDrag() {
-  trashEl.classList.remove('show', 'over');
+  hideTrash();
   document.body.classList.remove('card-drag');
   if (!dragEl) return;
   dragEl.classList.remove('dragging');
@@ -3109,19 +3109,32 @@ function endNodeDrag() {
 document.addEventListener('mousemove', () => {
   if (dragEl) endNodeDrag();
   else if (dockDrag) endDockDrag();
-  else if (trashEl.classList.contains('show')) { trashEl.classList.remove('show', 'over'); document.body.classList.remove('card-drag'); }
+  else if (trashEl.classList.contains('show')) { hideTrash(); document.body.classList.remove('card-drag'); }
 }, { passive: true });
 
 // ---------- 휴지통: 칩을 끌기 시작하면 위에 뜨고, 놓으면 제거 ----------
-// 워커 칩은 상세의 '제거'와 같고(실행 중이면 세션 종료), 대기실 칩은 저장된 역할 삭제와 같다. 둘 다 확인을 받는다
+// 놓는 곳이 둘이다 — '세션만 종료'(카드는 대기실로)와 '제거'(세션 종료 + 카드 지움). 세션이 이미 끝난 카드(대기실·종료된 워커)는 '제거'만 뜬다.
+// 워커 칩 '제거'는 실행 중이면 세션도 종료하고, 대기실 칩은 저장된 역할 삭제와 같다. 모두 확인을 받는다
 const trashEl = $('#trash');
-trashEl.addEventListener('dragover', (e) => { if (!dragEl && !dockDrag) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; trashEl.classList.add('over'); });
-trashEl.addEventListener('dragleave', (e) => { if (!trashEl.contains(e.relatedTarget)) trashEl.classList.remove('over'); });
-trashEl.addEventListener('drop', (e) => {
-  e.preventDefault();
-  const n = dragEl || dockDrag; // 카드 또는 최소화 칩
-  if (n) removeCard(n);
-});
+const liveCard = (n) => !n.classList.contains('socket') && state.workers.some((w) => w.id === n.dataset.id && w.status !== 'exited');
+function showTrash(n) { trashEl.classList.toggle('two', liveCard(n)); trashEl.classList.add('show'); }
+function hideTrash() { trashEl.classList.remove('show'); for (const b of trashEl.querySelectorAll('.bin')) b.classList.remove('over'); }
+for (const bin of trashEl.querySelectorAll('.bin')) {
+  bin.addEventListener('dragover', (e) => { if (!dragEl && !dockDrag) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; bin.classList.add('over'); });
+  bin.addEventListener('dragleave', (e) => { if (!bin.contains(e.relatedTarget)) bin.classList.remove('over'); });
+  bin.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const n = dragEl || dockDrag; // 카드 또는 최소화 칩
+    if (n) bin.dataset.drop === 'end' ? endSession(n) : removeCard(n);
+  });
+}
+// 세션만 종료 — 카드는 남아 대기실로 돌아간다(저장된 역할이 있으면 ▶ 투입으로 이어받기)
+async function endSession(n) {
+  const w = state.workers.find((x) => x.id === n.dataset.id);
+  if (!w || w.status === 'exited') return;
+  if (!(await ask({ title: _t('"{name}" 세션을 종료할까요?', { name: w.name }), body: _t('실행 중인 Claude 세션만 끝냅니다. 카드는 대기실에 남아 다시 투입할 수 있어요.'), ok: _t('세션 종료'), danger: true }))) return;
+  await api(`/api/workers/${w.id}/kill`);
+}
 // 카드·칩 제거 — 휴지통에 놓거나 터치 기기의 카드 메뉴에서
 async function removeCard(n) {
   if (n.classList.contains('socket')) {
@@ -3621,7 +3634,7 @@ dockList.addEventListener('dragstart', (e) => {
   dockDrag = c;
   e.dataTransfer.effectAllowed = 'move';
   e.dataTransfer.setData('text/plain', c.dataset.name || '');
-  requestAnimationFrame(() => { if (dockDrag === c) { c.classList.add('dragging'); trashEl.classList.add('show'); document.body.classList.add('card-drag'); } }); // 카드 끌기와 같은 휴지통·어둡게
+  requestAnimationFrame(() => { if (dockDrag === c) { c.classList.add('dragging'); showTrash(c); document.body.classList.add('card-drag'); } }); // 카드 끌기와 같은 휴지통·어둡게
 });
 dockList.addEventListener('dragover', (e) => {
   if (memoDrag) return memoDragOver(e);
@@ -3635,7 +3648,7 @@ dockList.addEventListener('dragover', (e) => {
 });
 dockList.addEventListener('dragend', () => endDockDrag());
 function endDockDrag() {
-  trashEl.classList.remove('show', 'over');
+  hideTrash();
   document.body.classList.remove('card-drag');
   if (!dockDrag) return;
   dockDrag.classList.remove('dragging');
@@ -6090,11 +6103,6 @@ $('#diff-files').addEventListener('keydown', (e) => {
 for (const b of document.querySelectorAll('.btn-diff')) b.onclick = () => setDiffOpen(!diffOpen);
 $('#btn-full').onclick = () => setTermFull(!$('#term-wrap').classList.contains('full'));
 $('#btn-full-exit').onclick = () => setTermFull(false);
-$('#btn-remove').onclick = async () => {
-  if (!selected || !(await ask({ title: _t('워커를 제거할까요?'), body: _t('목록에서 지웁니다. 실행 중이면 Claude 세션도 종료됩니다.'), ok: _t('제거'), danger: true }))) return;
-  await api(`/api/workers/${selected}/remove`);
-  selected = null; render();
-};
 // 상세 닫기 — 선택된 워커 카드(또는 칩)를 다시 누르면 (닫기 버튼 대신: 버튼줄이 좁은 화면·영어에서 넘치지 않게)
 function closeDetail() { if (selected) saveTermScroll(selected); selected = null; render(); }
 
@@ -6151,6 +6159,7 @@ async function cardMenu(n) {
     socket && { key: 'launch', label: at ? _t('▶ 이어서 투입 (마지막 세션 {t})', { t: fmtAgo(at) }) : _t('▶ 투입') },
     at && { key: 'fresh', label: _t('▶ 새 세션으로 투입') },
     w && ['working', 'decision'].includes(w.status) && { key: 'stop', label: _t('⏸ 중단') },
+    w && w.status !== 'exited' && { key: 'end', label: _t('⏹ 세션만 종료') },
     { key: 'rename', label: _t('이름 바꾸기') },
     { key: 'prev', label: _t('← 앞으로 옮기기'), disabled: i <= 0 },
     { key: 'next', label: _t('뒤로 옮기기 →'), disabled: i < 0 || i >= order.length - 1 },
@@ -6160,6 +6169,7 @@ async function cardMenu(n) {
   if (key === 'stop') api(`/api/workers/${w.id}/interrupt`, { from: chatOpen && w.id === selected ? 'chat' : 'cli' });
   if (key === 'prev' || key === 'next') moveCard(name, key === 'prev' ? -1 : 1);
   if (key === 'remove') removeCard(n);
+  if (key === 'end') endSession(n);
   if (key === 'rename') {
     const to = await ask({ title: _t('이름 바꾸기'), ok: _t('저장'), input: name });
     if (!to || to === name) return;

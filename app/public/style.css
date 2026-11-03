@@ -257,9 +257,9 @@ main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24p
 
 /* 칩을 끄는 동안만 뜨는 휴지통. 화면 위 가운데에 떠 있다(fixed · 칩 줄과 가까워 아래보다 끌 거리가 짧다) — 예전엔 칩 영역 끝에 붙어 마지막 줄 카드 아래쪽을
    덮었는데, 반투명 배경이라 카드에 묻혀 뒤에 있는 것처럼 보여 놓기 어려웠다. 이제 모든 카드 위에, 불투명 배경·진한 그림자로 */
-.trash { position: fixed; left: 0; right: 0; top: 28px; height: 0; z-index: 60; display: flex; justify-content: center; pointer-events: none; }
+.trash { position: fixed; left: 0; right: 0; top: 28px; height: 0; z-index: 60; display: flex; justify-content: center; align-items: flex-start; gap: 16px; pointer-events: none; }
 .trash .bin {
-  position: absolute; top: 0; display: flex; align-items: center; gap: 10px; padding: 14px 30px;
+  position: relative; display: flex; align-items: center; gap: 10px; padding: 14px 30px;
   border: 2px dashed rgb(var(--ink) / .5); border-radius: 999px; background: var(--surface-3);
   box-shadow: 0 0 0 6px color-mix(in srgb, var(--bg) 70%, transparent), 0 14px 40px rgb(0 0 0 / calc(.6 * var(--shade))), 0 4px 12px rgb(0 0 0 / calc(.4 * var(--shade)));
   color: var(--text); font-size: 14px; font-weight: 600; white-space: nowrap;
@@ -267,10 +267,13 @@ main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24p
   transition: opacity .15s, transform .18s cubic-bezier(.2, .8, .2, 1), border-color .15s, background .15s, color .15s;
 }
 .trash .ic { font-size: 22px; line-height: 1; }
+/* '세션만 종료'는 실행 중인 워커를 끌 때만(.two) — 대기실·종료된 카드는 '제거' 하나 */
+.trash:not(.two) .b-end, .trash.two .t1, .trash:not(.two) .t2 { display: none; }
 .trash.show .bin { opacity: 1; transform: none; pointer-events: auto; }
 /* 카드를 끄는 동안 놓을 수 있는 곳(워커 카드·휴지통)만 밝게 — 헤더·매니저·회로선·오른쪽 패널·비교 표 등은 어둡게 */
 body.card-drag > :is(.topbar, section:not(.floor)), body.card-drag .floor > :not(#nodes), body.card-drag :is(.dock-expand, .dthumbs) { opacity: .25; transition: opacity .2s; }
-.trash.over .bin { border-style: solid; border-color: #e0655a; background: color-mix(in srgb, #e0655a 30%, var(--surface-3)); color: var(--text); transform: scale(1.08); }
+.trash .bin.over { border-style: solid; border-color: #e0655a; background: color-mix(in srgb, #e0655a 30%, var(--surface-3)); color: var(--text); transform: scale(1.08); }
+.trash .b-end.over { border-color: #e0a23a; background: color-mix(in srgb, #e0a23a 30%, var(--surface-3)); }
 .nodes { position: relative; display: grid; grid-template-columns: repeat(auto-fill, minmax(236px, 1fr)); gap: 34px 22px; }
 /* repo 묶음 머리줄 — 줄 전체 폭. 회로선이 뒤로 지나가도 글자가 묻히지 않게 이름 칸에 바닥색 */
 .repo-head {

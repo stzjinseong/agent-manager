@@ -173,7 +173,7 @@
 
   <!-- 아무 워커도 열지 않았을 때 아래 빈 자리 안내 (app.js renderHint) -->
   <!-- 카드·최소화 칩을 끌 때 화면 아래에 뜨는 휴지통 — 최소화하면 회로 기판(#floor)이 숨으므로 그 밖에 둔다 -->
-  <div class="trash" id="trash" aria-hidden="true"><div class="bin"><span class="ic">🗑</span><span class="tx" data-i18n>여기에 놓으면 제거</span></div></div>
+  <div class="trash" id="trash" aria-hidden="true"><div class="bin b-end" data-drop="end"><span class="ic">⏹</span><span class="tx" data-i18n>세션만 종료 (카드는 대기실로)</span></div><div class="bin b-del" data-drop="remove"><span class="ic">🗑</span><span class="tx t1" data-i18n>여기에 놓으면 제거</span><span class="tx t2" data-i18n>세션 종료 + 카드 제거</span></div></div>
   <section class="hint" id="hint" hidden></section>
 
   <!-- 상세 패널 위에 걸린 탭: 타임라인에 남은 첨부 파일 모아 보기 (app.js renderAttTab) -->
@@ -188,7 +188,6 @@
       <button id="btn-diff" class="btn btn-diff" title="이 워커가 고친 파일의 변경 내용 — 터미널 자리에 보여 줌" data-i18n-attr="title">diff</button>
       <button id="btn-full" class="btn btn-ic" title="터미널 크게 보기 (다시 누르거나 ✕ 로 복귀)" aria-label="터미널 크게 보기 (다시 누르거나 ✕ 로 복귀)" data-i18n-attr="title,aria-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
       <button id="btn-interrupt" class="btn btn-ic" title="진행 중인 작업 중단 (Esc 전송)" aria-label="진행 중인 작업 중단 (Esc 전송)" data-i18n-attr="title,aria-label"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5.5" y="5.5" width="13" height="13" rx="2.5" class="fill"/></svg></button>
-      <button id="btn-remove" class="btn btn-ic btn-ic-danger" title="워커 제거" aria-label="워커 제거" data-i18n-attr="title,aria-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg></button>
     </div>
     <div class="detail-body">
       <div class="term-wrap" id="term-wrap">
