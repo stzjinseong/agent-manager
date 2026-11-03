@@ -1791,13 +1791,61 @@ $('#dock-list').addEventListener('click', (e) => {
 });
 
 const FLOOR_MIN_KEY = 'am.floorMin';
-function setFloorMin(on) {
-  $('#floor').hidden = on;
-  $('#dock').hidden = !on;
+// 최소화/펼치기 연출 — 판이 위로 접히며(카드는 차례로 살짝 떠오르며 흐려짐) 높이가 줄고, 칩 줄이 헤더 아래에서 내려온다.
+// 펼치면 거꾸로: 칩 줄이 걷히고 판 높이가 늘며 카드가 차례로 나타나고, 회로선은 다 펼친 뒤 흐릿하게. 판 높이가 부드럽게 변해
+// 아래 상세 화면도 툭 튀지 않고 따라 움직인다. 움직임 줄이기 설정이면 바로 바꾼다
+const FLOOR_ANIM_MS = 320, FLOOR_EASE = 'cubic-bezier(.3,.7,.2,1)';
+let floorAnim = null;
+function floorShutter(floor, open) {
+  const cs = getComputedStyle(floor), h = floor.offsetHeight;
+  const full = { height: `${h}px`, marginTop: cs.marginTop, paddingTop: cs.paddingTop, paddingBottom: cs.paddingBottom, opacity: 1 };
+  const shut = { height: '0px', marginTop: '0px', paddingTop: '0px', paddingBottom: '0px', opacity: 0 };
+  floor.style.overflow = 'hidden';
+  return floor.animate(open ? [shut, full] : [full, shut], { duration: FLOOR_ANIM_MS, easing: FLOOR_EASE }).finished.finally(() => { floor.style.overflow = ''; });
+}
+async function setFloorMin(on, animate = true) {
+  const floor = $('#floor'), dock = $('#dock');
+  const instant = !animate || matchMedia('(prefers-reduced-motion: reduce)').matches || floor.hidden === on;
+  if (floorAnim) return; // 연출 중 다시 누른 건 무시
   try { on ? localStorage.setItem(FLOOR_MIN_KEY, '1') : localStorage.removeItem(FLOOR_MIN_KEY); } catch {}
+  const cards = () => [...floor.querySelectorAll('#nodes > .node')].slice(0, 16); // 많으면 앞쪽만 차례로
+  if (!instant && on) {
+    floorAnim = (async () => {
+      cards().forEach((c, i) => c.animate([{ transform: 'none', opacity: 1 }, { transform: 'translateY(-10px) scale(.97)', opacity: 0 }],
+        { duration: 240, delay: i * 22, easing: FLOOR_EASE, fill: 'forwards' }));
+      await floorShutter(floor, false).catch(() => {});
+      floor.hidden = true;
+      for (const c of cards()) c.getAnimations().forEach((a) => a.cancel());
+    })();
+    await floorAnim; floorAnim = null;
+  }
+  if (!instant && !on) {
+    floorAnim = dock.animate([{ transform: 'none', opacity: 1 }, { transform: 'translateY(-8px)', opacity: 0 }], { duration: 140, easing: 'ease-in' }).finished.catch(() => {});
+    await floorAnim; floorAnim = null;
+  }
+  floor.hidden = on;
+  dock.hidden = !on;
+  // 숨겨져 있는 동안 묶음 배치가 폭 0(한 열)으로 계산돼 있다 → 펼치는 높이를 재기 전에 지금 폭으로 다시(안 하면 크게 펼쳤다 줄어든다)
+  if (!on) layoutRepoGroups();
   renderDock();
   renderHint();
-  if (!on) requestAnimationFrame(() => { traceSig = ''; drawTraces(); mgrUpdate(); });
+  if (!instant && on) dock.animate([{ transform: 'translateY(-8px)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 240, easing: FLOOR_EASE });
+  if (!on) {
+    const traces = $('#traces');
+    if (!instant) {
+      traces.style.opacity = '0';
+      cards().forEach((c, i) => c.animate([{ transform: 'translateY(-10px) scale(.97)', opacity: 0 }, { transform: 'none', opacity: 1 }],
+        { duration: 300, delay: 60 + i * 30, easing: FLOOR_EASE, fill: 'backwards' }));
+      floorAnim = floorShutter(floor, true).catch(() => {});
+    }
+    requestAnimationFrame(() => { traceSig = ''; drawTraces(); mgrUpdate(); });
+    if (floorAnim) {
+      await floorAnim; floorAnim = null;
+      traceSig = ''; drawTraces(); // 높이가 늘어나는 동안 잰 자리라 다 펼친 뒤 한 번 더
+      traces.style.opacity = '';
+      traces.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 260, easing: 'ease-out' });
+    }
+  }
   scheduleSelLink();
 }
 $('#btn-floor-min').addEventListener('click', () => setFloorMin(true));
@@ -4691,7 +4739,7 @@ try { if (localStorage.getItem(PROFILE_KEY)) setProfileCollapsed(true); } catch 
 $('#profile-toggle').addEventListener('click', () => setProfileCollapsed(!$('#profile').classList.contains('collapsed')));
 $('#profile-toggle').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('#profile-toggle').click(); } });
 
-try { if (localStorage.getItem(FLOOR_MIN_KEY)) setFloorMin(true); } catch {}
+try { if (localStorage.getItem(FLOOR_MIN_KEY)) setFloorMin(true, false); } catch {} // 처음 열 때는 연출 없이
 
 // ---------- 터미널 높이 조절 (CLI 아래 가로선을 위아래로 끌기) ----------
 // 높이는 #detail 의 --term-h 로 정하고 브라우저에 기억한다. 크기가 바뀌면 기존 ResizeObserver 가 fit + pty resize 를 한다
