@@ -608,8 +608,18 @@ async function sendNow(w, text) {
   if (w.status === 'starting') return { rejected: 'starting' };
   if (w.status === 'decision') return { rejected: 'blocked' };
   if (!isIdle(w) && w.status !== 'working') return assignTask(w, text);
+  await closeBtw(w); // 곁질문 답 창이 떠 있으면 키가 그 창에 먹힌다(붙여 넣은 글은 사라지고 창만 닫힘 — 실측) → 먼저 닫는다
   const cli = await cliDraft(w);
   if (cli.state !== 'empty') { logDraft(w, cli, 'reject'); return { rejected: cli.state, seen: seenDraft(cli) }; }
+  // /btw(곁질문)는 클로드가 일하는 도중에 쓰는 명령 — 턴 사이(nowQ)로 미루면 뜻이 없다. 작업 중이어도 곧장 넣고, 턴을 세지 않는다
+  // (UserPromptSubmit 이 오지 않고 대화 기록에도 안 남는다 — 답은 CLI 화면 위 창. watchBtw 가 화면에서 읽어 채팅에 따로 띄운다)
+  if (BTW_RE.test(text)) {
+    pasteInput(w, text);
+    pushLog(w, 'status', `곁질문(/btw): ${text.replace(BTW_RE, '').trim()}`);
+    watchBtw(w, text);
+    emitState();
+    return { btw: true };
+  }
   if (w.status === 'working') {
     (w.nowQ ||= []).push(text);
     pushLog(w, 'status', `작업 사이에 전달 대기: ${text}`);
@@ -619,6 +629,70 @@ async function sendNow(w, text) {
   cancelDispatch(w);
   sendPrompt(w, text);
   return {};
+}
+// ---------- /btw 곁질문 답 읽기 ----------
+// 답은 대화 기록(jsonl)에 남지 않고 CLI 화면 위 창으로만 뜬다(실측 v2.1.317 — 창 아래 '↑/↓ to scroll · c to copy · f to fork · Esc to close').
+// 화면 스냅숏을 1초마다 읽어 그 창의 글을 꺼내 w.btw 에 담는다 → 채팅 보기가 별도 창으로 띄운다. 창이 닫히면(또는 90초) 그만 본다.
+// 화면에 보이는 만큼만 읽는다 — 창 안에서 스크롤해야 보이는 긴 답은 잘린다
+const BTW_RE = /^\/btw(?:\s|$)/i;
+const BTW_FOOT = /Esc to (?:close|dismiss)/i;
+const BTW_WATCH_MS = 90_000;
+async function screenRows(w) {
+  const snap = await hostSnapshot(w.id);
+  if (!snap?.data || !snap.cols) return null;
+  const t = new HeadlessTerminal({ cols: snap.cols, rows: snap.rows, scrollback: 0, allowProposedApi: true });
+  try {
+    await new Promise((r) => t.write(snap.data, r));
+    const b = t.buffer.active, rows = [];
+    for (let i = b.baseY; i < b.length; i++) rows.push(b.getLine(i)?.translateToString(true) ?? '');
+    return rows;
+  } catch { return null; } finally { t.dispose(); }
+}
+// 창 글: 맨 아래 'Esc to close' 줄 위로, 질문 줄('/btw …')까지. 질문 줄을 못 찾으면 위로 가로선(─)까지
+function btwPanel(rows, q) {
+  const foot = rows.findLastIndex((l) => BTW_FOOT.test(l));
+  if (foot < 0) return null;
+  const key = q.replace(BTW_RE, '').trim().slice(0, 16);
+  let top = -1;
+  for (let i = foot - 1; i >= 0; i--) {
+    if ((key && rows[i].includes(key)) || /\/btw\b/.test(rows[i])) { top = i; break; }
+    if (/^\s*─{20,}/.test(rows[i])) { top = i; break; }
+  }
+  const body = rows.slice(top + 1, foot).map((l) => l.replace(/\s+$/, ''));
+  while (body.length && !body[0].trim()) body.shift();
+  while (body.length && !body.at(-1).trim()) body.pop();
+  const pad = Math.min(99, ...body.filter((l) => l.trim()).map((l) => l.match(/^ */)[0].length)); // 창 안쪽 들여쓰기 걷기
+  return body.map((l) => l.slice(Math.min(pad, l.match(/^ */)[0].length))).join('\n');
+}
+// 답 창 닫기 — 화면에 창이 실제로 있을 때만 Esc(없을 때 Esc 는 클로드 작업 중단이 된다). 닫았으면 true
+async function closeBtw(w) {
+  if (!w.btw?.open) return false;
+  const rows = await screenRows(w);
+  w.btw.open = false;
+  emitState();
+  if (!rows || btwPanel(rows, '/btw ' + w.btw.q) == null) return false;
+  w.term.write('\x1b');
+  await new Promise((r) => setTimeout(r, 300));
+  return true;
+}
+function watchBtw(w, q) {
+  const at = Date.now();
+  w.btw = { q: q.replace(BTW_RE, '').trim(), at, text: '', open: true };
+  let seen = false;
+  const tick = async () => {
+    if (!workers.has(w.id) || w.btw?.at !== at) return;
+    const rows = await screenRows(w);
+    const text = rows ? btwPanel(rows, q) : null;
+    if (text != null) {
+      seen = true;
+      if (text !== w.btw.text) { w.btw.text = text; emitState(); }
+    } else if (seen || Date.now() - at > 15_000) { // 창이 닫혔다(사용자가 Esc) · 15초 안에 안 떴다
+      w.btw.open = false; emitState(); return;
+    }
+    if (Date.now() - at < BTW_WATCH_MS) setTimeout(tick, 1000);
+    else { w.btw.open = false; emitState(); }
+  };
+  setTimeout(tick, 1200);
 }
 // 들고 있던 바로 전송 글을 CLI 에 넣는다 — 도구 하나가 끝날 때(PostToolUse). 입력창에 쓰던 글이 있으면 섞이지 않게 다음 틈까지 둔다.
 // 여러 개면 말풍선 하나씩 맞춰 지워지게 따로따로(붙여 넣기 + Enter 가 120ms 걸려 400ms 간격)
@@ -2179,7 +2253,7 @@ const server = http.createServer(async (req, res) => {
   if (sm) {
     const w = workers.get(sm[1]);
     if (!w) return json(res, 404, { error: '워커가 없습니다' });
-    return json(res, 200, { commands: slashCommands(w.cwd) });
+    return json(res, 200, { commands: slashCommands(w.cwd, CLAUDE_BIN) });
   }
   // 채팅 보기: 트랜스크립트에서 모은 대화 목록. gen 이 같으면 since(rev) 뒤에 생기거나 바뀐 것만, 다르면(새 세션·다시 읽음) 전부
   const cm = req.method === 'GET' && p.match(/^\/api\/workers\/(W\d+)\/chat$/);
@@ -2527,7 +2601,7 @@ const server = http.createServer(async (req, res) => {
     if (!ok) return json(res, 404, { error: '문서가 없습니다 (지워졌거나 옮겨짐)' });
     return json(res, 200, { ok: openPath(d.path) });
   }
-  if (req.method === 'POST' && (m = p.match(/^\/api\/workers\/(W\d+)\/(task|kill|remove|interrupt|unqueue|tomemo|resume|autoqueue|rename|diffclear|attclear)$/))) {
+  if (req.method === 'POST' && (m = p.match(/^\/api\/workers\/(W\d+)\/(task|kill|remove|interrupt|unqueue|tomemo|resume|autoqueue|rename|diffclear|attclear|btw-close)$/))) {
     const w = workers.get(m[1]);
     if (!w) return json(res, 404, { error: 'no worker' });
     const body = await readBody(req);
@@ -2593,6 +2667,7 @@ const server = http.createServer(async (req, res) => {
       const r = renameRole(w.name, body.name, w);
       if (r.error) return json(res, 409, r);
     }
+    if (m[2] === 'btw-close') { await closeBtw(w); w.btw = null; emitState(); } // 채팅의 곁질문 창 닫기 → CLI 답 창도
     if (m[2] === 'kill') { try { w.term.kill(); } catch {} }
     if (m[2] === 'remove') { forgetWorker(w); emitState(); }
     return json(res, 200, { ok: true });

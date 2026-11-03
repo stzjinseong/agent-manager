@@ -1,5 +1,6 @@
 // 채팅 입력칸의 / 자동 완성 — 그 워커에서 쓸 수 있는 슬래시 명령 목록.
-//  · 기본 명령: Claude Code 에 들어 있는 것(자주 쓰는 것만 골라 적음 — 버전마다 조금씩 다를 수 있다)
+//  · 기본 명령: 설명을 붙여 적어 둔 것(아래 BUILTIN) + Claude Code 에 물어 받은 목록(liveCommands — 버전이 올라 새로 생긴 명령도 잡힌다.
+//    설명이 없어 이름만). 받은 목록은 '화면 없이 쓸 수 있는 명령'이라 /btw · /resume · /rewind 같은 화면 전용 명령은 빠진다 → BUILTIN 에 적어 둔다
 //  · 사용자 명령: <작업 폴더>/.claude/commands · ~/.claude/commands 의 *.md (하위 폴더는 이름에 ':' 로 이음)
 //  · 스킬: <작업 폴더>/.claude/skills · ~/.claude/skills 의 <이름>/SKILL.md
 //  · 플러그인: ~/.claude/plugins/installed_plugins.json 에서 켜진 것(settings.json enabledPlugins)의 commands · skills → '플러그인:이름'
@@ -7,9 +8,11 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawn } from 'node:child_process';
 
 const BUILTIN = [
   ['clear', '대화 기록을 지우고 새로 시작'],
+  ['btw', '작업을 멈추지 않고 곁질문 — 답은 따로 뜨고 대화 기록에 안 남음', '<질문>'],
   ['compact', '대화를 요약해 컨텍스트 줄이기', '[요약에 남길 지시]'],
   ['context', '컨텍스트 사용량 보기'],
   ['cost', '이 세션의 토큰 · 비용'],
@@ -97,8 +100,45 @@ function pluginDirs(cwd) {
   return out;
 }
 
+// Claude Code 에 직접 물어 받는 명령 목록 — 헤드리스(-p)로 '/cost' 를 보내면 시작 알림(init)에 그 작업 폴더에서 쓸 수 있는 명령 이름이
+// 모두 온다(기본 · 스킬 · 플러그인 · MCP 프롬프트). /cost 는 모델을 부르지 않아 비용 0, 약 10초(실측 v2.1.317 · 82개). 세션 파일은 남기지 않는다.
+// 작업 폴더마다 12시간 담아 두고, 처음 묻는 동안은 파일에서 찾은 목록만 돌려준다(받으면 다음 요청부터 합쳐짐)
+const LIVE_TTL = 12 * 3600_000;
+const live = new Map(); // cwd → { at, names } | { pending: true }
+function fetchLive(bin, cwd) {
+  const key = cwd || '';
+  const cur = live.get(key);
+  if (!bin || cur?.pending || (cur && Date.now() - cur.at < LIVE_TTL)) return;
+  live.set(key, { ...cur, pending: true });
+  const env = { ...process.env };
+  for (const k of Object.keys(env)) if (/^(CLAUDECODE|CLAUDE_CODE_.*|CLAUDE_PID|CLAUDE_EFFORT|AGENT_MANAGER_.*)$/.test(k)) delete env[k];
+  let done = false, buf = '';
+  const finish = (names) => {
+    if (done) return; done = true;
+    clearTimeout(timer);
+    try { p.kill(); } catch {}
+    live.set(key, names ? { at: Date.now(), names } : { at: Date.now() - LIVE_TTL + 600_000, names: cur?.names || [] }); // 실패면 10분 뒤 다시
+    cache.delete(key);
+  };
+  let p;
+  try {
+    p = spawn(bin, ['-p', '--output-format', 'stream-json', '--verbose', '--no-session-persistence', '/cost'], { cwd: cwd || undefined, env, stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true });
+  } catch { finish(null); return; }
+  const timer = setTimeout(() => finish(null), 60_000);
+  p.on('error', () => finish(null));
+  p.on('exit', () => finish(null));
+  p.stdout.on('data', (d) => {
+    buf += d;
+    const lines = buf.split('\n'); buf = lines.pop();
+    for (const l of lines) {
+      try { const j = JSON.parse(l); if (j.type === 'system' && j.subtype === 'init' && Array.isArray(j.slash_commands)) return finish(j.slash_commands.filter((n) => typeof n === 'string' && /^[\w][\w:.-]*$/.test(n))); } catch {}
+    }
+  });
+}
+
 const cache = new Map(); // cwd → { at, list }
-export function slashCommands(cwd) {
+export function slashCommands(cwd, bin) {
+  fetchLive(bin, cwd);
   const c = cache.get(cwd || '');
   if (c && Date.now() - c.at < 30_000) return c.list;
   const out = [];
@@ -108,7 +148,8 @@ export function slashCommands(cwd) {
   for (const p of pluginDirs(cwd)) { commandsIn(path.join(p.dir, 'commands'), `${p.name}:`, 'plugin', out); skillsIn(path.join(p.dir, 'skills'), `${p.name}:`, 'plugin', out); }
   // 같은 이름은 먼저 찾은 것(프로젝트 > 사용자 > 플러그인)만, 기본 명령은 맨 뒤 — 사용자가 만든 같은 이름 명령이 기본보다 먼저 보이게
   const seen = new Set(), list = [];
-  for (const x of [...out, ...BUILTIN.map(([name, desc, hint = '']) => ({ name, desc, hint, src: 'builtin' }))]) if (!seen.has(x.name)) { seen.add(x.name); list.push(x); }
+  const got = (live.get(cwd || '')?.names || []).map((name) => ({ name, desc: '', hint: '', src: name.startsWith('mcp__') ? 'mcp' : 'builtin' }));
+  for (const x of [...out, ...BUILTIN.map(([name, desc, hint = '']) => ({ name, desc, hint, src: 'builtin' })), ...got]) if (!seen.has(x.name)) { seen.add(x.name); list.push(x); }
   cache.set(cwd || '', { at: Date.now(), list });
   return list;
 }

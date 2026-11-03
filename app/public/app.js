@@ -543,7 +543,7 @@ function cliPeekCheck() {
   clearTimeout(peekTimer);
   peekTimer = setTimeout(() => {
     const w = state.workers.find((x) => x.id === selected);
-    const want = Boolean(chatOpen && w && termSnap.id === selected && !['starting', 'exited'].includes(w.status) && !$('#detail').hidden && cliScreenBlocked());
+    const want = Boolean(chatOpen && w && termSnap.id === selected && !['starting', 'exited'].includes(w.status) && !$('#detail').hidden && !w.btw?.open && cliScreenBlocked()); // 곁질문 답 창은 채팅의 곁질문 창(#cv-btw)이 대신 보여 준다
     if (!want) { peekSince = 0; peekHidden = false; $('#cv-peek').hidden = true; return setCliPeek(false); }
     if (!peekSince) peekSince = Date.now();
     if (Date.now() - peekSince < 500) return cliPeekCheck(); // 다시 그리는 중의 잠깐 빈 화면은 넘긴다
@@ -1190,6 +1190,7 @@ function fillSelected() {
 }
 function render() {
   fillSelected();
+  renderBtw();
   renderStats();
   renderStale();
   renderUpd();
@@ -5734,6 +5735,32 @@ $('#cv-slash').addEventListener('click', (e) => {
   slashMenu.i = Number(b.dataset.k);
   slashFill(false);
 });
+// ---------- /btw 곁질문 창 ----------
+// /btw 의 답은 대화 기록에 안 남고 CLI 화면 위 창으로만 뜬다 — 서버가 화면에서 읽어(watchBtw) w.btw 로 보내 주면 채팅 위에 따로 띄운다.
+// 닫으면 CLI 의 답 창도 닫는다(btw-close). 화면에 보이는 만큼만 읽혀 아주 긴 답은 잘릴 수 있다
+var btwSig = ''; // var — render() 가 이 줄보다 먼저 불려도 되게
+function renderBtw() {
+  const btwBox = $('#cv-btw');
+  const w = state.workers.find((x) => x.id === selected), b = w?.btw;
+  const sig = b ? `${w.id}|${b.at}|${b.open}|${b.text}` : '';
+  if (sig === btwSig) return;
+  btwSig = sig;
+  cliPeekCheck(); // 답 창이 열리고 닫힐 때 아래 터미널 드러내기도 다시 판단
+  btwBox.hidden = !b;
+  if (!b) { btwBox.innerHTML = ''; return; }
+  const body = b.text ? `<div class="btw-a">${esc(b.text)}</div>` : `<div class="btw-wait">${esc(_t(b.open ? '답 받는 중…' : 'CLI 에서 답 창이 닫혔어요'))}</div>`;
+  btwBox.innerHTML = `<div class="btw-h"><b>${esc(_t('곁질문'))}</b><small>/btw · ${esc(_t('대화 기록에 남지 않아요'))}</small>`
+    + `<span class="btw-acts">${b.text ? `<button type="button" data-btw="copy" title="${esc(_t('답 복사'))}">⧉</button>` : ''}<button type="button" data-btw="close" title="${esc(_t('닫기 (CLI 의 답 창도 닫음)'))}">✕</button></span></div>`
+    + `<div class="btw-q">${esc(b.q)}</div>${body}`;
+}
+$('#cv-btw').addEventListener('click', async (e) => {
+  const a = e.target.closest('[data-btw]')?.dataset.btw, w = state.workers.find((x) => x.id === selected);
+  if (!a || !w) return;
+  if (a === 'copy') { try { await navigator.clipboard.writeText(w.btw?.text || ''); toast(_t('복사했어요')); } catch {} return; }
+  $('#cv-btw').hidden = true;
+  await api(`/api/workers/${w.id}/btw-close`, {});
+});
+
 // ---------- 입력 기록 (입력칸에서 ↑) ----------
 // 커서가 첫 줄에 있을 때 ↑ 를 누르면 지난번에 보낸 글을 목록으로 — ↑↓ 로 고르고 Enter · Tab 이면 입력칸에 그대로 넣고 닫는다.
 // Esc 는 목록만 닫는다(클로드 중단으로 번지지 않게). 재료는 지금 워커의 지금 세션에서 보낸 글만: 이 브라우저에서 채팅으로 보낸 글

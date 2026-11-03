@@ -234,6 +234,7 @@
 }
 /* 채팅 / 명령 · 보낸 글 기록 목록은 불투명하게 — 흐림이 걸린 채팅 상자(.term-wrap.chatting) 안이라 이 목록의 흐림이 듣지 않아
    뒤 채팅 글이 거의 그대로 비쳐 겹쳐 읽혔다(기록 목록을 780px 까지 키우며 더 눈에 띔). 진한 유리색을 바탕색 위에 한 번 더 깔아 막는다 */
+:root[data-skin="glass"] .cv-btw { background: linear-gradient(var(--glass-solid), var(--glass-solid)), var(--bg); border-color: var(--glass-l3-line); }
 :root[data-skin="glass"] .cv-slash { background: linear-gradient(var(--glass-solid), var(--glass-solid)), var(--bg); }
 :root[data-skin="glass"] .tip { color: var(--text); }
 /* 상단 알림 띠(재시작 안내 · 하루 요약) — 헤더 아래 기판 위에 겹쳐 뜨는데 기본 바탕이 --surface(유리 6%)라 뒤 카드와 겹쳐 읽히지 않았다.
