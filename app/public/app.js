@@ -3121,6 +3121,8 @@ async function removeCard(n, confirm = true) {
   const running = w.status !== 'exited';
   if (confirm && !(await ask({ title: _t('"{name}" 워커를 제거할까요?', { name: w.name }), body: _t(running ? '목록에서 지웁니다. 실행 중인 Claude 세션도 종료됩니다.' : '목록에서 지웁니다.'), ok: _t('제거'), danger: true }))) return;
   await api(`/api/workers/${w.id}/remove`);
+  // 워커만 지우면 같은 이름의 저장된 역할이 곧바로 대기실 카드로 다시 그려졌다 → 카드 제거는 역할까지(같은 이름의 다른 워커가 떠 있으면 남김)
+  if (state.profiles.some((p) => p.name === w.name) && !state.workers.some((x) => x.id !== w.id && x.name === w.name && x.status !== 'exited')) await api('/api/profiles/delete', { name: w.name });
   if (selected === w.id) { selected = null; render(); }
 }
 
