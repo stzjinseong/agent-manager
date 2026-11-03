@@ -2760,6 +2760,14 @@ button.cv-more:hover { color: var(--text); }
 .btw-grip-l { position: absolute; left: 0; bottom: 0; width: 14px; height: 14px; cursor: nesw-resize; touch-action: none;
   background: linear-gradient(45deg, transparent 0 45%, var(--dim) 45% 52%, transparent 52% 64%, var(--dim) 64% 71%, transparent 71%); opacity: .55; border-bottom-left-radius: 12px; }
 .btw-grip-l:hover { opacity: 1; }
+/* BTW 플로팅 버튼 — 채팅 입력 상자 바로 위 오른쪽(/ 목록 · 기록 목록이 뜨면 그 아래로 가려진다) */
+.cv-comp { position: relative; }
+.cv-btw-fab { position: absolute; right: 6px; bottom: calc(100% + 10px); z-index: 4; height: 30px; padding: 0 12px; border-radius: 999px; cursor: pointer;
+  font: 700 11.5px/1 var(--mono); letter-spacing: .06em; color: var(--accent-hi); background: var(--surface); border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line-2));
+  box-shadow: 0 6px 18px rgb(0 0 0 / calc(.15 + .3 * var(--shade))); transition: background .15s, transform .15s, color .15s; }
+.cv-btw-fab:hover { transform: translateY(-1px); background: color-mix(in srgb, var(--accent) 16%, var(--surface)); }
+.cv-btw-fab.on { color: #fff; background: var(--accent); border-color: var(--accent); }
+.btw-empty { margin: auto 0; padding: 18px 6px; text-align: center; font-size: 12.5px; color: var(--dim); line-height: 1.6; }
 .btw-form { flex: none; display: flex; align-items: flex-end; gap: 6px; }
 .btw-form textarea { flex: 1; min-width: 0; resize: none; overflow-y: auto; padding: 6px 9px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--surface-2); color: var(--text); font: inherit; font-size: 12.5px; outline: 0; }
 .btw-form textarea:focus { border-color: var(--accent); }
@@ -2785,7 +2793,6 @@ button.cv-more:hover { color: var(--text); }
 :root[data-theme="light"] .cv-ask-card { background: #fff; }
 
 /* 채팅 입력칸 / 자동 완성 — 입력칸 바로 위에 뜬다 */
-.cv-comp { position: relative; }
 .cv-slash { position: absolute; left: 2px; right: 2px; bottom: calc(100% - 4px); z-index: 6; max-height: 260px; overflow-y: auto; padding: 4px;
   background: var(--surface); border: 1px solid var(--line-2); border-radius: 10px; box-shadow: 0 -8px 24px rgb(0 0 0 / calc(.15 + .3 * var(--shade))); }
 .cv-sl { all: unset; box-sizing: border-box; cursor: pointer; width: 100%; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: baseline; gap: 10px; padding: 5px 9px; border-radius: 7px; }

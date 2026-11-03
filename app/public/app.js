@@ -5740,7 +5740,9 @@ $('#cv-slash').addEventListener('click', (e) => {
 // 창 안 입력칸으로 이어서 물을 수 있고(보내면 '/btw 글'), 이번에 연 창에서 주고받은 질문 · 답은 창 안에 쌓인다(브라우저에만 — 닫으면 비움).
 // 머리 줄을 끌어 채팅 화면 안에서 옮긴다(자리는 이 브라우저에 기억). 닫으면 CLI 의 답 창도 닫는다(btw-close).
 // 화면에 보이는 만큼만 읽혀 아주 긴 답은 잘릴 수 있다
-var btwSig = '', btwLog = { wid: null, items: [] }; // var — render() 가 이 줄보다 먼저 불려도 되게
+// 이력은 워커별로 이 브라우저 화면에만 쌓는다(닫아도 남아 플로팅 버튼으로 다시 열면 보임 · 새로고침하면 비움).
+// 창은 플로팅 버튼(#cv-btw-fab)으로 열고 닫는다 — 이력이 없어도 열어 바로 물을 수 있고, 새 답이 오면 저절로 열린다
+var btwSig = '', btwLogs = {}, btwOpenFor = {}, btwSeenAt = new Set(); // var — render() 가 이 줄보다 먼저 불려도 되게
 const BTW_POS_KEY = 'am.btwPos';
 function btwSkeleton(box) {
   box.innerHTML = `<div class="btw-h" data-btw-drag><b>BTW</b><small>/btw · ${esc(_t('대화 기록에 남지 않아요'))}</small>`
@@ -5766,29 +5768,41 @@ function btwPlace(box) {
   box.style.top = `${Math.min(Math.max(4, p.y), maxY)}px`;
 }
 function renderBtw() {
-  const box = $('#cv-btw');
+  const box = $('#cv-btw'), fab = $('#cv-btw-fab');
   const w = state.workers.find((x) => x.id === selected), b = w?.btw;
-  if (btwLog.wid !== (w?.id || null)) btwLog = { wid: w?.id || null, items: [] };
+  const items = w ? (btwLogs[w.id] ||= []) : [];
   if (b) {
-    const it = btwLog.items.find((x) => x.at === b.at);
-    if (it) Object.assign(it, { text: b.text, open: b.open }); else btwLog.items.push({ at: b.at, q: b.q, text: b.text, open: b.open });
-  } else btwLog.items = [];
-  const sig = `${btwLog.wid}|` + btwLog.items.map((x) => `${x.at}|${x.open}|${x.text}`).join('|');
+    const it = items.find((x) => x.at === b.at);
+    if (it) Object.assign(it, { text: b.text, open: b.open }); else items.push({ at: b.at, q: b.q, text: b.text, open: b.open });
+    if (!btwSeenAt.has(b.at)) { btwSeenAt.add(b.at); btwOpenFor[w.id] = true; } // 새 곁질문(채팅 입력칸의 /btw 포함)이면 창을 연다
+  } else for (const x of items) x.open = false;
+  const open = Boolean(w && btwOpenFor[w.id]);
+  const sig = `${w?.id}|${open}|` + items.map((x) => `${x.at}|${x.open}|${x.text}`).join('|');
   if (sig === btwSig) return;
   btwSig = sig;
   cliPeekCheck(); // 답 창이 열리고 닫힐 때 아래 터미널 드러내기도 다시 판단
-  box.hidden = !btwLog.items.length;
-  if (box.hidden) return;
+  fab.classList.toggle('on', open);
+  fab.setAttribute('aria-expanded', String(open));
+  box.hidden = !open;
+  if (!open) return;
   if (!box.dataset.built) btwSkeleton(box);
   // 질문은 오른쪽 말풍선, 답은 메인 채팅의 클로드 답처럼 — 캐릭터 + 'Claude · 시각' + 마크다운(화면에서 읽은 글이라 줄이 터미널 폭에서 끊겨 있는데,
   // 마크다운이 문단 안 줄바꿈을 이어 붙여 준다). 기다리는 동안은 캐릭터가 통통 튀는 '생각 중'
-  $('.btw-list', box).innerHTML = btwLog.items.map((x) => `<div class="btw-q">${esc(x.q)}</div>`
+  $('.btw-list', box).innerHTML = items.length ? items.map((x) => `<div class="btw-q">${esc(x.q)}</div>`
     + `<div class="btw-a${x.text ? '' : ' btw-think'}"><span class="btw-ico"></span><div class="btw-ab"><div class="btw-lab"><b>Claude</b>${chatTime(x.at)}</div>`
-    + (x.text ? chatMd(x.text) : x.open ? `<div class="btw-wait"><span class="cv-typing"><i></i><i></i><i></i></span> ${esc(_t('생각 중'))}</div>` : `<div class="btw-wait">${esc(_t('CLI 에서 답 창이 닫혔어요'))}</div>`)
-    + '</div></div>').join('');
+    + (x.text ? chatMd(x.text) : x.open ? `<div class="btw-wait"><span class="cv-typing"><i></i><i></i><i></i></span> ${esc(_t('생각 중'))}</div>` : `<div class="btw-wait">${esc(_t('답을 읽지 못했어요 (CLI 에서 답 창이 닫힘)'))}</div>`)
+    + '</div></div>').join('')
+    : `<div class="btw-empty">${esc(_t('작업을 멈추지 않고 Claude 에게 곁질문해 보세요. 답은 대화 기록에 남지 않아요.'))}</div>`;
   for (const a of box.querySelectorAll('.cv-md a[href]')) { a.target = '_blank'; a.rel = 'noopener'; }
   const list = $('.btw-list', box);
   list.scrollTop = list.scrollHeight;
+}
+function setBtwOpen(on) {
+  const w = state.workers.find((x) => x.id === selected);
+  if (!w) return;
+  btwOpenFor[w.id] = on;
+  renderBtw();
+  if (on) $('#cv-btw .btw-form textarea')?.focus();
 }
 async function btwAsk(text) {
   const w = state.workers.find((x) => x.id === selected);
@@ -5801,11 +5815,11 @@ async function btwAsk(text) {
 $('#cv-btw').addEventListener('click', async (e) => {
   const a = e.target.closest('[data-btw]')?.dataset.btw, w = state.workers.find((x) => x.id === selected);
   if (!a || !w) return;
-  if (a === 'copy') { try { await navigator.clipboard.writeText(btwLog.items.at(-1)?.text || ''); toast(_t('복사했어요')); } catch {} return; }
-  $('#cv-btw').hidden = true;
-  btwLog.items = [];
-  await api(`/api/workers/${w.id}/btw-close`, {});
+  if (a === 'copy') { try { await navigator.clipboard.writeText((btwLogs[w.id] || []).filter((x) => x.text).at(-1)?.text || ''); toast(_t('복사했어요')); } catch {} return; }
+  setBtwOpen(false);
+  if (w.btw) await api(`/api/workers/${w.id}/btw-close`, {}); // CLI 에 답 창이 떠 있으면 같이 닫는다(이력은 남음)
 });
+$('#cv-btw-fab').addEventListener('click', () => setBtwOpen($('#cv-btw').hidden));
 $('#cv-btw').addEventListener('submit', async (e) => {
   e.preventDefault();
   const ta = $('.btw-form textarea', e.currentTarget);
