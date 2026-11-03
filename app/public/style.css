@@ -617,18 +617,18 @@ body.term-full .side-grip { left: -6px; }
 .queue .qi button { background: none; border: 0; color: var(--dim); cursor: pointer; padding: 0 2px; font-size: 13px; }
 .queue .qi button:hover { color: var(--text); }
 .queue .qi .memo-ic + .memo-ic { margin-left: -2px; } /* 버튼 사이를 메모 카드 버튼 줄(.ma gap 6px)과 같게 — 줄 간격 8px 에서 2px 당긴다 */
-/* 옆 패널(대기열·Backlog)·세션 프로파일 서브에이전트 목록·diff 요청 목록·채팅 목록·헤더 칩 줄 스크롤바 — 앱의 스크롤바는 모두 이 모양: 트랙 없이 얇은 둥근 막대, 올리면 조금 진하게.
+/* 옆 패널(대기열·Backlog)·세션 프로파일 서브에이전트 목록·diff 요청 목록·채팅 목록·헤더 칩 줄·채팅 / 명령 · 보낸 글 기록 목록 스크롤바 — 앱의 스크롤바는 모두 이 모양: 트랙 없이 얇은 둥근 막대, 올리면 조금 진하게.
    크롬 계열은 ::-webkit-scrollbar 로 다듬고(표준 scrollbar-color 를 같이 주면 이 규칙이 무시되므로 주지 않는다),
    그 밖의 브라우저만 표준 속성으로 얇게 */
-:is(.queue, .memos, .subagents, #diff-files, .att-tab-list, .cv-list, .dv-chips)::-webkit-scrollbar { width: 10px; height: 10px; }
-:is(.queue, .memos, .subagents, #diff-files, .att-tab-list, .cv-list, .dv-chips)::-webkit-scrollbar-track { background: transparent; }
-:is(.queue, .memos, .subagents, #diff-files, .att-tab-list, .cv-list, .dv-chips)::-webkit-scrollbar-thumb {
+:is(.queue, .memos, .subagents, #diff-files, .att-tab-list, .cv-list, .dv-chips, .cv-slash)::-webkit-scrollbar { width: 10px; height: 10px; }
+:is(.queue, .memos, .subagents, #diff-files, .att-tab-list, .cv-list, .dv-chips, .cv-slash)::-webkit-scrollbar-track { background: transparent; }
+:is(.queue, .memos, .subagents, #diff-files, .att-tab-list, .cv-list, .dv-chips, .cv-slash)::-webkit-scrollbar-thumb {
   background: rgb(var(--ink) / .14); border-radius: 10px; border: 3px solid transparent; background-clip: padding-box; min-height: 32px; min-width: 32px;
 }
-:is(.queue, .memos, .subagents, #diff-files, .att-tab-list, .cv-list, .dv-chips)::-webkit-scrollbar-thumb:hover { background-color: rgb(var(--ink) / .3); }
-:is(.queue, .memos, .subagents, #diff-files, .att-tab-list, .cv-list, .dv-chips)::-webkit-scrollbar-button { display: none; }
+:is(.queue, .memos, .subagents, #diff-files, .att-tab-list, .cv-list, .dv-chips, .cv-slash)::-webkit-scrollbar-thumb:hover { background-color: rgb(var(--ink) / .3); }
+:is(.queue, .memos, .subagents, #diff-files, .att-tab-list, .cv-list, .dv-chips, .cv-slash)::-webkit-scrollbar-button { display: none; }
 @supports not selector(::-webkit-scrollbar) {
-  .queue, .memos, .subagents, #diff-files, .att-tab-list, .cv-list, .dv-chips { scrollbar-width: thin; scrollbar-color: rgb(var(--ink) / .18) transparent; }
+  .queue, .memos, .subagents, #diff-files, .att-tab-list, .cv-list, .dv-chips, .cv-slash { scrollbar-width: thin; scrollbar-color: rgb(var(--ink) / .18) transparent; }
 }
 
 /* ---------- 반응형 ---------- */
