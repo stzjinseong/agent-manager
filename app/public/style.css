@@ -346,10 +346,6 @@ body.card-drag .node-add { opacity: .25; transition: opacity .2s; }
   transition: transform .15s, box-shadow .2s, border-color .2s;
 }
 .node:hover { transform: translateY(-2px); border-color: rgb(var(--ink) / .16); }
-.node::before { /* 윗면 핀 */
-  content: ""; position: absolute; top: -6px; left: 22px; right: 22px; height: 5px;
-  background: repeating-linear-gradient(90deg, var(--copper) 0 4px, transparent 4px 12px); opacity: .45;
-}
 .node.sel { border-color: rgb(var(--ink) / .22); background: linear-gradient(180deg, var(--sel-a), var(--sel-b)); transform: translateY(-2px); }
 .node.sel::after { /* 선택 표시: 테두리 대신 아래쪽 짧은 막대 */
   content: ""; position: absolute; left: 50%; bottom: -9px; width: 34px; height: 3px; margin-left: -17px; border-radius: 2px; background: var(--accent);
@@ -448,7 +444,6 @@ body.card-drag .node-add { opacity: .25; transition: opacity .2s; }
 
 /* 빈 소켓 (저장된 역할) */
 .node.socket { background: transparent; border: 1px dashed rgb(var(--ink) / .13); box-shadow: none; cursor: default; }
-.node.socket::before { opacity: .2; }
 .node.socket .stage { background: rgb(0 0 0 / calc(.15 * var(--shade))); }
 .node.socket .avatar { opacity: .22; filter: grayscale(1); }
 .socket-acts { display: flex; gap: 6px; }
@@ -1324,10 +1319,6 @@ html[data-char="clawd-white"] :is(.node, .dchip, .term-wrap) { --avatar: var(--c
     radial-gradient(circle at 1px 1px, rgb(var(--ink) / .05) 1px, transparent 1.4px) 0 0 / 18px 18px,
     linear-gradient(180deg, var(--surface-2), var(--surface));
   box-shadow: 0 24px 60px rgb(0 0 0 / calc(.55 * var(--shade))), 0 1px 0 rgb(var(--ink) / .05) inset;
-}
-.modal::before { /* 윗면 핀 — 워커 카드와 같은 모양 */
-  content: ""; position: absolute; top: -6px; left: 28px; right: 28px; height: 5px;
-  background: repeating-linear-gradient(90deg, var(--copper) 0 4px, transparent 4px 12px); opacity: .55;
 }
 .ask { --ask-c: var(--accent); width: min(420px, calc(100% - 32px)); padding: 18px 20px 16px; }
 .modal-back.danger .ask { --ask-c: #e0655a; }
