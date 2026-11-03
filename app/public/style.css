@@ -2642,6 +2642,21 @@ button.upd-notes { background: none; font: inherit; font-size: 12px; cursor: poi
 /* 내 요청: 줄 밖 오른쪽 말풍선 */
 .cv-u { grid-template-columns: minmax(0, 1fr); justify-items: end; padding: 4px 0 14px; }
 .cv-u::before { display: none; }
+/* 채팅 상단 고정 요청(app.js updateCvPin) — 위로 스크롤돼 가려진 가장 가까운 내 요청을 목록 맨 위에 덮어 보여 준다(타임라인 .tl-pin 과 같은 생각).
+   목록 레이아웃 · 스크롤 위치는 그대로. 오른쪽은 목록 스크롤바 앞에서 멈춘다(right 는 app.js) */
+.cv-pin {
+  position: absolute; top: 0; left: 0; z-index: 3; display: flex; align-items: baseline; gap: 8px; padding: 7px 14px; cursor: pointer;
+  font-size: 12.5px; color: var(--text); background: color-mix(in srgb, var(--accent) 10%, var(--chat-bg, var(--term-bg)));
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); box-shadow: 0 6px 14px -6px rgb(0 0 0 / calc(.25 + .35 * var(--shade)));
+}
+.cv-pin[hidden] { display: none; }
+.cv-pin:hover { background: color-mix(in srgb, var(--accent) 18%, var(--chat-bg, var(--term-bg))); }
+.cv-pin .tag { flex: none; font-size: 10.5px; font-weight: 600; padding: 0 6px; border-radius: 4px; line-height: 17px; background: var(--accent); color: #1a0f0a; }
+.cv-pin time { flex: none; color: var(--dim); font: 11px var(--mono); }
+.cv-pin .tx { flex: 1; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-wrap; word-break: break-all; }
+.cv-pin .up { flex: none; color: var(--dim); }
+.cv-u.cv-flash .cv-msg { animation: cv-flash 1.2s ease-out; }
+@keyframes cv-flash { 0%, 30% { box-shadow: 0 0 0 2px var(--accent); } 100% { box-shadow: 0 0 0 2px transparent; } }
 .cv-msg { max-width: 78%; background: var(--surface-2); border-radius: 10px; border-top-right-radius: 4px; padding: 8px 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .cv-msg .att { margin-top: 6px; white-space: normal; }
 /* 보내고 기록에 남기 전(흐리게) — 기록에 들어오면 보통 말풍선으로 바뀐다 */

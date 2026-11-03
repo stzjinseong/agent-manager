@@ -5380,6 +5380,43 @@ $('#cv-list').addEventListener('load', (e) => {
 }, true);
 $('#cv-list').addEventListener('scroll', (e) => { if (!e.currentTarget._settling && e.currentTarget.scrollTop < 80) chatShowOlder(); }, { passive: true });
 $('#cv-list').addEventListener('click', (e) => { if (e.target.closest('[data-older]')) chatShowOlder(); });
+// ---------- 채팅 상단 고정 요청 ----------
+// 위로 스크롤돼 가려진 내 요청(.cv-u — 대기 중 말풍선 제외) 가운데 가장 아래(최근) 것을 목록 맨 위에 덮어 보여 준다(타임라인 updatePin 과 같은 생각).
+// 지금 보는 답이 어떤 요청에 대한 것인지 알 수 있고, 누르면 그 요청이 목록 맨 위에 오게 스크롤하고 잠깐 강조한다
+const cvPin = $('#cv-pin');
+let cvPinFor = null, cvPinRaf = 0;
+function updateCvPin() {
+  cvPinRaf = 0;
+  const list = $('#cv-list');
+  if (!chatOpen || list.offsetParent === null) { cvPin.hidden = true; cvPinFor = null; return; }
+  const top = list.getBoundingClientRect().top;
+  let hit = null;
+  for (const el of list.querySelectorAll('.cv-u:not(.cv-pending)')) {
+    if (el.getBoundingClientRect().bottom <= top + 2) hit = el; else break;
+  }
+  if (!hit) { cvPin.hidden = true; cvPinFor = null; return; }
+  cvPin.style.right = `${list.offsetWidth - list.clientWidth}px`; // 스크롤바는 가리지 않게
+  if (cvPinFor !== hit || cvPin.hidden) {
+    cvPinFor = hit;
+    const msg = hit.querySelector('.cv-msg')?.cloneNode(true);
+    msg?.querySelectorAll('.att').forEach((a) => a.remove());
+    const text = (msg?.textContent || '').trim() || _t('(그림만)');
+    const time = (hit.querySelector('.cv-lab')?.textContent || '').replace(_t('나'), '').trim();
+    cvPin.innerHTML = `<span class="tag">${_t('요청')}</span><time>${esc(time)}</time><span class="tx">${esc(text)}</span><span class="up" aria-hidden="true">↑</span>`;
+  }
+  cvPin.hidden = false;
+}
+const cvPinSoon = () => { if (!cvPinRaf) cvPinRaf = requestAnimationFrame(updateCvPin); };
+$('#cv-list').addEventListener('scroll', cvPinSoon, { passive: true });
+new ResizeObserver(cvPinSoon).observe($('#cv-list'));
+new MutationObserver(cvPinSoon).observe($('#cv-list'), { childList: true, subtree: true });
+cvPin.addEventListener('click', () => {
+  const el = cvPinFor, list = $('#cv-list');
+  if (!el?.isConnected) return;
+  list.scrollTo({ top: list.scrollTop + el.getBoundingClientRect().top - list.getBoundingClientRect().top - 8, behavior: 'smooth' });
+  el.classList.remove('cv-flash'); void el.offsetWidth; el.classList.add('cv-flash');
+  setTimeout(() => el.classList.remove('cv-flash'), 1300);
+});
 const chatCache = new Map(), CHAT_CACHE_N = 8; // 워커 id → chatData
 async function loadChat() {
   const w = state.workers.find((x) => x.id === selected);

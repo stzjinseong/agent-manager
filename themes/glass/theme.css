@@ -326,3 +326,10 @@
 :root[data-skin="glass"] .memos li.mh { background: transparent; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
 :root[data-skin="glass"] .tl-pin { background: color-mix(in srgb, var(--accent) 16%, var(--glass-solid)); }
 :root[data-skin="glass"] .tl-pin:hover { background: color-mix(in srgb, var(--accent) 24%, var(--glass-solid)); }
+/* 채팅 상단 고정 요청(.cv-pin) — 대화 글 바로 위를 덮으니 타임라인 고정 요청과 같은 진한 바탕 + 흐림 */
+:root[data-skin="glass"] .cv-pin {
+  background: color-mix(in srgb, var(--accent) 14%, var(--glass-solid)); border-bottom-color: var(--glass-l3-line);
+  backdrop-filter: blur(24px) saturate(160%); -webkit-backdrop-filter: blur(24px) saturate(160%);
+  box-shadow: inset 0 1px 0 var(--glass-l3-hi), 0 8px 18px -8px rgb(0 0 0 / calc(.25 + .3 * var(--shade)));
+}
+:root[data-skin="glass"] .cv-pin:hover { background: color-mix(in srgb, var(--accent) 22%, var(--glass-solid)); }
