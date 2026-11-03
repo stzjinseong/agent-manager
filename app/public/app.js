@@ -1123,7 +1123,7 @@ function connect() {
       const more = termSnap.loadingFull ? termSnap.fromBottom : null; // 맨 위로 올려 전부 불러온 것 — 보던 줄을 그대로 맨 위에
       termSnap = { id: msg.id, partial: Boolean(msg.partial), loadingFull: false, fromBottom: 0, pending: termSnap.id === msg.id && termSnap.pending };
       term.reset();
-      term.write(recolorTerm(msg.data), () => { if (more == null) restoreTermScroll(msg.id); else term.scrollToLine(Math.max(0, term.buffer.active.baseY - more)); requestAnimationFrame(() => requestAnimationFrame(() => switchFxReveal(msg.id, 'cli'))); });
+      term.write(recolorTerm(msg.data), () => { if (more == null) restoreTermScroll(msg.id); else term.scrollToLine(Math.max(0, term.buffer.active.baseY - more)); requestAnimationFrame(() => switchFxReveal(msg.id, 'cli')); });
     }
     else if (msg.type === 'clearScrollback' && msg.id === selected) term.write('\x1b[3J'); // /clear — 이전 대화 기록만 지움
     else if (msg.type === 'restored') chatRestored(msg);
@@ -2932,10 +2932,10 @@ function restoreTermScroll(id) {
 // ---------- 워커 전환 연출 ----------
 // 다른 워커를 누르면 새 대화를 불러오는 동안 채팅 · 터미널이 한두 프레임 비거나(실측 ~30ms '아직 대화가 없어요') 지난 내용이 보였다가
 // 바뀌어 깜빡여 보였다. → 누르는 순간 채팅 목록(#cv-list) · 터미널 화면(.xterm-screen)을 숨기고, 새 내용을 다 그리고 스크롤이 자리 잡으면
-// (loadChat · 기록 scrollback 쓰기 끝 + 2프레임 — switchFxReveal) 0.15초 동안 나타나게 한다. 0.7초 안에 준비가 안 되면 그냥 드러낸다.
+// (loadChat · 기록 scrollback 쓰기 끝 + 1프레임 — switchFxReveal, 지난 대화가 그대로면 곧장) 0.1초 동안 나타나게 한다. 0.7초 안에 준비가 안 되면 그냥 드러낸다.
 // 앞 화면을 복제해 겹쳐 두는 크로스페이드는 뺐다 — 긴 대화에선 복제본의 스크롤이 원래만큼 안 내려가 앞 워커의 위쪽 대화가 보였고,
 // 두 대화 글자가 겹쳐 어지러웠다(사용자 녹화 프레임 18~21)
-const SWITCH_MS = 150, SWITCH_WAIT_MS = 700;
+const SWITCH_MS = 100, SWITCH_WAIT_MS = 700;
 let switchFx = null;
 function switchFxEnd() {
   if (!switchFx) return;
@@ -5393,6 +5393,8 @@ async function loadChat() {
     chatData = c || { wid: w.id, gen: null, rev: 0, key: null, items: [] };
     chatLoading = !c;
     renderChat();
+    // 지난 대화가 그 뒤로 바뀌지 않았으면(chatRev 그대로) 서버 응답을 기다리지 않고 바로 드러낸다 — 바뀐 게 있을 때만 받아서 그린 뒤에
+    if (c && c.key === key) requestAnimationFrame(() => switchFxReveal(w.id, 'chat'));
   }
   const q = chatData.gen ? `?gen=${encodeURIComponent(chatData.gen)}&since=${chatData.rev}` : '';
   let d;
@@ -5413,8 +5415,8 @@ async function loadChat() {
   if (chatHtml.size > 2000) chatHtml.clear();
   renderChat();
   // 지난 대화(캐시)를 그린 순간 드러냈더니, 그 사이 진행된 대화가 붙고 스크롤이 한 번 더 내려가는 게 보였다(실측 880 → 1018px).
-  // 새로 받은 것까지 그리고 스크롤이 자리 잡은 뒤(2프레임)에 드러낸다
-  requestAnimationFrame(() => requestAnimationFrame(() => switchFxReveal(w.id, 'chat')));
+  // 새로 받은 것까지 그리고 스크롤이 자리 잡은 뒤(1프레임)에 드러낸다
+  requestAnimationFrame(() => switchFxReveal(w.id, 'chat'));
 }
 // 상태가 올 때마다(render): 버튼 표시 · 바뀌었으면 가져오기 · 끝줄(상태) 다시 그리기
 // 서버에 '이 워커를 채팅으로 보는 중'을 알린다 — 그동안 클로드의 질문은 터미널 대신 채팅 카드로 온다(server holdAsk)
