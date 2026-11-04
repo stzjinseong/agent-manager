@@ -730,6 +730,9 @@ function watchBtw(w, q) {
   const tick = async () => {
     if (!workers.has(w.id) || w.btw?.at !== at) return;
     const rows = await screenRows(w);
+    // 화면 읽는 사이 다음 곁질문이 왔으면(closeBtw 가 이 창을 닫고 w.btw 를 새로 만듦) 손대지 않는다 — 닫힌 화면을 보고
+    // 새 질문의 w.btw.open 을 false 로 덮어써, 채팅의 BTW 창이 닫힘으로 보이고 답이 그려지는 동안 'CLI 가 입력을 기다려요'가 떴다(실측 W20)
+    if (w.btw?.at !== at) return;
     const text = rows ? btwPanel(rows, q) : null;
     if (text != null) {
       seen = true;

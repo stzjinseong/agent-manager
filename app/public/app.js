@@ -546,7 +546,8 @@ function cliPeekCheck() {
   clearTimeout(peekTimer);
   peekTimer = setTimeout(() => {
     const w = state.workers.find((x) => x.id === selected);
-    const want = Boolean(chatOpen && w && termSnap.id === selected && !['starting', 'exited'].includes(w.status) && !$('#detail').hidden && !w.btw?.open && cliScreenBlocked()); // 곁질문 답 창은 채팅의 곁질문 창(#cv-btw)이 대신 보여 준다
+    const want = Boolean(chatOpen && w && termSnap.id === selected && !['starting', 'exited', 'decision'].includes(w.status) && !$('#detail').hidden && !w.btw?.open && cliScreenBlocked()); // 곁질문 답 창은 채팅의 곁질문 창(#cv-btw)이 대신 보여 준다
+    // 결정 대기(권한 · 질문)는 채팅 끝 카드(허락 · 거절 · CLI 에서 고르기)와 #cv-ask 가 맡는다 — 같이 열면 엿보기가 채팅을 덮어 카드가 가려졌다
     if (!want) { peekSince = 0; peekHidden = false; $('#cv-peek').hidden = true; return setCliPeek(false); }
     if (!peekSince) peekSince = Date.now();
     if (Date.now() - peekSince < 500) return cliPeekCheck(); // 다시 그리는 중의 잠깐 빈 화면은 넘긴다
