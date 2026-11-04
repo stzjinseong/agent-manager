@@ -5796,7 +5796,7 @@ var btwSig = '', btwLogs = {}, btwOpenFor = {}, btwSeenAt = new Set(); // var �
 const BTW_POS_KEY = 'am.btwPos';
 function btwSkeleton(box) {
   box.innerHTML = `<div class="btw-h" data-btw-drag><b>BTW</b><small>/btw · ${esc(_t('대화 기록에 남지 않아요'))}</small>`
-    + `<span class="cv-zoom btw-zoom"><button type="button" data-bz="-1" title="${esc(_t('글자 작게 (Ctrl+휠)'))}">가−</button><button type="button" data-bz="0" class="cv-zpct" title="${esc(_t('원래 크기로'))}">100%</button><button type="button" data-bz="1" title="${esc(_t('글자 크게 (Ctrl+휠)'))}">가+</button></span><span class="btw-acts"><button type="button" data-btw="max" title="${esc(_t('크게 보기 · 원래대로'))}" aria-pressed="false">⤢</button><button type="button" data-btw="close" title="${esc(_t('닫기 (CLI 의 답 창도 닫음)'))}">✕</button></span></div>`
+    + `<span class="cv-zoom btw-zoom"><button type="button" data-bz="-1" title="${esc(_t('글자 작게 (Ctrl+휠)'))}">가−</button><button type="button" data-bz="0" class="cv-zpct" title="${esc(_t('원래 크기로'))}">100%</button><button type="button" data-bz="1" title="${esc(_t('글자 크게 (Ctrl+휠)'))}">가+</button></span><span class="btw-acts"><button type="button" data-btw="close" title="${esc(_t('닫기 (CLI 의 답 창도 닫음)'))}">✕</button></span></div>`
     + `<div class="btw-list"></div>`
     + `<form class="btw-form"><textarea rows="1" placeholder="${esc(_t('이어서 BTW 묻기 — Enter 보내기'))}"></textarea><button type="submit" class="btn primary">${esc(_t('보내기'))}</button></form>`
     + `<span class="btw-grip-l" title="${esc(_t('끌어서 크기 조절'))}"></span>`;
@@ -5894,12 +5894,6 @@ $('#cv-btw').addEventListener('click', async (e) => {
   if (bz) { stepBtwZoom(Number(bz.dataset.bz)); return; }
   const a = e.target.closest('[data-btw]')?.dataset.btw, w = state.workers.find((x) => x.id === selected);
   if (!a || !w) return;
-  if (a === 'max') {
-    const b = e.target.closest('[data-btw]'), on = $('#cv-btw').classList.toggle('max');
-    b.setAttribute('aria-pressed', String(on));
-    b.textContent = on ? '⤡' : '⤢';
-    return;
-  }
   setBtwOpen(false);
   if (w.btw) await api(`/api/workers/${w.id}/btw-close`, {}); // CLI 에 답 창이 떠 있으면 같이 닫는다(이력은 남음)
 });
@@ -5926,7 +5920,7 @@ $('#cv-btw').addEventListener('input', (e) => {
 // 머리 줄 끌기 — 채팅 화면(#chat-view) 안에서만. 버튼을 누른 건 끌기가 아니다
 $('#cv-btw').addEventListener('pointerdown', (e) => {
   const h = e.target.closest('[data-btw-drag]');
-  if (!h || e.target.closest('button') || e.button !== 0 || $('#cv-btw').classList.contains('max')) return; // 크게 보기 중엔 끌지 않음
+  if (!h || e.target.closest('button') || e.button !== 0) return;
   const box = $('#cv-btw'), cv = $('#chat-view');
   const b0 = box.getBoundingClientRect();
   const dx = e.clientX - b0.left, dy = e.clientY - b0.top;

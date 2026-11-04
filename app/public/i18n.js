@@ -328,7 +328,6 @@ const EN = {
   '답 받는 중…': 'Waiting for the answer…',
   'CLI 에서 답 창이 닫혔어요': 'The answer panel was closed in the CLI',
   '끌어서 크기 조절': 'Drag to resize',
-  '크게 보기 · 원래대로': 'Maximize · restore',
   '답을 읽지 못했어요 (CLI 에서 답 창이 닫힘)': "Couldn't read the answer (the CLI panel was closed)",
   '작업을 멈추지 않고 Claude 에게 곁질문해 보세요. 답은 대화 기록에 남지 않아요.': "Ask Claude a side question without stopping its work. Answers aren't saved to the conversation.",
   'BTW — 작업을 멈추지 않고 곁질문 (답은 대화 기록에 안 남음)': "BTW — ask a side question without stopping the work (not saved to the conversation)",
