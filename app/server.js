@@ -1675,6 +1675,7 @@ function onHostHello({ ptys }) {
   const before = JSON.stringify(config.sessions);
   for (const w of [...workers.values()].sort((a, b) => (a.updatedAt || 0) - (b.updatedAt || 0))) noteWorkerSession(w, false);
   if (JSON.stringify(config.sessions) !== before) saveConfig();
+  restoreWorkers();
   emitState();
 }
 
@@ -2115,6 +2116,31 @@ setInterval(cleanupLegacyHook, 60_000);
 // ---------- 워커 기록 저장 ----------
 // 서버 재시작 후 이름·상태·타임라인·큐 등을 되살리기 위해 data/workers.json 에 저장 (상태가 바뀔 때마다, 1초 묶음)
 const WORKERS_PATH = path.join(DATA_DIR, 'workers.json');
+// ⏻ '서버 + 워커 모두 종료' 때 켜져 있던 워커 목록 — 다음에 서버를 켜면 그대로 다시 띄운다(지난 세션 이어서). 한 번 쓰면 지운다
+const RESTORE_PATH = path.join(DATA_DIR, 'restore-workers.json');
+function saveRestoreList() {
+  const list = [...workers.values()].filter((w) => w.status !== 'exited')
+    .map((w) => ({ name: w.name, cwd: w.cwd, args: w.args || '', permissionMode: w.permissionMode || 'default', sessionId: w.sessionId || null, tx: w.tx?.path || null }));
+  try { list.length ? fs.writeFileSync(RESTORE_PATH, JSON.stringify(list, null, 2)) : fs.rmSync(RESTORE_PATH, { force: true }); } catch (e) { console.error('restore list', e.message); }
+  return list.length;
+}
+function restoreWorkers() {
+  let list;
+  try { list = JSON.parse(fs.readFileSync(RESTORE_PATH, 'utf8')); } catch { return; }
+  try { fs.rmSync(RESTORE_PATH, { force: true }); } catch {}
+  if (!Array.isArray(list)) return;
+  for (const r of list) {
+    if (!r?.name || !r.cwd || !fs.existsSync(r.cwd)) continue;
+    if ([...workers.values()].some((x) => x.status !== 'exited' && x.name === r.name)) continue; // 이미 살아 있음
+    // claude --resume 은 같은 폴더의 세션만 찾는다 — 트랜스크립트가 남아 있고 역할 인자에 따로 --resume/--continue 가 없을 때만 이어 간다
+    const resume = r.sessionId && r.tx && fs.existsSync(r.tx) && !/(^|\s)(--resume|-r|--continue|-c)(\s|=|$)/.test(r.args || '') ? r.sessionId : null;
+    try {
+      const w = spawnWorker({ name: r.name, cwd: r.cwd, args: r.args || '', permissionMode: r.permissionMode, resume });
+      pushLog(w, 'status', resume ? `지난번 '서버 + 워커 종료' 때 켜져 있어 다시 띄움 — 지난 세션 이어서 (${resume.slice(0, 8)})` : "지난번 '서버 + 워커 종료' 때 켜져 있어 다시 띄움");
+      if (resume) w.seedAt = Date.now();
+    } catch (e) { console.error('restore', r.name, e.message); }
+  }
+}
 let saveTimer = null;
 
 function loadSavedWorkers() {
@@ -2611,7 +2637,7 @@ const server = http.createServer(async (req, res) => {
     const { workers: alsoWorkers } = await readBody(req);
     json(res, 200, { ok: true });
     console.log(alsoWorkers ? L('브라우저에서 종료 요청 (워커 포함)', 'Shutdown requested from the browser (including workers)') : L('브라우저에서 종료 요청 (서버만)', 'Shutdown requested from the browser (server only)'));
-    if (alsoWorkers) hostSend({ op: 'shutdown' });
+    if (alsoWorkers) { saveRestoreList(); hostSend({ op: 'shutdown' }); } // 켜져 있던 워커는 다음 시작 때 다시 띄운다
     setTimeout(shutdown, 300);
     return;
   }

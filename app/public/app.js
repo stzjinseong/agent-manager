@@ -4781,7 +4781,7 @@ powerPop.addEventListener('click', async (e) => {
   if (act === 'restart') return restartServer();
   try { await api('/api/shutdown', { workers: act === 'all' }); } catch {}
   serverDown = true;
-  $('#down-detail').textContent = _t(act === 'all' ? '모든 워커도 함께 종료했습니다.' : '워커는 백그라운드에서 계속 실행 중입니다 — 서버를 다시 켜면 그대로 다시 붙습니다.');
+  $('#down-detail').textContent = _t(act === 'all' ? '모든 워커도 함께 종료했습니다 — 서버를 다시 켜면 켜져 있던 워커를 지난 세션 이어서 다시 띄웁니다.' : '워커는 백그라운드에서 계속 실행 중입니다 — 서버를 다시 켜면 그대로 다시 붙습니다.');
   $('#down-screen').hidden = false;
 });
 
