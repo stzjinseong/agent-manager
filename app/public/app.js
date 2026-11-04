@@ -6053,7 +6053,7 @@ histBox.addEventListener('click', (e) => { const b = e.target.closest('[data-k]'
 // ---------- 채팅 내용 드래그 → 물어보기 · 복사 ----------
 // 대화 목록에서 글을 고르면 고른 곳 위에 작은 버튼을 띄운다. 물어보기 = 고른 글을 인용(> …)으로 입력칸 맨 위에 넣고
 // 그 아래에 커서 — 이어서 질문을 쓰면 된다(쓰던 글이 있으면 그 앞에). 입력칸에 넣기 = 고른 글 그대로 커서 자리에. 복사 = 클립보드. 선택이 풀리면(새 메시지로 목록이 다시 그려질 때 포함) 버튼도 닫는다
-const quoteBar = el(`<div class="cv-quote" hidden><button type="button" data-q="ask">${_t('물어보기')}</button><button type="button" data-q="paste">${_t('입력칸에 넣기')}</button><button type="button" data-q="copy">${_t('복사')}</button></div>`);
+const quoteBar = el(`<div class="cv-quote" hidden><button type="button" data-q="ask"><kbd>1</kbd>${_t('물어보기')}</button><button type="button" data-q="paste"><kbd>2</kbd>${_t('입력칸에 넣기')}</button><button type="button" data-q="copy"><kbd>3</kbd>${_t('복사')}</button></div>`);
 $('#chat-view').append(quoteBar);
 let quoteText = '';
 function quoteHide() { quoteBar.hidden = true; quoteText = ''; }
@@ -6077,6 +6077,14 @@ $('#cv-list').addEventListener('scroll', quoteHide);
 document.addEventListener('selectionchange', () => { if (!quoteBar.hidden && getSelection()?.isCollapsed) quoteHide(); });
 document.addEventListener('mousedown', (e) => { if (!quoteBar.contains(e.target)) quoteHide(); });
 quoteBar.addEventListener('mousedown', (e) => e.preventDefault()); // 누르는 동안 선택이 풀리지 않게
+// 버튼이 떠 있으면 1 · 2 · 3 키 = 물어보기 · 입력칸에 넣기 · 복사. 입력칸에서 글을 쓰는 중이면 숫자는 그대로 입력되게 건드리지 않는다
+document.addEventListener('keydown', (e) => {
+  if (quoteBar.hidden || e.isComposing || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+  const k = ['1', '2', '3'].indexOf(e.key);
+  if (k < 0 || document.activeElement?.matches?.('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) return;
+  e.preventDefault(); e.stopPropagation();
+  quoteBar.querySelectorAll('[data-q]')[k]?.click();
+}, true);
 quoteBar.addEventListener('click', async (e) => {
   const b = e.target.closest('[data-q]');
   if (!b || !quoteText) return;
