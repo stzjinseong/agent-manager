@@ -503,7 +503,7 @@ body.card-drag .node-add { opacity: .25; transition: opacity .2s; }
 .mt { flex-direction: column; align-items: stretch; gap: 3px; }
 .mt-top { display: flex; align-items: baseline; gap: 6px; line-height: 1.1; }
 .mt-pc { color: var(--uc); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.mt-bar { height: 5px; display: grid; grid-template-columns: repeat(10, 1fr); gap: 1.5px; }
+.mt-bar { height: 7.5px; display: grid; grid-template-columns: repeat(10, 1fr); gap: 1.5px; }
 .mt-bar i { border-radius: 1px; background: color-mix(in srgb, var(--uc) 16%, rgb(var(--ink) / .08)); transition: background .3s; }
 .mt-bar i.on { background: var(--uc); box-shadow: 0 0 4px color-mix(in srgb, var(--uc) 60%, transparent); }
 /* 물결: 채운 칸이 왼쪽부터 차례로 살짝 밝아지며 튀어 오른다(1.8초 주기 · 칸마다 90ms 늦게). 움직임 줄이기면 멈춤 */
