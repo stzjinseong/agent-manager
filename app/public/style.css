@@ -2590,7 +2590,8 @@ button.upd-run:disabled { opacity: .6; cursor: default; }
 .cv-zoom button:disabled { opacity: .35; cursor: default; }
 .cv-zoom .cv-zpct { min-width: 34px; font-variant-numeric: tabular-nums; }
 .cv-st::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; margin-right: 6px; vertical-align: 1px; }
-.cv-list { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 12px 6px 6px; }
+/* 오른쪽 60px 는 떠 있는 버튼(Backlog · BTW) 자리 — 비워 두지 않으면 맨 아래 내 말풍선 · 대기 글이 버튼 밑에 깔렸다 */
+.cv-list { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 60px 6px 6px; }
 .cv-empty { color: var(--faint); text-align: center; padding: 40px 0; }
 .cv-ev { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 10px; position: relative; padding-bottom: 12px; }
 .cv-ev::before { content: ""; position: absolute; left: 8px; top: 16px; bottom: 0; width: 2px; background: var(--line-2); }
