@@ -5355,6 +5355,14 @@ function chatShowOlder() {
   renderChat();
 }
 trackBottom($('#cv-list'), 60);
+// 맨 아래가 아니면 입력칸 위 가운데에 '맨 아래로' 동그라미 — 누르면 부드럽게 내린다. 그리는 중엔 scrollHeight 를 읽지 않게 스크롤 때만 잰다
+{
+  const list = $('#cv-list'), fab = $('#cv-bottom-fab');
+  const sync = () => fab.classList.toggle('show', list.scrollHeight - list.scrollTop - list.clientHeight > 160);
+  list.addEventListener('scroll', sync, { passive: true });
+  new ResizeObserver(sync).observe(list);
+  fab.addEventListener('click', () => { list._atBottom = true; list.scrollTo({ top: list.scrollHeight, behavior: 'smooth' }); });
+}
 // 답 속 그림이 늦게 불러와져도 맨 아래를 보던 중이면 맨 아래로
 $('#cv-list').addEventListener('load', (e) => {
   const l = e.currentTarget;
