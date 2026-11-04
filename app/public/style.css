@@ -2742,6 +2742,8 @@ button.cv-more:hover { color: var(--text); }
 .cv-btw.dragging .btw-h { cursor: grabbing; }
 .btw-h b { font-size: 12.5px; letter-spacing: .04em; color: var(--accent-hi); }
 .btw-h small { font-size: 11px; color: var(--dim); }
+.btw-zoom { margin-left: auto; }
+.btw-zoom + .btw-acts { margin-left: 4px; }
 .btw-acts { margin-left: auto; display: flex; gap: 2px; }
 .btw-acts button { all: unset; cursor: pointer; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 6px; color: var(--dim); font-size: 13px; }
 .btw-acts button:hover { background: var(--surface-3); color: var(--text); }

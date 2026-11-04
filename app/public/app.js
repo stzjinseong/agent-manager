@@ -5796,12 +5796,13 @@ var btwSig = '', btwLogs = {}, btwOpenFor = {}, btwSeenAt = new Set(); // var �
 const BTW_POS_KEY = 'am.btwPos';
 function btwSkeleton(box) {
   box.innerHTML = `<div class="btw-h" data-btw-drag><b>BTW</b><small>/btw · ${esc(_t('대화 기록에 남지 않아요'))}</small>`
-    + `<span class="btw-acts"><button type="button" data-btw="max" title="${esc(_t('크게 보기 · 원래대로'))}" aria-pressed="false">⤢</button><button type="button" data-btw="close" title="${esc(_t('닫기 (CLI 의 답 창도 닫음)'))}">✕</button></span></div>`
+    + `<span class="cv-zoom btw-zoom"><button type="button" data-bz="-1" title="${esc(_t('글자 작게 (Ctrl+휠)'))}">가−</button><button type="button" data-bz="0" class="cv-zpct" title="${esc(_t('원래 크기로'))}">100%</button><button type="button" data-bz="1" title="${esc(_t('글자 크게 (Ctrl+휠)'))}">가+</button></span><span class="btw-acts"><button type="button" data-btw="max" title="${esc(_t('크게 보기 · 원래대로'))}" aria-pressed="false">⤢</button><button type="button" data-btw="close" title="${esc(_t('닫기 (CLI 의 답 창도 닫음)'))}">✕</button></span></div>`
     + `<div class="btw-list"></div>`
     + `<form class="btw-form"><textarea rows="1" placeholder="${esc(_t('이어서 BTW 묻기 — Enter 보내기'))}"></textarea><button type="submit" class="btn primary">${esc(_t('보내기'))}</button></form>`
     + `<span class="btw-grip-l" title="${esc(_t('끌어서 크기 조절'))}"></span>`;
   box.dataset.built = '1';
   btwPlace(box);
+  setBtwZoom(btwZoom);
 }
 // 저장한 자리(채팅 화면 안 비율 아닌 px — 창 크기가 바뀌면 안쪽으로 당긴다). 없으면 오른쪽 위(CSS 기본)
 function btwPlace(box) {
@@ -5852,6 +5853,27 @@ function btwBold(text) {
   const html = esc(text).replace(/[]/g, (m) => { if (m === '' && !open) { open = true; return '<b>'; } if (m === '' && open) { open = false; return '</b>'; } return ''; });
   return open ? html + '</b>' : html;
 }
+// BTW 창 글자 크기 — 메인 채팅(setChatZoom)과 같은 단계 · 방식(목록만 CSS zoom), 크기는 따로 기억
+const BTW_ZOOM_KEY = 'am.btwZoom';
+var btwZoom = 1;
+try { const z = Number(localStorage.getItem(BTW_ZOOM_KEY)); if (CHAT_ZOOMS.includes(z)) btwZoom = z; } catch {}
+function setBtwZoom(z) {
+  btwZoom = z;
+  const box = $('#cv-btw'), list = $('.btw-list', box);
+  if (!list) return;
+  const keep = list.scrollHeight - list.scrollTop - list.clientHeight < 60;
+  list.style.zoom = z === 1 ? '' : String(z);
+  $('.btw-zoom .cv-zpct', box).textContent = `${Math.round(z * 100)}%`;
+  for (const b of box.querySelectorAll('[data-bz]')) b.disabled = (b.dataset.bz === '-1' && z === CHAT_ZOOMS[0]) || (b.dataset.bz === '1' && z === CHAT_ZOOMS.at(-1));
+  try { z === 1 ? localStorage.removeItem(BTW_ZOOM_KEY) : localStorage.setItem(BTW_ZOOM_KEY, String(z)); } catch {}
+  if (keep) list.scrollTop = list.scrollHeight;
+}
+const stepBtwZoom = (d) => setBtwZoom(d ? CHAT_ZOOMS[Math.max(0, Math.min(CHAT_ZOOMS.length - 1, CHAT_ZOOMS.indexOf(btwZoom) + d))] : 1);
+$('#cv-btw').addEventListener('wheel', (e) => {
+  if ((!e.ctrlKey && !e.metaKey) || !e.target.closest('.btw-list')) return;
+  e.preventDefault();
+  stepBtwZoom(e.deltaY < 0 ? 1 : -1);
+}, { passive: false });
 function setBtwOpen(on) {
   const w = state.workers.find((x) => x.id === selected);
   if (!w) return;
@@ -5868,6 +5890,8 @@ async function btwAsk(text) {
   return true;
 }
 $('#cv-btw').addEventListener('click', async (e) => {
+  const bz = e.target.closest('[data-bz]');
+  if (bz) { stepBtwZoom(Number(bz.dataset.bz)); return; }
   const a = e.target.closest('[data-btw]')?.dataset.btw, w = state.workers.find((x) => x.id === selected);
   if (!a || !w) return;
   if (a === 'max') {
