@@ -2758,6 +2758,11 @@ button.cv-more:hover { color: var(--text); }
 .btw-think .btw-ico { animation: cv-bob 1s ease-in-out infinite; }
 .btw-ab { min-width: 0; font-size: 13px; line-height: 1.6; } /* 말풍선 없이 글만 — 캐릭터 · 이름 줄로 구분 */
 .btw-txt { white-space: pre-wrap; overflow-wrap: anywhere; }
+.btw-txt b { font-weight: 700; color: var(--text); }
+/* 크게 보기 — 채팅 화면을 거의 다 채운다(끌기 · 크기 손잡이는 쉼). 다시 누르면 기억해 둔 자리 · 크기로 */
+.cv-btw.max { left: 10px !important; top: 10px !important; right: 10px !important; bottom: 10px !important; width: auto !important; height: auto !important; max-width: none; max-height: none; resize: none; }
+.cv-btw.max .btw-grip-l { display: none; }
+.cv-btw.max .btw-h { cursor: default; }
 .btw-lab { font-size: 11px; color: var(--dim); margin-bottom: 2px; }
 .btw-lab b { color: var(--accent-hi); font-weight: 600; margin-right: 6px; }
 .btw-wait { font-size: 12.5px; color: var(--dim); }

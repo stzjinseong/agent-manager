@@ -644,9 +644,25 @@ async function screenRows(w) {
   try {
     await new Promise((r) => t.write(snap.data, r));
     const b = t.buffer.active, rows = [];
-    for (let i = b.baseY; i < b.length; i++) rows.push(b.getLine(i)?.translateToString(true) ?? '');
+    for (let i = b.baseY; i < b.length; i++) rows.push(styledLine(b.getLine(i)));
     return rows;
   } catch { return null; } finally { t.dispose(); }
+}
+// 화면 한 줄 → 글자 + 굵게 표시(\x01 … \x02). 화면엔 마크다운 기호(**)가 없고 칸마다 '굵게' 속성만 남는다 — 그대로 글자만 읽었더니
+// BTW 답에 강조가 하나도 없어 밋밋했다. 줄 끝에서 닫는다(다음 줄로 이어져도 줄마다 다시 연다)
+const BOLD_ON = '\x01', BOLD_OFF = '\x02';
+function styledLine(line) {
+  if (!line) return '';
+  let out = '', bold = false;
+  for (let x = 0; x < line.length; x++) {
+    const c = line.getCell(x);
+    if (!c || c.getWidth() === 0) continue; // 전각 글자의 뒤 칸
+    const ch = c.getChars() || ' ', on = Boolean(c.isBold()) && ch.trim() !== '';
+    if (on !== bold && (on || ch.trim())) { out += on ? BOLD_ON : BOLD_OFF; bold = on; }
+    out += ch;
+  }
+  if (bold) out = out.replace(/(\s*)$/, `${BOLD_OFF}$1`);
+  return out.replace(/\s+$/, '');
 }
 // 창 글: 맨 아래 'Esc to close' 줄 위로, 질문 줄('/btw …')까지. 질문 줄을 못 찾으면 위로 가로선(─)까지
 function btwPanel(rows, q) {
@@ -655,7 +671,7 @@ function btwPanel(rows, q) {
   const key = q.replace(BTW_RE, '').trim().slice(0, 16);
   let top = -1;
   for (let i = foot - 1; i >= 0; i--) {
-    if ((key && rows[i].includes(key)) || /\/btw\b/.test(rows[i])) { top = i; break; }
+    if ((key && rows[i].replace(/[\x01\x02]/g, '').includes(key)) || /\/btw\b/.test(rows[i])) { top = i; break; }
     if (/^\s*─{20,}/.test(rows[i])) { top = i; break; }
   }
   // 질문이 길면 질문 줄이 여러 줄로 꺾인다 — 질문 뒤 첫 빈 줄(4줄 안)까지는 질문으로 보고 건너뛴다
@@ -673,6 +689,7 @@ const cellWidth = (s) => {
   let n = 0;
   for (const ch of s) {
     const c = ch.codePointAt(0);
+    if (c < 0x20) continue; // 굵게 표시(BOLD_ON · BOLD_OFF)는 칸을 차지하지 않는다
     n += (c >= 0x1100 && c <= 0x115f) || (c >= 0x2e80 && c <= 0xa4cf) || (c >= 0xac00 && c <= 0xd7a3) || (c >= 0xf900 && c <= 0xfaff)
       || (c >= 0xfe30 && c <= 0xfe4f) || (c >= 0xff00 && c <= 0xff60) || (c >= 0xffe0 && c <= 0xffe6) || (c >= 0x1f300 && c <= 0x1faff) ? 2 : 1;
   }
@@ -692,12 +709,16 @@ function unwrapLines(lines) {
   return out;
 }
 // 답 창 닫기 — 화면에 창이 실제로 있을 때만 Esc(없을 때 Esc 는 클로드 작업 중단이 된다). 닫았으면 true
+// 지켜보는 중(w.btw.open)이 아니어도 본다 — 답 창 읽기는 90초면 그만두는데 창은 CLI 에 남아 입력줄을 가려, 그 뒤 채팅 보내기가
+// 'CLI 가 입력 대기 화면이 아님'으로 거절됐다. 화면 맨 아래쪽에 'Esc to close' 줄이 있으면 닫는다
 async function closeBtw(w) {
-  if (!w.btw?.open) return false;
+  if (w.status === 'exited') return false;
   const rows = await screenRows(w);
-  w.btw.open = false;
-  emitState();
-  if (!rows || btwPanel(rows, '/btw ' + w.btw.q) == null) return false;
+  if (w.btw?.open) { w.btw.open = false; emitState(); }
+  if (!rows) return false;
+  let last = rows.length - 1;
+  while (last >= 0 && !rows[last].trim()) last--;
+  if (!rows.slice(Math.max(0, last - 12), last + 1).some((l) => BTW_FOOT.test(l) && /copy|fork|scroll/i.test(l))) return false;
   w.term.write('\x1b');
   await new Promise((r) => setTimeout(r, 300));
   return true;

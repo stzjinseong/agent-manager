@@ -1021,6 +1021,9 @@ function placeMeters() {
 }
 new ResizeObserver(() => requestAnimationFrame(placeMeters)).observe($('#term-wrap'));
 new ResizeObserver(() => requestAnimationFrame(placeMeters)).observe($('.detail-head'));
+// diff 버튼에 고친 파일 수가 붙거나 중지(■) 버튼이 나타나고 숨으면 diff 의 왼쪽 끝이 움직인다 — 헤더 크기는 그대로라 위 감시로는 못 잡아
+// 미터가 diff 와 겹쳤다. 오른쪽 버튼들의 크기 변화도 본다
+{ const ro = new ResizeObserver(() => requestAnimationFrame(placeMeters)); for (const b of document.querySelectorAll('.detail-head .btn')) ro.observe(b); }
 // 터미널 칸 수(가로 글자 수)를 고정하고, 공간이 넓으면 글자를 키워 채운다.
 // 칸 수가 줄면 화면 위로 밀려난 기록(스크롤백)은 Claude 가 다시 그릴 수 없어서, 넓을 때 줄 끝까지
 // 배경을 칠한 줄(diff 등)이 접히며 배경만 남은 조각 줄이 줄무늬처럼 생겼다(실측: 163→101칸에서 125줄).
@@ -5793,7 +5796,7 @@ var btwSig = '', btwLogs = {}, btwOpenFor = {}, btwSeenAt = new Set(); // var �
 const BTW_POS_KEY = 'am.btwPos';
 function btwSkeleton(box) {
   box.innerHTML = `<div class="btw-h" data-btw-drag><b>BTW</b><small>/btw · ${esc(_t('대화 기록에 남지 않아요'))}</small>`
-    + `<span class="btw-acts"><button type="button" data-btw="close" title="${esc(_t('닫기 (CLI 의 답 창도 닫음)'))}">✕</button></span></div>`
+    + `<span class="btw-acts"><button type="button" data-btw="max" title="${esc(_t('크게 보기 · 원래대로'))}" aria-pressed="false">⤢</button><button type="button" data-btw="close" title="${esc(_t('닫기 (CLI 의 답 창도 닫음)'))}">✕</button></span></div>`
     + `<div class="btw-list"></div>`
     + `<form class="btw-form"><textarea rows="1" placeholder="${esc(_t('이어서 BTW 묻기 — Enter 보내기'))}"></textarea><button type="submit" class="btn primary">${esc(_t('보내기'))}</button></form>`
     + `<span class="btw-grip-l" title="${esc(_t('끌어서 크기 조절'))}"></span>`;
@@ -5837,11 +5840,17 @@ function renderBtw() {
   // 폭 때문에 꺾인 줄만 이어 둔다 · 마크다운으로 그렸더니 'a.' 'b.' 항목이 윗줄에 붙었다). 기다리는 동안은 캐릭터가 통통 튀는 '생각 중'
   $('.btw-list', box).innerHTML = items.length ? items.map((x) => `<div class="btw-q">${esc(x.q)}</div>`
     + `<div class="btw-a${x.text ? '' : ' btw-think'}"><span class="btw-ico"></span><div class="btw-ab"><div class="btw-lab"><b>Claude</b>${chatTime(x.at)}</div>`
-    + (x.text ? `<div class="btw-txt">${esc(x.text)}</div>` : x.open ? `<div class="btw-wait"><span class="cv-typing"><i></i><i></i><i></i></span> ${esc(_t('생각 중'))}</div>` : `<div class="btw-wait">${esc(_t('답을 읽지 못했어요 (CLI 에서 답 창이 닫힘)'))}</div>`)
+    + (x.text ? `<div class="btw-txt">${btwBold(x.text)}</div>` : x.open ? `<div class="btw-wait"><span class="cv-typing"><i></i><i></i><i></i></span> ${esc(_t('생각 중'))}</div>` : `<div class="btw-wait">${esc(_t('답을 읽지 못했어요 (CLI 에서 답 창이 닫힘)'))}</div>`)
     + '</div></div>').join('')
     : `<div class="btw-empty">${esc(_t('작업을 멈추지 않고 Claude 에게 곁질문해 보세요. 답은 대화 기록에 남지 않아요.'))}</div>`;
   const list = $('.btw-list', box);
   list.scrollTop = list.scrollHeight;
+}
+// 서버가 화면 칸의 '굵게' 속성을  …  로 표시해 보낸다(server.js styledLine) — 이스케이프한 뒤 <b> 로. 짝이 안 맞으면 닫아 준다
+function btwBold(text) {
+  let open = false;
+  const html = esc(text).replace(/[]/g, (m) => { if (m === '' && !open) { open = true; return '<b>'; } if (m === '' && open) { open = false; return '</b>'; } return ''; });
+  return open ? html + '</b>' : html;
 }
 function setBtwOpen(on) {
   const w = state.workers.find((x) => x.id === selected);
@@ -5861,6 +5870,12 @@ async function btwAsk(text) {
 $('#cv-btw').addEventListener('click', async (e) => {
   const a = e.target.closest('[data-btw]')?.dataset.btw, w = state.workers.find((x) => x.id === selected);
   if (!a || !w) return;
+  if (a === 'max') {
+    const b = e.target.closest('[data-btw]'), on = $('#cv-btw').classList.toggle('max');
+    b.setAttribute('aria-pressed', String(on));
+    b.textContent = on ? '⤡' : '⤢';
+    return;
+  }
   setBtwOpen(false);
   if (w.btw) await api(`/api/workers/${w.id}/btw-close`, {}); // CLI 에 답 창이 떠 있으면 같이 닫는다(이력은 남음)
 });
@@ -5887,7 +5902,7 @@ $('#cv-btw').addEventListener('input', (e) => {
 // 머리 줄 끌기 — 채팅 화면(#chat-view) 안에서만. 버튼을 누른 건 끌기가 아니다
 $('#cv-btw').addEventListener('pointerdown', (e) => {
   const h = e.target.closest('[data-btw-drag]');
-  if (!h || e.target.closest('button') || e.button !== 0) return;
+  if (!h || e.target.closest('button') || e.button !== 0 || $('#cv-btw').classList.contains('max')) return; // 크게 보기 중엔 끌지 않음
   const box = $('#cv-btw'), cv = $('#chat-view');
   const b0 = box.getBoundingClientRect();
   const dx = e.clientX - b0.left, dy = e.clientY - b0.top;
