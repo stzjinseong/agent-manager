@@ -438,6 +438,7 @@ const EN = {
   '채팅': 'Chat',
   '채팅 보기 — 이 워커와의 대화를 말풍선으로 (다시 누르면 터미널로)': 'Chat view — this worker’s conversation as messages (click again for the terminal)',
   '메시지 보내기': 'Send a message',
+  '눌러 메시지 보내기': 'to type a message',
   '보내기 (Enter)': 'Send (Enter)',
   'Esc 중단': 'Esc to interrupt',
   '/ 명령도 그대로 보냄': '/ commands are sent as-is',
