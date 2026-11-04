@@ -530,7 +530,10 @@ function cliScreenBlocked() {
   const rule = rows.map((t, i) => (/^\s*─{20,}/.test(t) ? i : -1)).filter((i) => i >= 0);
   for (let k = rule.length - 1; k > 0; k--) {
     if (last - rule[k] > 8) break; // 입력창 아래엔 상태줄 · 안내 몇 줄뿐
-    if (rule[k] - rule[k - 1] >= 2 && /^\s*[❯›>]/.test(rows[rule[k - 1] + 1])) return false;
+    // 워커 터미널이 화면보다 넓으면(크기를 맞추기 전) 가로선 끝이 다음 줄로 꺾여 '───' 만 있는 줄이 끼인다 — 건너뛰고 ❯ 줄을 찾는다
+    let j = rule[k - 1] + 1;
+    while (j < rule[k] && /^\s*─+\s*$/.test(rows[j])) j++;
+    if (j < rule[k] && /^\s*[❯›>]/.test(rows[j])) return false;
   }
   return true;
 }

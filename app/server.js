@@ -471,6 +471,9 @@ function ensureRoleColor(name) {
   saveConfig();
 }
 
+// 새 워커 터미널 폭 — 화면(PC) 터미널 폭(app.js TERM_COLS)과 같게. 120 으로 띄우면 화면이 크기를 맞춰 보내기 전까지(브라우저 창에
+// 포커스가 없으면 안 보낸다) Claude 가 120칸 가로선을 그려 110칸 화면에서 줄이 꺾였고, 입력창을 못 찾아 'CLI 가 입력을 기다려요'가 잘못 떴다
+const PTY_COLS = 110;
 function spawnWorker({ name, cwd, args = '', permissionMode = 'default', resume = null }) {
   let id;
   do id = `W${++seq}`; while (workers.has(id)); // 복원된 워커·호스트 터미널과 id 가 겹치면 안 된다
@@ -501,8 +504,8 @@ function spawnWorker({ name, cwd, args = '', permissionMode = 'default', resume 
   // 전역 설정이 bypassPermissions 여도 워커는 지정한 모드로 띄운다 — 그래야 권한 요청이 관제탑에 '결정 대기'로 보인다
   if (!PERMISSION_MODES.includes(permissionMode)) permissionMode = 'default';
   // 터미널은 PTY 호스트가 띄우고 붙잡는다 — 이 서버를 재시작해도 워커는 살아 있다
-  hostSend({ op: 'spawn', id, file: CLAUDE_BIN, args: ['--settings', settingsPath, '--permission-mode', permissionMode, ...extra], cwd, env, cols: 120, rows: 34 });
-  const term = hostTerm(id, '120x34', (s) => { w.ptySize = s; });
+  hostSend({ op: 'spawn', id, file: CLAUDE_BIN, args: ['--settings', settingsPath, '--permission-mode', permissionMode, ...extra], cwd, env, cols: PTY_COLS, rows: 34 });
+  const term = hostTerm(id, `${PTY_COLS}x34`, (s) => { w.ptySize = s; });
 
   const w = {
     id, name: name || id, cwd, args, permissionMode, pid: term.pid,
@@ -514,7 +517,7 @@ function spawnWorker({ name, cwd, args = '', permissionMode = 'default', resume 
     log: [], // 최근 이벤트 타임라인
     tx: null, // 트랜스크립트 프로파일러 상태 (profile.js)
     approvalWaits: [], // 결정함을 거친 권한 승인 대기 시간 [{ toolUseId, ms }] — 트랜스크립트엔 없어서 서버가 기록
-    ptySize: '120x34', // PTY 의 마지막 크기 — 재시작 뒤 같은 크기 resize 를 거르는 데 쓴다 (hostTerm)
+    ptySize: `${PTY_COLS}x34`, // PTY 의 마지막 크기 — 재시작 뒤 같은 크기 resize 를 거르는 데 쓴다 (hostTerm)
     term,
   };
   workers.set(id, w);
