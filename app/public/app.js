@@ -2070,6 +2070,7 @@ function renderDetail() {
   // 접은 영역 제목줄에 건수를 보여 준다 (펼쳐 있으면 안에 보이므로 비움)
   const memoN = (state.memos?.[w.name] || []).length;
   setSecCount('sec-memo', memoN ? _t('{n}건', { n: memoN }) : '');
+  $('#cv-memo-fab .n').textContent = memoN || '';
 }
 
 // 상세 패널 위에 걸린 탭: 워커가 만든 결과물(w.docs) · 도구 캡처(w.shots) · 요청에 붙은 입력 첨부를 세 묶음으로 한 줄에 — 다른 로그 사이에서 찾느라 스크롤하지 않게.
@@ -4876,6 +4877,7 @@ const saveSide = (mode) => {
 };
 // 지금 모드에 기억한 폭·접힘을 적용 — 처음, 크게 보기 전환 때, 창이 좁아져 터미널이 줄 때(상세가 숨겨져 폭이 0 이면 건너뜀)
 const applySideWant = () => {
+  if ($('#detail').classList.contains('chat-mode')) { if (sideEl.classList.contains('cover')) setSideExtra(0); return; }
   const m = sideMode();
   if (sideMin[m] !== $('#detail').classList.contains('side-min')) setSideMin(sideMin[m]);
   if (sideMin[m]) return;
@@ -5584,6 +5586,33 @@ function syncChat(w) {
   if (chatData.wid !== w.id || chatData.key !== w.chatRev) { clearTimeout(chatTimer); chatTimer = setTimeout(loadChat, chatData.wid === w.id ? 120 : 0); }
   renderChat();
 }
+// ---------- 채팅 보기의 Backlog 팝업 ----------
+// 채팅 보기에선 옆 패널 대신 BTW 버튼 위 동그라미(#cv-memo-fab)로 연다. 목록 요소(#memos)를 통째로 옮겨 와서
+// 카드 그리기(renderMemos) · 전송/수정/삭제(memoAct · editMemo) · 순서 바꾸기 · 워커로 끌어 옮기기가 옆 패널과 똑같이 동작한다.
+// 담기는 입력칸 오른쪽 Backlog 버튼(채팅) · 옆 패널 입력칸(CLI)에서
+const memoHome = $('#sec-memo'), memoListEl = $('#memos'), memoPop = $('#cv-memo-pop'), memoFab = $('#cv-memo-fab');
+function placeMemoList() {
+  if (chatOpen) { if (memoListEl.parentElement !== memoPop) memoPop.insertBefore(memoListEl, $('.mp-empty', memoPop)); }
+  else { if (memoListEl.parentElement !== memoHome) memoHome.append(memoListEl); setMemoPop(false); }
+}
+function setMemoPop(on) {
+  memoPop.hidden = !on;
+  memoFab.classList.toggle('on', on);
+  memoFab.setAttribute('aria-expanded', String(on));
+  if (on) memoPop.style.maxHeight = `${Math.max(200, $('#cv-list').clientHeight - 16)}px`; // 채팅 칸 안에서만
+}
+memoFab.addEventListener('click', () => setMemoPop(memoPop.hidden));
+memoPop.addEventListener('click', (e) => { if (e.target.closest('[data-mp="close"]')) setMemoPop(false); });
+// 바깥을 누르면 닫는다(카드를 워커로 끄는 중 · 길게 누름 메뉴는 그대로) · Esc 도 — 채팅의 Esc(작업 중단)로 번지지 않게 먼저 받는다
+document.addEventListener('pointerdown', (e) => {
+  if (!memoPop.hidden && !e.target.closest('#cv-memo-pop, #cv-memo-fab, .sheet-back')) setMemoPop(false);
+}, true);
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape' || memoPop.hidden || e.isComposing) return;
+  if (document.activeElement?.closest?.('#cv-memo-pop li.editing')) return; // 수정 중 Esc 는 수정 취소가 받는다
+  e.preventDefault(); e.stopPropagation();
+  setMemoPop(false);
+}, true);
 function setChatOpen(on, keepPref = false) {
   if (!keepPref) { // 직접 CLI/채팅을 고르면 그 선택대로 — diff 를 닫아도 채팅으로 돌아가지 않는다
     diffFromChat = false;
@@ -5596,6 +5625,9 @@ function setChatOpen(on, keepPref = false) {
   if (on && diffOpen) setDiffOpen(false);
   $('#chat-view').hidden = !on;
   $('#term-wrap').classList.toggle('chatting', on);
+  $('#detail').classList.toggle('chat-mode', on);
+  placeMemoList();
+  applySideWant();
   peekHidden = false; cliPeekCheck();
   if (on) {
     term.blur();

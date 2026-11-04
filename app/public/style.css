@@ -2768,6 +2768,30 @@ button.cv-more:hover { color: var(--text); }
 .btw-grip-l:hover { opacity: 1; }
 /* BTW 플로팅 버튼 — 채팅 입력 상자 바로 위 오른쪽, 채팅 목록 스크롤바(10px)와 겹치지 않게 안쪽으로(/ 목록 · 기록 목록이 뜨면 그 아래로 가려진다) */
 .cv-comp { position: relative; }
+/* 채팅 보기: 옆 패널(Backlog)은 감추고 채팅이 폭을 다 쓴다 — Backlog 는 BTW 버튼 위 동그라미 → 팝업(#cv-memo-pop) */
+#detail.chat-mode .detail-body { grid-template-columns: minmax(0, 1fr); }
+#detail.chat-mode .side { display: none !important; }
+body.term-full #detail.chat-mode { --full-side-w: 0px; }
+.cv-memo-fab { position: absolute; right: 20px; bottom: calc(100% + 60px); z-index: 4; width: 40px; height: 40px; padding: 0; border-radius: 50%; cursor: pointer;
+  display: grid; place-items: center; color: var(--text); background: var(--surface); border: 1px solid var(--line-2);
+  box-shadow: 0 6px 18px rgb(0 0 0 / calc(.15 + .3 * var(--shade))); transition: background .15s, transform .15s, color .15s; }
+.cv-memo-fab svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+.cv-memo-fab:hover { transform: translateY(-1px); background: color-mix(in srgb, var(--accent) 16%, var(--surface)); }
+.cv-memo-fab.on { color: #fff; background: var(--accent); border-color: var(--accent); }
+.cv-memo-fab .n { position: absolute; top: -5px; right: -5px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; display: grid; place-items: center;
+  font: 700 10.5px/1 var(--mono); color: #fff; background: var(--accent); border: 2px solid var(--surface); }
+.cv-memo-fab .n:empty, .cv-memo-fab.on .n { display: none; }
+.cv-memo-pop { position: absolute; right: 70px; bottom: calc(100% + 10px); z-index: 6; width: min(420px, calc(100% - 90px)); display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--line-2); border-radius: 12px; padding: 10px 6px 6px 6px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / calc(.2 + .35 * var(--shade))); }
+.cv-memo-pop[hidden] { display: none; }
+.cv-memo-pop .mp-h { display: flex; align-items: baseline; gap: 8px; padding: 0 2px 8px 8px; font-size: 13px; color: var(--text); }
+.cv-memo-pop .mp-h small { flex: 1; min-width: 0; color: var(--dim); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cv-memo-pop .mp-x { align-self: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--dim); cursor: pointer; font-size: 12px; }
+.cv-memo-pop .mp-x:hover { background: rgb(var(--ink) / .08); color: var(--text); }
+.cv-memo-pop .memos { max-height: none; flex: 1 1 auto; min-height: 0; overflow: hidden auto; padding-right: 6px; }
+.cv-memo-pop .mp-empty { display: none; margin: 4px 8px 8px; color: var(--dim); font-size: 12px; }
+.cv-memo-pop .memos:empty + .mp-empty { display: block; }
 .cv-bottom-fab { position: absolute; left: 50%; bottom: calc(100% + 12px); z-index: 4; width: 36px; height: 36px; padding: 0; border-radius: 50%; cursor: pointer;
   display: grid; place-items: center; color: var(--text); background: var(--surface); border: 1px solid var(--line-2);
   box-shadow: 0 6px 18px rgb(0 0 0 / calc(.15 + .3 * var(--shade)));

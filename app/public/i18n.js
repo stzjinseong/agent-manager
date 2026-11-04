@@ -618,6 +618,7 @@ const EN = {
   '바로 투입 · 작업 중이면 대기열에 쌓임': 'sent now · queued while busy',
   '전송 : Alt(⌘)+Enter\n개행 : Enter\n*CLI에서도 동일하게 작동': 'Send: Alt(⌘)+Enter\nNew line: Enter\n*Works the same in the CLI',
   '위아래로 끌어 높이 조절 · 더블클릭: 기본 높이': 'Drag up/down to resize · double-click: default height',
+  '비어 있어요 — 입력칸 오른쪽 Backlog 버튼으로 담아 두세요': 'Empty — add items with the Backlog button next to the input',
   '자동 실행 안 됨 · ▶ 를 누르면 바로 전송': 'not run automatically · press ▶ to send now',
   '턴이 끝나면 전달': 'Delivered after this turn',
   'Backlog — 자동 실행 안 됨 · ▶ 를 누르면 바로 전송': 'Backlog — not run automatically · ▶ sends it now',
