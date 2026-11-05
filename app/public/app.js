@@ -5521,7 +5521,10 @@ function updateCvPin() {
     if (el.getBoundingClientRect().bottom <= top + 2) hit = el; else break;
   }
   if (!hit) { cvPin.hidden = true; cvPinFor = null; return; }
-  cvPin.style.right = `${list.offsetWidth - list.clientWidth}px`; // 스크롤바는 가리지 않게
+  // 글자 크기(가−/가+)는 목록의 zoom 이라 목록 밖에 떠 있는 이 줄엔 안 걸린다 — 같은 배율을 따로 준다. right 는 zoom 걸린 이 줄의 px 라 배율로 나눈다
+  cvPin.style.zoom = list.style.zoom;
+  const sb = list.getBoundingClientRect().right - list.clientLeft - list.getBoundingClientRect().left - list.clientWidth * chatZoom;
+  cvPin.style.right = `${Math.max(0, sb) / chatZoom}px`; // 스크롤바는 가리지 않게
   if (cvPinFor !== hit || cvPin.hidden) {
     cvPinFor = hit;
     const msg = hit.querySelector('.cv-msg')?.cloneNode(true);
@@ -5695,6 +5698,7 @@ function setChatZoom(z) {
   for (const b of document.querySelectorAll('#cv-zoom [data-zoom]')) b.disabled = (b.dataset.zoom === '-1' && z === CHAT_ZOOMS[0]) || (b.dataset.zoom === '1' && z === CHAT_ZOOMS.at(-1));
   try { z === 1 ? localStorage.removeItem(CHAT_ZOOM_KEY) : localStorage.setItem(CHAT_ZOOM_KEY, String(z)); } catch {}
   if (keep) list.scrollTop = list.scrollHeight;
+  updateCvPin(); // 위에 떠 있는 '요청' 줄도 같은 배율로
 }
 const stepChatZoom = (d) => setChatZoom(d ? CHAT_ZOOMS[Math.max(0, Math.min(CHAT_ZOOMS.length - 1, CHAT_ZOOMS.indexOf(chatZoom) + d))] : 1);
 $('#cv-zoom').addEventListener('click', (e) => { const b = e.target.closest('[data-zoom]'); if (b) stepChatZoom(Number(b.dataset.zoom)); });
