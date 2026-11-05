@@ -5969,7 +5969,7 @@ $('#cv-slash').addEventListener('click', (e) => {
 // 창은 플로팅 버튼(#cv-btw-fab)으로 열고 닫는다 — 이력이 없어도 열어 바로 물을 수 있고, 새 답이 오면 저절로 열린다
 var btwSig = '', btwLogs = {}, btwOpenFor = {}, btwSeenAt = new Set(); // var — render() 가 이 줄보다 먼저 불려도 되게
 // 창 요소 — 별도 창(btwPip)으로 빼면 이 문서에서 찾을 수 없으므로 잡아 둔 것을 쓴다. var: render() 가 먼저 불려도 되게
-var btwBoxRef = null, btwPip = null, btwWid = null, btwTitle = 'BTW';
+var btwBoxRef = null, btwPip = null, btwPipBack = false, btwWid = null, btwTitle = 'BTW';
 function btwEl() { return btwBoxRef || document.getElementById('cv-btw'); }
 const BTW_POS_KEY = 'am.btwPos2'; // 2: 창 기준 좌표(예전 am.btwPos 는 채팅 화면 기준이라 버린다)
 function btwSkeleton(box) {
@@ -6170,7 +6170,7 @@ window.addEventListener('resize', () => { const box = btwEl(); if (!box.hidden &
 // 안전한 출처(https · localhost)에서만 있는 기능이라 그 밖(같은 망의 다른 기기로 http 접속 등)에선 버튼이 없다
 function btwPipBtn() {
   const b = btwEl().querySelector('.btw-pip-btn');
-  if (b) b.title = b.ariaLabel = btwPip ? _t('브라우저 안으로 되돌리기') : _t('브라우저 밖 창으로 띄우기 (늘 위에)');
+  if (b) b.title = b.ariaLabel = btwPip ? _t('탭으로 돌아가기 (창의 X 는 닫기)') : _t('브라우저 밖 창으로 띄우기 (늘 위에)');
 }
 function btwPipSync() {
   if (!btwPip) return;
@@ -6184,10 +6184,12 @@ function btwPipSync() {
   d.title = btwTitle; // head 를 갈아 끼우면 제목도 빠진다
 }
 async function btwPopOut() {
-  if (btwPip) { btwPip.close(); return; } // 다시 누르면 브라우저 안으로
+  if (btwPip) { btwPipBack = true; btwPip.close(); return; } // 다시 누르면 브라우저 안으로(탭으로 돌아가기는 이 버튼뿐)
   const box = btwEl(), r = box.getBoundingClientRect();
   let pip;
-  try { pip = await documentPictureInPicture.requestWindow({ width: Math.round(r.width), height: Math.round(Math.max(r.height, 360)) }); }
+  // disallowReturnToOpener: 크롬이 별도 창에 붙이는 '탭으로 돌아가기' 버튼을 없앤다 — 그 버튼과 창의 X 가 똑같이 창을 닫기만 해서
+  // 구분할 수 없었다(X 를 눌러도 탭으로 돌아옴). 이제 창의 X = 완전히 닫기, 탭으로 돌아가기 = 머리 줄의 이 버튼
+  try { pip = await documentPictureInPicture.requestWindow({ width: Math.round(r.width), height: Math.round(Math.max(r.height, 360)), disallowReturnToOpener: true }); }
   catch { toast(_t('별도 창을 열지 못했습니다'), 3000); return; }
   btwPip = pip;
   btwPipSync();
@@ -6198,8 +6200,11 @@ async function btwPopOut() {
   btwPipBtn();
   btwSig = ''; renderBtw();
   box.querySelector('.btw-form textarea')?.focus();
-  pip.addEventListener('pagehide', () => { // 창의 ✕ · 다시 누르기 · 메인 창 새로고침
+  pip.addEventListener('pagehide', () => { // 창의 X · 머리 줄 버튼(탭으로 돌아가기) · ✕ · 메인 창 새로고침
+    const back = btwPipBack;
+    btwPipBack = false;
     btwPip = null;
+    if (!back && selected) btwOpenFor[selected] = false; // 창의 X 는 완전히 닫기 — 탭에 다시 띄우지 않는다
     box.classList.remove('btw-pip');
     document.body.append(box);
     btwPipBtn();

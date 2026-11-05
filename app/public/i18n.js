@@ -521,7 +521,7 @@ const EN = {
   '아직 고친 파일이 없습니다': 'No files changed yet',
   '변경 내용을 가져오지 못했습니다': 'Could not load the changes',
   '누르면 바뀐 내용(diff)': 'Click to see the changes (diff)',
-  '브라우저 안으로 되돌리기': 'Move back into the browser',
+  '탭으로 돌아가기 (창의 X 는 닫기)': 'Back to tab (the window X closes it)',
   '브라우저 밖 창으로 띄우기 (늘 위에)': 'Pop out into its own window (always on top)',
   '별도 창을 열지 못했습니다': 'Could not open a separate window',
   '이 기록의 변경 내용을 찾지 못했습니다 (diff 목록을 비웠거나 오래된 기록).': 'Could not find the changes for this entry (the diff list was cleared or the entry is old).',
