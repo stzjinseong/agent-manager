@@ -2770,6 +2770,13 @@ button.cv-more:hover { color: var(--text); }
 .btw-acts { margin-left: auto; display: flex; gap: 2px; }
 .btw-acts button { all: unset; cursor: pointer; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 6px; color: var(--dim); font-size: 13px; }
 .btw-acts button:hover { background: var(--surface-3); color: var(--text); }
+.btw-acts .btw-pip-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+/* 브라우저 밖 별도 창(app.js btwPopOut) — 창 전체를 채운다. 옮기기·크기는 OS 창으로 */
+.btw-pip-body { margin: 0; height: 100vh; overflow: hidden; background: var(--bg); }
+.cv-btw.btw-pip { position: static; width: auto; height: 100vh; max-width: none; max-height: none; min-width: 0; min-height: 0; box-sizing: border-box; resize: none; border: 0; border-radius: 0; box-shadow: none; }
+.cv-btw.btw-pip .btw-h { cursor: default; }
+.cv-btw.btw-pip .btw-grip-l { display: none; }
+.cv-btw.btw-pip .btw-pip-btn { color: var(--accent-hi); }
 .btw-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
 .btw-q { align-self: flex-end; max-width: 85%; font-size: 12.5px; color: var(--text); padding: 7px 11px; border-radius: 10px; border-top-right-radius: 4px;
   background: color-mix(in srgb, var(--accent) 22%, var(--surface-2)); white-space: pre-wrap; word-break: break-word;
