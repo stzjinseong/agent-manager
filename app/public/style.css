@@ -2792,6 +2792,9 @@ html:has(> .btw-pip-body) { scrollbar-gutter: auto; } /* 본창의 스크롤바 
 .btw-pip-body { margin: 0; height: 100vh; overflow: hidden; background: var(--bg); }
 .cv-btw.btw-pip { position: static; width: auto; height: 100vh; max-width: none; max-height: none; min-width: 0; min-height: 0; box-sizing: border-box; resize: none; border: 0; border-radius: 0; box-shadow: none; }
 .cv-btw.btw-pip .btw-h { cursor: default; }
+.btw-who { display: none; }
+.cv-btw.btw-pip .btw-who { display: inline; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; font-weight: 600; color: var(--text); }
+.cv-btw.btw-pip .btw-h small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .cv-btw.btw-pip .btw-grip-l { display: none; }
 .cv-btw.btw-pip .btw-pip-btn { color: var(--accent-hi); }
 .btw-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }

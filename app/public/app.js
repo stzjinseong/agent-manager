@@ -5998,7 +5998,7 @@ var btwBoxRef = null, btwPip = null, btwPipBack = false, btwWid = null, btwTitle
 function btwEl() { return btwBoxRef || document.getElementById('cv-btw'); }
 const BTW_POS_KEY = 'am.btwPos2'; // 2: 창 기준 좌표(예전 am.btwPos 는 채팅 화면 기준이라 버린다)
 function btwSkeleton(box) {
-  box.innerHTML = `<div class="btw-h" data-btw-drag><b>BTW</b><small>/btw · ${esc(_t('대화 기록에 남지 않아요'))}</small>`
+  box.innerHTML = `<div class="btw-h" data-btw-drag><b>BTW</b><span class="btw-who"></span><small>/btw · ${esc(_t('대화 기록에 남지 않아요'))}</small>`
     + `<span class="cv-zoom btw-zoom"><button type="button" data-bz="-1" title="${esc(_t('글자 작게 (Ctrl+휠)'))}">가−</button><button type="button" data-bz="0" class="cv-zpct" title="${esc(_t('원래 크기로'))}">100%</button><button type="button" data-bz="1" title="${esc(_t('글자 크게 (Ctrl+휠)'))}">가+</button></span><span class="btw-acts">${'documentPictureInPicture' in window ? `<button type="button" data-btw="pip" class="btw-pip-btn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-8 8M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"/></svg></button>` : ''}<button type="button" data-btw="close" title="${esc(_t('닫기 (CLI 의 답 창도 닫음)'))}">✕</button></span></div>`
     + `<div class="btw-list"></div>`
     + `<form class="btw-form"><textarea rows="1" placeholder="${esc(_t('이어서 BTW 묻기 — Enter 보내기'))}"></textarea><button type="submit" class="btn primary">${esc(_t('보내기'))}</button></form>`
@@ -6060,6 +6060,7 @@ function renderBtw() {
   const switched = btwWid !== w.id;
   btwWid = w.id;
   btwTitle = `BTW · ${w.name || w.id}`; // 별도 창 제목 — 어느 워커의 곁질문인지
+  const who = $('.btw-who', box); if (who && who.textContent !== (w.name || w.id)) who.textContent = w.name || w.id; // 별도 창 머리 줄의 역할 이름(브라우저 안 창은 채팅 화면이 이미 그 워커라 숨김)
   if (btwPip) btwPip.document.title = btwTitle;
   if (list._html === html) return; // 같은 내용이면(빈 안내 → 빈 안내 등) 건드리지 않는다
   list.innerHTML = list._html = html;
