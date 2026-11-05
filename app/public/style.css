@@ -2665,7 +2665,7 @@ button.upd-run:disabled { opacity: .6; cursor: default; }
 /* 채팅 칩 diff 패널 — 가로로 긴 화면은 오른쪽(왼쪽 가장자리를 끌어 넓힘), 세로로 긴 화면은 위(아래 가장자리를 끌어 늘림).
    높이는 내용에 맞추고(아래 여백 12px) 화면을 넘으면 화면 높이까지 채운 뒤 안에서 스크롤.
    크기는 --cd-w / --cd-h (app.js 가 끌기·기억한 값으로 넣는다) */
-.chip-diff { position: fixed; top: 0; right: 0; max-height: 100vh; z-index: 60; width: var(--cd-w, min(640px, 92vw)); max-width: calc(100vw - 40px); min-width: 320px; display: flex; flex-direction: column; background: linear-gradient(var(--surface), var(--surface)), var(--term-bg); border-left: 1px solid var(--line-2); border-bottom: 1px solid var(--line-2); border-bottom-left-radius: 10px; box-shadow: -12px 12px 32px rgb(0 0 0 / .5), -2px 2px 8px rgb(0 0 0 / .3); } /* 왼쪽·아래 그림자 — 높이가 내용에 맞춰 짧으면 아래가 떠 보인다. 바탕은 --surface 를 불투명한 --term-bg 위에 겹친다(glass 처럼 --surface 가 반투명인 테마에서 뒤가 비쳤다) */
+.chip-diff { position: fixed; top: 0; right: 0; max-height: 100vh; z-index: 150; width: var(--cd-w, min(640px, 92vw)); max-width: calc(100vw - 40px); min-width: 320px; display: flex; flex-direction: column; background: linear-gradient(var(--surface), var(--surface)), var(--term-bg); border-left: 1px solid var(--line-2); border-bottom: 1px solid var(--line-2); border-bottom-left-radius: 10px; box-shadow: -12px 12px 32px rgb(0 0 0 / .5), -2px 2px 8px rgb(0 0 0 / .3); } /* 왼쪽·아래 그림자 — 높이가 내용에 맞춰 짧으면 아래가 떠 보인다. 바탕은 --surface 를 불투명한 --term-bg 위에 겹친다(glass 처럼 --surface 가 반투명인 테마에서 뒤가 비쳤다) */
 :root[data-theme="light"] .chip-diff { box-shadow: -12px 12px 32px rgb(0 0 0 / .16), -2px 2px 8px rgb(0 0 0 / .08); }
 .chip-diff[hidden] { display: none; }
 .chip-diff.cd-drag { user-select: none; }
@@ -2756,7 +2756,7 @@ button.cv-more:hover { color: var(--text); }
 
 /* 채팅에서 답하기 — 클로드의 질문 카드(입력칸 위) */
 /* 화면(창) 기준 고정 — 채팅 화면 밖으로도 옮길 수 있다. 처음 자리는 app.js btwPlace 가 채팅 화면 오른쪽 위로 잡는다 */
-.cv-btw { position: fixed; top: 10px; right: 12px; z-index: 80; width: min(440px, calc(100vw - 24px)); max-height: calc(100vh - 8px); max-width: calc(100vw - 8px); min-width: 280px; min-height: 150px; resize: both; overflow: hidden; display: flex; flex-direction: column; gap: 8px;
+.cv-btw { position: fixed; top: 10px; right: 12px; z-index: 160; /* 터미널 크게 보기(.term-wrap.full 100) 위 · 팝업(200~) 아래 */ width: min(440px, calc(100vw - 24px)); max-height: calc(100vh - 8px); max-width: calc(100vw - 8px); min-width: 280px; min-height: 150px; resize: both; overflow: hidden; display: flex; flex-direction: column; gap: 8px;
   padding: 10px 12px 12px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--surface); box-shadow: 0 12px 32px rgb(0 0 0 / calc(.2 + .35 * var(--shade))); }
 /* 오른쪽 아래 모서리를 끌어 크기 조절(resize) — 처음엔 내용 높이(답이 길면 채팅 화면 높이까지) */
 .cv-btw.dragging { box-shadow: 0 18px 44px rgb(0 0 0 / calc(.3 + .4 * var(--shade))); }

@@ -5976,7 +5976,8 @@ function renderBtw() {
     if (it) Object.assign(it, { text: b.text, open: b.open }); else items.push({ at: b.at, q: b.q, text: b.text, open: b.open });
     if (!btwSeenAt.has(b.at)) { btwSeenAt.add(b.at); btwOpenFor[w.id] = true; } // 새 곁질문(채팅 입력칸의 /btw 포함)이면 창을 연다
   } else for (const x of items) x.open = false;
-  const open = Boolean(w && btwOpenFor[w.id]);
+  // 창은 body 에 붙어 있으므로(아래 'body 로 옮김') 채팅 화면이 안 보이면(CLI 보기 · diff · 워커 닫힘) 직접 숨긴다
+  const open = Boolean(w && btwOpenFor[w.id] && $('#chat-view').getClientRects().length);
   const sig = `${w?.id}|${open}|` + items.map((x) => `${x.at}|${x.open}|${x.text}`).join('|');
   if (sig === btwSig) return;
   btwSig = sig;
@@ -6112,7 +6113,11 @@ $('#cv-btw').addEventListener('pointerdown', (e) => {
   };
   g.addEventListener('pointermove', move); g.addEventListener('pointerup', up); g.addEventListener('pointercancel', up);
 });
-new ResizeObserver(() => { const box = $('#cv-btw'); if (!box.hidden && box.dataset.built) btwPlace(box); }).observe($('#chat-view'));
+// body 로 옮김 — 채팅 상자 안에 두면 position:fixed 가 창 기준이 아니게 될 수 있다(glass 테마는 .term-wrap.chatting 에 backdrop-filter 를
+// 걸어 그 상자가 기준이 됨 → 끌 때 마우스와 어긋나고 상자 밖은 잘렸다). 붙어 있던 이벤트는 요소에 걸려 있어 그대로 동작한다
+document.body.append($('#cv-btw'));
+// 채팅 화면이 보이고 숨을 때(크기 0 ↔) · 크기가 바뀔 때 — 보임 여부를 다시 판단하고 창 안으로 자리를 맞춘다
+new ResizeObserver(() => { renderBtw(); const box = $('#cv-btw'); if (!box.hidden && box.dataset.built) btwPlace(box); }).observe($('#chat-view'));
 window.addEventListener('resize', () => { const box = $('#cv-btw'); if (!box.hidden && box.dataset.built) btwPlace(box); }); // 창이 줄면 창 안으로 끌어온다
 function btwSave(part) {
   let p = {};
