@@ -2659,10 +2659,9 @@ button.upd-run:disabled { opacity: .6; cursor: default; }
 .cv-chip b { color: var(--done); font-weight: 500; overflow: hidden; text-overflow: ellipsis; }
 .cv-chip.err b { color: var(--decision); }
 .cv-chip.run b { color: var(--text); }
-.cv-chip.cv-ed { cursor: pointer; border-color: color-mix(in srgb, var(--done) 55%, transparent); }
+.cv-chip.cv-ed { cursor: pointer; border-color: var(--done); } /* diff 를 볼 수 있는 칩 — 초록 외곽선 */
 .cv-chip.cv-ed, :root[data-theme="light"] .cv-chip.cv-ed { background: color-mix(in srgb, var(--done) 8%, var(--surface)); }
-.cv-chip.cv-ed::after { content: '±'; flex: none; font-size: 11px; color: var(--done); opacity: .8; } /* diff 를 볼 수 있는 칩 표시 */
-.cv-chip.cv-ed:hover, .cv-chip.cd-on, :root[data-theme="light"] :is(.cv-chip.cv-ed:hover, .cv-chip.cd-on) { border-color: var(--done); color: var(--text); background: color-mix(in srgb, var(--done) 16%, var(--surface)); }
+.cv-chip.cv-ed:hover, .cv-chip.cd-on, :root[data-theme="light"] :is(.cv-chip.cv-ed:hover, .cv-chip.cd-on) { color: var(--text); background: color-mix(in srgb, var(--done) 18%, var(--surface)); box-shadow: 0 0 0 1px var(--done); }
 /* 채팅 칩 diff 패널 — 가로로 긴 화면은 오른쪽(왼쪽 가장자리를 끌어 넓힘), 세로로 긴 화면은 위(아래 가장자리를 끌어 늘림).
    크기는 --cd-w / --cd-h (app.js 가 끌기·기억한 값으로 넣는다) */
 .chip-diff { position: fixed; top: 0; right: 0; bottom: 0; z-index: 60; width: var(--cd-w, min(640px, 92vw)); max-width: calc(100vw - 40px); min-width: 320px; display: flex; flex-direction: column; background: var(--term-bg); border-left: 1px solid var(--line-2); box-shadow: -8px 0 24px rgba(0, 0, 0, .28); }
