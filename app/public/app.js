@@ -5423,6 +5423,19 @@ for (const el of [chipDiff.querySelector('.cd-body'), $('#diff-main')]) el.addEv
   stepDiffZoom(e.deltaY < 0 ? 1 : -1);
 }, { passive: false });
 setDiffZoom(diffZoom);
+// diff 위에서 굴린 휠은 diff 안에서만 — 내용이 끝에 닿았거나 짧아 스크롤할 게 없을 때 페이지가 대신 굴러갔다.
+// 마우스가 있는 칸(파일 목록 · 변경 내용 · 패널 본문)을 직접 굴리고 브라우저 기본 동작은 막는다. Ctrl+휠은 위 글자 크기
+function diffWheel(e) {
+  if (e.ctrlKey || e.metaKey) return;
+  const el = e.target.closest('.cd-body, #diff-main, #diff-files') || (chipDiff.contains(e.target) ? chipDiff.querySelector('.cd-body') : null);
+  e.preventDefault();
+  if (!el) return;
+  const k = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? el.clientHeight : 1; // 줄 · 쪽 단위 휠
+  const dx = e.shiftKey && !e.deltaX ? e.deltaY : e.deltaX, dy = e.shiftKey && !e.deltaX ? 0 : e.deltaY;
+  el.scrollBy({ left: dx * k, top: dy * k });
+}
+chipDiff.addEventListener('wheel', diffWheel, { passive: false });
+$('#diff-view').addEventListener('wheel', diffWheel, { passive: false });
 let chipDiffFor = null, chipDiffSeq = 0;
 try { // 가로 배치 폭만 기억한다 — 높이는 열 때마다 내용에 맞춘다(세로 배치에서 끌어 바꾼 높이는 그 패널에만)
   const cw = Number(localStorage.getItem(CD_W_KEY));
@@ -6353,9 +6366,9 @@ document.addEventListener('keydown', (e) => {
   e.preventDefault();
   chatForm.text.focus();
 });
+// CLI | 채팅 은 토글 — 묶음(.cv-seg) 어디를 눌러도(켜져 있는 쪽 · 사이 여백 포함) 반대로 바뀐다
 $('.cv-bar').addEventListener('click', (e) => {
-  const b = e.target.closest('[data-cv]');
-  if (b) setChatOpen(b.dataset.cv === 'chat');
+  if (e.target.closest('.cv-seg')) setChatOpen(!chatOpen);
 });
 $('#chat-view').addEventListener('click', (e) => {
   const b = e.target.closest('button');
