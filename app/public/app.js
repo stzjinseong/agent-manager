@@ -5969,7 +5969,7 @@ $('#cv-slash').addEventListener('click', (e) => {
 // 창은 플로팅 버튼(#cv-btw-fab)으로 열고 닫는다 — 이력이 없어도 열어 바로 물을 수 있고, 새 답이 오면 저절로 열린다
 var btwSig = '', btwLogs = {}, btwOpenFor = {}, btwSeenAt = new Set(); // var — render() 가 이 줄보다 먼저 불려도 되게
 // 창 요소 — 별도 창(btwPip)으로 빼면 이 문서에서 찾을 수 없으므로 잡아 둔 것을 쓴다. var: render() 가 먼저 불려도 되게
-var btwBoxRef = null, btwPip = null;
+var btwBoxRef = null, btwPip = null, btwWid = null, btwTitle = 'BTW';
 function btwEl() { return btwBoxRef || document.getElementById('cv-btw'); }
 const BTW_POS_KEY = 'am.btwPos2'; // 2: 창 기준 좌표(예전 am.btwPos 는 채팅 화면 기준이라 버린다)
 function btwSkeleton(box) {
@@ -6009,7 +6009,10 @@ function renderBtw() {
     if (!btwSeenAt.has(b.at)) { btwSeenAt.add(b.at); btwOpenFor[w.id] = true; } // 새 곁질문(채팅 입력칸의 /btw 포함)이면 창을 연다
   } else for (const x of items) x.open = false;
   // 창은 body 에 붙어 있으므로(아래 'body 로 옮김') 채팅 화면이 안 보이면(CLI 보기 · diff · 워커 닫힘) 직접 숨긴다
-  const open = Boolean(w && btwOpenFor[w.id] && (btwPip || $('#chat-view').getClientRects().length)); // 별도 창이면 채팅 화면과 상관없이
+  // 별도 창(btwPip)은 워커를 바꿔도 떠 있고 지금 고른 워커의 곁질문을 보여 준다(그 워커에서 창을 연 적 없어도) — 닫는 건 ✕ · 창 닫기뿐.
+  // 워커를 하나도 안 고른 순간(목록만 보기 등)엔 보던 내용을 그대로 둔다
+  if (btwPip && !w) return;
+  const open = Boolean(w && (btwPip || (btwOpenFor[w.id] && $('#chat-view').getClientRects().length)));
   const sig = `${w?.id}|${open}|` + items.map((x) => `${x.at}|${x.open}|${x.text}`).join('|');
   if (sig === btwSig) return;
   btwSig = sig;
@@ -6018,18 +6021,25 @@ function renderBtw() {
   fab.setAttribute('aria-expanded', String(open));
   const wasHidden = box.hidden;
   box.hidden = !open;
-  if (!open) { btwPip?.close(); return; } // 닫기(✕) · 곁질문 창을 연 적 없는 워커로 바꾸면 별도 창도 닫는다
+  if (!open) return;
   if (!box.dataset.built) btwSkeleton(box);
   else if (wasHidden) btwPlace(box); // 창 기준 고정이라 닫힌 사이 스크롤·창 크기가 바뀌었을 수 있다 — 열 때마다 자리를 다시 잡는다
   // 질문은 오른쪽 말풍선, 답은 메인 채팅의 클로드 답처럼 — 캐릭터 + 'Claude · 시각' + CLI 에서 정리된 줄 구조 그대로(서버 unwrapLines 가
   // 폭 때문에 꺾인 줄만 이어 둔다 · 마크다운으로 그렸더니 'a.' 'b.' 항목이 윗줄에 붙었다). 기다리는 동안은 캐릭터가 통통 튀는 '생각 중'
-  $('.btw-list', box).innerHTML = items.length ? items.map((x) => `<div class="btw-q">${esc(x.q)}</div>`
+  const html = items.length ? items.map((x) => `<div class="btw-q">${esc(x.q)}</div>`
     + `<div class="btw-a${x.text ? '' : ' btw-think'}"><span class="btw-ico"></span><div class="btw-ab"><div class="btw-lab"><b>Claude</b>${chatTime(x.at)}</div>`
     + (x.text ? `<div class="btw-txt">${btwBold(x.text)}</div>` : x.open ? `<div class="btw-wait"><span class="cv-typing"><i></i><i></i><i></i></span> ${esc(_t('생각 중'))}</div>` : `<div class="btw-wait">${esc(_t('답을 읽지 못했어요 (CLI 에서 답 창이 닫힘)'))}</div>`)
     + '</div></div>').join('')
     : `<div class="btw-empty">${esc(_t('작업을 멈추지 않고 Claude 에게 곁질문해 보세요. 답은 대화 기록에 남지 않아요.'))}</div>`;
   const list = $('.btw-list', box);
-  list.scrollTop = list.scrollHeight;
+  const apply = () => { list.innerHTML = html; list.scrollTop = list.scrollHeight; };
+  // 다른 워커로 바뀔 땐 내용이 통째로 갈려 깜빡여 보였다 — 별도 창이면 교차 페이드(View Transition)로 바꾼다. 같은 워커의 답 갱신은 그대로
+  const doc = box.ownerDocument, switched = btwWid !== w.id;
+  btwWid = w.id;
+  btwTitle = `BTW · ${w.name || w.id}`; // 별도 창 제목 — 어느 워커의 곁질문인지
+  if (btwPip) btwPip.document.title = btwTitle;
+  if (switched && btwPip && doc.startViewTransition && !wasHidden) doc.startViewTransition(apply);
+  else apply();
 }
 // 서버가 화면 칸의 '굵게' 속성을  …  로 표시해 보낸다(server.js styledLine) — 이스케이프한 뒤 <b> 로. 짝이 안 맞으면 닫아 준다
 function btwBold(text) {
@@ -6079,6 +6089,7 @@ btwEl().addEventListener('click', async (e) => {
   const a = e.target.closest('[data-btw]')?.dataset.btw, w = state.workers.find((x) => x.id === selected);
   if (!a || !w) return;
   if (a === 'pip') { btwPopOut(); return; }
+  btwPip?.close(); // ✕ 는 별도 창도 닫는다(창을 닫으면 요소가 브라우저로 돌아온 뒤 아래에서 숨김)
   setBtwOpen(false);
   if (w.btw) await api(`/api/workers/${w.id}/btw-close`, {}); // CLI 에 답 창이 떠 있으면 같이 닫는다(이력은 남음)
 });
@@ -6170,7 +6181,7 @@ function btwPipSync() {
     if (el.tagName === 'STYLE') return el.cloneNode(true);
     const l = d.createElement('link'); l.rel = 'stylesheet'; l.href = el.href; return l; // 상대 경로는 별도 창(about:blank)에서 깨지므로 절대 주소로
   }));
-  d.title = 'BTW';
+  d.title = btwTitle; // head 를 갈아 끼우면 제목도 빠진다
 }
 async function btwPopOut() {
   if (btwPip) { btwPip.close(); return; } // 다시 누르면 브라우저 안으로
