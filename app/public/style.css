@@ -1559,7 +1559,7 @@ html[data-char="clawd-white"] :is(.node, .dchip, .term-wrap) { --avatar: var(--c
 .de-head .d-add, .de-head .d-del { font-family: var(--mono); }
 .de-head i { font-style: normal; font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--surface-3); color: var(--text-2); }
 .de-head .de-user { color: var(--decision); }
-.diff-tbl { width: 100%; border-collapse: collapse; font: 12px/1.5 var(--mono); }
+.diff-tbl { width: 100%; border-collapse: collapse; font: 12.5px/1.5 var(--ui-family); font-variant-numeric: tabular-nums; } /* 화면 글꼴(꾸미기 → 글꼴) — 줄 번호는 자릿수 고정 */
 .diff-tbl td { padding: 0 6px; vertical-align: top; white-space: pre; }
 .diff-tbl td:nth-child(-n+2) { width: 1%; min-width: 34px; text-align: right; color: var(--faint); user-select: none; }
 .diff-tbl td.dl-s { width: 1%; padding: 0 4px; user-select: none; color: var(--dim); }
