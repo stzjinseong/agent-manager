@@ -5389,8 +5389,30 @@ const cdTall = window.matchMedia('(max-aspect-ratio: 1/1)'); // 세로로 긴 �
 const chipDiff = document.createElement('aside');
 chipDiff.className = 'chip-diff';
 chipDiff.hidden = true;
-chipDiff.innerHTML = `<div class="cd-grip" title=""></div><div class="cd-head"><span class="cd-title"></span><button type="button" class="cd-x" aria-label="close">✕</button></div><div class="cd-body"></div>`;
+chipDiff.innerHTML = `<div class="cd-grip" title=""></div><div class="cd-head"><span class="cd-title"></span><span class="cv-zoom diff-zoom"><button type="button" data-dz="-1" title="글자 작게 (Ctrl+휠)" data-i18n-attr="title">가−</button><button type="button" data-dz="0" class="cv-zpct" title="원래 크기로" data-i18n-attr="title">100%</button><button type="button" data-dz="1" title="글자 크게 (Ctrl+휠)" data-i18n-attr="title">가+</button></span><button type="button" class="cd-x" aria-label="close">✕</button></div><div class="cd-body"></div>`;
 document.body.append(chipDiff);
+applyI18n(chipDiff);
+// diff 글자 크기 — 채팅(setChatZoom)과 같은 단계 · 방식(내용만 CSS zoom). 칩 diff 패널과 diff 보기가 같은 크기를 쓴다
+const DIFF_ZOOM_KEY = 'am.diffZoom';
+let diffZoom = 1;
+try { const z = Number(localStorage.getItem(DIFF_ZOOM_KEY)); if (CHAT_ZOOMS.includes(z)) diffZoom = z; } catch {}
+function setDiffZoom(z) {
+  diffZoom = z;
+  for (const el of [chipDiff.querySelector('.cd-body'), $('#diff-main')]) el.style.zoom = z === 1 ? '' : String(z);
+  for (const box of document.querySelectorAll('.diff-zoom')) {
+    box.querySelector('.cv-zpct').textContent = `${Math.round(z * 100)}%`;
+    for (const b of box.querySelectorAll('[data-dz]')) b.disabled = (b.dataset.dz === '-1' && z === CHAT_ZOOMS[0]) || (b.dataset.dz === '1' && z === CHAT_ZOOMS.at(-1));
+  }
+  try { z === 1 ? localStorage.removeItem(DIFF_ZOOM_KEY) : localStorage.setItem(DIFF_ZOOM_KEY, String(z)); } catch {}
+}
+const stepDiffZoom = (d) => setDiffZoom(d ? CHAT_ZOOMS[Math.max(0, Math.min(CHAT_ZOOMS.length - 1, CHAT_ZOOMS.indexOf(diffZoom) + d))] : 1);
+document.addEventListener('click', (e) => { const b = e.target.closest('.diff-zoom [data-dz]'); if (b) stepDiffZoom(Number(b.dataset.dz)); });
+for (const el of [chipDiff.querySelector('.cd-body'), $('#diff-main')]) el.addEventListener('wheel', (e) => {
+  if (!e.ctrlKey && !e.metaKey) return;
+  e.preventDefault();
+  stepDiffZoom(e.deltaY < 0 ? 1 : -1);
+}, { passive: false });
+setDiffZoom(diffZoom);
 let chipDiffFor = null, chipDiffSeq = 0;
 try { // 가로 배치 폭 · 세로 배치 높이를 따로 기억한다
   const cw = Number(localStorage.getItem(CD_W_KEY)), ch = Number(localStorage.getItem(CD_H_KEY));
