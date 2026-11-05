@@ -298,6 +298,7 @@
   box-shadow: 0 0 0 1px var(--done), 0 4px 14px rgb(0 0 0 / calc(.12 + .2 * var(--shade)));
 }
 :root[data-skin="glass"] .term-wrap.chatting :is(.cv-chip.cv-ed:hover, .cv-chip.cd-on) { background: color-mix(in srgb, var(--done) 30%, var(--glass-l2-bg)); }
+:root[data-skin="glass"] .term-wrap.chatting .cv-chip.cv-ed:hover { box-shadow: 0 0 0 1px var(--done), 0 0 14px color-mix(in srgb, var(--done) 50%, transparent); }
 
 /* 채팅 입력 상자 — 글래스의 입력칸 공통 바탕(아래 4)이 채팅 글상자에도 칠해져 상자 안에 칸이 한 겹 더 생겼는데, 칸 여백이 0 이라
    '/ 눌러 메시지 보내기' 안내가 칸 왼쪽 끝에 닿았다 → 칸을 왼쪽으로 늘리고(상자 왼쪽 여백 12 → 6px) 칸 안 여백 10px, 안내도 그만큼 */

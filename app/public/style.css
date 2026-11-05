@@ -2661,7 +2661,15 @@ button.upd-run:disabled { opacity: .6; cursor: default; }
 .cv-chip.run b { color: var(--text); }
 .cv-chip.cv-ed { cursor: pointer; color: var(--text); border-color: var(--done); box-shadow: 0 0 0 1px var(--done); } /* diff 를 볼 수 있는 칩 — 늘 두꺼운 초록 외곽선 */
 .cv-chip.cv-ed, :root[data-theme="light"] .cv-chip.cv-ed { background: color-mix(in srgb, var(--done) 14%, var(--surface)); }
+.cv-chip.cv-ed { transition: background-color .15s, box-shadow .15s, transform .15s; }
 .cv-chip.cv-ed:hover, .cv-chip.cd-on, :root[data-theme="light"] :is(.cv-chip.cv-ed:hover, .cv-chip.cd-on) { background: color-mix(in srgb, var(--done) 28%, var(--surface)); }
+/* 올리면 살짝 떠오르고 초록 빛이 번진다 — 누를 수 있다는 표시 */
+.cv-chip.cv-ed:hover { transform: translateY(-1px); box-shadow: 0 0 0 1px var(--done), 0 0 12px color-mix(in srgb, var(--done) 45%, transparent); }
+.cv-chip.cv-ed:active { transform: none; }
+/* 답 속 결과물 경로 — 링크처럼 */
+a.cv-path { color: inherit; text-decoration: none; }
+a.cv-path code { cursor: pointer; color: var(--done); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--done) 45%, transparent); text-underline-offset: 3px; }
+a.cv-path:hover code { text-decoration-color: var(--done); background: color-mix(in srgb, var(--done) 12%, transparent); }
 /* 채팅 칩 diff 패널 — 가로로 긴 화면은 오른쪽(왼쪽 가장자리를 끌어 넓힘), 세로로 긴 화면은 위(아래 가장자리를 끌어 늘림).
    높이는 내용에 맞추고(아래 여백 12px) 화면을 넘으면 화면 높이까지 채운 뒤 안에서 스크롤.
    크기는 --cd-w / --cd-h (app.js 가 끌기·기억한 값으로 넣는다) */

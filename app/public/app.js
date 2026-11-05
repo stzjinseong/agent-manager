@@ -2234,7 +2234,7 @@ const TXT_DOC = new Set(['md', 'markdown', 'txt', 'log', 'csv', 'tsv', 'json', '
 const docOpenHint = (img) => _t(img ? (LOCAL_VIEW ? '클릭: 크게 보기 · Ctrl/⌘+클릭: 열기' : '클릭: 크게 보기 · Ctrl/⌘+클릭: 새 탭')
   : LOCAL_VIEW ? '클릭: 열기 · Ctrl/⌘+클릭: 새 탭' : '클릭: 새 탭에서 열기');
 document.addEventListener('click', (e) => {
-  const a = e.target.closest?.('a.card-doc, a.dock-doc, a.tl-doc, a.att-doc');
+  const a = e.target.closest?.('a.card-doc, a.dock-doc, a.tl-doc, a.att-doc, a.cv-path');
   if (!a || e.button || e.shiftKey) return;
   const mod = e.ctrlKey || e.metaKey, vid = a.dataset.vid != null, txt = a.dataset.txt != null, img = a.dataset.img != null || vid || txt;
   if (img && !mod) {
@@ -5241,6 +5241,20 @@ function chatWithDocs(items) {
   if (di < docs.length) out.push({ k: 'd', list: docs.slice(di) });
   return out;
 }
+// 답 글의 `경로` 가 이 워커의 결과물(w.docs)이면 눌러 열 수 있게 — 결과물 카드와 같은 열기(문서 · 그림 · 글 보기, 이 PC 면 기본 앱).
+// 서버는 결과물로 기록된 파일만 열어 주므로 아무 경로나 열리지 않는다. 그린 HTML 은 캐시(chatHtml)라 결과물이 늦게 잡혀도 매번 다시 입힌다
+const HTML_UNESC = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'" };
+function chatPathLinks(html) {
+  const docs = state.workers.find((w) => w.id === chatData.wid)?.docs;
+  if (!docs?.length || !html.includes('<code>')) return html;
+  const byPath = new Map(docs.map((d) => [normPath(d.path), d]));
+  return html.replace(/<code>([^<]{3,400})<\/code>/g, (m, t) => {
+    const d = byPath.get(normPath(t.replace(/&(amp|lt|gt|quot|#39);/g, (x) => HTML_UNESC[x])));
+    if (!d) return m;
+    const ext = d.name.split('.').pop().toLowerCase();
+    return `<a class="cv-path" href="${esc(d.url)}" target="_blank" rel="noopener"${docImgAttr(d, ext)} title="${esc(d.path)}&#10;${docOpenHint(IMG_DOC.has(ext) || VID_DOC.has(ext) || TXT_DOC.has(ext))}">${m}</a>`;
+  });
+}
 // 이어지는 도구는 칩 한 줄로, 이어지는 답 글은 이름표 하나 아래로 묶는다
 // limit: 끝에서 그만큼의 묶음만 그린다(renderChat 의 chatWin) — 앞이 잘렸으면 맨 위에 '이전 대화' 줄
 function chatBlocks(items, limit = Infinity) {
@@ -5262,7 +5276,7 @@ function chatBlocks(items, limit = Infinity) {
       return `<div class="cv-ev cv-t"><span class="cv-dot"></span><div class="cv-body"><div class="cv-chips">${shown.map(chatChip).join('')}${more}</div>${chatShots(b.list)}</div></div>`;
     }
     if (b.k === 'd') return `<div class="cv-ev cv-d"><span class="cv-dot"></span><div class="cv-body"><div class="cv-lab"><b>${_t('📄 결과물')}</b>${chatTime(b.list.at(-1).t)}</div><div class="cv-docs">${b.list.map(docCard).join('')}</div></div></div>`;
-    if (b.k === 'a') return `<div class="cv-ev cv-a"><span class="cv-dot"></span><div class="cv-body"><div class="cv-lab"><b>${_t('클로드')}</b>${chatTime(b.list[0].ts)}</div>${b.list.map((x) => `<div class="cv-ai" data-seq="${x.seq}">${chatItemHtml(x)}</div>`).join('')}</div></div>`;
+    if (b.k === 'a') return `<div class="cv-ev cv-a"><span class="cv-dot"></span><div class="cv-body"><div class="cv-lab"><b>${_t('클로드')}</b>${chatTime(b.list[0].ts)}</div>${b.list.map((x) => `<div class="cv-ai" data-seq="${x.seq}">${chatPathLinks(chatItemHtml(x))}</div>`).join('')}</div></div>`;
     return chatItemHtml(b.x);
   }).join('');
 }

@@ -2016,6 +2016,9 @@ const IMAGE_TYPES = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', g
 const SHELL_DOC_EXT = ['pdf', 'svg', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt', 'hwp', 'hwpx', 'odt', 'ods', 'odp', 'rtf',
   'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'mp4', 'm4v', 'mov', 'webm', 'zip', '7z'];
 const SHELL_DOC_RE = new RegExp(`(["'])([^"'\\n]+?\\.(?:${SHELL_DOC_EXT.join('|')}))\\1|([^\\s"'\`<>|;&()=,]+\\.(?:${SHELL_DOC_EXT.join('|')}))(?!\\w|\\.\\w)`, 'gi'); // 끝에 마침표만 붙은 경로("…\\clip.mp4.")도
+// 답 글에 적힌 경로는 글 문서(html · md · txt …)도 결과물로 친다 — 단 작업 폴더 밖(다운로드 폴더 등)에 있을 때만.
+// 작업 폴더 안의 html · md 는 프로젝트 소스를 고친 것일 수 있어 빼고(Bash 와 같은 이유), 바이너리 문서 · 그림 · 영상은 위 형식대로
+const ANSWER_DOC_RE = new RegExp(SHELL_DOC_RE.source.replaceAll(SHELL_DOC_EXT.join('|'), [...new Set([...SHELL_DOC_EXT, ...Object.keys(DOC_TYPES)])].join('|')), 'gi');
 const DOC_KEEP = 50;
 const CLAUDE_HOME = path.join(os.homedir(), '.claude');
 const docExt = (file) => path.extname(file).slice(1).toLowerCase();
@@ -2064,18 +2067,19 @@ function trackShellDocs(w, ev) {
 // 결과물 카드가 안 떴다. 답에 나온 경로 중 이번 턴에 생기거나 바뀐 파일만(Bash 와 같은 형식·시각 조건)
 function trackAnswerDocs(w, text) {
   if (!w.turnStartedAt || typeof text !== 'string' || !text) return false;
-  return trackPathsIn(w, text, null, '답변');
+  return trackPathsIn(w, text, null, '답변', ANSWER_DOC_RE);
 }
-function trackPathsIn(w, text, cwd, tool) {
+function trackPathsIn(w, text, cwd, tool, re = SHELL_DOC_RE) {
   text = text.slice(0, 200000);
   const found = new Set();
-  for (const m of text.matchAll(SHELL_DOC_RE)) { found.add(m[2] || m[3]); if (found.size >= 20) break; }
+  for (const m of text.matchAll(re)) { found.add(m[2] || m[3]); if (found.size >= 20) break; }
   let added = false;
   for (const raw of found) {
     // ~/… 는 홈, Windows 에서 Git Bash 꼴 /c/Users/… 는 C:/Users/…
     const p = raw.replace(/^~(?=[\\/])/, os.homedir()).replace(/^\/([a-z])\//i, (m, d) => (process.platform === 'win32' ? `${d.toUpperCase()}:/` : m));
     const full = path.resolve(cwd || w.cwd || ROOT, p);
     if (!isDocCandidate(full) || /[\\/](node_modules|\.git)[\\/]/i.test(full)) continue;
+    if (!SHELL_DOC_EXT.includes(docExt(full)) && w.cwd && underDir(full, path.resolve(w.cwd))) continue; // 글 문서는 작업 폴더 밖만(위 ANSWER_DOC_RE)
     let st;
     try { st = fs.statSync(full); } catch { continue; }
     if (!st.isFile() || st.mtimeMs < w.turnStartedAt - 5000) continue;
