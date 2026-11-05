@@ -6057,14 +6057,16 @@ function renderBtw() {
     + '</div></div>').join('')
     : `<div class="btw-empty">${esc(_t('작업을 멈추지 않고 Claude 에게 곁질문해 보세요. 답은 대화 기록에 남지 않아요.'))}</div>`;
   const list = $('.btw-list', box);
-  const apply = () => { list.innerHTML = html; list.scrollTop = list.scrollHeight; };
-  // 다른 워커로 바뀔 땐 내용이 통째로 갈려 깜빡여 보였다 — 별도 창이면 교차 페이드(View Transition)로 바꾼다. 같은 워커의 답 갱신은 그대로
-  const doc = box.ownerDocument, switched = btwWid !== w.id;
+  const switched = btwWid !== w.id;
   btwWid = w.id;
   btwTitle = `BTW · ${w.name || w.id}`; // 별도 창 제목 — 어느 워커의 곁질문인지
   if (btwPip) btwPip.document.title = btwTitle;
-  if (switched && btwPip && doc.startViewTransition && !wasHidden) doc.startViewTransition(apply);
-  else apply();
+  if (list._html === html) return; // 같은 내용이면(빈 안내 → 빈 안내 등) 건드리지 않는다
+  list.innerHTML = list._html = html;
+  list.scrollTop = list.scrollHeight;
+  // 다른 워커로 바뀔 땐 목록만 살짝 떠오르며 나타나게. 예전엔 View Transition 이었는데, 창 전체를 그림(스냅숏)으로 찍어 0.2초 겹쳐
+  // 그 사이 글자가 뭉개진 '영상 같은' 화면이 보였다(녹화 프레임 3~13 이 전체 화면 미세 변화) — 실제 글자 그대로 움직이는 애니메이션으로
+  if (switched && !wasHidden && list.animate) list.animate([{ opacity: 0.25, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 200, easing: 'cubic-bezier(.2, .8, .2, 1)' });
 }
 // 서버가 화면 칸의 '굵게' 속성을  …  로 표시해 보낸다(server.js styledLine) — 이스케이프한 뒤 <b> 로. 짝이 안 맞으면 닫아 준다
 function btwBold(text) {
