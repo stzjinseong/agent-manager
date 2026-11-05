@@ -2665,19 +2665,21 @@ button.upd-run:disabled { opacity: .6; cursor: default; }
 /* 채팅 칩 diff 패널 — 가로로 긴 화면은 오른쪽(왼쪽 가장자리를 끌어 넓힘), 세로로 긴 화면은 위(아래 가장자리를 끌어 늘림).
    높이는 내용에 맞추고(아래 여백 12px) 화면을 넘으면 화면 높이까지 채운 뒤 안에서 스크롤.
    크기는 --cd-w / --cd-h (app.js 가 끌기·기억한 값으로 넣는다) */
-.chip-diff { position: fixed; top: 0; right: 0; max-height: 100vh; z-index: 60; width: var(--cd-w, min(640px, 92vw)); max-width: calc(100vw - 40px); min-width: 320px; display: flex; flex-direction: column; background: var(--term-bg); border-left: 1px solid var(--line-2); box-shadow: -8px 0 24px rgba(0, 0, 0, .28); }
+.chip-diff { position: fixed; top: 0; right: 0; max-height: 100vh; z-index: 60; width: var(--cd-w, min(640px, 92vw)); max-width: calc(100vw - 40px); min-width: 320px; display: flex; flex-direction: column; background: var(--surface); border-left: 1px solid var(--line-2); border-bottom: 1px solid var(--line-2); border-bottom-left-radius: 10px; box-shadow: -12px 12px 32px rgb(0 0 0 / .5), -2px 2px 8px rgb(0 0 0 / .3); } /* 왼쪽·아래 그림자 — 높이가 내용에 맞춰 짧으면 아래가 떠 보인다 */
+:root[data-theme="light"] .chip-diff { box-shadow: -12px 12px 32px rgb(0 0 0 / .16), -2px 2px 8px rgb(0 0 0 / .08); }
 .chip-diff[hidden] { display: none; }
 .chip-diff.cd-drag { user-select: none; }
 .cd-grip { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; cursor: ew-resize; z-index: 2; }
 .cd-grip:hover, .cd-drag .cd-grip { background: color-mix(in srgb, var(--done) 35%, transparent); }
-.cd-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 14px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.cd-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 14px; border-bottom: 1px solid var(--line); background: var(--surface-2); }
 .cd-title { flex: 1; min-width: 0; font: 600 12.5px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cd-x { flex: none; background: none; border: 0; color: var(--dim); font-size: 14px; cursor: pointer; padding: 2px 6px; border-radius: 4px; }
 .cd-x:hover { color: var(--text); background: var(--surface-3); }
 .cd-body { flex: 0 1 auto; min-height: 0; overflow: auto; padding-bottom: 12px; scrollbar-gutter: stable; } /* 스크롤바가 생겨도 내용 폭이 흔들리지 않게 자리를 미리 잡는다 */
-.cd-body .diff-path { position: static; margin-top: 8px; border-bottom: 0; }
+.cd-body .diff-path { position: static; margin-top: 8px; border-bottom: 0; background: none; }
 @media (max-aspect-ratio: 1/1) {
-  .chip-diff { left: 0; bottom: auto; width: auto; min-width: 0; max-width: none; height: var(--cd-h, auto); max-height: 100vh; border-left: 0; border-bottom: 1px solid var(--line-2); box-shadow: 0 8px 24px rgba(0, 0, 0, .28); }
+  .chip-diff { left: 0; bottom: auto; width: auto; min-width: 0; max-width: none; height: var(--cd-h, auto); max-height: 100vh; border-left: 0; border-bottom-left-radius: 0; box-shadow: 0 12px 32px rgb(0 0 0 / .5), 0 2px 8px rgb(0 0 0 / .3); } /* 위에 붙으면 아래 그림자만 */
+  :root[data-theme="light"] .chip-diff { box-shadow: 0 12px 32px rgb(0 0 0 / .16), 0 2px 8px rgb(0 0 0 / .08); }
   .cd-grip { top: auto; bottom: -4px; left: 0; right: 0; width: auto; height: 8px; cursor: ns-resize; }
 }
 @media (max-width: 640px) and (min-aspect-ratio: 1/1) { .chip-diff { width: 100vw; max-width: 100vw; min-width: 0; } .cd-grip { display: none; } }
