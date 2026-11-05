@@ -5181,7 +5181,9 @@ function chatMd(text) {
 const chatTime = (ts) => fmtDate(ts + clockSkew, TIME_HM);
 function chatChip(x) {
   const st = x.st === 'err' ? ' err' : x.st === 'ok' ? '' : ' run';
-  return `<span class="cv-chip${st}" title="${esc(`${x.name}${x.arg ? ` · ${x.arg}` : ''}`)}">${esc(x.name)}${x.arg ? ` <b>${esc(x.arg)}</b>` : ''}${x.st === 'err' ? ' ✕' : x.st === 'ok' ? '' : ' …'}</span>`;
+  const ed = x.ed && x.id ? ` cv-ed" data-ed="${esc(x.id)}` : '';
+  const tip = `${x.name}${x.arg ? ` · ${x.arg}` : ''}${x.ed ? `\n${_t('누르면 바뀐 내용(diff)')}` : ''}`;
+  return `<span class="cv-chip${st}${ed}" title="${esc(tip)}">${esc(x.name)}${x.arg ? ` <b>${esc(x.arg)}</b>` : ''}${x.st === 'err' ? ' ✕' : x.st === 'ok' ? '' : ' …'}</span>`;
 }
 // 요청에 붙은 파일: 글 속 업로드 경로 + 붙인 그림의 원본 경로(files). 경로를 모르는 그림(클립보드)은 개수만
 function chatAtt(x) {
@@ -5374,7 +5376,68 @@ $('#cv-list').addEventListener('load', (e) => {
   if (e.target.tagName === 'IMG' && l._atBottom) afterFrame('cv-img', () => { if (l._atBottom) { l._settling = true; l.scrollTop = l.scrollHeight; l._settling = false; } });
 }, true);
 $('#cv-list').addEventListener('scroll', (e) => { if (!e.currentTarget._settling && e.currentTarget.scrollTop < 80) chatShowOlder(); }, { passive: true });
-$('#cv-list').addEventListener('click', (e) => { if (e.target.closest('[data-older]')) chatShowOlder(); });
+$('#cv-list').addEventListener('click', (e) => {
+  if (e.target.closest('[data-older]')) { chatShowOlder(); return; }
+  const chip = e.target.closest('.cv-chip[data-ed]');
+  if (chip) openChipDiff(chip);
+});
+// ---------- 채팅 칩 diff 패널 ----------
+// 파일을 고친 도구 칩(서버가 ed 표시)을 누르면 그 도구 호출 한 번의 변경을 오른쪽 패널로 띄운다. 내용은 diff 보기와 같은 /diff 에서
+// tool_use id 로 찾는다(Edit/Write = id, 셸 명령 = toolUseId). 왼쪽 가장자리를 끌어 넓힌다(브라우저에 기억), 패널 밖을 누르거나 Esc 면 닫힌다
+const CD_W_KEY = 'am.chipDiffW';
+const chipDiff = document.createElement('aside');
+chipDiff.className = 'chip-diff';
+chipDiff.hidden = true;
+chipDiff.innerHTML = `<div class="cd-grip" title=""></div><div class="cd-head"><span class="cd-title"></span><button type="button" class="cd-x" aria-label="close">✕</button></div><div class="cd-body"></div>`;
+document.body.append(chipDiff);
+let chipDiffFor = null, chipDiffSeq = 0;
+try { const cw = Number(localStorage.getItem(CD_W_KEY)); if (cw) chipDiff.style.width = `${cw}px`; } catch {}
+function closeChipDiff() {
+  if (chipDiff.hidden) return;
+  chipDiff.hidden = true; chipDiffFor = null; chipDiffSeq++;
+  $('#cv-list .cv-chip.cd-on')?.classList.remove('cd-on');
+}
+async function openChipDiff(chip) {
+  const id = chip.dataset.ed, wid = chatData.wid;
+  if (!chipDiff.hidden && chipDiffFor === id) { closeChipDiff(); return; } // 같은 칩을 다시 누르면 닫기
+  $('#cv-list .cv-chip.cd-on')?.classList.remove('cd-on');
+  chip.classList.add('cd-on');
+  chipDiffFor = id;
+  const seq = ++chipDiffSeq;
+  chipDiff.querySelector('.cd-grip').title = _t('끌어서 크기 조절');
+  chipDiff.querySelector('.cd-title').textContent = chip.title.split('\n')[0];
+  const body = chipDiff.querySelector('.cd-body');
+  body.innerHTML = `<div class="diff-empty">${_t('불러오는 중…')}</div>`;
+  chipDiff.hidden = false;
+  let data;
+  try { data = await (await fetch(`/api/workers/${wid}/diff`)).json(); } catch { data = null; }
+  if (seq !== chipDiffSeq) return; // 그새 닫았거나 다른 칩을 눌렀다
+  const hits = (data?.files || []).flatMap((f) => f.edits.filter((ed) => ed.id === id || ed.toolUseId === id).map((ed) => ({ f, ed }))).sort((a, b) => a.ed.ts - b.ed.ts);
+  if (!hits.length) { body.innerHTML = `<div class="diff-empty">${_t(data ? '이 기록의 변경 내용을 찾지 못했습니다 (diff 목록을 비웠거나 오래된 기록).' : '변경 내용을 가져오지 못했습니다')}</div>`; return; }
+  body.innerHTML = hits.map(({ f, ed }) => `<div class="diff-path" title="${esc(f.file)}">${esc(f.rel)}</div>${diffEditHtml(ed, wid)}`).join('');
+  body.scrollTop = 0;
+}
+chipDiff.querySelector('.cd-x').addEventListener('click', closeChipDiff);
+// 패널 밖을 누르면 닫는다 — 다른 diff 칩은 그 칩으로 바뀌므로 제외
+document.addEventListener('pointerdown', (e) => {
+  if (chipDiff.hidden || chipDiff.contains(e.target) || e.target.closest?.('.cv-chip[data-ed]')) return;
+  closeChipDiff();
+}, true);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !chipDiff.hidden) { e.stopPropagation(); closeChipDiff(); } }, true);
+// 왼쪽 가장자리 끌기: 왼쪽으로 끌수록 넓어진다(화면 폭 - 40px 까지)
+chipDiff.querySelector('.cd-grip').addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  const grip = e.currentTarget;
+  grip.setPointerCapture(e.pointerId);
+  chipDiff.classList.add('cd-drag');
+  const move = (ev) => { chipDiff.style.width = `${Math.max(320, Math.min(window.innerWidth - 40, window.innerWidth - ev.clientX))}px`; };
+  const up = () => {
+    grip.removeEventListener('pointermove', move); grip.removeEventListener('pointerup', up); grip.removeEventListener('pointercancel', up);
+    chipDiff.classList.remove('cd-drag');
+    try { localStorage.setItem(CD_W_KEY, String(chipDiff.offsetWidth)); } catch {}
+  };
+  grip.addEventListener('pointermove', move); grip.addEventListener('pointerup', up); grip.addEventListener('pointercancel', up);
+});
 // ---------- 채팅 상단 고정 요청 ----------
 // 위로 스크롤돼 가려진 내 요청(.cv-u — 대기 중 말풍선 제외) 가운데 가장 아래(최근) 것을 목록 맨 위에 덮어 보여 준다.
 // 지금 보는 답이 어떤 요청에 대한 것인지 알 수 있고, 누르면 그 요청이 목록 맨 위에 오게 스크롤하고 잠깐 강조한다
@@ -5617,6 +5680,7 @@ document.addEventListener('keydown', (e) => {
   setMemoPop(false);
 }, true);
 function setChatOpen(on, keepPref = false) {
+  if (!on) closeChipDiff();
   if (!keepPref) { // 직접 CLI/채팅을 고르면 그 선택대로 — diff 를 닫아도 채팅으로 돌아가지 않는다
     diffFromChat = false;
     try { localStorage.setItem(CHAT_KEY, on ? '1' : '0'); } catch {}
@@ -6227,6 +6291,29 @@ function diffGroups() {
       add: fs.reduce((a, x) => a + x.add, 0), del: fs.reduce((a, x) => a + x.del, 0) };
   }).sort((a, b) => (a.turn ?? -1) - (b.turn ?? -1));
 }
+// 수정 한 건(diff 보기의 한 칸) — diff 보기와 채팅 칩 diff 패널이 같이 쓴다
+function diffEditHtml(ed, wid) {
+  const tool = ed.tool === 'Bash' ? `${_t('셸 명령')} $ ${ed.cmd || ''}` : ed.tool || (ed.kind === 'create' ? 'Write' : 'Edit');
+  const head = [fmtClock(ed.ts), ed.agent ? `🤖 ${ed.agent}` : '', tool, ed.kind === 'create' ? _t('새 파일') : ed.kind === 'delete' ? _t('삭제') : '']
+    .filter(Boolean).join(' · ');
+  const body = ed.hunks.map((h) => {
+    let o = h.oldStart, n = h.newStart;
+    const rows = h.lines.map((l) => {
+      const sign = l[0], text = esc(l.slice(1));
+      if (sign === '+') return `<tr class="dl-add"><td></td><td>${n++}</td><td class="dl-s">+</td><td>${text}</td></tr>`;
+      if (sign === '-') return `<tr class="dl-del"><td>${o++}</td><td></td><td class="dl-s">−</td><td>${text}</td></tr>`;
+      if (sign === '\\') return `<tr class="dl-meta"><td></td><td></td><td></td><td>${text}</td></tr>`; // \ No newline at end of file
+      return `<tr><td>${o++}</td><td>${n++}</td><td class="dl-s"></td><td>${text}</td></tr>`;
+    }).join('');
+    return `<tr class="dl-hunk"><td colspan="4">@@ −${h.oldStart},${h.oldLines} +${h.newStart},${h.newLines} @@</td></tr>${rows}`;
+  }).join('') || (ed.binary && !ed.img ? `<tr class="dl-meta"><td></td><td></td><td></td><td>${_t('바이너리 파일 — 내용은 비교하지 않음')}</td></tr>` : '');
+  // 셸 명령이 바꾼 그림: 전/후를 좌우로 나란히(새 파일은 전, 지운 파일은 후가 빈 칸). 못 꺼내면(git gc 등) 그 칸에 안내
+  const imgSide = (side, label) => `<figure class="di-side"><figcaption>${_t(label)}</figcaption>${ed.img[side]
+    ? `<a href="/api/workers/${wid}/diff-image?edit=${encodeURIComponent(ed.id)}&side=${side}" target="_blank" rel="noopener"><img loading="lazy" alt="${_t(label)}" src="/api/workers/${wid}/diff-image?edit=${encodeURIComponent(ed.id)}&side=${side}" onerror="this.parentNode.outerHTML='<span class=&quot;di-none&quot;>${_t('그림을 꺼낼 수 없음')}</span>'"></a>`
+    : `<span class="di-none">${_t(side === 'before' ? '없음 (새 파일)' : '없음 (삭제됨)')}</span>`}</figure>`;
+  const imgCmp = ed.img ? `<div class="diff-img">${imgSide('before', '변경 전')}${imgSide('after', '변경 후')}</div>` : '';
+  return `<section class="diff-edit"><div class="de-head"><span title="${esc(head)}">${esc(head)}</span><span class="d-add">+${ed.add}</span><span class="d-del">−${ed.del}</span>${ed.userModified ? `<i class="de-user" title="${_t('승인 창에서 사람이 내용을 고쳐서 반영됨')}">${_t('사람이 고침')}</i>` : ''}${ed.cut ? `<i title="${_t('너무 길어 앞부분만 보여 줌')}">${_t('일부만')}</i>` : ''}</div>${body ? `<table class="diff-tbl">${body}</table>` : ''}${imgCmp}</section>`;
+}
 function renderDiff() {
   const groups = diffGroups(), latest = groups.at(-1);
   const find = (sel) => sel && groups.find((g) => g.key === sel.turn)?.files.find((x) => x.file === sel.file);
@@ -6274,28 +6361,7 @@ function renderDiff() {
   if (!f) { main.innerHTML = `${shellNote}<div class="diff-empty">${_t('이 워커가 고친 파일이 아직 없습니다.')}</div>`; main._file = main._html = null; return; }
   // 고른 요청 안에서 이 파일을 고친 순서대로(위에서 아래로)
   const reqLine = `<div class="diff-reqline"><b>${_t('요청')} ${g.turn != null ? `#${g.turn}` : '#?'}</b>${esc(reqText(g.prompt) || _t('(지난 요청 — 글이 남아 있지 않음)'))}</div>`;
-  const html = shellNote + `<div class="diff-path">${reqLine}${esc(f.rel)}<small>${_t('수정 {n}번', { n: f.edits.length })}</small></div>` + f.edits.map((ed) => {
-    const tool = ed.tool === 'Bash' ? `${_t('셸 명령')} $ ${ed.cmd || ''}` : ed.tool || (ed.kind === 'create' ? 'Write' : 'Edit');
-    const head = [fmtClock(ed.ts), ed.agent ? `🤖 ${ed.agent}` : '', tool, ed.kind === 'create' ? _t('새 파일') : ed.kind === 'delete' ? _t('삭제') : '']
-      .filter(Boolean).join(' · ');
-    const body = ed.hunks.map((h) => {
-      let o = h.oldStart, n = h.newStart;
-      const rows = h.lines.map((l) => {
-        const sign = l[0], text = esc(l.slice(1));
-        if (sign === '+') return `<tr class="dl-add"><td></td><td>${n++}</td><td class="dl-s">+</td><td>${text}</td></tr>`;
-        if (sign === '-') return `<tr class="dl-del"><td>${o++}</td><td></td><td class="dl-s">−</td><td>${text}</td></tr>`;
-        if (sign === '\\') return `<tr class="dl-meta"><td></td><td></td><td></td><td>${text}</td></tr>`; // \ No newline at end of file
-        return `<tr><td>${o++}</td><td>${n++}</td><td class="dl-s"></td><td>${text}</td></tr>`;
-      }).join('');
-      return `<tr class="dl-hunk"><td colspan="4">@@ −${h.oldStart},${h.oldLines} +${h.newStart},${h.newLines} @@</td></tr>${rows}`;
-    }).join('') || (ed.binary && !ed.img ? `<tr class="dl-meta"><td></td><td></td><td></td><td>${_t('바이너리 파일 — 내용은 비교하지 않음')}</td></tr>` : '');
-    // 셸 명령이 바꾼 그림: 전/후를 좌우로 나란히(새 파일은 전, 지운 파일은 후가 빈 칸). 못 꺼내면(git gc 등) 그 칸에 안내
-    const imgSide = (side, label) => `<figure class="di-side"><figcaption>${_t(label)}</figcaption>${ed.img[side]
-      ? `<a href="/api/workers/${selected}/diff-image?edit=${encodeURIComponent(ed.id)}&side=${side}" target="_blank" rel="noopener"><img loading="lazy" alt="${_t(label)}" src="/api/workers/${selected}/diff-image?edit=${encodeURIComponent(ed.id)}&side=${side}" onerror="this.parentNode.outerHTML='<span class=&quot;di-none&quot;>${_t('그림을 꺼낼 수 없음')}</span>'"></a>`
-      : `<span class="di-none">${_t(side === 'before' ? '없음 (새 파일)' : '없음 (삭제됨)')}</span>`}</figure>`;
-    const imgCmp = ed.img ? `<div class="diff-img">${imgSide('before', '변경 전')}${imgSide('after', '변경 후')}</div>` : '';
-    return `<section class="diff-edit"><div class="de-head"><span title="${esc(head)}">${esc(head)}</span><span class="d-add">+${ed.add}</span><span class="d-del">−${ed.del}</span>${ed.userModified ? `<i class="de-user" title="${_t('승인 창에서 사람이 내용을 고쳐서 반영됨')}">${_t('사람이 고침')}</i>` : ''}${ed.cut ? `<i title="${_t('너무 길어 앞부분만 보여 줌')}">${_t('일부만')}</i>` : ''}</div>${body ? `<table class="diff-tbl">${body}</table>` : ''}${imgCmp}</section>`;
-  }).join('');
+  const html = shellNote + `<div class="diff-path">${reqLine}${esc(f.rel)}<small>${_t('수정 {n}번', { n: f.edits.length })}</small></div>` + f.edits.map((ed) => diffEditHtml(ed, selected)).join('');
   const view = `${g.key}|${f.file}`; // 같은 요청·파일을 다시 그릴 땐 보던 스크롤 자리를 지킨다
   if (main._html !== html) {
     const keep = main._file === view ? main.scrollTop : 0;

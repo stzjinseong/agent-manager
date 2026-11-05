@@ -2659,6 +2659,21 @@ button.upd-run:disabled { opacity: .6; cursor: default; }
 .cv-chip b { color: var(--done); font-weight: 500; overflow: hidden; text-overflow: ellipsis; }
 .cv-chip.err b { color: var(--decision); }
 .cv-chip.run b { color: var(--text); }
+.cv-chip.cv-ed { cursor: pointer; }
+.cv-chip.cv-ed:hover, .cv-chip.cd-on { border-color: var(--done); color: var(--text); }
+/* 채팅 칩 diff 패널 — 오른쪽에 붙고 왼쪽 가장자리(.cd-grip)를 끌어 넓힌다 */
+.chip-diff { position: fixed; top: 0; right: 0; bottom: 0; z-index: 60; width: min(640px, 92vw); max-width: calc(100vw - 40px); min-width: 320px; display: flex; flex-direction: column; background: var(--term-bg); border-left: 1px solid var(--line-2); box-shadow: -8px 0 24px rgba(0, 0, 0, .28); }
+.chip-diff[hidden] { display: none; }
+.chip-diff.cd-drag { user-select: none; }
+.cd-grip { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; cursor: ew-resize; z-index: 2; }
+.cd-grip:hover, .cd-drag .cd-grip { background: color-mix(in srgb, var(--done) 35%, transparent); }
+.cd-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 14px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.cd-title { flex: 1; min-width: 0; font: 600 12.5px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cd-x { flex: none; background: none; border: 0; color: var(--dim); font-size: 14px; cursor: pointer; padding: 2px 6px; border-radius: 4px; }
+.cd-x:hover { color: var(--text); background: var(--surface-3); }
+.cd-body { flex: 1; overflow: auto; padding-bottom: 12px; }
+.cd-body .diff-path { position: static; margin-top: 8px; border-bottom: 0; }
+@media (max-width: 640px) { .chip-diff { width: 100vw !important; max-width: 100vw; min-width: 0; } .cd-grip { display: none; } }
 button.cv-more { cursor: pointer; color: var(--dim); }
 button.cv-more:hover { color: var(--text); }
 .cv-md { overflow-wrap: anywhere; }

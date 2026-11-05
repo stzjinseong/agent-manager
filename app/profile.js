@@ -252,7 +252,7 @@ function apply(p, e, line) {
       if (!b.is_error && !p.editSeen.has(b.tool_use_id)) {
         const st = p.toolStart.get(b.tool_use_id);
         const ed = editOf(e.toolUseResult, b.tool_use_id, st?.name, st?.turn || p.toolTurn.get(b.tool_use_id), ts);
-        if (ed) { p.editSeen.add(b.tool_use_id); pushEdit(p, ed); }
+        if (ed) { p.editSeen.add(b.tool_use_id); pushEdit(p, ed); if (ci) ci.ed = 1; } // 채팅 칩: 누르면 이 수정의 diff
       }
       // 이미지 블록: { type:'image', source:{ type:'base64', media_type, data } } — 실측 Read 134건 모두 이 모양
       if (Array.isArray(b.content)) b.content.forEach((x, i) => {

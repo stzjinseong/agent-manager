@@ -1162,6 +1162,8 @@ function closeShell(w, id) {
     }
     if (w.tx && (!txPath || w.tx.path === txPath)) {
       w.tx.shellEdits.push(...recs);
+      const chip = w.tx.chat?.findLast((x) => x.k === 't' && x.id === id); // 채팅 칩: 누르면 이 명령이 바꾼 파일 diff
+      if (chip && !chip.ed) { chip.ed = 1; chip.rev = ++w.tx.chatRev; }
       compactShellFile(w.tx);
       emitState();
     }
@@ -2344,7 +2346,10 @@ const server = http.createServer(async (req, res) => {
     if (!gen) return json(res, 200, { gen: null, rev: 0, full: true, items: [] });
     const q = url.searchParams, since = Number(q.get('since')) || 0;
     const full = q.get('gen') !== gen;
-    return json(res, 200, { gen, rev: tx.chatRev, full, items: full ? tx.chat : tx.chat.filter((x) => x.rev > since) });
+    // 다시 읽은 세션은 셸 명령 수정(파일에서 복원)이 칩에 표시돼 있지 않다 — 보낼 때 얹는다
+    const shellIds = new Set((tx.shellEdits || []).map((x) => x.toolUseId));
+    const items = (full ? tx.chat : tx.chat.filter((x) => x.rev > since)).map((x) => x.k === 't' && !x.ed && shellIds.has(x.id) ? { ...x, ed: 1 } : x);
+    return json(res, 200, { gen, rev: tx.chatRev, full, items });
   }
 
   // diff 보기: 워커가 Edit/Write 로 고친 파일과 그 변경(트랜스크립트의 structuredPatch). 상태 방송에는 개수만 싣고 내용은 열 때 가져간다
