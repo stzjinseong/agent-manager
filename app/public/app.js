@@ -6199,16 +6199,35 @@ function btwPipBtn() {
   const b = btwEl().querySelector('.btw-pip-btn');
   if (b) b.title = b.ariaLabel = btwPip ? _t('탭으로 돌아가기 (창의 X 는 닫기)') : _t('브라우저 밖 창으로 띄우기 (늘 위에)');
 }
+// 원래 탭의 테마 · 스타일을 별도 창에 맞춘다. 예전엔 head 가 조금만 바뀌어도(작업 상태로 탭 제목이 바뀔 때마다) 스타일시트를 전부
+// 지우고 새로 붙여, 다시 받는 동안 스타일 없는 흰 화면이 한 프레임 보였다(녹화 13번째 프레임). 이제 바뀐 것만:
+// 속성은 다른 값만 쓰고, 스타일시트는 주소(·style 글)로 비교해 새것은 먼저 붙여 다 받은 뒤에 옛것을 뗀다
 function btwPipSync() {
-  if (!btwPip) return;
-  const d = btwPip.document, h = d.documentElement;
-  for (const a of [...h.attributes]) if (!document.documentElement.hasAttribute(a.name)) h.removeAttribute(a.name);
-  for (const a of document.documentElement.attributes) h.setAttribute(a.name, a.value);
-  d.head.replaceChildren(...[...document.querySelectorAll('link[rel="stylesheet"], style')].map((el) => {
-    if (el.tagName === 'STYLE') return el.cloneNode(true);
-    const l = d.createElement('link'); l.rel = 'stylesheet'; l.href = el.href; return l; // 상대 경로는 별도 창(about:blank)에서 깨지므로 절대 주소로
-  }));
-  d.title = btwTitle; // head 를 갈아 끼우면 제목도 빠진다
+  if (!btwPip) return Promise.resolve();
+  const d = btwPip.document, h = d.documentElement, src = document.documentElement;
+  for (const a of [...h.attributes]) if (!src.hasAttribute(a.name)) h.removeAttribute(a.name);
+  for (const a of src.attributes) if (h.getAttribute(a.name) !== a.value) h.setAttribute(a.name, a.value);
+  const want = [...document.querySelectorAll('link[rel="stylesheet"], style')].map((el) => (el.tagName === 'STYLE' ? `style:${el.textContent}` : `link:${el.href}`));
+  const have = new Map([...d.head.querySelectorAll('link[rel="stylesheet"], style')].map((el) => [el._k, el]));
+  if (want.length === have.size && want.every((k) => have.has(k))) { if (d.title !== btwTitle) d.title = btwTitle; return Promise.resolve(); }
+  const loads = [];
+  let prev = null;
+  for (const k of want) { // 원래 탭과 같은 순서(뒤 것이 앞 것을 덮는다)로 끼운다
+    let el = have.get(k);
+    if (el) have.delete(k);
+    else {
+      if (k.startsWith('style:')) { el = d.createElement('style'); el.textContent = k.slice(6); }
+      else { el = d.createElement('link'); el.rel = 'stylesheet'; el.href = k.slice(5); loads.push(new Promise((r) => { el.onload = el.onerror = r; })); } // 상대 경로는 about:blank 에서 깨지므로 절대 주소
+      el._k = k;
+    }
+    if ((prev ? prev.nextElementSibling : d.head.firstElementChild) !== el) { if (prev) prev.after(el); else d.head.prepend(el); } // 이미 제자리면 옮기지 않는다(떼었다 붙이면 다시 읽음)
+    prev = el;
+  }
+  const stale = [...have.values()];
+  const done = Promise.all(loads);
+  if (stale.length) done.then(() => stale.forEach((el) => el.remove()));
+  if (d.title !== btwTitle) d.title = btwTitle;
+  return done;
 }
 async function btwPopOut() {
   if (btwPip) { btwPipBack = true; btwPip.close(); return; } // 다시 누르면 브라우저 안으로(탭으로 돌아가기는 이 버튼뿐)
@@ -6219,7 +6238,9 @@ async function btwPopOut() {
   try { pip = await documentPictureInPicture.requestWindow({ width: Math.round(r.width), height: Math.round(Math.max(r.height, 360)), disallowReturnToOpener: true }); }
   catch { toast(_t('별도 창을 열지 못했습니다'), 3000); return; }
   btwPip = pip;
-  btwPipSync();
+  // 스타일을 다 받은 뒤에 옮긴다 — 먼저 옮기면 받는 동안 스타일 없는 화면이 보인다(오래 걸리면 1.5초에서 그만 기다림)
+  await Promise.race([btwPipSync(), new Promise((r) => setTimeout(r, 1500))]);
+  if (pip.closed) { btwPip = null; return; } // 받는 사이 창을 닫았다
   pip.document.body.className = 'btw-pip-body';
   box.classList.add('btw-pip');
   for (const k of ['left', 'top', 'right', 'width', 'height']) box.style[k] = '';
@@ -6241,7 +6262,7 @@ async function btwPopOut() {
 }
 // 테마 · 스킨 · 색을 바꾸면 별도 창도 따라간다(html 속성 · 테마 CSS 링크)
 new MutationObserver(btwPipSync).observe(document.documentElement, { attributes: true });
-new MutationObserver(btwPipSync).observe(document.head, { childList: true, subtree: true, attributes: true, attributeFilter: ['href'] });
+new MutationObserver(btwPipSync).observe(document.head, { childList: true, subtree: true, attributes: true, attributeFilter: ['href'] }); // 탭 제목이 바뀌어도 불리지만 위에서 같으면 바로 끝난다
 function btwSave(part) {
   let p = {};
   try { p = JSON.parse(localStorage.getItem(BTW_POS_KEY) || '{}') || {}; } catch {}
