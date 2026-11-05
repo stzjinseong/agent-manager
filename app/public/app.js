@@ -5393,6 +5393,7 @@ chipDiff.innerHTML = `<div class="cd-grip" title=""></div><div class="cd-head"><
 document.body.append(chipDiff);
 applyI18n(chipDiff);
 // diff 글자 크기 — 채팅(setChatZoom)과 같은 단계 · 방식(내용만 CSS zoom). 칩 diff 패널과 diff 보기가 같은 크기를 쓴다
+const CHAT_ZOOM_KEY = 'am.chatZoom', CHAT_ZOOMS = [0.8, 0.9, 1, 1.1, 1.2, 1.35, 1.5];
 const DIFF_ZOOM_KEY = 'am.diffZoom';
 let diffZoom = 1;
 try { const z = Number(localStorage.getItem(DIFF_ZOOM_KEY)); if (CHAT_ZOOMS.includes(z)) diffZoom = z; } catch {}
@@ -5648,7 +5649,6 @@ function chatBar(w) {
   stEl.style.color = `var(--${st === 'waiting' ? 'idle' : st}, var(--dim))`;
 }
 // 채팅 글자 크기 — 목록(대화 내용)만 비율로 키운다(CSS zoom: 글·칩·썸네일이 함께). 입력칸·막대는 그대로
-const CHAT_ZOOM_KEY = 'am.chatZoom', CHAT_ZOOMS = [0.8, 0.9, 1, 1.1, 1.2, 1.35, 1.5];
 let chatZoom = 1;
 try { const z = Number(localStorage.getItem(CHAT_ZOOM_KEY)); if (CHAT_ZOOMS.includes(z)) chatZoom = z; } catch {}
 function setChatZoom(z) {
