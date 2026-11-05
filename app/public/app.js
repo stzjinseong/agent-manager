@@ -5941,7 +5941,7 @@ $('#cv-slash').addEventListener('click', (e) => {
 // 이력은 워커별로 이 브라우저 화면에만 쌓는다(닫아도 남아 플로팅 버튼으로 다시 열면 보임 · 새로고침하면 비움).
 // 창은 플로팅 버튼(#cv-btw-fab)으로 열고 닫는다 — 이력이 없어도 열어 바로 물을 수 있고, 새 답이 오면 저절로 열린다
 var btwSig = '', btwLogs = {}, btwOpenFor = {}, btwSeenAt = new Set(); // var — render() 가 이 줄보다 먼저 불려도 되게
-const BTW_POS_KEY = 'am.btwPos';
+const BTW_POS_KEY = 'am.btwPos2'; // 2: 창 기준 좌표(예전 am.btwPos 는 채팅 화면 기준이라 버린다)
 function btwSkeleton(box) {
   box.innerHTML = `<div class="btw-h" data-btw-drag><b>BTW</b><small>/btw · ${esc(_t('대화 기록에 남지 않아요'))}</small>`
     + `<span class="cv-zoom btw-zoom"><button type="button" data-bz="-1" title="${esc(_t('글자 작게 (Ctrl+휠)'))}">가−</button><button type="button" data-bz="0" class="cv-zpct" title="${esc(_t('원래 크기로'))}">100%</button><button type="button" data-bz="1" title="${esc(_t('글자 크게 (Ctrl+휠)'))}">가+</button></span><span class="btw-acts"><button type="button" data-btw="close" title="${esc(_t('닫기 (CLI 의 답 창도 닫음)'))}">✕</button></span></div>`
@@ -5956,15 +5956,16 @@ function btwSkeleton(box) {
 function btwPlace(box) {
   let p = null;
   try { p = JSON.parse(localStorage.getItem(BTW_POS_KEY) || 'null'); } catch {}
-  const cv = $('#chat-view');
-  // 끌어 늘린 크기(이 브라우저에 기억) — 채팅 화면보다 크면 줄인다
-  if (p?.w) box.style.width = `${Math.min(p.w, cv.clientWidth - 8)}px`;
-  if (p?.h) box.style.height = `${Math.min(p.h, cv.clientHeight - 20)}px`;
-  if (!p || p.x == null) { box.style.left = box.style.top = ''; box.style.right = ''; return; }
-  const maxX = Math.max(0, cv.clientWidth - box.offsetWidth - 4), maxY = Math.max(0, cv.clientHeight - 60);
+  const W = window.innerWidth, H = window.innerHeight;
+  // 끌어 늘린 크기(이 브라우저에 기억) — 창보다 크면 줄인다
+  if (p?.w) box.style.width = `${Math.min(p.w, W - 8)}px`;
+  if (p?.h) box.style.height = `${Math.min(p.h, H - 8)}px`;
   box.style.right = 'auto';
-  box.style.left = `${Math.min(Math.max(4, p.x), maxX)}px`;
-  box.style.top = `${Math.min(Math.max(4, p.y), maxY)}px`;
+  // 옮긴 적 없으면 채팅 화면 오른쪽 위(예전 자리). 창 기준 고정이라 채팅 화면 밖으로도 옮길 수 있다 — 창 밖으로는 못 나간다
+  let x = p?.x, y = p?.y;
+  if (x == null) { const c = $('#chat-view').getBoundingClientRect(); x = c.right - box.offsetWidth - 12; y = c.top + 10; }
+  box.style.left = `${Math.min(Math.max(4, x), Math.max(4, W - box.offsetWidth - 4))}px`;
+  box.style.top = `${Math.min(Math.max(4, y), Math.max(4, H - 60))}px`;
 }
 function renderBtw() {
   const box = $('#cv-btw'), fab = $('#cv-btw-fab');
@@ -5982,9 +5983,11 @@ function renderBtw() {
   cliPeekCheck(); // 답 창이 열리고 닫힐 때 아래 터미널 드러내기도 다시 판단
   fab.classList.toggle('on', open);
   fab.setAttribute('aria-expanded', String(open));
+  const wasHidden = box.hidden;
   box.hidden = !open;
   if (!open) return;
   if (!box.dataset.built) btwSkeleton(box);
+  else if (wasHidden) btwPlace(box); // 창 기준 고정이라 닫힌 사이 스크롤·창 크기가 바뀌었을 수 있다 — 열 때마다 자리를 다시 잡는다
   // 질문은 오른쪽 말풍선, 답은 메인 채팅의 클로드 답처럼 — 캐릭터 + 'Claude · 시각' + CLI 에서 정리된 줄 구조 그대로(서버 unwrapLines 가
   // 폭 때문에 꺾인 줄만 이어 둔다 · 마크다운으로 그렸더니 'a.' 'b.' 항목이 윗줄에 붙었다). 기다리는 동안은 캐릭터가 통통 튀는 '생각 중'
   $('.btw-list', box).innerHTML = items.length ? items.map((x) => `<div class="btw-q">${esc(x.q)}</div>`
@@ -6065,19 +6068,18 @@ $('#cv-btw').addEventListener('input', (e) => {
   ta.style.height = 'auto';
   ta.style.height = `${Math.min(ta.scrollHeight, 120)}px`;
 });
-// 머리 줄 끌기 — 채팅 화면(#chat-view) 안에서만. 버튼을 누른 건 끌기가 아니다
+// 머리 줄 끌기 — 창 안 어디로든(채팅 화면 밖 포함). 버튼을 누른 건 끌기가 아니다
 $('#cv-btw').addEventListener('pointerdown', (e) => {
   const h = e.target.closest('[data-btw-drag]');
   if (!h || e.target.closest('button') || e.button !== 0) return;
-  const box = $('#cv-btw'), cv = $('#chat-view');
+  const box = $('#cv-btw');
   const b0 = box.getBoundingClientRect();
   const dx = e.clientX - b0.left, dy = e.clientY - b0.top;
   h.setPointerCapture(e.pointerId);
   box.classList.add('dragging');
   const move = (ev) => {
-    const c = cv.getBoundingClientRect();
-    const x = Math.min(Math.max(0, ev.clientX - dx - c.left), c.width - box.offsetWidth);
-    const y = Math.min(Math.max(0, ev.clientY - dy - c.top), c.height - Math.min(box.offsetHeight, 60));
+    const x = Math.min(Math.max(0, ev.clientX - dx), window.innerWidth - box.offsetWidth);
+    const y = Math.min(Math.max(0, ev.clientY - dy), window.innerHeight - Math.min(box.offsetHeight, 60));
     box.style.right = 'auto'; box.style.left = `${x}px`; box.style.top = `${y}px`;
   };
   const up = () => {
@@ -6088,18 +6090,18 @@ $('#cv-btw').addEventListener('pointerdown', (e) => {
   h.addEventListener('pointermove', move); h.addEventListener('pointerup', up); h.addEventListener('pointercancel', up);
   e.preventDefault();
 });
-// 왼쪽 아래 손잡이 — 오른쪽 끝은 그대로 두고 왼쪽 끝 · 아래 끝을 움직인다(채팅 화면 안에서만)
+// 왼쪽 아래 손잡이 — 오른쪽 끝은 그대로 두고 왼쪽 끝 · 아래 끝을 움직인다(창 안에서)
 $('#cv-btw').addEventListener('pointerdown', (e) => {
   const g = e.target.closest('.btw-grip-l');
   if (!g || e.button !== 0) return;
   e.preventDefault(); e.stopPropagation();
-  const box = $('#cv-btw'), cv = $('#chat-view'), c = cv.getBoundingClientRect(), b0 = box.getBoundingClientRect();
-  const right = b0.right - c.left, top = b0.top - c.top, minW = 280, minH = 150;
+  const box = $('#cv-btw'), b0 = box.getBoundingClientRect();
+  const right = b0.right, top = b0.top, minW = 280, minH = 150;
   g.setPointerCapture(e.pointerId);
   box.classList.add('dragging');
   const move = (ev) => {
-    const left = Math.min(Math.max(0, ev.clientX - c.left), right - minW);
-    const h = Math.min(Math.max(minH, ev.clientY - c.top - top), c.height - top - 4);
+    const left = Math.min(Math.max(0, ev.clientX), right - minW);
+    const h = Math.min(Math.max(minH, ev.clientY - top), window.innerHeight - top - 4);
     box.style.right = 'auto'; box.style.left = `${left}px`; box.style.top = `${top}px`;
     box.style.width = `${right - left}px`; box.style.height = `${h}px`;
   };
@@ -6111,6 +6113,7 @@ $('#cv-btw').addEventListener('pointerdown', (e) => {
   g.addEventListener('pointermove', move); g.addEventListener('pointerup', up); g.addEventListener('pointercancel', up);
 });
 new ResizeObserver(() => { const box = $('#cv-btw'); if (!box.hidden && box.dataset.built) btwPlace(box); }).observe($('#chat-view'));
+window.addEventListener('resize', () => { const box = $('#cv-btw'); if (!box.hidden && box.dataset.built) btwPlace(box); }); // 창이 줄면 창 안으로 끌어온다
 function btwSave(part) {
   let p = {};
   try { p = JSON.parse(localStorage.getItem(BTW_POS_KEY) || '{}') || {}; } catch {}
