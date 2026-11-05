@@ -2577,9 +2577,17 @@ button.upd-run:disabled { opacity: .6; cursor: default; }
 :root[data-theme="light"] :is(.cv-chip, .cv-perm, .cv-box, .cv-seg) { background: #fff; }
 :root[data-theme="light"] .cv-md pre { background: var(--surface-2); }
 :root[data-theme="light"] .cv-btns button:not(.cv-yes) { background: var(--surface-3); }
-.cv-seg { flex: none; cursor: pointer; display: inline-flex; background: var(--surface); border: 1px solid var(--line-2); border-radius: 8px; padding: 2px; }
-.cv-seg button { all: unset; cursor: pointer; white-space: nowrap; padding: 1px 10px; border-radius: 6px; font-size: 12px; color: var(--dim); }
-.cv-seg button.on { background: var(--surface-3); color: var(--text); }
+.cv-seg { flex: none; cursor: pointer; position: relative; isolation: isolate; display: inline-flex; background: var(--surface); border: 1px solid var(--line-2); border-radius: 8px; padding: 2px; }
+.cv-seg button { all: unset; cursor: pointer; white-space: nowrap; padding: 1px 10px; border-radius: 6px; font-size: 12px; color: var(--dim); transition: color .25s; }
+.cv-seg button.on { color: var(--text); }
+/* 켜진 쪽 바탕은 따로 미끄러지는 손잡이(app.js placeCvThumb) — 넘쳤다 돌아오는 곡선으로 옮기고, 옮기는 동안 가로로 늘었다 출렁이며 자리 잡는다(쫀득) */
+.cv-thumb { position: absolute; top: 2px; bottom: 2px; left: 0; width: var(--tw, 0); translate: var(--tx, 0) 0; z-index: -1; pointer-events: none; border-radius: 6px; background: var(--surface-3);
+  transition: translate .5s cubic-bezier(.34, 1.56, .64, 1), width .5s cubic-bezier(.34, 1.56, .64, 1); }
+.cv-seg.still .cv-thumb { transition: none; }
+.cv-seg.seg-go .cv-thumb { animation: cvSegSquish .5s ease-out; }
+@keyframes cvSegSquish { 0% { scale: 1 1; } 22% { scale: 1.28 .78; } 50% { scale: .9 1.08; } 75% { scale: 1.04 .97; } 100% { scale: 1 1; } }
+.cv-seg.seg-go { cursor: default; }
+@media (prefers-reduced-motion: reduce) { .cv-thumb { transition-duration: .01s; } .cv-seg.seg-go .cv-thumb { animation: none; } }
 .cv-seg:hover button:not(.on) { color: var(--text); } /* 토글 — 묶음 어디에 올려도 바뀔 쪽이 밝아진다 */
 /* 워커 정보(id · 모델 · 권한 · 세션 · 브랜치 · 경로) — 상세 헤더 제목 아래에 있던 줄. 길면 끝을 줄임 */
 .cv-bar #detail-meta { flex: 0 1 auto; min-width: 0; }

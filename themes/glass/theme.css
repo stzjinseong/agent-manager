@@ -265,6 +265,8 @@
 :root[data-skin="glass"] :is(.cv-seg button.on, .ur-range button.on, .btn-diff.on, .btn-chat.on) {
   background: var(--glass-front-bg); color: var(--glass-front-fg); border-color: transparent; box-shadow: var(--glass-front-shadow);
 }
+:root[data-skin="glass"] .cv-bar .cv-seg button.on { background: transparent; box-shadow: none; } /* 켜진 바탕은 미끄러지는 손잡이가 칠한다 */
+:root[data-skin="glass"] .cv-thumb { border-radius: 999px; background: var(--glass-front-bg); box-shadow: var(--glass-front-shadow); }
 
 /* 채팅 보기 — 터미널(CLI)은 xterm 캔버스라 불투명 그대로 두고(투명하게 하면 글자 다듬기가 약해지고 느려진다), 채팅일 때만 상자를 유리로.
    상자(.term-wrap.chatting)에 흐림을 걸고 채팅 화면 · 위 막대는 비운다. 크게 보기(.full)는 뒤가 단색 덮개라 그대로 비친다.

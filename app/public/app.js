@@ -5709,6 +5709,7 @@ function chatSeg() {
   $('#cv-zoom').hidden = !chatOpen;
   for (const b of document.querySelectorAll('.btn-chat')) b.classList.toggle('on', chatOpen);
   for (const b of document.querySelectorAll('.cv-seg [data-cv]')) b.classList.toggle('on', (b.dataset.cv === 'chat') === chatOpen);
+  placeCvThumb(true);
 }
 function syncChat(w) {
   chatSeg();
@@ -5746,6 +5747,30 @@ document.addEventListener('keydown', (e) => {
   e.preventDefault(); e.stopPropagation();
   setMemoPop(false);
 }, true);
+// 토글 손잡이: 켜진 버튼 자리 · 폭으로 옮긴다. animate 면 쫀득 연출(style.css cvSegSquish) + 끝날 때까지 클릭 잠금
+var cvThumbTimer = 0;
+function placeCvThumb(animate) {
+  const seg = document.querySelector('.cv-bar .cv-seg'), on = seg?.querySelector('button.on');
+  if (!seg || !on) return;
+  let th = seg.querySelector('.cv-thumb');
+  if (!th) { th = document.createElement('span'); th.className = 'cv-thumb'; seg.prepend(th); animate = false; }
+  const x = `${on.offsetLeft}px`, w = `${on.offsetWidth}px`; // offsetLeft · left 둘 다 묶음 테두리 안쪽 기준
+  if (th.style.getPropertyValue('--tx') === x && th.style.getPropertyValue('--tw') === w) return;
+  const first = !th.style.getPropertyValue('--tw');
+  if (!animate || first || !seg.offsetWidth) { // 처음 · 글자 폭이 바뀐 것 · 안 보이는 중이면 연출 없이 그 자리로
+    seg.classList.add('still');
+    th.style.setProperty('--tx', x); th.style.setProperty('--tw', w);
+    requestAnimationFrame(() => seg.classList.remove('still'));
+    return;
+  }
+  th.style.setProperty('--tx', x); th.style.setProperty('--tw', w);
+  seg.classList.remove('seg-go'); void th.offsetWidth; // 연달아 와도 처음부터
+  seg.classList.add('seg-go');
+  clearTimeout(cvThumbTimer);
+  cvThumbTimer = setTimeout(() => seg.classList.remove('seg-go'), 520);
+}
+new ResizeObserver(() => placeCvThumb(false)).observe(document.querySelector('.cv-bar .cv-seg'));
+document.addEventListener('langchange', () => requestAnimationFrame(() => placeCvThumb(false)));
 function setChatOpen(on, keepPref = false) {
   if (!on) closeChipDiff();
   if (!keepPref) { // 직접 CLI/채팅을 고르면 그 선택대로 — diff 를 닫아도 채팅으로 돌아가지 않는다
@@ -6396,9 +6421,10 @@ document.addEventListener('keydown', (e) => {
   e.preventDefault();
   chatForm.text.focus();
 });
-// CLI | 채팅 은 토글 — 묶음(.cv-seg) 어디를 눌러도(켜져 있는 쪽 · 사이 여백 포함) 반대로 바뀐다
+// CLI | 채팅 은 토글 — 묶음(.cv-seg) 어디를 눌러도(켜져 있는 쪽 · 사이 여백 포함) 반대로 바뀐다. 손잡이가 움직이는 동안(seg-go)은 무시
 $('.cv-bar').addEventListener('click', (e) => {
-  if (e.target.closest('.cv-seg')) setChatOpen(!chatOpen);
+  const seg = e.target.closest('.cv-seg');
+  if (seg && !seg.classList.contains('seg-go')) setChatOpen(!chatOpen);
 });
 $('#chat-view').addEventListener('click', (e) => {
   const b = e.target.closest('button');
