@@ -610,18 +610,18 @@ body.term-full .side-grip { left: -6px; }
 /* 옆 패널(대기열·Backlog)·세션 프로파일 서브에이전트 목록·diff 요청 목록·채팅 목록·헤더 칩 줄·채팅 / 명령 · 보낸 글 기록 목록 스크롤바 — 앱의 스크롤바는 모두 이 모양: 트랙 없이 얇은 둥근 막대, 올리면 조금 진하게.
    크롬 계열은 ::-webkit-scrollbar 로 다듬고(표준 scrollbar-color 를 같이 주면 이 규칙이 무시되므로 주지 않는다),
    그 밖의 브라우저만 표준 속성으로 얇게 */
-:is(.queue, .memos, .subagents, #diff-files, .att-tab-list, .cv-list, .dv-chips, .cv-slash, .btw-list)::-webkit-scrollbar { width: 10px; height: 10px; }
-:is(.queue, .memos, .subagents, #diff-files, .att-tab-list, .cv-list, .dv-chips, .cv-slash, .btw-list)::-webkit-scrollbar-track { background: transparent; }
-:is(.queue, .memos, .subagents, #diff-files, .att-tab-list, .cv-list, .dv-chips, .cv-slash, .btw-list)::-webkit-scrollbar-thumb {
+:is(.queue, .memos, .subagents, #diff-files, .att-tab-list, .cv-list, .dv-chips, .cv-slash, .btw-list, .cd-body)::-webkit-scrollbar { width: 10px; height: 10px; }
+:is(.queue, .memos, .subagents, #diff-files, .att-tab-list, .cv-list, .dv-chips, .cv-slash, .btw-list, .cd-body)::-webkit-scrollbar-track { background: transparent; }
+:is(.queue, .memos, .subagents, #diff-files, .att-tab-list, .cv-list, .dv-chips, .cv-slash, .btw-list, .cd-body)::-webkit-scrollbar-thumb {
   background: rgb(var(--ink) / .14); border-radius: 10px; border: 3px solid transparent; background-clip: padding-box; min-height: 32px; min-width: 32px;
 }
-:is(.queue, .memos, .subagents, #diff-files, .att-tab-list, .cv-list, .dv-chips, .cv-slash, .btw-list)::-webkit-scrollbar-thumb:hover { background-color: rgb(var(--ink) / .3); }
-:is(.queue, .memos, .subagents, #diff-files, .att-tab-list, .cv-list, .dv-chips, .cv-slash, .btw-list)::-webkit-scrollbar-button { display: none; }
+:is(.queue, .memos, .subagents, #diff-files, .att-tab-list, .cv-list, .dv-chips, .cv-slash, .btw-list, .cd-body)::-webkit-scrollbar-thumb:hover { background-color: rgb(var(--ink) / .3); }
+:is(.queue, .memos, .subagents, #diff-files, .att-tab-list, .cv-list, .dv-chips, .cv-slash, .btw-list, .cd-body)::-webkit-scrollbar-button { display: none; }
 /* 결과물 · 캡처 · 입력 가로 줄은 더 얇게 — 막대 2px(칸 6px · 테두리 2px) */
 #att-tab-list::-webkit-scrollbar { height: 6px; } /* 공통 규칙의 :is() 가 #diff-files 때문에 id 우선순위라 id 로 */
 #att-tab-list::-webkit-scrollbar-thumb { border-width: 2px; min-width: 24px; }
 @supports not selector(::-webkit-scrollbar) {
-  .queue, .memos, .subagents, #diff-files, .att-tab-list, .cv-list, .dv-chips, .cv-slash, .btw-list { scrollbar-width: thin; scrollbar-color: rgb(var(--ink) / .18) transparent; }
+  .queue, .memos, .subagents, #diff-files, .att-tab-list, .cv-list, .dv-chips, .cv-slash, .btw-list, .cd-body { scrollbar-width: thin; scrollbar-color: rgb(var(--ink) / .18) transparent; }
 }
 
 /* ---------- 반응형 ---------- */
@@ -2659,8 +2659,10 @@ button.upd-run:disabled { opacity: .6; cursor: default; }
 .cv-chip b { color: var(--done); font-weight: 500; overflow: hidden; text-overflow: ellipsis; }
 .cv-chip.err b { color: var(--decision); }
 .cv-chip.run b { color: var(--text); }
-.cv-chip.cv-ed { cursor: pointer; }
-.cv-chip.cv-ed:hover, .cv-chip.cd-on { border-color: var(--done); color: var(--text); }
+.cv-chip.cv-ed { cursor: pointer; border-color: color-mix(in srgb, var(--done) 55%, transparent); }
+.cv-chip.cv-ed, :root[data-theme="light"] .cv-chip.cv-ed { background: color-mix(in srgb, var(--done) 8%, var(--surface)); }
+.cv-chip.cv-ed::after { content: '±'; flex: none; font-size: 11px; color: var(--done); opacity: .8; } /* diff 를 볼 수 있는 칩 표시 */
+.cv-chip.cv-ed:hover, .cv-chip.cd-on, :root[data-theme="light"] :is(.cv-chip.cv-ed:hover, .cv-chip.cd-on) { border-color: var(--done); color: var(--text); background: color-mix(in srgb, var(--done) 16%, var(--surface)); }
 /* 채팅 칩 diff 패널 — 가로로 긴 화면은 오른쪽(왼쪽 가장자리를 끌어 넓힘), 세로로 긴 화면은 위(아래 가장자리를 끌어 늘림).
    크기는 --cd-w / --cd-h (app.js 가 끌기·기억한 값으로 넣는다) */
 .chip-diff { position: fixed; top: 0; right: 0; bottom: 0; z-index: 60; width: var(--cd-w, min(640px, 92vw)); max-width: calc(100vw - 40px); min-width: 320px; display: flex; flex-direction: column; background: var(--term-bg); border-left: 1px solid var(--line-2); box-shadow: -8px 0 24px rgba(0, 0, 0, .28); }
@@ -2672,7 +2674,7 @@ button.upd-run:disabled { opacity: .6; cursor: default; }
 .cd-title { flex: 1; min-width: 0; font: 600 12.5px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cd-x { flex: none; background: none; border: 0; color: var(--dim); font-size: 14px; cursor: pointer; padding: 2px 6px; border-radius: 4px; }
 .cd-x:hover { color: var(--text); background: var(--surface-3); }
-.cd-body { flex: 1; overflow: auto; padding-bottom: 12px; }
+.cd-body { flex: 1; overflow: auto; padding-bottom: 12px; scrollbar-gutter: stable; } /* 스크롤바가 생겨도 내용 폭이 흔들리지 않게 자리를 미리 잡는다 */
 .cd-body .diff-path { position: static; margin-top: 8px; border-bottom: 0; }
 @media (max-aspect-ratio: 1/1) {
   .chip-diff { left: 0; bottom: auto; width: auto; min-width: 0; max-width: none; height: var(--cd-h, 50vh); min-height: 160px; max-height: calc(100vh - 40px); border-left: 0; border-bottom: 1px solid var(--line-2); box-shadow: 0 8px 24px rgba(0, 0, 0, .28); }
