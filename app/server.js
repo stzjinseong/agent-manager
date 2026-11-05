@@ -2363,7 +2363,8 @@ const server = http.createServer(async (req, res) => {
     if (!w) return json(res, 404, { error: '워커가 없습니다' });
     const rel = (f) => { const r = path.relative(w.cwd || ROOT, f); return r && !r.startsWith('..') && !path.isAbsolute(r) ? r : f; };
     const log = w.tx ? editLog(warmProfile(w)) : { files: [], requests: [] };
-    const shellTracked = Boolean(await snapshotRepo(w.cwd));
+    // 칩 diff 패널(lite)은 기록만 본다 — 저장소 찍기(snapshotRepo)는 큰 저장소(Unity 등)에서 수 초~수십 초라 패널이 '불러오는 중'에 머물렀다
+    const shellTracked = url.searchParams.get('lite') === '1' ? null : Boolean(await snapshotRepo(w.cwd));
     return json(res, 200, { cwd: w.cwd, shellTracked, files: log.files.map((x) => ({ ...x, rel: rel(x.file) })), requests: log.requests });
   }
 

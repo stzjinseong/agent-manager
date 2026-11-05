@@ -5474,7 +5474,7 @@ async function openChipDiff(chip) {
   body.innerHTML = `<div class="diff-empty">${_t('불러오는 중…')}</div>`;
   chipDiff.hidden = false;
   let data;
-  try { data = await (await fetch(`/api/workers/${wid}/diff`)).json(); } catch { data = null; }
+  try { data = await (await fetch(`/api/workers/${wid}/diff?lite=1`, { signal: AbortSignal.timeout(20000) })).json(); } catch { data = null; } // 서버가 바쁘면 20초 뒤 '못 가져옴'으로
   if (seq !== chipDiffSeq) return; // 그새 닫았거나 다른 칩을 눌렀다
   const hits = (data?.files || []).flatMap((f) => f.edits.filter((ed) => ed.id === id || ed.toolUseId === id).map((ed) => ({ f, ed }))).sort((a, b) => a.ed.ts - b.ed.ts);
   if (!hits.length) { body.innerHTML = `<div class="diff-empty">${_t(data ? '이 기록의 변경 내용을 찾지 못했습니다 (diff 목록을 비웠거나 오래된 기록).' : '변경 내용을 가져오지 못했습니다')}</div>`; return; }
