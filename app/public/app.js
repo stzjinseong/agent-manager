@@ -6060,7 +6060,7 @@ function renderBtw() {
   const switched = btwWid !== w.id;
   btwWid = w.id;
   btwTitle = `BTW · ${w.name || w.id}`; // 별도 창 제목 — 어느 워커의 곁질문인지
-  const who = $('.btw-who', box); if (who && who.textContent !== (w.name || w.id)) who.textContent = w.name || w.id; // 별도 창 머리 줄의 역할 이름(브라우저 안 창은 채팅 화면이 이미 그 워커라 숨김)
+  const who = $('.btw-who', box); if (who && who.textContent !== (w.name || w.id)) who.textContent = w.name || w.id; // 머리 줄의 역할 이름 — 어느 워커의 곁질문인지
   if (btwPip) btwPip.document.title = btwTitle;
   if (list._html === html) return; // 같은 내용이면(빈 안내 → 빈 안내 등) 건드리지 않는다
   list.innerHTML = list._html = html;

@@ -2780,7 +2780,7 @@ button.cv-more:hover { color: var(--text); }
   margin: 0 -12px; padding: 0 12px 8px; border-bottom: 1px solid var(--line); } /* 머리 줄 아래 얇은 구분선 — 창 좌우 끝까지 */
 .cv-btw.dragging .btw-h { cursor: grabbing; }
 .btw-h b { font-size: 12.5px; letter-spacing: .04em; color: var(--accent-hi); flex: none; }
-.btw-h small { font-size: 11px; color: var(--dim); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* 창이 좁아지면 안내 글이 말줄임 — 머리 줄은 한 줄 높이 그대로 */
+.btw-h small { font-size: 11px; color: var(--dim); min-width: 0; flex: 1 1 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* 창이 좁아지면 안내 글이 말줄임 — 머리 줄은 한 줄 높이 그대로 */
 .btw-h :is(.btw-zoom, .btw-acts) { flex: none; white-space: nowrap; }
 .btw-zoom { margin-left: auto; }
 .btw-zoom + .btw-acts { margin-left: 4px; }
@@ -2793,8 +2793,7 @@ html:has(> .btw-pip-body) { scrollbar-gutter: auto; } /* 본창의 스크롤바 
 .btw-pip-body { margin: 0; height: 100vh; overflow: hidden; background: var(--bg); }
 .cv-btw.btw-pip { position: static; width: auto; height: 100vh; max-width: none; max-height: none; min-width: 0; min-height: 0; box-sizing: border-box; resize: none; border: 0; border-radius: 0; box-shadow: none; }
 .cv-btw.btw-pip .btw-h { cursor: default; }
-.btw-who { display: none; }
-.cv-btw.btw-pip .btw-who { display: inline; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; font-weight: 600; color: var(--text); }
+.btw-who { min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; font-weight: 600; color: var(--text); }
 .cv-btw.btw-pip .btw-grip-l { display: none; }
 .cv-btw.btw-pip .btw-pip-btn { color: var(--accent-hi); }
 .btw-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
