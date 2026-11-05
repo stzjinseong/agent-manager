@@ -5160,7 +5160,7 @@ function chatSettle(wid) {
   }
   chatPending = chatPending.filter((p) => !used.has(p));
 }
-try { chatOpen = localStorage.getItem(CHAT_KEY) === '1'; } catch {}
+try { chatOpen = localStorage.getItem(CHAT_KEY) !== '0'; } catch { chatOpen = true; } // 고른 적이 없으면 채팅 — CLI 를 직접 고른 사람만 CLI 로 연다
 // 답 속 그림 ![설명](경로) — 터미널은 못 그리지만 채팅 보기에서는 글 사이에 그린다. 이 PC 경로(절대 · ~/ · file:// · 작업 폴더 기준)는
 // 서버(chat-image)가 그 답에 적힌 경로인지 확인하고 꺼내 준다. 앱 주소(/uploads/ 등) · 웹 주소는 그대로
 let chatMarked = null;
