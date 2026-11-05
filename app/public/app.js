@@ -1198,22 +1198,31 @@ function fillSelected() {
   const f = fullOf?.id === w.id ? fullOf : { log: [], past: [], atts: [], profile: w.profile };
   Object.assign(w, { log: f.log, past: f.past, atts: f.atts, profile: f.profile, lite: false });
 }
+// 한 단계가 던져도 나머지(특히 워커 카드 renderFloor)는 그린다 — 예외를 삼키지는 않고 콘솔에 단계 이름과 함께 남긴다.
+// 같은 단계 · 같은 메시지는 한 번만 찍는다(render 는 상태가 올 때마다 불려 같은 에러가 콘솔을 덮는다)
+const renderErrSeen = new Set();
+function renderStep(name, fn) {
+  try { fn(); } catch (e) {
+    const key = name + "|" + (e?.message ?? e);
+    if (!renderErrSeen.has(key)) { renderErrSeen.add(key); console.error(`[render] ${name} 실패`, e); }
+  }
+}
 function render() {
-  fillSelected();
-  renderBtw();
-  renderStats();
-  renderStale();
-  renderUpd();
-  window.renderDaily?.(); // 하루 요약 카드 도착 띠 · 우편함 버튼 (growth.js)
-  window.renderSchedules?.(); // 예약 실행 버튼 · 상세 패널의 이 역할 예약 (schedule.js)
-  window.renderDirectives?.(); // 작업 지시 버튼 · 상세 패널의 이 워커 지시 칩 (directives.js)
-  window.renderStash?.(); // 알림 보관함 버튼 · 끝난 알림 정리 (stash.js)
-  renderInbox();
-  renderFloor();
-  renderDock();
-  renderDetail();
-  renderHint();
-  mgrUpdate();
+  renderStep("fillSelected", fillSelected);
+  renderStep("renderBtw", renderBtw);
+  renderStep("renderStats", renderStats);
+  renderStep("renderStale", renderStale);
+  renderStep("renderUpd", renderUpd);
+  renderStep("renderDaily", () => window.renderDaily?.()); // 하루 요약 카드 도착 띠 · 우편함 버튼 (growth.js)
+  renderStep("renderSchedules", () => window.renderSchedules?.()); // 예약 실행 버튼 · 상세 패널의 이 역할 예약 (schedule.js)
+  renderStep("renderDirectives", () => window.renderDirectives?.()); // 작업 지시 버튼 · 상세 패널의 이 워커 지시 칩 (directives.js)
+  renderStep("renderStash", () => window.renderStash?.()); // 알림 보관함 버튼 · 끝난 알림 정리 (stash.js)
+  renderStep("renderInbox", renderInbox);
+  renderStep("renderFloor", renderFloor);
+  renderStep("renderDock", renderDock);
+  renderStep("renderDetail", renderDetail);
+  renderStep("renderHint", renderHint);
+  renderStep("mgrUpdate", mgrUpdate);
 }
 
 function pendingCount() {
