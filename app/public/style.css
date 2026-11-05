@@ -2661,8 +2661,9 @@ button.upd-run:disabled { opacity: .6; cursor: default; }
 .cv-chip.run b { color: var(--text); }
 .cv-chip.cv-ed { cursor: pointer; }
 .cv-chip.cv-ed:hover, .cv-chip.cd-on { border-color: var(--done); color: var(--text); }
-/* 채팅 칩 diff 패널 — 오른쪽에 붙고 왼쪽 가장자리(.cd-grip)를 끌어 넓힌다 */
-.chip-diff { position: fixed; top: 0; right: 0; bottom: 0; z-index: 60; width: min(640px, 92vw); max-width: calc(100vw - 40px); min-width: 320px; display: flex; flex-direction: column; background: var(--term-bg); border-left: 1px solid var(--line-2); box-shadow: -8px 0 24px rgba(0, 0, 0, .28); }
+/* 채팅 칩 diff 패널 — 가로로 긴 화면은 오른쪽(왼쪽 가장자리를 끌어 넓힘), 세로로 긴 화면은 위(아래 가장자리를 끌어 늘림).
+   크기는 --cd-w / --cd-h (app.js 가 끌기·기억한 값으로 넣는다) */
+.chip-diff { position: fixed; top: 0; right: 0; bottom: 0; z-index: 60; width: var(--cd-w, min(640px, 92vw)); max-width: calc(100vw - 40px); min-width: 320px; display: flex; flex-direction: column; background: var(--term-bg); border-left: 1px solid var(--line-2); box-shadow: -8px 0 24px rgba(0, 0, 0, .28); }
 .chip-diff[hidden] { display: none; }
 .chip-diff.cd-drag { user-select: none; }
 .cd-grip { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; cursor: ew-resize; z-index: 2; }
@@ -2673,7 +2674,11 @@ button.upd-run:disabled { opacity: .6; cursor: default; }
 .cd-x:hover { color: var(--text); background: var(--surface-3); }
 .cd-body { flex: 1; overflow: auto; padding-bottom: 12px; }
 .cd-body .diff-path { position: static; margin-top: 8px; border-bottom: 0; }
-@media (max-width: 640px) { .chip-diff { width: 100vw !important; max-width: 100vw; min-width: 0; } .cd-grip { display: none; } }
+@media (max-aspect-ratio: 1/1) {
+  .chip-diff { left: 0; bottom: auto; width: auto; min-width: 0; max-width: none; height: var(--cd-h, 50vh); min-height: 160px; max-height: calc(100vh - 40px); border-left: 0; border-bottom: 1px solid var(--line-2); box-shadow: 0 8px 24px rgba(0, 0, 0, .28); }
+  .cd-grip { top: auto; bottom: -4px; left: 0; right: 0; width: auto; height: 8px; cursor: ns-resize; }
+}
+@media (max-width: 640px) and (min-aspect-ratio: 1/1) { .chip-diff { width: 100vw; max-width: 100vw; min-width: 0; } .cd-grip { display: none; } }
 button.cv-more { cursor: pointer; color: var(--dim); }
 button.cv-more:hover { color: var(--text); }
 .cv-md { overflow-wrap: anywhere; }

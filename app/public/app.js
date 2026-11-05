@@ -5383,15 +5383,20 @@ $('#cv-list').addEventListener('click', (e) => {
 });
 // ---------- 채팅 칩 diff 패널 ----------
 // 파일을 고친 도구 칩(서버가 ed 표시)을 누르면 그 도구 호출 한 번의 변경을 오른쪽 패널로 띄운다. 내용은 diff 보기와 같은 /diff 에서
-// tool_use id 로 찾는다(Edit/Write = id, 셸 명령 = toolUseId). 왼쪽 가장자리를 끌어 넓힌다(브라우저에 기억), 패널 밖을 누르거나 Esc 면 닫힌다
-const CD_W_KEY = 'am.chipDiffW';
+// tool_use id 로 찾는다(Edit/Write = id, 셸 명령 = toolUseId). 가로로 긴 화면은 오른쪽 · 세로로 긴 화면은 위에 붙고 가장자리를 끌어 크기를 바꾼다(브라우저에 기억), 패널 밖을 누르거나 Esc 면 닫힌다
+const CD_W_KEY = 'am.chipDiffW', CD_H_KEY = 'am.chipDiffH';
+const cdTall = window.matchMedia('(max-aspect-ratio: 1/1)'); // 세로로 긴 화면이면 위에 붙는다(style.css 와 같은 조건)
 const chipDiff = document.createElement('aside');
 chipDiff.className = 'chip-diff';
 chipDiff.hidden = true;
 chipDiff.innerHTML = `<div class="cd-grip" title=""></div><div class="cd-head"><span class="cd-title"></span><button type="button" class="cd-x" aria-label="close">✕</button></div><div class="cd-body"></div>`;
 document.body.append(chipDiff);
 let chipDiffFor = null, chipDiffSeq = 0;
-try { const cw = Number(localStorage.getItem(CD_W_KEY)); if (cw) chipDiff.style.width = `${cw}px`; } catch {}
+try { // 가로 배치 폭 · 세로 배치 높이를 따로 기억한다
+  const cw = Number(localStorage.getItem(CD_W_KEY)), ch = Number(localStorage.getItem(CD_H_KEY));
+  if (cw) chipDiff.style.setProperty('--cd-w', `${cw}px`);
+  if (ch) chipDiff.style.setProperty('--cd-h', `${ch}px`);
+} catch {}
 function closeChipDiff() {
   if (chipDiff.hidden) return;
   chipDiff.hidden = true; chipDiffFor = null; chipDiffSeq++;
@@ -5424,17 +5429,21 @@ document.addEventListener('pointerdown', (e) => {
   closeChipDiff();
 }, true);
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !chipDiff.hidden) { e.stopPropagation(); closeChipDiff(); } }, true);
-// 왼쪽 가장자리 끌기: 왼쪽으로 끌수록 넓어진다(화면 폭 - 40px 까지)
+// 가장자리 끌기: 오른쪽 배치는 왼쪽 가장자리, 위 배치는 아래 가장자리(화면 - 40px 까지)
 chipDiff.querySelector('.cd-grip').addEventListener('pointerdown', (e) => {
   e.preventDefault();
   const grip = e.currentTarget;
   grip.setPointerCapture(e.pointerId);
   chipDiff.classList.add('cd-drag');
-  const move = (ev) => { chipDiff.style.width = `${Math.max(320, Math.min(window.innerWidth - 40, window.innerWidth - ev.clientX))}px`; };
+  const tall = cdTall.matches; // 오른쪽 배치: 왼쪽으로 끌수록 넓게 · 위 배치: 아래로 끌수록 높게
+  const move = (ev) => {
+    if (tall) chipDiff.style.setProperty('--cd-h', `${Math.max(160, Math.min(window.innerHeight - 40, ev.clientY))}px`);
+    else chipDiff.style.setProperty('--cd-w', `${Math.max(320, Math.min(window.innerWidth - 40, window.innerWidth - ev.clientX))}px`);
+  };
   const up = () => {
     grip.removeEventListener('pointermove', move); grip.removeEventListener('pointerup', up); grip.removeEventListener('pointercancel', up);
     chipDiff.classList.remove('cd-drag');
-    try { localStorage.setItem(CD_W_KEY, String(chipDiff.offsetWidth)); } catch {}
+    try { if (tall) localStorage.setItem(CD_H_KEY, String(chipDiff.offsetHeight)); else localStorage.setItem(CD_W_KEY, String(chipDiff.offsetWidth)); } catch {}
   };
   grip.addEventListener('pointermove', move); grip.addEventListener('pointerup', up); grip.addEventListener('pointercancel', up);
 });
