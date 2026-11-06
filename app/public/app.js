@@ -6139,6 +6139,14 @@ btwEl().addEventListener('submit', async (e) => {
   if (await btwAsk(ta.value)) ta.value = '';
   ta.focus();
 });
+// BTW 창 안에 포커스가 있을 때 Esc = 닫기(✕ 와 같음 — 별도 창이면 창도 닫힌다). 브라우저 안 창이면 채팅 입력칸으로 돌아간다
+btwEl().addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape' || e.isComposing) return;
+  e.preventDefault(); e.stopPropagation();
+  const inTab = !btwPip;
+  btwEl().querySelector('[data-btw="close"]')?.click();
+  if (inTab) chatForm.text.focus();
+}, true);
 btwEl().addEventListener('keydown', (e) => {
   const ta = e.target.closest?.('.btw-form textarea');
   if (!ta) return;
@@ -6347,9 +6355,12 @@ function histFill() {
 chatForm.text.addEventListener('keydown', (e) => {
   if (e.isComposing || e.altKey || e.ctrlKey || e.metaKey) return;
   const ta = chatForm.text, take = () => { e.preventDefault(); e.stopImmediatePropagation(); };
+  if (blMenu.open) return blKey(e, take);
   if (!histMenu.open) {
     // 커서가 첫 줄에 있고 / 목록이 닫혀 있을 때만 — 여러 줄 글에서 ↑ 는 원래대로 윗줄로
     if (e.key === 'ArrowUp' && !e.shiftKey && !slashMenu.open && !ta.value.slice(0, ta.selectionStart).includes('\n') && histOpen()) take();
+    // 커서가 마지막 줄이면 ↓ = Backlog 꺼내기 목록(↑ 기록과 반대 방향)
+    else if (e.key === 'ArrowDown' && !e.shiftKey && !slashMenu.open && !ta.value.slice(ta.selectionEnd).includes('\n') && blOpen()) take();
     return;
   }
   const n = histMenu.items.length;
@@ -6359,7 +6370,53 @@ chatForm.text.addEventListener('keydown', (e) => {
   else if (e.key === 'Escape') { take(); histClose(); }
   else if (!['Shift', 'Control', 'Alt', 'Meta', 'CapsLock'].includes(e.key)) histClose(); // 다른 글자를 치면 목록만 닫고 그대로 입력
 }, true);
-chatForm.text.addEventListener('blur', () => setTimeout(() => { if (document.activeElement !== chatForm.text) histClose(); }, 150));
+chatForm.text.addEventListener('blur', () => setTimeout(() => { if (document.activeElement !== chatForm.text) { histClose(); blClose(); } }, 150));
+// ---------- ↓ Backlog 꺼내기 ----------
+// 입력칸 마지막 줄에서 ↓ → 이 역할의 Backlog 목록. ↓↑ 로 고르고 Enter · Tab(또는 클릭) = Backlog 에서 빼서 입력칸에 넣기(쓰던 글이 있으면 그 아래 줄에).
+// ↑ 기록 목록과 헷갈리지 않게 머리 줄 · 번호 · 색을 따로 준다
+const blBox = el('<div class="cv-slash cv-bl" id="cv-bl" role="listbox" hidden></div>');
+histBox.after(blBox);
+let blMenu = { open: false, items: [], i: 0, wid: null, role: null };
+function blPaint() {
+  const { items, i } = blMenu;
+  blBox.innerHTML = `<div class="cv-bl-h"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></svg><b>Backlog</b><span>${items.length}</span><small>${esc(_t('↓↑ 고르기 · Enter 꺼내기 · Esc 닫기'))}</small></div>`
+    + items.map((m, k) => `<button type="button" class="cv-bli${k === i ? ' on' : ''}" data-k="${k}" role="option"><em>${k + 1}</em><span>${esc(m.text.replace(/\s+/g, ' ').slice(0, 300))}</span></button>`).join('');
+  blBox.hidden = false;
+  const cv = blBox.closest('.chat-view'), room = cv ? blBox.getBoundingClientRect().bottom - cv.getBoundingClientRect().top - 8 : 520;
+  blBox.style.maxHeight = `${Math.max(160, Math.min(520, room))}px`;
+  blBox.querySelector('.cv-bli.on')?.scrollIntoView({ block: 'nearest' });
+}
+function blOpen() {
+  const w = state.workers.find((x) => x.id === selected);
+  const items = (w && state.memos?.[w.name]) || [];
+  if (!items.length) return false;
+  blMenu = { open: true, items: items.slice(), i: 0, wid: w.id, role: w.name };
+  blPaint();
+  return true;
+}
+function blClose() { if (!blMenu.open) return; blMenu.open = false; blBox.hidden = true; blBox.innerHTML = ''; }
+async function blTake() {
+  const m = blMenu.items[blMenu.i], { wid, role } = blMenu, ta = chatForm.text;
+  blClose();
+  if (!m) return;
+  const cur = ta.value.replace(/\s+$/, '');
+  ta.value = cur ? `${cur}\n${m.text}` : m.text;
+  ta.setSelectionRange(ta.value.length, ta.value.length);
+  ta.dispatchEvent(new Event('input', { bubbles: true }));
+  ta.focus();
+  const r = await api('/api/memos', { role, op: 'remove', id: m.id, workerId: wid });
+  if (r?.error) toast(r.error, 3000);
+}
+function blKey(e, take) {
+  const n = blMenu.items.length;
+  if (e.key === 'ArrowDown') { take(); blMenu.i = Math.min(n - 1, blMenu.i + 1); blPaint(); }
+  else if (e.key === 'ArrowUp') { take(); if (blMenu.i <= 0) blClose(); else { blMenu.i--; blPaint(); } } // 맨 위에서 ↑ = 닫기
+  else if ((e.key === 'Enter' && !e.shiftKey) || (e.key === 'Tab' && !e.shiftKey)) { take(); blTake(); }
+  else if (e.key === 'Escape') { take(); blClose(); }
+  else if (!['Shift', 'Control', 'Alt', 'Meta', 'CapsLock'].includes(e.key)) blClose();
+}
+blBox.addEventListener('mousedown', (e) => e.preventDefault());
+blBox.addEventListener('click', (e) => { const b = e.target.closest('[data-k]'); if (!b) return; blMenu.i = Number(b.dataset.k); blTake(); });
 histBox.addEventListener('mousedown', (e) => e.preventDefault());
 histBox.addEventListener('click', (e) => { const b = e.target.closest('[data-k]'); if (!b) return; histMenu.i = Number(b.dataset.k); histFill(); });
 // ---------- 채팅 내용 드래그 → 물어보기 · 복사 ----------
