@@ -26,6 +26,7 @@ export function createProfile(file) {
     subs: new Map(), // 서브에이전트 파일 → 상태
     toolResults: new Set(), // 결과가 돌아온 tool_use id (포그라운드 서브에이전트 완료 판정)
     doneAgents: new Set(), // 완료 알림(<task-notification>) 또는 SubagentStop 훅으로 끝난 agentId
+    resumedAgents: new Set(), // SendMessage 로 다시 깨운 agentId — 처음 실행의 완료 알림으로 끝난 것으로 남아 있으면 안 된다
     // 백그라운드 작업 (Monitor 감시 · run_in_background 명령). 턴이 끝나도 계속 돈다 → '백그라운드 대기' 판정용
     bgTasks: new Map(), // task id → { kind: 'monitor'|'shell', desc, startedAt, expiresAt, done }
     bgCalls: new Map(), // 백그라운드로 시작한 tool_use id → { kind, desc } (결과에서 task id 를 읽기 전까지)
@@ -223,6 +224,11 @@ function apply(p, e, line) {
       if (id && /<status>[^<]+<\/status>/.test(blk[1]) && p.bgTasks.has(id)) p.bgTasks.get(id).done = true;
     }
   }
+  // 끝난 서브에이전트를 SendMessage 로 다시 깨우면(결과에 resumedAgentId) 같은 agentId 로 다시 돈다 — 첫 실행의 완료 알림 때문에
+  // 끝난 것으로 남아 있어, 메인 턴이 끝나고 그 에이전트만 도는 동안 CLI 는 'Waiting for 1 background agent' 인데 채팅은 '응답 완료'였다(W144 실측).
+  // 다음 완료 알림 · SubagentStop 이 오면 위에서 다시 끝난 것으로
+  const revived = e.type === 'user' && (e.toolUseResult?.resumedAgentId || e.toolUseResult?.revivedAgentId);
+  if (typeof revived === 'string') { p.doneAgents.delete(revived); p.resumedAgents.add(revived); }
   const ts = Date.parse(e.timestamp) || Date.now();
   if (e.type === 'system' && /compact/i.test(e.subtype || '')) {
     p.compactions++;
@@ -435,6 +441,7 @@ function readSubagents(p) {
 
 function isRunning(p, s) {
   if (p.doneAgents.has(s.agentId)) return false;
+  if (p.resumedAgents.has(s.agentId)) return true; // 다시 깨운 에이전트 — 첫 실행의 도구 결과는 이미 와 있어 아래로 판단하면 끝난 것으로 보인다
   // 포그라운드는 도구 결과가 돌아오면 끝. 백그라운드는 즉시 "launched" 결과가 오므로 완료 알림만 믿는다
   if (s.meta.requestShape !== 'background' && s.meta.toolUseId && p.toolResults.has(s.meta.toolUseId)) return false;
   return true;
