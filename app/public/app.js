@@ -549,8 +549,10 @@ function cliPeekCheck() {
   clearTimeout(peekTimer);
   peekTimer = setTimeout(() => {
     const w = state.workers.find((x) => x.id === selected);
-    const want = Boolean(chatOpen && w && termSnap.id === selected && !['starting', 'exited', 'decision'].includes(w.status) && !$('#detail').hidden && !w.btw?.open && cliScreenBlocked()); // 곁질문 답 창은 채팅의 곁질문 창(#cv-btw)이 대신 보여 준다
-    // 결정 대기(권한 · 질문)는 채팅 끝 카드(허락 · 거절 · CLI 에서 고르기)와 #cv-ask 가 맡는다 — 같이 열면 엿보기가 채팅을 덮어 카드가 가려졌다
+    // 결정 대기 중 권한 요청(허락 · 거절 카드)과 클로드의 질문(#cv-ask 카드)은 채팅 카드가 맡는다 — 같이 열면 엿보기가 채팅을 덮어 카드가 가려졌다.
+    // 그 밖의 선택창(카드가 'CLI 에서 답하기' 하나뿐)은 CLI 로 통째로 넘기지 않고 예전처럼 아래에 터미널을 드러내 그 자리에서 고르게 한다
+    const cardOwns = w?.status === 'decision' && (w.askQ || /^권한 요청/.test(w.ask || ''));
+    const want = Boolean(chatOpen && w && termSnap.id === selected && !['starting', 'exited'].includes(w.status) && !cardOwns && !$('#detail').hidden && !w.btw?.open && cliScreenBlocked()); // 곁질문 답 창은 채팅의 곁질문 창(#cv-btw)이 대신 보여 준다
     if (!want) { peekSince = 0; peekHidden = false; $('#cv-peek').hidden = true; return setCliPeek(false); }
     if (!peekSince) peekSince = Date.now();
     if (Date.now() - peekSince < 500) return cliPeekCheck(); // 다시 그리는 중의 잠깐 빈 화면은 넘긴다
