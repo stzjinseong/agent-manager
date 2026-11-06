@@ -26,6 +26,7 @@ export function createProfile(file) {
     subs: new Map(), // 서브에이전트 파일 → 상태
     toolResults: new Set(), // 결과가 돌아온 tool_use id (포그라운드 서브에이전트 완료 판정)
     doneAgents: new Set(), // 완료 알림(<task-notification>) 또는 SubagentStop 훅으로 끝난 agentId
+    think: null, // 이번 턴의 마지막 생각(thinking) 첫 줄 { text, ts } — 채팅 '생각 중' 자리에 지금 하는 일로 보여 준다
     resumedAgents: new Set(), // SendMessage 로 다시 깨운 agentId — 처음 실행의 완료 알림으로 끝난 것으로 남아 있으면 안 된다
     // 백그라운드 작업 (Monitor 감시 · run_in_background 명령). 턴이 끝나도 계속 돈다 → '백그라운드 대기' 판정용
     bgTasks: new Map(), // task id → { kind: 'monitor'|'shell', desc, startedAt, expiresAt, done }
@@ -201,6 +202,7 @@ function newTurn(p, text, ts) {
     firstAt: null, modelMs: 0, toolWallMs: 0, toolPer: {}, ...empty(), thinking: 0, toolErrors: 0, model: null,
     hasPrev: Boolean(last), gap: last ? ts - last.end : null, missReason: null, missCounted: false };
   p.turns.push(t);
+  p.think = null;
   if (p.turns.length > (p.maxTurns || MAX_TURNS)) p.turns.shift(); // 사용자 프로파일(userprofile.js)은 전부 들고 읽는다
   return t;
 }
@@ -347,6 +349,9 @@ function apply(p, e, line) {
   p.lastKind = 'assistant';
   p.lastStop = m.stop_reason || null; // 'end_turn' 이면 응답이 정상으로 끝난 것 (스트리밍 중간 줄은 null)
   p.lastText = (m.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('\n') || p.lastText;
+  // CLI 는 생각 블록을 화면에 보여 주는데 채팅엔 없어, 도구만 이어질 땐 채팅이 멈춘 듯 보였다(W141). 빈 생각("")은 건너뛴다
+  const th = (m.content || []).filter((b) => b.type === 'thinking' && b.thinking?.trim()).at(-1);
+  if (th) p.think = { text: th.thinking.trim().split('\n')[0].replace(/`/g, '').slice(0, 200), ts };
   target.end = ts;
   if (m.model && m.model !== '<synthetic>') { p.model = m.model; p.modelAt = ts; target.model = m.model; }
   p.context = usage.input + usage.cacheWrite + usage.cacheRead;
@@ -526,7 +531,7 @@ export function profileLite(p) {
     if (isRunning(p, s)) running++;
   }
   return {
-    lite: true, model: p.model, window: windowFor(p.model), total, turnCount: p.turns.length, context: p.context,
+    lite: true, think: p.think, model: p.model, window: windowFor(p.model), total, turnCount: p.turns.length, context: p.context,
     cacheHit: inputAll ? total.cacheRead / inputAll : null, cacheMisses: p.miss.n + (lastMiss ? 1 : 0),
     sub, bgRunning: running + runningTasks(p).length,
   };
@@ -590,6 +595,7 @@ export function profileSummary(p, waits = []) {
     window: windowFor(p.model),
     total, calls, tools,
     turnCount: p.turns.length,
+    think: p.think,
     context: p.context,
     cacheHit: inputAll ? total.cacheRead / inputAll : null,
     cache: p.cacheAt && p.cacheTtl ? { at: p.cacheAt, ttl: p.cacheTtl } : null, // 메인 대화 캐시가 살아 있는 기한(at + ttl)

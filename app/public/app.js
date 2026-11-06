@@ -5294,7 +5294,12 @@ function chatTail(w, items, waiting) {
       : `<button type="button" class="cv-yes" data-cv="cli">${_t('CLI 에서 답하기')}</button>`;
     return `<div class="cv-ev cv-p"><span class="cv-dot"></span><div class="cv-perm"><div class="cv-q">${q}</div>${w.ask ? `<code>${esc(w.ask.replace(/^권한 요청\s*/, '').replace(/\s*— 터미널에서 선택하세요$/, ''))}</code>` : ''}<div class="cv-btns">${btns}</div></div></div>`;
   }
-  if (st === 'working') return `<div class="cv-ev cv-a cv-think"><span class="cv-dot"></span><div class="cv-sys"><span class="cv-typing"><i></i><i></i><i></i></span> ${_t('생각 중')}</div></div>`;
+  if (st === 'working') {
+    // 이번 턴의 마지막 생각 첫 줄(서버 profile.think) — CLI 엔 보이는 '이제 무엇을 하겠다'를 여기 한 줄로. 그 뒤에 답 글이 왔으면 그 글이 더 새 소식이라 '생각 중'
+    const th = w.profile?.think, last = items[items.length - 1];
+    const now = th?.text && !(last?.k === 'a' && last.ts > th.ts) ? th.text : '';
+    return `<div class="cv-ev cv-a cv-think"><span class="cv-dot"></span><div class="cv-sys${now ? ' cv-now' : ''}"><span class="cv-typing"><i></i><i></i><i></i></span> ${now ? `<span class="cv-now-tx" title="${esc(now)}">${esc(now)}</span>` : _t('생각 중')}</div></div>`;
+  }
   // 턴은 끝났지만 백그라운드 작업(서브에이전트 · run_in_background · Monitor)이 남았다 — '응답 완료'로 보이면 멈춘 줄 안다
   // 고른 워커는 프로필 전부(subagents · bgTasks)를 받으니 이름까지, 아니면 개수만
   if (st === 'waiting') {
