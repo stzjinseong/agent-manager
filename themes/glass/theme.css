@@ -239,6 +239,7 @@
 :root[data-skin="glass"] .cv-memo-pop { background: linear-gradient(var(--glass-solid), var(--glass-solid)), var(--bg); border-color: var(--glass-l3-line); }
 :root[data-skin="glass"] .cv-memo-pop .memos li.mh { background: linear-gradient(var(--glass-solid), var(--glass-solid)), var(--bg); }
 :root[data-skin="glass"] .cv-btw { background: linear-gradient(var(--glass-solid), var(--glass-solid)), var(--bg); border-color: var(--glass-l3-line); }
+:root[data-skin="glass"] .cv-btw:not(.btw-pip):focus-within { border-color: color-mix(in srgb, var(--accent) 60%, var(--glass-l3-line)); }
 :root[data-skin="glass"] .cv-slash { background: linear-gradient(var(--glass-solid), var(--glass-solid)), var(--bg); }
 /* Backlog 꺼내기 목록(↓)은 기록 목록(↑)과 갈리게 강조색을 한 겹 더 · 강조 테두리 */
 :root[data-skin="glass"] .cv-slash.cv-bl { background: linear-gradient(color-mix(in srgb, var(--accent) 9%, transparent), color-mix(in srgb, var(--accent) 9%, transparent)), linear-gradient(var(--glass-solid), var(--glass-solid)), var(--bg);

@@ -6015,6 +6015,7 @@ function btwSkeleton(box) {
     + `<form class="btw-form"><textarea rows="1" placeholder="${esc(_t('이어서 BTW 묻기 — Enter 보내기'))}"></textarea><button type="submit" class="btn primary">${esc(_t('보내기'))}</button></form>`
     + `<span class="btw-grip-l" title="${esc(_t('끌어서 크기 조절'))}"></span>`;
   box.dataset.built = '1';
+  box.tabIndex = -1; // 목록 · 머리 줄을 눌러도 포커스가 창 안에 남게 — 그래야 입력칸 밖에서도 Esc 로 닫힌다
   btwPipBtn();
   btwPlace(box);
   setBtwZoom(btwZoom);
@@ -6160,6 +6161,11 @@ btwEl().addEventListener('input', (e) => {
   ta.style.height = 'auto';
   ta.style.height = `${Math.min(ta.scrollHeight, 120)}px`;
 });
+// 창 어디를 눌러도 포커스는 창 안에 — 머리 줄 끌기 · 손잡이는 preventDefault 로 포커스 이동을 막으므로 직접 옮긴다(그래야 Esc 로 닫히고 강조 테두리가 보인다)
+btwEl().addEventListener('pointerdown', () => setTimeout(() => {
+  const box = btwEl();
+  if (!box.hidden && !box.contains(box.ownerDocument.activeElement)) box.focus({ preventScroll: true });
+}, 0));
 // 머리 줄 끌기 — 창 안 어디로든(채팅 화면 밖 포함). 버튼을 누른 건 끌기가 아니다
 btwEl().addEventListener('pointerdown', (e) => {
   const h = e.target.closest('[data-btw-drag]');

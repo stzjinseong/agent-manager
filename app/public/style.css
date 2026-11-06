@@ -2774,9 +2774,13 @@ button.cv-more:hover { color: var(--text); }
 
 /* 채팅에서 답하기 — 클로드의 질문 카드(입력칸 위) */
 /* 화면(창) 기준 고정 — 채팅 화면 밖으로도 옮길 수 있다. 처음 자리는 app.js btwPlace 가 채팅 화면 오른쪽 위로 잡는다 */
+.cv-btw:focus { outline: none; } /* 창 자체 포커스(Esc 받기용)는 테두리 없이 */
 .cv-btw { position: fixed; top: 10px; right: 12px; z-index: 160; /* 터미널 크게 보기(.term-wrap.full 100) 위 · 팝업(200~) 아래 */ width: min(440px, calc(100vw - 24px)); max-height: calc(100vh - 8px); max-width: calc(100vw - 8px); min-width: 280px; min-height: 150px; resize: both; overflow: hidden; display: flex; flex-direction: column; gap: 8px;
   padding: 10px 12px 12px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--surface); box-shadow: 0 12px 32px rgb(0 0 0 / calc(.2 + .35 * var(--shade))); }
 /* 오른쪽 아래 모서리를 끌어 크기 조절(resize) — 처음엔 내용 높이(답이 길면 채팅 화면 높이까지) */
+/* 창 안에 포커스가 있으면(입력칸 · 목록 · 머리 줄) 강조색 테두리 + 옅은 고리 — Esc 가 이 창을 닫는다는 걸 보이게 */
+.cv-btw { transition: border-color .15s, box-shadow .15s; }
+.cv-btw:not(.btw-pip):focus-within { border-color: color-mix(in srgb, var(--accent) 60%, var(--line-2)); box-shadow: 0 12px 32px rgb(0 0 0 / calc(.2 + .35 * var(--shade))), 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
 .cv-btw.dragging { box-shadow: 0 18px 44px rgb(0 0 0 / calc(.3 + .4 * var(--shade))); }
 .btw-h { display: flex; align-items: baseline; gap: 8px; cursor: grab; user-select: none; touch-action: none;
   margin: 0 -12px; padding: 0 12px 8px; border-bottom: 1px solid var(--line); } /* 머리 줄 아래 얇은 구분선 — 창 좌우 끝까지 */
