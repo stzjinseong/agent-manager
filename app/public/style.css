@@ -2918,6 +2918,11 @@ body.term-full #detail.chat-mode { --full-side-w: 0px; }
 .cv-bli.on { background: color-mix(in srgb, var(--accent) 20%, transparent); }
 .cv-bli.on em { background: var(--accent); color: #1a0f0a; }
 .cv-bli.on span { color: var(--text); }
+/* ↑ 기록 목록도 Backlog 와 같은 상자(.cv-bl) — 줄은 번호 없이 글 + 오른쪽 시각. 고른 줄이 머리 줄 밑에 숨지 않게 scroll-padding */
+.cv-slash.cv-bl { scroll-padding-top: 36px; }
+.cv-hist .cv-sl.cv-hi { padding: 6px 9px; border-radius: 8px; }
+.cv-hist .cv-sl.cv-hi:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.cv-hist .cv-sl.cv-hi.on { background: color-mix(in srgb, var(--accent) 20%, transparent); }
 :root[data-theme="light"] .cv-slash.cv-bl { background: linear-gradient(color-mix(in srgb, var(--accent) 6%, transparent), color-mix(in srgb, var(--accent) 6%, transparent)), #fff; }
 :root[data-theme="light"] .cv-slash { background: #fff; }
 

@@ -524,6 +524,7 @@ const EN = {
   '탭으로 돌아가기 (창의 X 는 닫기)': 'Back to tab (the window X closes it)',
   '브라우저 밖 창으로 띄우기 (늘 위에)': 'Pop out into its own window (always on top)',
   '↓↑ 고르기 · Enter 꺼내기 · Esc 닫기': '↓↑ pick · Enter take out · Esc close',
+  '↑↓ 고르기 · Enter 넣기 · Esc 닫기': '↑↓ pick · Enter insert · Esc close',
   '별도 창을 열지 못했습니다': 'Could not open a separate window',
   '이 기록의 변경 내용을 찾지 못했습니다 (diff 목록을 비웠거나 오래된 기록).': 'Could not find the changes for this entry (the diff list was cleared or the entry is old).',
   '요청 <b>{n}</b>': (v) => `<b>${v.n}</b> request${v.n > 1 ? 's' : ''}`,

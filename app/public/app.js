@@ -6322,12 +6322,13 @@ function histItems() {
   }
   return out.reverse(); // 오래된 것이 위, 최근 것이 맨 아래(입력칸 바로 위)
 }
-const histBox = el('<div class="cv-slash cv-hist" id="cv-hist" role="listbox" hidden></div>');
+const histBox = el('<div class="cv-slash cv-bl cv-hist" id="cv-hist" role="listbox" hidden></div>');
 $('#cv-slash').after(histBox);
 let histMenu = { open: false, items: [], i: 0 };
 function histPaint() {
   const fmt = (t) => fmtDate(t, DATE_MD_HM);
-  histBox.innerHTML = histMenu.items.map((x, k) => `<button type="button" class="cv-sl cv-hi${k === histMenu.i ? ' on' : ''}" data-k="${k}" role="option"><span>${esc(x.t.replace(/\s+/g, ' ').slice(0, 300))}</span><small>${fmt(x.at)}</small></button>`).join('');
+  // 머리 줄 · 강조색 상자 — ↓ Backlog 목록과 같은 디자인(번호 배지 대신 오른쪽에 시각)
+  histBox.innerHTML = `<div class="cv-bl-h"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg><b>History</b><span>${histMenu.items.length}</span><small>${esc(_t('↑↓ 고르기 · Enter 넣기 · Esc 닫기'))}</small></div>` + histMenu.items.map((x, k) => `<button type="button" class="cv-sl cv-hi${k === histMenu.i ? ' on' : ''}" data-k="${k}" role="option"><span>${esc(x.t.replace(/\s+/g, ' ').slice(0, 300))}</span><small>${fmt(x.at)}</small></button>`).join('');
   histBox.hidden = false;
   // 기록 목록은 / 명령 목록(260px)의 3배까지 — 채팅 화면이 그보다 낮으면 입력칸 위 남은 높이까지(채팅 화면 밖은 잘린다)
   const cv = histBox.closest('.chat-view'), room = cv ? histBox.getBoundingClientRect().bottom - cv.getBoundingClientRect().top - 8 : 780;
