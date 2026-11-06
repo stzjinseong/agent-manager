@@ -2652,7 +2652,7 @@ button.upd-run:disabled { opacity: .6; cursor: default; }
 .cv-wq svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .cv-sys { color: var(--dim); font-size: 12px; padding-top: 2px; }
 .cv-sys.cv-now { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
-.cv-now-tx { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-style: italic; } /* 지금 하는 일(마지막 생각 첫 줄) — 한 줄, 넘치면 말줄임 */
+.cv-now-tx { min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-style: italic; line-height: 1.5; } /* 지금 하는 일(마지막 생각 전문) — 줄바꿈 그대로 다 보인다 */
 .cv-err .cv-sys { color: var(--decision); }
 .cv-bg { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 3px; }
 .cv-bg li { display: flex; gap: 8px; align-items: baseline; min-width: 0; }
