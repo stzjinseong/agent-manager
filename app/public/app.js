@@ -552,7 +552,9 @@ function cliPeekCheck() {
     // 결정 대기 중 권한 요청(허락 · 거절 카드)과 클로드의 질문(#cv-ask 카드)은 채팅 카드가 맡는다 — 같이 열면 엿보기가 채팅을 덮어 카드가 가려졌다.
     // 그 밖의 선택창(카드가 'CLI 에서 답하기' 하나뿐)은 CLI 로 통째로 넘기지 않고 예전처럼 아래에 터미널을 드러내 그 자리에서 고르게 한다
     const cardOwns = w?.status === 'decision' && (w.askQ || /^권한 요청/.test(w.ask || ''));
-    const want = Boolean(chatOpen && w && termSnap.id === selected && !['starting', 'exited'].includes(w.status) && !cardOwns && !$('#detail').hidden && !w.btw?.open && cliScreenBlocked()); // 곁질문 답 창은 채팅의 곁질문 창(#cv-btw)이 대신 보여 준다
+    // 시작 중(SessionStart 전)이라도 서버가 선택창을 본 경우(w.bootOpen — 처음 여는 폴더의 신뢰 확인 등)는 연다. 빼 두면 채팅엔 '아직 대화가 없어요'만 남아 멈춘 듯 보였다
+    const live = w && w.status !== 'exited' && (w.status !== 'starting' || w.bootOpen);
+    const want = Boolean(chatOpen && live && termSnap.id === selected && !cardOwns && !$('#detail').hidden && !w.btw?.open && cliScreenBlocked()); // 곁질문 답 창은 채팅의 곁질문 창(#cv-btw)이 대신 보여 준다
     if (!want) { peekSince = 0; peekHidden = false; $('#cv-peek').hidden = true; return setCliPeek(false); }
     if (!peekSince) peekSince = Date.now();
     if (Date.now() - peekSince < 500) return cliPeekCheck(); // 다시 그리는 중의 잠깐 빈 화면은 넘긴다
@@ -2059,6 +2061,9 @@ function renderDetail() {
   scheduleSelLink();
   $('#term-wrap').classList.toggle('unseen', Boolean(w && isUnseenDone(w))); // 확인 안 한 완료 빛 — 카드 대신 여기(unseenOnCard)
   $('#term-boot').hidden = !termLocked();
+  // 신뢰 확인 화면은 이미 그려진 뒤에 서버가 bootOpen 을 켠다 — 새 터미널 출력이 없어 엿보기 판정이 다시 돌지 않으므로 상태가 바뀔 때 직접 다시 본다
+  const bootKey = w ? `${w.id}|${w.status}|${w.bootOpen ? 1 : 0}` : '';
+  if (bootKey !== renderDetail.bootKey) { renderDetail.bootKey = bootKey; cliPeekCheck(); }
   // 종료된 워커는 PTY 호스트에 화면이 없어 빈 터미널에 커서만 보였다 — 종료 안내로 덮고, 중단 버튼은 감춘다
   $('#term-gone').hidden = !(w && w.status === 'exited');
   $('#btn-interrupt').hidden = Boolean(w && w.status === 'exited');
@@ -5340,7 +5345,7 @@ function renderChat() {
       ? `<span class="cv-wait-acts" data-local="${x.at}"><button type="button" class="cv-wq" data-wq="back" title="${_t('입력칸으로 되돌리기')}" aria-label="${_t('입력칸으로 되돌리기')}">${UNDO_SVG}</button><button type="button" class="cv-wq" data-wq="drop" title="${_t('지우기')}" aria-label="${_t('지우기')}">${X_SVG}</button></span>`
       : '';
   if (list._wid !== w.id) chatWin = CHAT_WIN; // 워커를 바꾸면 다시 최근 것만
-  const html = (items.length || waiting.length ? chatBlocks(chatWithDocs(items), chatWin) : `<div class="cv-empty">${_t(chatLoading ? '불러오는 중…' : '아직 대화가 없어요')}</div>`)
+  const html = (items.length || waiting.length ? chatBlocks(chatWithDocs(items), chatWin) : `<div class="cv-empty">${_t(chatLoading ? '불러오는 중…' : w.status === 'starting' ? '부팅 중… (처음 여는 폴더면 터미널에서 신뢰 여부를 선택하세요)' : '아직 대화가 없어요')}</div>`)
     + (waiting.length ? `<div class="cv-wait-sep"><span>${_t('대기 중 · 클로드가 아직 읽지 않음')} ${waiting.length}</span></div>` : '')
     + waiting.map((x) => `<div class="cv-ev cv-u cv-pending"${x.qi >= 0 ? '' : ` title="${_t('이미 CLI 입력에 넣은 글이라 뺄 수 없어요')}"`}><div class="cv-lab">${waitActs(x)}<b>${_t('나')}</b>${esc(x.label)}</div><div class="cv-msg">${esc(x.text)}${chatAtt({ text: x.text })}</div></div>`).join('')
     + chatTail(w, items, waiting.length);
