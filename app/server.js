@@ -24,6 +24,7 @@ import { createUpdates } from './updates.js';
 import { gitBranch } from './branch.js';
 import { ensureToken, hostOk, callerOk, TOKEN_HEADER } from './auth.js';
 import { chromePath, openInChrome } from './chrome.js';
+import { linkUserStatusLine } from './userstatusline.js';
 const { Terminal: HeadlessTerminal } = createRequire(import.meta.url)('@xterm/headless');
 
 const APP_DIR = path.dirname(fileURLToPath(import.meta.url)); // app/ — 코드
@@ -314,6 +315,9 @@ function resolveClaude() {
 
 // ---------- 워커 ----------
 
+// 상태줄 명령 — 워커 --settings 와, 관리 설정이 있는 PC 의 사용자 설정(userstatusline.js)에 같은 것을 넣는다
+const statusLineCommand = () => `"${process.execPath.replace(/\\/g, '/')}" "${path.join(APP_DIR, 'statusline.mjs').replace(/\\/g, '/')}"`;
+
 function hookSettings() {
   // http 타입 훅은 이 환경에서 서버에 도달하지 않아(실측) command 훅 + 전달 스크립트로 보낸다.
   // 워커 식별은 hook.mjs 가 상속받는 AGENT_MANAGER_WORKER 환경변수로 한다.
@@ -333,7 +337,7 @@ function hookSettings() {
   hooks.PostToolUseFailure = [{ matcher: 'Bash', hooks: h() }];
   hooks.PermissionRequest = [{ matcher: '*', hooks: h(600) }];
   // 상태줄 명령으로 계정 사용량(5시간·주간 한도)을 받는다 — 사용자가 원래 쓰던 상태줄은 statusline.mjs 가 대신 실행해 그대로 보인다
-  const statusLine = { type: 'command', command: `"${slash(process.execPath)}" "${slash(path.join(APP_DIR, 'statusline.mjs'))}"` };
+  const statusLine = { type: 'command', command: statusLineCommand() };
   const theme = workerTheme();
   return theme ? { hooks, statusLine, theme } : { hooks, statusLine };
 }
@@ -483,6 +487,9 @@ function spawnWorker({ name, cwd, args = '', permissionMode = 'default', resume 
   fs.writeFileSync(settingsPath, JSON.stringify(hookSettings(), null, 2));
 
   const env = { ...process.env, AGENT_MANAGER_WORKER: id, AGENT_MANAGER_PORT: String(PORT) };
+  // Windows 의 python 은 파일을 시스템 코드 페이지(한국어 = cp949)로 연다 — 관리 상태줄이 python 으로 사용자 설정(UTF-8, 한글 포함)을
+  // 읽다 UnicodeDecodeError 로 끊겨 사용자 상태줄(statusline.mjs)까지 오지 않았다(실측). 워커 안의 python 은 UTF-8 모드로
+  if (IS_WIN && !env.PYTHONUTF8) env.PYTHONUTF8 = '1';
   // 관제탑이 Claude 세션 안에서 실행된 경우 중첩 세션 표식이 새지 않게 한다
   for (const k of Object.keys(env)) if (/^(CLAUDECODE|CLAUDE_CODE_.*|CLAUDE_PID|CLAUDE_EFFORT)$/.test(k)) delete env[k];
   // Claude Code 가 전체 화면 모드(대체 화면 ESC[?1049h)로 뜨면 터미널 기록(스크롤백)이 화면 한 장뿐이라
@@ -2827,6 +2834,8 @@ const scheduler = createScheduler({
 server.listen(PORT, HOST, () => {
   console.log(`${L('클로드 키우기', 'Clawdgotchi')} http://${HOST}:${PORT}  (claude: ${CLAUDE_BIN})`);
   setTimeout(cleanupLegacyHook, 5000);
+  // 관리 설정이 상태줄을 정한 PC 면 사용자 상태줄 자리로 사용량을 받는다 (userstatusline.js)
+  try { const r = linkUserStatusLine({ dataDir: DATA_DIR, command: statusLineCommand() }); if (r !== 'none' && r !== 'kept') console.log(`statusLine: ${r}`); } catch {}
   setTimeout(() => updates.check(), 3000); // 업데이트 확인은 시작할 때 한 번 + 화면의 아이콘을 누를 때
 });
 

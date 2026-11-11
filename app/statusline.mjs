@@ -4,10 +4,13 @@
 // 워커는 --settings 로 이 명령을 상태줄로 쓰므로 사용자가 원래 쓰던 상태줄을 가린다 → 그 명령을 같은 입력으로 실행해 출력을 그대로 낸다.
 // 서버가 꺼져 있거나 늦어도 상태줄 표시를 막지 않게 짧게 기다리고 넘어간다.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { readToken, TOKEN_HEADER } from './auth.js';
+import { savedPath, claudeHome } from './userstatusline.js';
+
+const DATA_DIR = process.env.AM_DATA || path.join(path.dirname(path.dirname(fileURLToPath(import.meta.url))), 'data');
 
 const worker = process.env.AGENT_MANAGER_WORKER;
 const port = process.env.AGENT_MANAGER_PORT || '7788';
@@ -31,12 +34,16 @@ process.stdin.on('end', async () => {
   }
   // 사용자가 원래 쓰던 상태줄: 프로젝트 로컬 > 프로젝트 > 사용자 설정 순으로 처음 찾은 것
   const cwd = data.workspace?.current_dir || data.cwd || process.cwd();
-  const files = [path.join(cwd, '.claude', 'settings.local.json'), path.join(cwd, '.claude', 'settings.json'), path.join(os.homedir(), '.claude', 'settings.json')];
+  const files = [path.join(cwd, '.claude', 'settings.local.json'), path.join(cwd, '.claude', 'settings.json'), path.join(claudeHome(), 'settings.json')];
   for (const f of files) {
     let cmd;
     try { cmd = JSON.parse(fs.readFileSync(f, 'utf8')).statusLine?.command; } catch { continue; }
+    // 사용자 설정의 상태줄이 이 명령이면(관리 설정 연결, userstatusline.js) 바꾸기 전에 기억해 둔 원래 명령을 쓴다
+    if (cmd?.includes('statusline.mjs')) { try { cmd = JSON.parse(fs.readFileSync(savedPath(DATA_DIR), 'utf8')).statusLine?.command; } catch { cmd = null; } }
     if (!cmd || cmd.includes('statusline.mjs')) continue;
-    try { process.stdout.write(execSync(cmd, { input, encoding: 'utf8', timeout: 3000, cwd, stdio: ['pipe', 'pipe', 'ignore'] })); } catch {}
+    // Claude Code 는 Windows 에서도 상태줄 명령을 bash 로 돌린다 — 기본(cmd.exe)으로 돌리면 $(…) 같은 sh 문법 명령이 깨진다
+    const shell = process.platform === 'win32' ? process.env.CLAUDE_CODE_GIT_BASH_PATH || 'bash' : undefined;
+    try { process.stdout.write(execSync(cmd, { input, encoding: 'utf8', timeout: 3000, cwd, shell, stdio: ['pipe', 'pipe', 'ignore'] })); } catch {}
     break;
   }
 });
