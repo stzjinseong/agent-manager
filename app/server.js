@@ -706,13 +706,16 @@ const cellWidth = (s) => {
   return n;
 };
 const ITEM_START = /^\s*(?:[-*•·]\s|\d+[.)]\s|[a-zA-Z][.)]\s|#{1,6}\s|>\s|\||```)/;
+// CLI 가 그린 표(┌─┬─┐ · │ 칸 │ · ├─┼─┤ · └─┴─┘)의 줄 — 잇지 않는다. 표 줄끼리 · 표 다음 줄을 공백으로 이었더니 표 전체가 한 덩어리로 뭉개졌다.
+// 표 폭은 '꽉 찬 줄' 기준에서도 뺀다(표가 가장 넓으면 문단 줄이 꽉 찬 것으로 안 보여 이어지지 않았다)
+const BOX_LINE = /^\s*[│┌├└╭╰]/;
 function unwrapLines(lines) {
-  const full = Math.max(0, ...lines.map(cellWidth)) - 14;
+  const full = Math.max(0, ...lines.filter((l) => !BOX_LINE.test(l)).map(cellWidth)) - 14;
   const out = [];
   let lastW = 0; // 마지막으로 붙인 원래 줄의 폭 — 이어 붙인 줄 전체 길이로 재면 문단 끝 짧은 줄도 꽉 찬 것으로 보인다
   for (const l of lines) {
     const prev = out.at(-1);
-    if (prev != null && prev.trim() && l.trim() && !ITEM_START.test(l) && lastW >= full) out[out.length - 1] = `${prev.replace(/\s+$/, '')} ${l.trim()}`;
+    if (prev != null && prev.trim() && l.trim() && !ITEM_START.test(l) && !BOX_LINE.test(l) && !BOX_LINE.test(prev) && lastW >= full) out[out.length - 1] = `${prev.replace(/\s+$/, '')} ${l.trim()}`;
     else out.push(l);
     lastW = cellWidth(l);
   }

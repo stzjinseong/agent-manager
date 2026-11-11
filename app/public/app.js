@@ -6070,7 +6070,7 @@ function renderBtw() {
   // 폭 때문에 꺾인 줄만 이어 둔다 · 마크다운으로 그렸더니 'a.' 'b.' 항목이 윗줄에 붙었다). 기다리는 동안은 캐릭터가 통통 튀는 '생각 중'
   const html = items.length ? items.map((x) => `<div class="btw-q">${esc(x.q)}</div>`
     + `<div class="btw-a${x.text ? '' : ' btw-think'}"><span class="btw-ico"></span><div class="btw-ab"><div class="btw-lab"><b>Claude</b>${chatTime(x.at)}</div>`
-    + (x.text ? `<div class="btw-txt">${btwBold(x.text)}</div>` : x.open ? `<div class="btw-wait"><span class="cv-typing"><i></i><i></i><i></i></span> ${esc(_t('생각 중'))}</div>` : `<div class="btw-wait">${esc(_t('답을 읽지 못했어요 (CLI 에서 답 창이 닫힘)'))}</div>`)
+    + (x.text ? `<div class="btw-txt">${btwHtml(x.text)}</div>` : x.open ? `<div class="btw-wait"><span class="cv-typing"><i></i><i></i><i></i></span> ${esc(_t('생각 중'))}</div>` : `<div class="btw-wait">${esc(_t('답을 읽지 못했어요 (CLI 에서 답 창이 닫힘)'))}</div>`)
     + '</div></div>').join('')
     : `<div class="btw-empty">${esc(_t('작업을 멈추지 않고 Claude 에게 곁질문해 보세요. 답은 대화 기록에 남지 않아요.'))}</div>`;
   const list = $('.btw-list', box);
@@ -6091,6 +6091,46 @@ function btwBold(text) {
   let open = false;
   const html = esc(text).replace(/[]/g, (m) => { if (m === '' && !open) { open = true; return '<b>'; } if (m === '' && open) { open = false; return '</b>'; } return ''; });
   return open ? html + '</b>' : html;
+}
+// BTW 답 본문 — 글은 btwBold 그대로, CLI 가 박스 문자로 그린 표(┌─┬─┐ · │ 칸 │ · ├─┼─┤ · └─┴─┘)는 채팅 모드처럼 HTML 표로.
+// 화면을 긁어 온 답이라 원문 마크다운(| a | b |)이 없다(답이 대화 기록에 남지 않음) — 박스 표를 그대로 두면 창 폭에서 꺾여
+// 줄이 엉켰다. 칸 안 글이 길면 CLI 가 같은 칸 안에서 여러 줄로 꺾으므로, 가로선(├ ┼) 사이의 줄들을 칸마다 이어 한 행으로 만든다
+const BTW_BOX = /^\s*[│┌├└╭╰]/;
+function btwHtml(text) {
+  const lines = text.split('\n'), out = [];
+  for (let i = 0; i < lines.length;) {
+    if (!BTW_BOX.test(lines[i])) {
+      const j = lines.findIndex((l, k) => k > i && BTW_BOX.test(l));
+      out.push(btwBold(lines.slice(i, j < 0 ? lines.length : j).join('\n')));
+      i = j < 0 ? lines.length : j;
+      continue;
+    }
+    let j = i;
+    while (j < lines.length && BTW_BOX.test(lines[j])) j++;
+    out.push(btwTable(lines.slice(i, j)) ?? btwBold(lines.slice(i, j).join('\n')));
+    i = j;
+  }
+  // 표 앞뒤의 줄바꿈은 표(블록)가 이미 나누므로 하나씩 걷는다 — 남기면 pre-wrap 이라 빈 줄이 하나 더 생긴다
+  return out.join('').replace(/\n(<table)/g, '$1').replace(/(<\/table>)\n/g, '$1');
+}
+function btwTable(lines) {
+  const rows = [];
+  let cur = null, sepAfterFirst = false;
+  for (const l of lines) {
+    const t = l.trim();
+    if (t.startsWith('│')) {
+      const cells = t.split('│').slice(1, -1).map((c) => c.trim());
+      if (!cells.length) continue;
+      if (!cur) { cur = cells.map(() => []); rows.push(cur); }
+      cells.forEach((c, k) => { if (c) (cur[k] ??= []).push(c); });
+    } else if (/^[├╞]/.test(t)) { if (rows.length === 1 && cur) sepAfterFirst = true; cur = null; } // 행 사이 가로선
+    else cur = null; // 위 · 아래 테두리
+  }
+  if (!rows.length) return null;
+  const cell = (tag, parts) => `<${tag}>${btwBold(parts.join(' '))}</${tag}>`;
+  const tr = (r, tag) => `<tr>${r.map((p) => cell(tag, p || [])).join('')}</tr>`;
+  const [head, ...body] = sepAfterFirst ? rows : [null, ...rows];
+  return `<table class="btw-tbl">${head ? `<thead>${tr(head, 'th')}</thead>` : ''}<tbody>${body.map((r) => tr(r, 'td')).join('')}</tbody></table>`;
 }
 // BTW 창 글자 크기 — 메인 채팅(setChatZoom)과 같은 단계 · 방식(목록만 CSS zoom), 크기는 따로 기억
 const BTW_ZOOM_KEY = 'am.btwZoom';
