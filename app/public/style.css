@@ -2963,3 +2963,6 @@ body.term-full #detail.chat-mode { --full-side-w: 0px; }
 .cv-peek button:hover { color: var(--text); }
 @media (prefers-reduced-motion: reduce) { .cv-peek-dot { animation: none; } }
 .term-wrap.cli-peek .term-stage { overflow: hidden; } /* 터미널을 아래로 내려 마지막 줄을 맞출 때 넘친 부분은 자른다 */
+/* 채팅 뷰는 .term-stage 만 덮는다 — 높이를 줄이면 xterm 이 줄 수를 다시 맞추기 전(60ms 디바운스 · 행 높이 반올림)까지 아래로 넘쳐
+   .term-wrap 아래 여백 8px 에 터미널 줄이 비쳤다. 채팅 중엔 넘친 부분을 자른다 */
+.term-wrap.chatting .term-stage { overflow: hidden; }
