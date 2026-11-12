@@ -5288,6 +5288,7 @@ function chatBlocks(items, limit = Infinity) {
   }).join('');
 }
 // 끝줄: 결정 대기면 권한 카드, 작업 중이면 '생각 중', 백그라운드 대기면 '백그라운드 작업 N개 진행 중', 클로드 답으로 끝나고 쉬면 '응답 완료'
+const LONG_BG_MS = 10 * 60_000; // 백그라운드 셸 명령이 이보다 오래 돌면 '상주 프로세스'(서버 등)로 표시
 function chatTail(w, items, waiting) {
   const st = viewStatus(w);
   if (st === 'decision' && w.askQ) return ''; // 질문은 입력칸 위 카드(#cv-ask)로
@@ -5311,10 +5312,20 @@ function chatTail(w, items, waiting) {
     const p = w.profile || {};
     const jobs = [
       ...(p.subagents || []).filter((s) => s.running).map((s) => ({ kind: s.type, name: s.description, since: s.start })),
-      ...(p.bgTasks || []).map((b) => ({ kind: _t(b.kind === 'monitor' ? '감시' : '백그라운드 명령'), name: b.desc || b.id, since: b.startedAt })),
+      // 셸 명령이 10분 넘게 돌면 서버 같은 상주 프로세스로 본다 — '끝나면 이어서 답해요'는 끄기 전엔 영영 안 오는 약속이라 멈춘 줄 안다
+      ...(p.bgTasks || []).map((b) => {
+        const long = b.kind !== 'monitor' && b.startedAt && serverNow() - b.startedAt > LONG_BG_MS;
+        return { kind: _t(b.kind === 'monitor' ? '감시' : long ? '상주 프로세스' : '백그라운드 명령'), name: b.desc || b.id, since: b.startedAt, long };
+      }),
     ];
     const list = jobs.length ? `<ul class="cv-bg">${jobs.map((j) => `<li><b>${esc(j.kind)}</b><span title="${esc(j.name || '')}">${esc(j.name || '—')}</span>${j.since ? `<em data-since="${j.since}"></em>` : ''}</li>`).join('')}</ul>` : '';
-    return `<div class="cv-ev cv-a cv-think"><span class="cv-dot"></span><div class="cv-sys"><span class="cv-typing"><i></i><i></i><i></i></span> ${_t('백그라운드 작업 {n}개 진행 중 · 끝나면 이어서 답해요', { n: jobs.length || p.bgRunning || 1 })}${list}<div class="cv-bg-hint">${_t('기다리는 동안 다른 요청을 보내도 돼요')}</div></div></div>`;
+    // 남은 게 전부 상주 프로세스면 답을 기다리는 게 아니다 — 끌 때까지 표시가 남는다고 말한다
+    const allLong = jobs.length && jobs.every((j) => j.long);
+    const head = allLong
+      ? _t('상주 프로세스 {n}개 실행 중 · 서버처럼 계속 도는 명령은 끌 때까지 이 표시가 남아요', { n: jobs.length })
+      : _t('백그라운드 작업 {n}개 진행 중 · 끝나면 이어서 답해요', { n: jobs.length || p.bgRunning || 1 });
+    const hint = allLong ? _t('응답은 끝났어요 · 다른 요청을 보내거나 끄라고 말하면 돼요') : _t('기다리는 동안 다른 요청을 보내도 돼요');
+    return `<div class="cv-ev cv-a cv-think"><span class="cv-dot"></span><div class="cv-sys"><span class="cv-typing"><i></i><i></i><i></i></span> ${head}${list}<div class="cv-bg-hint">${hint}</div></div></div>`;
   }
   // 중단 · 오류로 끝났으면 그 줄이 이미 끝을 말한다 — 답(a) · 도구(t)로 끝났을 때만
   const last = items[items.length - 1];
