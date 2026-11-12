@@ -571,7 +571,15 @@ function setCliPeek(on) {
   $('#cv-peek').classList.toggle('open', on);
   $('[data-peek]', $('#cv-peek')).textContent = _t(on ? '접기' : '펼치기');
   peekShift();
-  if (on) { term.scrollToBottom(); if (!(document.activeElement === chatForm.text && chatForm.text.value)) term.focus(); }
+  // 터미널 메뉴를 키로 고르게 포커스를 옮기되, 사용자가 다른 입력칸에 쓰는 중이면 뺏지 않는다. BTW 입력칸을 예외에 안 넣었더니
+  // 이어 묻기 사이(서버가 답 창 open 을 잠깐 내림) 엿보기가 켜져 포커스가 터미널로 → 꺼질 때 채팅 입력칸으로 옮겨가,
+  // BTW 에 쓴다고 생각한 글이 메인 채팅으로 전송됐다
+  if (on) {
+    term.scrollToBottom();
+    const a = document.activeElement;
+    const typing = a?.matches?.('textarea, input, [contenteditable="true"]') && !a.closest('#term') && (a !== chatForm.text || chatForm.text.value);
+    if (!typing) term.focus();
+  }
   else if (chatOpen && document.activeElement?.closest?.('#term')) chatForm.text.focus();
 }
 $('#cv-peek').addEventListener('click', (e) => {
