@@ -1542,7 +1542,6 @@ function repoLabels(cwds) {
   return out;
 }
 const repoHeadEls = new Map();
-// 묶음 보기 켜고 끄기 — 저장한 순서 그대로 보는 게 편한 사람도 있어 고를 수 있게(이 브라우저에만, 기본은 묶음)
 // 작업 폴더(repo)별 묶음 보기는 늘 켠다 — 저장 순서 보기 버튼은 없앴다. 예전에 꺼 둔 브라우저(am.repoGroup=0)도 묶음으로: 그 값은 지운다
 try { localStorage.removeItem('am.repoGroup'); } catch {}
 // repo 색: 묶음 머리줄·카드 머리·최소화 칩의 네모 표시. 폴더 키 가나다순으로 정해 묶음 순서를 바꿔도 색은 그대로.
@@ -1571,7 +1570,7 @@ function renderFloor() {
   // repo 묶음: 묶음 순서는 그 묶음의 첫 카드 자리(저장된 순서), 묶음 안은 저장된 순서 그대로
   for (const it of items) { it.cwd = it.w ? it.w.cwd : it.p.cwd; it.repo = repoKey(it.cwd); }
   const repos = [...new Set(items.map((i) => i.repo))];
-  const grouped = repos.length > 1; // 폴더가 하나뿐이면 묶을 게 없다
+  const grouped = repos.length > 0; // 폴더가 하나뿐이어도 묶음 머리줄(이름 · 개수 · + 로 그 폴더에 워커 추가)을 보인다 — 2개 이상일 때만 그렸더니 한 폴더만 쓰는 PC 에선 머리줄 · + 가 안 보였다
   if (grouped) items.sort((a, b) => repos.indexOf(a.repo) - repos.indexOf(b.repo));
   const labels = grouped ? repoLabels(repos.map((r) => items.find((i) => i.repo === r).cwd)) : new Map();
   for (const [k, h] of repoHeadEls) if (!labels.has(k)) { h.remove(); repoHeadEls.delete(k); }
