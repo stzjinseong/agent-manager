@@ -2359,10 +2359,21 @@ function afterFrame(key, fn) {
   if (!frameJobs.size) requestAnimationFrame(() => { const jobs = [...frameJobs.values()]; frameJobs.clear(); for (const f of jobs) { try { f(); } catch (e) { console.error(e); } } });
   frameJobs.set(key, fn);
 }
-// 목록이 맨 아래를 보고 있는지 — 그릴 때 scrollHeight 를 읽지 않게 스크롤할 때 적어 둔다(el._settling 동안은 우리가 옮기는 중이라 무시)
+// 목록이 맨 아래를 보고 있는지 — 그릴 때 scrollHeight 를 읽지 않게 스크롤할 때 적어 둔다.
+// 사용자가 굴린 스크롤(휠 · 터치 · 키 · 스크롤바 끌기)만 판정을 바꾼다. 다시 그릴 때 늦게 불러오는 그림이 잠깐 높이 0 이 되면
+// 브라우저가 scrollTop 을 줄어든 바닥으로 당기는데, 그 scroll 이벤트로 '맨 아래'가 되어 위로 올려 둔 목록이 답이 올 때마다
+// 끌려 내려갔다. 거꾸로 다시 그린 직후(_settling) 들어온 사용자 스크롤을 버리던 것도 같은 증상을 냈다 — 둘 다 입력 기준으로 막는다
 function trackBottom(el, near) {
   el._atBottom = true;
-  el.addEventListener('scroll', () => { if (!el._settling) el._atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < near; }, { passive: true });
+  let userAt = 0, drag = false;
+  const mark = () => { userAt = performance.now(); };
+  for (const t of ['wheel', 'touchstart', 'touchmove', 'keydown']) el.addEventListener(t, mark, { passive: true });
+  el.addEventListener('pointerdown', () => { drag = true; mark(); });
+  for (const t of ['pointerup', 'pointercancel']) addEventListener(t, () => { if (drag) { drag = false; mark(); } });
+  el.addEventListener('scroll', () => {
+    if (!drag && performance.now() - userAt > 800) return; // 우리가 옮겼거나 내용 높이가 바뀌어 생긴 스크롤
+    el._atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < near;
+  }, { passive: true });
 }
 const shotImg = (s, cls) => `<img class="${cls}" src="${esc(s.url)}" data-shot="${esc(s.url)}" alt="${_t('캡처')}" loading="lazy" decoding="async" draggable="false" title="${_t('클릭해 크게 보기')}">`;
 // 같은 워커의 캡처끼리 ←/→ 로 넘겨 본다. 몇 번째인지·찍힌 시각과 보관 한도 안내를 아래에 둔다
