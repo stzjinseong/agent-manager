@@ -360,6 +360,13 @@ body.card-drag .node-add { opacity: .25; transition: opacity .2s; }
 .led { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--c); box-shadow: 0 0 10px var(--c); }
 .s-working .led, .s-decision .led { animation: led 1s ease-in-out infinite; }
 @keyframes led { 50% { opacity: .35; } }
+/* 워커 카드엔 상태 점(LED)을 두지 않는다 — 상태 태그가 같은 색 · 같은 깜빡임을 맡는다(점과 태그가 같은 말을 두 번 했다).
+   글자째 흐려지면 읽기 어려워 태그 면 · 테두리 빛만 맥동 */
+.node:is(.s-working, .s-decision) .stage > .pill { animation: pill-pulse 1s ease-in-out infinite; }
+.node.s-waiting .stage > .pill { animation: pill-pulse 1.6s ease-in-out infinite; }
+@keyframes pill-pulse {
+  50% { background: color-mix(in srgb, var(--c) 34%, var(--bg)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--c) 55%, transparent), 0 0 10px color-mix(in srgb, var(--c) 45%, transparent); }
+}
 .nid { font: 600 11px/1 var(--mono); color: var(--dim); letter-spacing: .06em; }
 .nname { flex: 1; min-width: 0; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pill { font-size: 11.5px; padding: 2px 9px; border-radius: 999px; color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); white-space: nowrap; }
