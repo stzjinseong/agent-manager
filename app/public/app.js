@@ -1626,6 +1626,7 @@ function renderFloor() {
   if (!add) add = el(`<button type="button" class="node-add" data-new><span class="na-plus" aria-hidden="true">${PLUS_SVG}</span><b></b><small></small></button>`);
   $('b', add).textContent = _t('워커 추가');
   $('small', add).textContent = _t('역할 이름과 작업 폴더를 정해 투입');
+  add.title = $('small', add).textContent;
   add.classList.toggle('on', !$('#new-panel').hidden);
   if (nodes.lastElementChild !== add) nodes.append(add);
   layoutRepoGroups();
