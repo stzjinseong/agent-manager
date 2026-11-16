@@ -1651,7 +1651,7 @@ function layoutRepoGroups() {
     $('#btn-floor-add').hidden = fits;
   };
   if (!kids.some((k) => k.classList.contains('repo-head'))) {
-    for (const k of kids) k.style.gridRow = k.style.gridColumn = '';
+    for (const k of kids) { k.style.gridRow = k.style.gridColumn = ''; k.classList?.remove('stack-lo'); }
     const n = kids.filter((k) => k.classList.contains('node')).length;
     showAdd(n === 0 || n % cols !== 0);
     return;
@@ -1663,9 +1663,19 @@ function layoutRepoGroups() {
   }
   // 선반 채우기: 묶음은 들어갈 자리가 있는 가장 앞 선반에 넣는다(first-fit) — 앞 선반의 남는 칸을 비워 두지 않게.
   // 카드가 열 수보다 많은 묶음은 선반 하나를 혼자 쓰고 여러 줄로 내려간다
+  // 칸(slot) 나누기: 워커 카드는 칸 하나를 혼자, 대기실 카드(.socket)는 이어진 둘을 한 칸에 위아래로(작게 접은 카드).
+  // 칸은 위 · 아래 두 줄(sub-row)로 이뤄진다 — 워커 카드는 두 줄을 다 쓰고(span 2), 대기실 카드는 한 줄씩
+  for (const g of groups) {
+    g.slots = [];
+    for (const c of g.cards) {
+      const last = g.slots.at(-1);
+      if (c.classList.contains('socket') && last?.socket && last.cards.length < 2) last.cards.push(c);
+      else g.slots.push({ socket: c.classList.contains('socket'), cards: [c] });
+    }
+  }
   const shelves = [];
   for (const g of groups) {
-    g.shown = g.cards.length;
+    g.shown = g.slots.length;
     g.w = Math.max(1, Math.min(g.shown, cols));
     let sh = shelves.find((x) => x.used + g.w <= cols);
     if (!sh) shelves.push(sh = { used: 0, deep: 0, groups: [] });
@@ -1680,18 +1690,22 @@ function layoutRepoGroups() {
     for (const g of sh.groups) {
       g.head.style.gridRow = String(row);
       g.head.style.gridColumn = `${g.col} / span ${g.w}`;
-      g.cards.forEach((c, i) => {
-        c.style.gridRow = String(row + 1 + Math.floor(i / cols));
-        c.style.gridColumn = String(g.col + (i % cols));
+      g.slots.forEach((slot, i) => {
+        const r = row + 1 + 2 * Math.floor(i / cols), col = String(g.col + (i % cols));
+        slot.cards.forEach((c, k) => {
+          c.style.gridRow = slot.socket ? String(r + k) : `${r} / span 2`;
+          c.style.gridColumn = col;
+          c.classList.toggle('stack-lo', slot.socket && k === 1); // 칸 아래쪽 대기실 카드 — 위 카드와 간격을 줄이고 회로선을 긋지 않는다
+        });
       });
     }
-    row += 1 + Math.max(1, sh.deep);
+    row += 1 + 2 * Math.max(1, sh.deep);
   }
   // '워커 추가' 카드: 칸이 남는 첫 선반의 카드 줄 끝. 남는 칸이 없으면 카드 대신 도구 줄 버튼
   const sh = shelves.find((x) => x.used < cols && x.deep <= 1);
   showAdd(!!sh);
   if (add && sh) {
-    add.style.gridRow = String(sh.row + 1);
+    add.style.gridRow = `${sh.row + 1} / span 2`;
     add.style.gridColumn = String(sh.used + 1);
   }
 }
@@ -1901,7 +1915,8 @@ function drawTraces() {
   // 칩 위치는 레이아웃 좌표(offsetTop/Left)로 잰다. getBoundingClientRect 는 호버·선택 시 떠오르는
   // translateY(-2px) 까지 반영해서, 떠오를 때마다 선 끝이 흔들리고 다시 그려졌다.
   const nr = $('#nodes').getBoundingClientRect();
-  const list = [...nodeEls.values()].filter((n) => n.isConnected && n.offsetParent).map((n) => {
+  // 칸 아래쪽 대기실 카드(stack-lo)는 뺀다 — 선이 위 카드를 가로질러 지나갔다
+  const list = [...nodeEls.values()].filter((n) => n.isConnected && n.offsetParent && !n.classList.contains('stack-lo')).map((n) => {
     const w = state.workers.find((x) => x.id === n.dataset.id);
     return {
       x: Math.round(nr.left - fr.left + n.offsetLeft), y: Math.round(nr.top - fr.top + n.offsetTop),

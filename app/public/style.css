@@ -442,6 +442,10 @@ body.card-drag .node-add { opacity: .25; transition: opacity .2s; }
 /* 빈 소켓 (저장된 역할) */
 .node.socket { background: transparent; border: 1px dashed rgb(var(--ink) / .13); box-shadow: none; cursor: default; }
 .node.socket .stage { background: rgb(0 0 0 / calc(.15 * var(--shade))); }
+/* 대기실 카드는 작게 접는다 — 제목 줄과 ▶ · ✕ 만(캐릭터 무대는 숨김). 이어진 두 장이 워커 카드 한 칸에 위아래로 들어간다(app.js layoutRepoGroups) */
+.node.socket { align-self: start; padding: 8px 12px; }
+.node.socket .stage { display: none; }
+.node.socket.stack-lo { margin-top: -22px; } /* 칸 안 두 장 사이 — 줄 간격(34px)이 회로선 자리라 넓어서 12px 로 */
 .node.socket .avatar { opacity: .22; filter: grayscale(1); }
 .node-add { min-height: 0; } /* 워커 카드 높이에 맞춰 늘어난다(그리드 줄 높이) — 고정 150px 이면 카드보다 커졌다 */
 /* 대기실 카드: ▶ 투입(아이콘만) · ✕ 를 맨 아래 가운데에 작은 동그라미로 */
