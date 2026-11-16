@@ -1391,9 +1391,8 @@ function fmtAgo(t) {
 function socketTemplate() {
   return el(`
     <div class="node socket">
-      <div class="node-head"><span class="repo-sw" hidden></span><span class="nid">SLOT</span><span class="nname" title="${_t('더블클릭해 이름 변경 · 칩을 끌어 순서 변경')}"></span><button class="node-more" data-act="more" aria-label="${_t('메뉴')}">⋯</button></div>
+      <div class="node-head"><span class="repo-sw" hidden></span><span class="nname" title="${_t('더블클릭해 이름 변경 · 칩을 끌어 순서 변경')}"></span><div class="socket-acts"><button class="btn primary nlaunch" data-act="launch" aria-label="${_t('투입')}"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M3 1.8v6.4L8.4 5z"/></svg></button><button class="btn ghost nforget" data-act="forget" title="${_t('저장된 역할 삭제')}" aria-label="${_t('저장된 역할 삭제')}"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2.6 2.6l4.8 4.8M7.4 2.6L2.6 7.4"/></svg></button></div><button class="node-more" data-act="more" aria-label="${_t('메뉴')}">⋯</button></div>
       <div class="stage"><div class="avatar">${clawdSVG()}</div><span class="pill">${_t('대기실')}</span></div>
-      <div class="socket-acts"><button class="btn primary nlaunch" data-act="launch" aria-label="${_t('투입')}"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M3 1.8v6.4L8.4 5z"/></svg></button><button class="btn ghost nforget" data-act="forget" title="${_t('저장된 역할 삭제')}" aria-label="${_t('저장된 역할 삭제')}"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2.6 2.6l4.8 4.8M7.4 2.6L2.6 7.4"/></svg></button></div>
     </div>`);
 }
 
@@ -1651,7 +1650,7 @@ function layoutRepoGroups() {
     $('#btn-floor-add').hidden = fits;
   };
   if (!kids.some((k) => k.classList.contains('repo-head'))) {
-    for (const k of kids) { k.style.gridRow = k.style.gridColumn = ''; k.classList?.remove('stack-lo'); }
+    for (const k of kids) { k.style.gridRow = k.style.gridColumn = ''; k.style.removeProperty('--sk'); k.classList?.remove('stack-lo'); }
     const n = kids.filter((k) => k.classList.contains('node')).length;
     showAdd(n === 0 || n % cols !== 0);
     return;
@@ -1663,13 +1662,15 @@ function layoutRepoGroups() {
   }
   // 선반 채우기: 묶음은 들어갈 자리가 있는 가장 앞 선반에 넣는다(first-fit) — 앞 선반의 남는 칸을 비워 두지 않게.
   // 카드가 열 수보다 많은 묶음은 선반 하나를 혼자 쓰고 여러 줄로 내려간다
-  // 칸(slot) 나누기: 워커 카드는 칸 하나를 혼자, 대기실 카드(.socket)는 이어진 둘을 한 칸에 위아래로(작게 접은 카드).
-  // 칸은 위 · 아래 두 줄(sub-row)로 이뤄진다 — 워커 카드는 두 줄을 다 쓰고(span 2), 대기실 카드는 한 줄씩
+  // 칸(slot) 나누기: 워커 카드는 칸 하나를 혼자, 대기실 카드(.socket)는 이어진 넷(터치는 둘)을 한 칸에 위아래로(한 줄로 접은 카드).
+  // 칸은 위 · 아래 두 줄(sub-row)로 이뤄진다 — 워커 카드도 대기실 카드도 두 줄을 다 쓰고(span 2), 대기실 카드는
+  // 같은 칸에 겹쳐 놓고 칸 안 순번(--sk)만큼 아래로 민다(style.css .node.socket margin-top)
+  const perSlot = TOUCH ? 2 : 4;
   for (const g of groups) {
     g.slots = [];
     for (const c of g.cards) {
       const last = g.slots.at(-1);
-      if (c.classList.contains('socket') && last?.socket && last.cards.length < 2) last.cards.push(c);
+      if (c.classList.contains('socket') && last?.socket && last.cards.length < perSlot) last.cards.push(c);
       else g.slots.push({ socket: c.classList.contains('socket'), cards: [c] });
     }
   }
@@ -1693,9 +1694,10 @@ function layoutRepoGroups() {
       g.slots.forEach((slot, i) => {
         const r = row + 1 + 2 * Math.floor(i / cols), col = String(g.col + (i % cols));
         slot.cards.forEach((c, k) => {
-          c.style.gridRow = slot.socket ? String(r + k) : `${r} / span 2`;
+          c.style.gridRow = `${r} / span 2`;
           c.style.gridColumn = col;
-          c.classList.toggle('stack-lo', slot.socket && k === 1); // 칸 아래쪽 대기실 카드 — 위 카드와 간격을 줄이고 회로선을 긋지 않는다
+          if (slot.socket) c.style.setProperty('--sk', k); else c.style.removeProperty('--sk');
+          c.classList.toggle('stack-lo', slot.socket && k > 0); // 칸 맨 위가 아닌 대기실 카드 — 회로선을 긋지 않는다
         });
       });
     }
