@@ -132,6 +132,8 @@ function mgrOnFx(msg) {
     const from = $('#term-wrap .xterm-helper-textarea') || $('#term-wrap');
     flyToWorker(msg.id, from, 'task');
   }
+  // 연결된 워커끼리 주고받은 순간 — 보낸 카드에서 받은 카드로 쪽지가 날아가고, 짝 선이 잠깐 켜진다 (links.js · drawPairLinks)
+  if (msg.kind === 'relay') { flyToWorker(msg.to, workerAvatar(msg.from), 'task'); flashPair(msg.from, msg.to); }
   if (msg.kind === 'commit' && mgrStage >= 1) {
     const t = document.createElement('span');
     t.className = 'mgr-twinkle'; t.textContent = '✦';
@@ -1373,7 +1375,7 @@ const ltrPath = (p) => (p ? `\u200E${p}` : '');
 function nodeTemplate() {
   return el(`
     <div class="node">
-      <div class="node-head"><span class="led"></span><span class="repo-sw" hidden></span><span class="nid"></span><span class="nname" title="${_t('더블클릭해 이름 변경 · 칩을 끌어 순서 변경')}"></span><span class="pill"></span><button class="node-more" data-act="more" aria-label="${_t('메뉴')}">⋯</button></div>
+      <div class="node-head"><span class="led"></span><span class="repo-sw" hidden></span><span class="nid"></span><span class="nname" title="${_t('더블클릭해 이름 변경 · 칩을 끌어 순서 변경')}"></span><span class="nlink" hidden></span><span class="pill"></span><button class="node-more" data-act="more" aria-label="${_t('메뉴')}">⋯</button></div>
       <div class="stage"><div class="avatar">${clawdSVG()}</div><div class="fx"><span></span><span></span><span></span><span class="mark"></span></div></div>
       <div class="meta"></div>
       <div class="path-row"><span class="branch" hidden></span><div class="path"></div></div>
@@ -1479,6 +1481,7 @@ function updateNode(node, w) {
   $('.nid', node).textContent = w.id;
   if (!node.classList.contains('renaming')) $('.nname', node).textContent = w.name;
   $('.pill', node).textContent = statusLabel(viewStatus(w));
+  renderLinkChip($('.nlink', node), w);
   const running = w.status === 'working' || w.status === 'decision';
   $('.meta', node).innerHTML =
     (window.roleLevelChip?.(w.name) || '') + // 역할 레벨 (growth.js) — 누르면 성장 기록
@@ -1949,7 +1952,7 @@ const selLink = document.body.appendChild(Object.assign(document.createElementNS
 selLink.setAttribute('class', 'sel-link');
 selLink.setAttribute('aria-hidden', 'true');
 var selLinkRaf = 0, selLinkSig = ''; // var: 이 줄보다 먼저 도는 초기화(setFloorMin·renderDetail)에서도 부를 수 있게
-function scheduleSelLink() { if (!selLinkRaf) selLinkRaf = requestAnimationFrame(() => { selLinkRaf = 0; drawSelLink(); drawDockTraces(); }); }
+function scheduleSelLink() { if (!selLinkRaf) selLinkRaf = requestAnimationFrame(() => { selLinkRaf = 0; drawSelLink(); drawDockTraces(); drawPairLinks(); }); }
 // 최소화 중엔 헤더 로고가 매니저다 — 바닥의 회로선(drawTraces)처럼 매니저에서 칩 줄의 워커 칩으로 선을 잇는다(선마다 다른 높이의 차선).
 // 헤더 · 칩 줄은 붙박이(sticky)라 화면 좌표로 그리는 고정 SVG 하나(#dock-traces, 헤더 위)에 그린다.
 // 칩 줄이 가로로 굴러 줄 밖으로 밀린 칩은 뺀다. 선 모양 · 상태 색은 바닥 회로선과 같은 .traces 규칙
@@ -5258,6 +5261,87 @@ async function linkMenu(w) {
   toast(op === 'on' ? _t('{a} ⇄ {b} 연결됨 — 다음 메시지부터 서로를 알아요', { a: w.id, b: id }) : _t('{a} ⇄ {b} 연결 끊음', { a: w.id, b: id }), 3000);
 }
 $('#btn-link').onclick = () => linkMenu(state.workers.find((x) => x.id === selected));
+
+// 카드 위 연결 표시 — 회로선(drawTraces)이 이미 많아 선을 늘 그리면 어지럽다. 그래서 3단계로:
+//  ① 평소: 카드 머리의 짝 칩(🔗 W4). 서로 이어진 워커 묶음마다 같은 색 — 선 없이 짝을 알아본다
+//  ② 마우스를 올리거나 그 워커를 열면: 짝 카드까지 점선 호. 올렸을 때는 회로선을 흐리게 낮춰 이 선만 또렷하게
+//  ③ 실제로 주고받은 순간: 쪽지가 날아가고(mgrOnFx 'relay') 선이 잠깐 켜진다
+const LINK_COLORS = ['#38bdf8', '#c084fc', '#f472b6', '#34d399', '#fbbf24', '#fb7185'];
+let linkColorMemo = { ws: null, map: new Map() };
+function linkColor(id) {
+  if (linkColorMemo.ws !== state.workers) {
+    // 이어진 워커들(연결 그래프의 덩어리)마다 색 하나 — 번호가 작은 워커가 든 덩어리부터 차례로
+    const map = new Map(), byId = new Map(state.workers.map((w) => [w.id, w]));
+    const ids = state.workers.filter((w) => w.links?.length).map((w) => w.id).sort((a, b) => a.slice(1) - b.slice(1));
+    let k = 0;
+    for (const start of ids) {
+      if (map.has(start)) continue;
+      const c = LINK_COLORS[k++ % LINK_COLORS.length], stack = [start];
+      while (stack.length) { const id = stack.pop(); if (map.has(id)) continue; map.set(id, c); stack.push(...(byId.get(id)?.links || [])); }
+    }
+    linkColorMemo = { ws: state.workers, map };
+  }
+  return linkColorMemo.map.get(id) || 'var(--accent)';
+}
+function renderLinkChip(chip, w) {
+  const ids = w.links || [];
+  chip.hidden = !ids.length;
+  if (!ids.length) return;
+  const html = `${LINK_SVG}${ids.map(esc).join(' ')}`;
+  if (chip._html !== html) chip.innerHTML = chip._html = html;
+  chip.style.setProperty('--pc', linkColor(w.id));
+  chip.title = _t('연결된 워커: {ids} — 마우스를 올리면 짝을 선으로 보여 줘요', { ids: ids.join(', ') });
+}
+let pairHover = null, pairLinkSig = '';
+const pairFlash = new Map(); // 'W1|W2' → 선을 켜 둘 시각(ms)
+function flashPair(a, b) {
+  pairFlash.set([a, b].sort().join('|'), Date.now() + 1800);
+  scheduleSelLink();
+  setTimeout(scheduleSelLink, 1850);
+}
+$('#nodes').addEventListener('mouseover', (e) => {
+  const id = e.target.closest('.node[data-id]')?.dataset.id || null;
+  if (id !== pairHover) { pairHover = id; scheduleSelLink(); }
+});
+$('#nodes').addEventListener('mouseleave', () => { if (pairHover) { pairHover = null; scheduleSelLink(); } });
+function drawPairLinks() {
+  let svg = document.getElementById('pair-link');
+  if (!svg) {
+    svg = document.body.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'svg'));
+    svg.id = 'pair-link'; svg.setAttribute('class', 'pair-link'); svg.setAttribute('aria-hidden', 'true');
+  }
+  const now = Date.now();
+  for (const [k, t] of pairFlash) if (t <= now) pairFlash.delete(k);
+  const off = $('#floor').hidden || document.body.classList.contains('term-full');
+  // 그릴 짝: 올린 카드 · 연 워커의 모든 연결 + 방금 주고받은 짝. 강한 표시(hot)는 올렸거나 방금 주고받은 것
+  const pairs = new Map();
+  const add = (a, b, hot) => { const k = [a, b].sort().join('|'); pairs.set(k, hot || pairs.get(k) || false); };
+  if (!off) {
+    for (const id of [pairHover, selected]) {
+      const w = id && state.workers.find((x) => x.id === id);
+      for (const p of w?.links || []) add(id, p, id === pairHover);
+    }
+    for (const k of pairFlash.keys()) { const [a, b] = k.split('|'); add(a, b, true); }
+  }
+  const segs = [];
+  for (const [k, hot] of pairs) {
+    const [na, nb] = k.split('|').map((id) => nodeEls.get(id));
+    if (!na?.isConnected || !nb?.isConnected || !na.offsetParent || !nb.offsetParent) continue;
+    const pt = (n) => { const r = n.getBoundingClientRect(); return [Math.round(r.left + r.width / 2 + scrollX), Math.round(r.top + scrollY)]; };
+    const [a, b] = [pt(na), pt(nb)];
+    // 두 카드 윗변 가운데를 위로 솟은 호로 — 같은 줄이면 무지개, 다른 줄이면 위 카드 쪽으로 더 솟게
+    const top = Math.min(a[1], b[1]), h = 26 + Math.min(70, Math.abs(a[0] - b[0]) * 0.12);
+    const d = `M${a[0]} ${a[1] - 2} C${a[0]} ${top - h} ${b[0]} ${top - h} ${b[0]} ${b[1] - 2}`;
+    segs.push({ d, a, b, hot, c: linkColor(k.split('|')[0]) });
+  }
+  const anyHot = segs.some((s) => s.hot);
+  document.body.classList.toggle('pair-focus', anyHot);
+  const sig = segs.map((s) => `${s.d}${s.hot ? '!' : ''}${s.c}`).join('|');
+  if (sig === pairLinkSig) return;
+  pairLinkSig = sig;
+  svg.innerHTML = segs.map((s) => `<g class="${s.hot ? 'hot' : 'calm'}" style="--pc:${s.c}"><path class="base" d="${s.d}"/><path class="flow" d="${s.d}"/>` +
+    `<circle cx="${s.a[0]}" cy="${s.a[1] - 2}" r="3"/><circle cx="${s.b[0]}" cy="${s.b[1] - 2}" r="3"/></g>`).join('');
+}
 document.addEventListener('click', (e) => {
   const g = e.target.closest('[data-goto-worker]');
   if (g && state.workers.some((x) => x.id === g.dataset.gotoWorker)) select(g.dataset.gotoWorker);

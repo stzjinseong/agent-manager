@@ -702,6 +702,7 @@ const EN = {
   '{id} · {name} — 워커 연결': '{id} · {name} — Link worker',
   '{a} ⇄ {b} 연결됨 — 다음 메시지부터 서로를 알아요': '{a} ⇄ {b} linked — they know each other from the next message',
   '{a} ⇄ {b} 연결 끊음': '{a} ⇄ {b} unlinked',
+  '연결된 워커: {ids} — 마우스를 올리면 짝을 선으로 보여 줘요': 'Linked workers: {ids} — hover to see the link line',
   '← 앞으로 옮기기': '← Move earlier',
   '뒤로 옮기기 →': 'Move later →',
   '↑ 위로': '↑ Move up',

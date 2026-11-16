@@ -2753,6 +2753,7 @@ const server = http.createServer(async (req, res) => {
     }
     const n = links.bumpHop(a.id, b.id);
     pushLog(a, 'status', `🔗 → ${b.id}: ${text}`);
+    broadcast({ type: 'fx', kind: 'relay', from: a.id, to: b.id }); // 화면: 보낸 카드 → 받은 카드로 쪽지 + 짝 선 잠깐 (app.js mgrOnFx)
     emitState();
     return json(res, 200, { ok: true, note: `${b.id}(${b.name}) 에게 보냈습니다${wasIdle ? '' : ' — 상대가 작업 중이라 지금 일이 끝나면 들어갑니다'} (사람 없이 ${n}/${links.HOP_LIMIT})` });
   }
