@@ -418,15 +418,6 @@ body.card-drag .node-add { opacity: .25; transition: opacity .2s; }
 .s-working .fx span:nth-child(2) { left: calc(50% + 4px); animation-delay: .35s; }
 .s-working .fx span:nth-child(3) { left: calc(50% + 28px); animation-delay: .7s; }
 @keyframes spark { 0% { opacity: 0; transform: translateY(6px); } 20% { opacity: 1; } 100% { opacity: 0; transform: translateY(-26px); } }
-.fx .mark { font: 800 15px/1 var(--mono); left: calc(50% + 30px); top: 10px; }
-.s-decision .fx .mark::before { content: "!"; }
-.s-decision .fx .mark { opacity: 1; color: #1b1203; background: var(--decision); padding: 3px 7px; border-radius: 7px; box-shadow: 0 0 16px color-mix(in srgb, var(--decision) 60%, transparent); animation: pop 1.6s ease-in-out infinite; }
-.s-done .fx .mark::before { content: "✓"; }
-.s-done .fx .mark { opacity: 1; color: #04150d; background: var(--done); padding: 3px 6px; border-radius: 7px; }
-.s-checked .fx .mark::before { content: "✓"; }
-.s-checked .fx .mark { opacity: .8; color: var(--checked); border: 1.5px solid var(--checked); padding: 2px 5px; border-radius: 7px; }
-.s-idle .fx .mark::before { content: "z"; }
-.s-idle .fx .mark { opacity: 1; color: var(--dim); font-size: 13px; animation: zz 2.6s ease-in-out infinite; }
 @keyframes pop { 50% { transform: scale(1.12); } }
 @keyframes zz { 0% { opacity: 0; transform: translate(0, 6px); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(10px, -12px); } }
 
@@ -436,6 +427,8 @@ body.card-drag .node-add { opacity: .25; transition: opacity .2s; }
 .meta .q { color: var(--accent); }
 .path-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .path-row .path { flex: 1; min-width: 0; }
+/* 카드 아래 줄은 브랜치만(폴더 경로는 뺐다) — 줄 폭을 다 쓴다. 다른 곳(.branch 기본)은 경로와 나눠 쓰느라 절반까지였다 */
+.path-row .branch { flex: 0 1 auto; min-width: 0; max-width: 100%; }
 /* git 브랜치 — 카드 경로 줄 앞과 상세 메타 줄에 작은 꼬리표. 분리된 HEAD(브랜치 아님)는 주황 */
 .branch { display: inline-flex; align-items: center; gap: 3px; flex: none; max-width: 50%; font: 11px/1.3 var(--mono); color: var(--text-2); vertical-align: -1px; }
 .branch[hidden] { display: none; }
@@ -859,7 +852,7 @@ body.term-full .side-grip { left: -6px; }
 .s-waiting .avatar { animation: look 2.4s ease-in-out infinite; }
 @keyframes look { 0%, 40%, 100% { transform: translateX(0); } 55%, 70% { transform: translateX(-3px); } 80%, 92% { transform: translateX(3px); } }
 /* 주변을 도는 작은 서브에이전트 픽셀 3개 */
-.s-waiting .fx span:not(.mark) {
+.s-waiting .fx span {
   opacity: 1; width: 5px; height: 5px; background: var(--waiting); box-shadow: 0 0 8px var(--waiting);
   left: calc(50% - 2.5px); top: 44px; animation: orbit 2.4s linear infinite;
 }
@@ -892,8 +885,6 @@ body.term-full .side-grip { left: -6px; }
 .node.s-interrupted { --c: var(--interrupted); }
 .s-interrupted .avatar { animation: none; filter: saturate(.45) brightness(.85); }  /* 얼어붙은 캐릭터 */
 .s-interrupted .clawd .eye { animation: none; }
-.s-interrupted .fx .mark::before { content: "⏸"; }
-.s-interrupted .fx .mark { opacity: 1; color: #0c0d11; background: var(--interrupted); padding: 2px 6px; border-radius: 7px; font-size: 12px; }
 /* 선: 흐름 없이 끊긴 점선 */
 .traces .t-interrupted path.base { stroke: color-mix(in srgb, var(--interrupted) 45%, var(--floor)); stroke-dasharray: 5 6; }
 .traces .t-interrupted { color: var(--interrupted); }
