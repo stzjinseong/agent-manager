@@ -1,6 +1,5 @@
-// ---------- 역할 성장 카드 · 하루 요약 카드 ----------
-// 서버(rolestats.js)가 역할 이름마다 쌓은 기록을 state.roles 로, 마지막 하루 요약 카드의 머리말을 state.daily 로 보낸다.
-// - 워커 카드의 배지 칩(딴 배지 아이콘)을 누르면 그 역할의 배지 목록(못 딴 것은 흐리게 · 조건 설명)
+// ---------- 하루 요약 카드 ----------
+// 서버(rolestats.js)가 역할 이름마다 쌓은 기록으로 하루 요약 카드를 만들고, 마지막 카드의 머리말을 state.daily 로 보낸다.
 // - 매일 오후 5시(KST)에 카드가 만들어지면 헤더 아래에 '도착' 띠가 겹쳐 뜨고, 누르면 그날의 요약을 연다.
 //   헤더의 우편함 버튼은 언제든 다시 열기(안 읽은 카드가 있으면 점)
 (() => {
@@ -14,23 +13,6 @@
   const hhmm = (t) => new Date(t).toLocaleTimeString(uiLocale(), { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Seoul' });
   const dateLabel = (d) => new Date(`${d}T12:00:00+09:00`).toLocaleDateString(uiLocale(), { month: 'long', day: 'numeric', weekday: 'short', timeZone: 'Asia/Seoul' });
 
-  // ---------- 워커 카드의 배지 칩 (app.js updateNode 가 부른다) — 딴 배지 아이콘(2개까지, 넘치면 +N), 없으면 흐린 🏅 ----------
-  window.roleLevelChip = (name) => {
-    const c = state.roles?.[name];
-    if (!c) return '';
-    const n = c.badges.length;
-    const tip = T('{name} · 배지 {n}/{of} — 눌러서 보기', { name, n, of: c.of });
-    const face = n ? c.badges.slice(0, 2).map((b) => b.icon).join('') + (n > 2 ? `<small>+${n - 2}</small>` : '') : '🏅';
-    return `<button type="button" class="lv-chip${n ? '' : ' none'}" data-role="${esc(name)}" title="${esc(tip)}" aria-label="${esc(tip)}">${face}</button>`;
-  };
-  // 카드를 누르면 선택되므로 칩은 따로 받는다(캡처 단계에서 가로채 카드 선택을 막는다)
-  document.addEventListener('click', (e) => {
-    const chip = e.target.closest?.('.lv-chip');
-    if (!chip) return;
-    e.stopPropagation(); e.preventDefault();
-    openRole(chip.dataset.role);
-  }, true);
-
   // ---------- 공통 모달 ----------
   const back = el(`<div class="modal-back gr-back" hidden><div class="modal panel gr-modal" role="dialog" aria-modal="true" tabindex="-1"></div></div>`);
   document.body.append(back);
@@ -40,43 +22,7 @@
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !back.hidden) close(); });
   const show = (html, cls) => { box.className = `modal panel gr-modal ${cls}`; box.innerHTML = html; back.hidden = false; box.focus(); };
 
-  // ---------- 역할 성장 카드 ----------
-  function openRole(name) {
-    const c = state.roles?.[name];
-    if (!c) return;
-    show(`
-      <div class="gr-head">
-        <div class="gr-lv">🏅</div>
-        <div><h3>${esc(name)}</h3>
-          <small class="gr-sub">${esc(T('배지 {n}/{of}개 획득', { n: c.badges.length, of: c.of }))}</small></div>
-        <button class="btn ghost gr-x" data-gr="close" aria-label="${esc(T('닫기'))}">✕</button>
-      </div>
-      <div class="gr-badges">${BADGE_ALL.map((b) => {
-        const got = c.badges.some((x) => x.id === b.id);
-        const p = c.stats ? b.prog(c.stats) : null;
-        const pct = got ? 1 : Math.min(0.99, p?.pct || 0); // 조건을 다 못 채웠으면 꽉 채우지 않는다
-        return `<div class="gr-badge${got ? ' got' : ''}" title="${esc(T(b.desc))}"><i>${b.icon}</i><span>${esc(T(b.name))}</span><small>${esc(T(b.desc))}</small>
-          ${p ? `<div class="gr-prog"><b><i style="width:${(pct * 100).toFixed(1)}%"></i></b><em>${got ? `✓ ${esc(T('달성'))}` : esc(p.text)}</em></div>` : ''}</div>`;
-      }).join('')}</div>`, 'gr-role');
-  }
   const tile = (label, value, sub = '') => `<div class="gr-tile"><small>${esc(label)}</small><b>${esc(value)}</b>${sub ? `<em>${esc(sub)}</em>` : ''}</div>`;
-  // 아직 못 딴 배지도 흐리게 보여 준다(목표가 보이게) — 조건은 서버(rolestats.js BADGES)와 같은 순서·문구.
-  // prog(stats): 진행도 { pct 0~1, text } — 두 조건짜리(완주왕 · 알뜰)는 작업 수를 먼저 채우고, 다 채우면 두 번째 조건(완료율 · 평균 비용)으로 잰다
-  const count = (now, goal, unit) => ({ pct: now / goal, text: T(`{now}/{goal}${unit}`, { now: Math.min(now, goal), goal }) });
-  const BADGE_ALL = [
-    { id: 'finisher', icon: '🏁', name: '완주왕', desc: '작업 20개 이상 · 완료율 90% 이상', prog: (s) => {
-      const rate = s.ends ? s.done / s.ends : 0;
-      return s.done < 20 ? { pct: s.done / 20, text: T('작업 {n}/20 · 완료율 {p}%', { n: s.done, p: Math.round(rate * 100) }) } : { pct: rate / 0.9, text: T('완료율 {p}% / 90%', { p: Math.round(rate * 100) }) };
-    } },
-    { id: 'committer', icon: '📦', name: '커밋 장인', desc: '커밋 50번', prog: (s) => count(s.commits, 50, '번') },
-    { id: 'veteran', icon: '📅', name: '개근', desc: '일한 날 10일', prog: (s) => count(s.activeDays, 10, '일') },
-    { id: 'saver', icon: '💰', name: '알뜰', desc: '작업 20개 이상 · 작업당 평균 $0.30 이하', prog: (s) => {
-      const avg = s.done ? s.cost / s.done : 0;
-      return s.done < 20 ? { pct: s.done / 20, text: T('작업 {n}/20 · 평균 {v}', { n: s.done, v: money(avg) }) } : { pct: avg ? 0.3 / avg : 1, text: T('평균 {v} / $0.30', { v: money(avg) }) };
-    } },
-    { id: 'crew', icon: '🤝', name: '팀장', desc: '서브에이전트 30번', prog: (s) => count(s.subagents, 30, '번') },
-    { id: 'century', icon: '💯', name: '백전노장', desc: '작업 완료 100개', prog: (s) => count(s.done, 100, '개') },
-  ];
 
   // ---------- 하루 요약 카드 ----------
   const bar = el(`<div class="daily-bar" role="status" hidden>
@@ -149,7 +95,7 @@
       </div>
       <div class="gr-roles">${c.roles.map((r) => `
         <section class="gr-rrow">
-          <header><b>${esc(r.name)}</b>${r.badges.length ? `<span class="gr-rlv" title="${esc(r.badges.map((b) => T(b.name)).join(' · '))}">${r.badges.map((b) => b.icon).join('')}</span>` : ''}
+          <header><b>${esc(r.name)}</b>
             ${r.name === c.mvp ? '<span class="gr-mvp">MVP</span>' : ''}
             <small>${esc(T('작업 {d}', { d: r.done }))}${r.interrupted ? ` · ${esc(T('중단 {n}', { n: r.interrupted }))}` : ''}${r.failed ? ` · ${esc(T('오류 {n}', { n: r.failed }))}` : ''} · ${esc(T('커밋 {n}', { n: r.commits }))} · ${esc(money(r.cost))}${r.decisionMs > 60_000 ? ` · ${esc(T('결정 대기 {t}', { t: dur(r.decisionMs) }))}` : ''}</small></header>
           ${r.prompts.length ? `<ol>${r.prompts.map((p) => `<li><time>${hhmm(p.t)}</time><span>${esc(p.text)}</span></li>`).join('')}</ol>` : `<p class="gr-none">${esc(T('보낸 요청 기록 없음'))}</p>`}

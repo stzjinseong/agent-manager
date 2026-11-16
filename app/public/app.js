@@ -1484,7 +1484,6 @@ function updateNode(node, w) {
   renderLinkChip($('.nlink', node), w);
   const running = w.status === 'working' || w.status === 'decision';
   $('.meta', node).innerHTML =
-    (window.roleLevelChip?.(w.name) || '') + // 역할 레벨 (growth.js) — 누르면 성장 기록
     `<span title="${_t(running ? '이번 턴 경과' : '마지막 갱신')}">⏱ <em data-since="${running ? w.turnStartedAt : w.updatedAt}"></em></span>` +
     `<span title="${_t('도구 사용 횟수')}">⚙ ${w.toolCount}</span>` +
     (w.profile?.turnCount ? `<span title="${_t('추정 비용 (API 환산)')}">$ ${fmtUsd(w.profile.total.cost).slice(1)}</span>` : '');

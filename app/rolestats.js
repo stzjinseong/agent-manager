@@ -1,6 +1,6 @@
-// ---------- 역할(워커)별 성장 기록 · 하루 요약 카드 ----------
+// ---------- 역할(워커)별 기록 · 하루 요약 카드 ----------
 // 매니저 XP(progress.js)는 한 사람 몫이라, 어느 역할이 얼마나 일했는지는 남지 않았다. 역할 이름마다
-// 끝낸 작업 수(완료·중단·오류), 커밋, 도구 종류, 비용, 결정 대기 시간을 쌓고 배지로 보여 준다.
+// 끝낸 작업 수(완료·중단·오류), 커밋, 도구 종류, 비용, 결정 대기 시간을 쌓는다(예전 배지 기능은 뺐다).
 // 같은 기록을 날짜(한국 시간)별로도 쌓아 두고, 매일 오후 5시(KST)에 그날 것을 '하루 요약 카드'로 묶어 화면에 보낸다.
 // 저장: data/roles.json (역할 누적 · 최근 14일 · 세션별 본 비용) · data/daily.json (최근 14장 카드)
 import fs from 'node:fs';
@@ -23,16 +23,6 @@ const TOOL_KIND = {
   Agent: 'agent', Task: 'agent',
 };
 
-// 배지: 조건과 이름. 화면은 아이콘 + 이름 + 조건 설명을 보여 준다
-const BADGES = [
-  { id: 'finisher', icon: '🏁', name: '완주왕', desc: '작업 20개 이상 · 완료율 90% 이상', ok: (r) => r.done >= 20 && r.done / ends(r) >= 0.9 },
-  { id: 'committer', icon: '📦', name: '커밋 장인', desc: '커밋 50번', ok: (r) => r.commits >= 50 },
-  { id: 'veteran', icon: '📅', name: '개근', desc: '일한 날 10일', ok: (r) => r.activeDays >= 10 },
-  { id: 'saver', icon: '💰', name: '알뜰', desc: '작업 20개 이상 · 작업당 평균 $0.30 이하', ok: (r) => r.done >= 20 && r.cost / r.done <= 0.3 },
-  { id: 'crew', icon: '🤝', name: '팀장', desc: '서브에이전트 30번', ok: (r) => r.subagents >= 30 },
-  { id: 'century', icon: '💯', name: '백전노장', desc: '작업 완료 100개', ok: (r) => r.done >= 100 },
-];
-const ends = (r) => r.done + r.interrupted + r.failed || 1;
 
 const freshRole = () => ({ done: 0, interrupted: 0, failed: 0, commits: 0, subagents: 0, tools: 0, kinds: {}, cost: 0, decisionMs: 0, activeDays: 0, lastDay: null, firstAt: Date.now(), lastAt: 0 });
 const freshDay = () => ({ done: 0, interrupted: 0, failed: 0, commits: 0, tools: 0, cost: 0, decisionMs: 0, prompts: [] });
@@ -154,19 +144,11 @@ export function createRoleStats(dataDir) {
     return out;
   };
 
-  // 화면용: 딴 배지 · 전체 배지 수
-  const badgesOf = (r) => BADGES.filter((b) => b.ok(r)).map(({ id, icon, name, desc }) => ({ id, icon, name, desc }));
-  // stats: 화면이 배지마다 진행도(작업 12/20 등)를 그리는 데 쓰는 누적값
-  const publicRoles = () => Object.fromEntries(Object.entries(s.roles).map(([n, r]) => [n, {
-    badges: badgesOf(r), of: BADGES.length,
-    stats: { done: r.done, ends: r.done + r.interrupted + r.failed, commits: r.commits, subagents: r.subagents, activeDays: r.activeDays, cost: r.cost },
-  }]));
-
   // ---------- 하루 요약 카드 ----------
-  // 오늘 일한 역할마다: 끝낸 작업 · 커밋 · 비용 · 결정 대기 · 요청 목록 · 지금 딴 배지
+  // 오늘 일한 역할마다: 끝낸 작업 · 커밋 · 비용 · 결정 대기 · 요청 목록
   function build(day = kstDay()) {
     const today = s.days[day] || {};
-    const roles = Object.entries(today).map(([name, d]) => ({ name, ...d, badges: badgesOf(s.roles[name] || freshRole()) })).sort((a, b) => b.done - a.done || b.prompts.length - a.prompts.length);
+    const roles = Object.entries(today).map(([name, d]) => ({ name, ...d })).sort((a, b) => b.done - a.done || b.prompts.length - a.prompts.length);
     const sum = (k) => roles.reduce((a, r) => a + (r[k] || 0), 0);
     const total = { roles: roles.length, done: sum('done'), interrupted: sum('interrupted'), failed: sum('failed'), commits: sum('commits'), tools: sum('tools'), cost: sum('cost'), decisionMs: sum('decisionMs'), prompts: roles.reduce((a, r) => a + r.prompts.length, 0) };
     const mvp = roles.find((r) => r.done > 0)?.name || null;
@@ -192,5 +174,5 @@ export function createRoleStats(dataDir) {
   const publicDaily = () => { const c = latest(); return c ? { date: c.date, at: c.at, seen: c.seen, dates: daily.cards.map((x) => x.date) } : null; };
   const getDaily = (date) => (date ? daily.cards.find((x) => x.date === date) : latest()) || null;
 
-  return { prompt, end, tool, commit, subagent, cost, watch, rename, public: publicRoles, tickDaily, seenDaily, publicDaily, getDaily };
+  return { prompt, end, tool, commit, subagent, cost, watch, rename, tickDaily, seenDaily, publicDaily, getDaily };
 }

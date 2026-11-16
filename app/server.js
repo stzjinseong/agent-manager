@@ -1548,7 +1548,6 @@ function publicState(sel = null) {
     serverStale: serverStale(),
     recentCwds: recentCwdList(),
     progress: progress.public(),
-    roles: roleStats.public(), // 역할별 레벨·칭호·배지 (이름 → 카드)
     daily: roleStats.publicDaily(),
     directives: config.directives, // 작업 지시 (directives.js)
     directivePresets: directives.PRESETS,
