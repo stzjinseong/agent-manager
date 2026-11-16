@@ -527,7 +527,8 @@ body.card-drag .node-add { opacity: .25; transition: opacity .2s; }
 .mt-cache { min-width: 52px; text-align: right; } /* '⏱ 59:44' ↔ '캐시 만료' 가 바뀌어도 폭이 같게 */
 .mt-cache.gone { color: var(--decision); } /* 캐시가 만료됨 — 다음 요청은 캐시를 새로 쓴다 */
 /* 보통 화면: 오른쪽 끝을 터미널(CLI) 오른쪽 가장자리에, 높이는 역할 이름 줄에 맞춘다 — 위치는 app.js placeMeters 가 잰다 */
-.detail-head .meters { position: absolute; right: var(--mt-right, 0px); top: var(--mt-top, 0px); height: var(--mt-h, 20px); }
+.detail-head .meters { position: absolute; right: var(--mt-right, 0px); top: calc(var(--mt-top, 0px) + var(--mt-h, 20px) / 2); transform: translateY(-50%); padding: 1px 0; }
+/* 높이를 이름 글자 높이(--mt-h ≈ 20px)로 묶었더니 내용(숫자 줄 + 막대 ≈ 24px)이 넘쳐 overflow:hidden 에 윗부분이 잘렸다 — 높이는 내용대로, 이름 줄 세로 가운데에 */
 .detail-head .meters:is(.y1, .y2) .mt-r, .detail-head .meters.y2 .mt-l { display: none; }
 .detail-head .meters.y3 { display: none; }
 .term-wrap.full .term-bar .meters { flex: 0 1 auto; min-width: 0; margin-left: auto; margin-right: 8px; font-size: 12px; }
