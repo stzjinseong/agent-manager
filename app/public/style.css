@@ -296,7 +296,7 @@ body.card-drag .repo-head { opacity: .25; transition: opacity .2s; }
 /* 묶음 머리줄 맨 앞 repo 색 네모 = + 버튼: 이 폴더에 워커 바로 추가(app.js openQuickNew). 색 표시와 + 를 따로 두던 것을 하나로 */
 .repo-head .rh-add { display: grid; place-items: center; width: 16px; height: 16px; padding: 0; border-radius: 4px; color: #fff; cursor: pointer;
   background: var(--repo); border: 0; transition: filter .15s, box-shadow .15s; }
-.repo-head .rh-add svg { display: block; width: 10px; height: 10px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
+.repo-head .rh-add svg { display: block; width: 16px; height: 16px; fill: currentColor; shape-rendering: crispEdges; } /* 버튼과 같은 16 격자에 2px 두께 + 를 정수 좌표로 — 선 SVG 를 줄여 그리면 1px 미만으로 얇고 반 픽셀 어긋났다 */
 .repo-head .rh-add:hover, .repo-head .rh-add.on { filter: brightness(1.18); box-shadow: 0 0 0 2px color-mix(in srgb, var(--repo) 40%, transparent); }
 .qn-pop { position: fixed; z-index: 60; width: min(340px, calc(100vw - 16px)); display: flex; flex-direction: column; gap: 10px; padding: 12px;
   border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: 0 10px 30px rgb(0 0 0 / .35); }

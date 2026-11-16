@@ -1588,7 +1588,7 @@ function renderFloor() {
     if (grouped && it.repo !== prevRepo) {
       let h = repoHeadEls.get(it.repo);
       if (!h) {
-        h = el(`<div class="repo-head"><button type="button" class="rh-add">${PLUS_SVG}</button><b></b></div>`); // repo 색 네모가 곧 + 버튼
+        h = el(`<div class="repo-head"><button type="button" class="rh-add"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M7 4h2v8H7zM4 7h8v2H4z"/></svg></button><b></b></div>`); // repo 색 네모가 곧 + 버튼
         h.dataset.repo = it.repo;
         repoHeadEls.set(it.repo, h);
       }
