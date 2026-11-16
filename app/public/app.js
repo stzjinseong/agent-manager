@@ -1588,13 +1588,11 @@ function renderFloor() {
     if (grouped && it.repo !== prevRepo) {
       let h = repoHeadEls.get(it.repo);
       if (!h) {
-        h = el(`<div class="repo-head"><span class="repo-sw"></span><b></b><span class="rh-n"></span><button type="button" class="rh-add">+</button></div>`);
+        h = el(`<div class="repo-head"><button type="button" class="rh-add">${PLUS_SVG}</button><b></b></div>`); // repo 색 네모가 곧 + 버튼
         h.dataset.repo = it.repo;
         repoHeadEls.set(it.repo, h);
       }
-      const mine = items.filter((i) => i.repo === it.repo);
       $('b', h).textContent = labels.get(it.repo);
-      $('.rh-n', h).textContent = mine.length;
       h.style.setProperty('--repo', colorOf.get(it.repo));
       h.title = it.cwd || '';
       h.dataset.cwd = it.cwd || '';
