@@ -727,19 +727,19 @@ body.term-full .side-grip { left: -6px; }
 
 /* 도구 결과 캡처: 카드 무대 왼쪽 아래 썸네일 / 타임라인 썸네일 / 크게 보기 */
 .card-shot {
-  position: absolute; left: 6px; bottom: 6px; z-index: 4; width: 46px; height: 30px; object-fit: cover; border-radius: 5px;
+  position: absolute; left: 6px; bottom: 4px; z-index: 4; width: 46px; height: 26px; object-fit: cover; border-radius: 5px; /* 위 끝 32px — 상태 · 짝 칩(6~23px)과 겹치지 않게 */
   border: 1px solid rgb(var(--ink) / .35); box-shadow: 0 2px 8px rgb(0 0 0 / calc(.5 * var(--shade))); cursor: zoom-in; background: var(--bg);
 }
 .card-shot:hover { border-color: rgb(var(--ink)); transform: scale(1.06); }
 /* 최근 결과물 문서 타일 (무대 오른쪽 아래, 캡처 썸네일과 같은 크기) */
 .card-doc {
-  position: absolute; right: 6px; bottom: 6px; z-index: 4; width: 46px; height: 30px; border-radius: 5px;
+  position: absolute; right: 6px; bottom: 4px; z-index: 4; width: 46px; height: 26px; border-radius: 5px;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; text-decoration: none;
   border: 1px solid rgb(var(--ink) / .35); box-shadow: 0 2px 8px rgb(0 0 0 / calc(.5 * var(--shade))); background: var(--bg); color: var(--text-2);
   transition: border-color .15s, transform .15s;
 }
 .card-doc:hover { border-color: rgb(var(--ink)); transform: scale(1.06); color: var(--text); }
-.card-doc .ic { font-size: 13px; line-height: 1; }
+.card-doc .ic { font-size: 12px; line-height: 1; }
 .card-doc .ext { font: 600 9px/1 var(--mono); letter-spacing: .04em; }
 /* 워커가 쓴 결과물 문서 카드 — 채팅에서 그 턴 끝에(app.js chatWithDocs · docCard). 누르면 앱 안 보기 또는 OS 로 */
 .cv-docs { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 2px; }
