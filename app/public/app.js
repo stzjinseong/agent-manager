@@ -1498,11 +1498,6 @@ function updateNode(node, w) {
   const docKey = showDoc && `${showDoc.url}@${showDoc.t}`;
   if (showDoc && tile?.dataset.key !== docKey) { tile?.remove(); tile = el(docTile(showDoc)); tile.dataset.key = docKey; $('.stage', node).append(tile); }
   if (!showDoc && tile) tile.remove();
-  const ctx = w.profile ? ctxLevel(w.profile) : { level: 0 };
-  node.classList.toggle('ctx-warn', ctx.level > 0);
-  let badge = $('.ctx-badge', node);
-  if (ctx.level && !badge) { badge = el('<div class="ctx-badge"></div>'); $('.stage', node).append(badge); }
-  if (badge) { badge.hidden = !ctx.level; badge.textContent = ctx.level ? `⚠ ctx ${fmtN(w.profile.context)}` : ''; badge.title = ctx.text || ''; }
   $('.path', node).textContent = ltrPath(w.cwd);
   $('.path', node).title = w.cwd;
   setBranch($('.branch', node), w.branch);
