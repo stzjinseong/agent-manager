@@ -376,10 +376,11 @@ body.card-drag .node-add { opacity: .25; transition: opacity .2s; }
   border: 1px solid var(--line);
 }
 .stage::after { /* 바닥 그림자 — blur 필터 대신 가장자리가 흐린 그라데이션(Safari 는 캐릭터가 움직일 때 blur 주변을 다시 그리다 얼룩졌다) */
-  content: ""; position: absolute; bottom: 3px; left: 50%; width: 64px; height: 9px; margin-left: -32px;
+  content: ""; position: absolute; bottom: 4px; left: 50%; width: 46px; height: 7px; margin-left: -23px;
   border-radius: 50%; background: radial-gradient(closest-side, rgb(0 0 0 / calc(.45 * var(--shade))) 55%, transparent);
 }
 .avatar { position: relative; z-index: 1; width: 72px; height: 40px; }
+.stage .avatar { width: 50px; height: 28px; } /* 카드 캐릭터 30% 줄임(72×40 → 50×28) — 무대 안 효과 위치도 이 크기 기준 */
 .avatar svg { width: 100%; height: 100%; display: block; overflow: visible; }
 /* 워커 캐릭터 색: 역할별 --avatar (서버가 고른 OKLCH 색상각). 없으면 Claude 코랄 */
 .clawd .body { fill: var(--avatar, var(--accent)); }
@@ -411,12 +412,12 @@ body.card-drag .node-add { opacity: .25; transition: opacity .2s; }
 .fx { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
 .fx span { position: absolute; opacity: 0; }
 .s-working .fx span { /* 픽셀 스파크 */
-  width: 4px; height: 4px; background: var(--working); bottom: 38px; box-shadow: 0 0 6px var(--working);
+  width: 4px; height: 4px; background: var(--working); bottom: 32px; box-shadow: 0 0 6px var(--working);
   animation: spark 1.1s ease-out infinite;
 }
-.s-working .fx span:nth-child(1) { left: calc(50% - 30px); }
-.s-working .fx span:nth-child(2) { left: calc(50% + 4px); animation-delay: .35s; }
-.s-working .fx span:nth-child(3) { left: calc(50% + 28px); animation-delay: .7s; }
+.s-working .fx span:nth-child(1) { left: calc(50% - 21px); }
+.s-working .fx span:nth-child(2) { left: calc(50% + 3px); animation-delay: .35s; }
+.s-working .fx span:nth-child(3) { left: calc(50% + 19px); animation-delay: .7s; }
 @keyframes spark { 0% { opacity: 0; transform: translateY(6px); } 20% { opacity: 1; } 100% { opacity: 0; transform: translateY(-18px); } }
 @keyframes pop { 50% { transform: scale(1.12); } }
 @keyframes zz { 0% { opacity: 0; transform: translate(0, 6px); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(10px, -12px); } }
@@ -858,11 +859,11 @@ body.term-full .side-grip { left: -6px; }
 /* 주변을 도는 작은 서브에이전트 픽셀 3개 */
 .s-waiting .fx span {
   opacity: 1; width: 5px; height: 5px; background: var(--waiting); box-shadow: 0 0 8px var(--waiting);
-  left: calc(50% - 2.5px); top: 30px; animation: orbit 2.4s linear infinite;
+  left: calc(50% - 2.5px); top: 43px; animation: orbit 2.4s linear infinite;
 }
 .s-waiting .fx span:nth-child(2) { animation-delay: -.8s; }
 .s-waiting .fx span:nth-child(3) { animation-delay: -1.6s; }
-@keyframes orbit { from { transform: rotate(0deg) translateX(40px); } to { transform: rotate(360deg) translateX(40px); } }
+@keyframes orbit { from { transform: rotate(0deg) translateX(30px); } to { transform: rotate(360deg) translateX(30px); } }
 /* 무대가 낮아져(62px) 반지름 40 원이 위아래로 잘린다 — 캐릭터 둘레를 도는 건 그대로 두고 궤도만 납작한 타원으로 */
 .s-waiting .fx { transform: scaleY(.6); }
 .traces .t-waiting path.base { stroke: color-mix(in srgb, var(--waiting) 40%, transparent); }
@@ -1804,7 +1805,7 @@ body.card-drag .dadd { opacity: .25; }
 /* 올린 그림 캐릭터(.char-img) — 그림 비율이 제각각이라 자리마다 높이만 정하고 가로는 그림 비율대로.
    카드 높이(--ch-card · 워커 그림), 종료 화면 높이(--ch-logo)와 매니저 높이(--ch-mgr · 매니저 기본 그림)는 characters.js 가 그림 크기로 정한다(도트는 정수배) */
 html.char-img .avatar { width: auto; height: var(--ch-card, 66px); }
-html.char-img .stage .avatar { height: min(var(--ch-card, 66px), 50px); } /* 무대가 62px 로 낮아져 — 위 상태 표시 · 짝 칩 줄은 비켜서 */
+html.char-img .stage .avatar { height: min(var(--ch-card, 66px), 35px); } /* 무대가 62px 로 낮아져 — 위 상태 표시 · 짝 칩 줄은 비켜서 */
 html.char-img .avatar svg { width: auto; max-width: 160px; }
 html.char-img .dchip .avatar { height: 15px; }
 html.char-img .dchip .avatar svg { max-width: 30px; }
