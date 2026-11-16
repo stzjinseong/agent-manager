@@ -448,15 +448,10 @@ body.card-drag .node-add { opacity: .25; transition: opacity .2s; }
 .touch .node.socket { --sock-step: 52px; }
 .node.socket .stage { display: none; }
 .node.socket .avatar { opacity: .22; filter: grayscale(1); }
-/* 대기실 카드: ▶ 투입(아이콘만) · ✕ 를 제목 줄 오른쪽 끝에 작은 알약으로 — 이름 칸을 남기려 가로를 34 로 */
+/* 대기실 카드: ▶ 투입(아이콘만)을 제목 줄 오른쪽 끝에 작은 알약으로. 삭제는 휴지통에 끌어 놓기(터치는 ⋯ 메뉴) — ✕ 버튼은 뺐다 */
 .socket-acts { flex: none; display: flex; align-items: center; gap: 4px; margin-left: auto; }
-.socket-acts .nlaunch, .socket-acts .nforget { flex: none; display: grid; place-items: center; width: 34px; height: 22px; padding: 0; border-radius: 999px; font-size: 12px; line-height: 1; }
+.socket-acts .nlaunch { flex: none; display: grid; place-items: center; width: 34px; height: 22px; padding: 0; border-radius: 999px; font-size: 12px; line-height: 1; }
 .socket-acts .nlaunch svg { width: 13px; height: 13px; fill: currentColor; margin-left: 1px; }
-/* ✕ 는 글자로 두면 글꼴 기준선 탓에 위로 떠 보여 SVG 로 — 버튼 가운데에 정확히 */
-.socket-acts .nforget svg { width: 11px; height: 11px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; }
-/* ✕ = 저장된 역할 삭제 — 점선 카드 위에서 보이게 면 · 테두리를 주고, 올리면 빨갛게(지우는 버튼) */
-.socket-acts .nforget { color: var(--text-2); background: var(--surface-3); border: 1px solid var(--line-2); }
-.socket-acts .nforget:hover { color: #e0655a; background: color-mix(in srgb, #e0655a 14%, var(--surface-3)); border-color: color-mix(in srgb, #e0655a 55%, transparent); }
 
 /* ---------- 상세 ---------- */
 /* 가로로 아무리 늘려도 터미널이 과하게 길어지지 않게 상세 패널 폭 상한 */
@@ -2018,7 +2013,7 @@ button.upd-run:disabled { opacity: .6; cursor: default; }
 .touch .keys-wrap { display: none; } /* 전송·개행 키 세트: 터치 기기 입력칸은 Enter 줄바꿈 · ↑ 버튼 전송으로 고정이라 고를 것이 없다 */
 /* 누르기 쉬운 크기(44px 안팎) */
 .touch .detail-head .btn, .touch .decision .acts .btn { min-height: 38px; padding: 8px 14px; }
-.touch .socket-acts :is(.nlaunch, .nforget) { width: 48px; height: 34px; }
+.touch .socket-acts .nlaunch { width: 48px; height: 34px; }
 .touch .memo-ic { min-width: 34px; min-height: 32px; }
 .touch .queue .qi button { min-width: 34px; min-height: 32px; }
 .touch .sec-toggle { padding: 6px 0; }

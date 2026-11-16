@@ -1391,7 +1391,7 @@ function fmtAgo(t) {
 function socketTemplate() {
   return el(`
     <div class="node socket">
-      <div class="node-head"><span class="repo-sw" hidden></span><span class="nname" title="${_t('더블클릭해 이름 변경 · 칩을 끌어 순서 변경')}"></span><div class="socket-acts"><button class="btn primary nlaunch" data-act="launch" aria-label="${_t('투입')}"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M3 1.8v6.4L8.4 5z"/></svg></button><button class="btn ghost nforget" data-act="forget" title="${_t('저장된 역할 삭제')}" aria-label="${_t('저장된 역할 삭제')}"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2.6 2.6l4.8 4.8M7.4 2.6L2.6 7.4"/></svg></button></div><button class="node-more" data-act="more" aria-label="${_t('메뉴')}">⋯</button></div>
+      <div class="node-head"><span class="repo-sw" hidden></span><span class="nname" title="${_t('더블클릭해 이름 변경 · 칩을 끌어 순서 변경')}"></span><div class="socket-acts"><button class="btn primary nlaunch" data-act="launch" aria-label="${_t('투입')}"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M3 1.8v6.4L8.4 5z"/></svg></button></div><button class="node-more" data-act="more" aria-label="${_t('메뉴')}">⋯</button></div>
       <div class="stage"><div class="avatar">${clawdSVG()}</div><span class="pill">${_t('대기실')}</span></div>
     </div>`);
 }
@@ -3323,7 +3323,6 @@ $('#nodes').addEventListener('click', async (e) => {
     const p = state.profiles.find((x) => x.name === node.dataset.profile);
     if (!p) return;
     if (act === 'launch') launchProfile(p.name, e.shiftKey);
-    if (act === 'forget' && await ask({ title: _t('저장된 역할 삭제'), body: _t('"{name}" 역할을 목록에서 지울까요?', { name: p.name }), ok: _t('삭제'), danger: true })) api('/api/profiles/delete', { name: p.name });
     return;
   }
   // 이미 열린 카드를 다시 누르면 닫는다. 이름 더블클릭(이름 변경)의 첫 클릭에 닫히지 않게 잠깐 기다렸다가 —
