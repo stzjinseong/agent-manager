@@ -363,6 +363,9 @@ body.card-drag .node-add { opacity: .25; transition: opacity .2s; }
 .nid { font: 600 11px/1 var(--mono); color: var(--dim); letter-spacing: .06em; }
 .nname { flex: 1; min-width: 0; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pill { font-size: 11.5px; padding: 2px 9px; border-radius: 999px; color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); white-space: nowrap; }
+/* 카드의 상태 표시는 무대 위 가운데 — 머리 줄에 두면 긴 역할 이름이 잘렸다(머리 줄 = 상태 점 · 번호 · 이름 · ⋯ 만).
+   왼쪽 위 = 컨텍스트 경고, 오른쪽 위 = 짝 칩(🔗) */
+.stage > .pill { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 3; font-size: 11px; padding: 1px 8px; background: color-mix(in srgb, var(--c) 16%, var(--bg)); }
 
 /* 무대 */
 .stage {
