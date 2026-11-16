@@ -1375,8 +1375,8 @@ const ltrPath = (p) => (p ? `\u200E${p}` : '');
 function nodeTemplate() {
   return el(`
     <div class="node">
-      <div class="node-head"><span class="led"></span><span class="repo-sw" hidden></span><span class="nid"></span><span class="nname" title="${_t('더블클릭해 이름 변경 · 칩을 끌어 순서 변경')}"></span><span class="nlink" hidden></span><span class="pill"></span><button class="node-more" data-act="more" aria-label="${_t('메뉴')}">⋯</button></div>
-      <div class="stage"><div class="avatar">${clawdSVG()}</div><div class="fx"><span></span><span></span><span></span><span class="mark"></span></div></div>
+      <div class="node-head"><span class="led"></span><span class="repo-sw" hidden></span><span class="nid"></span><span class="nname" title="${_t('더블클릭해 이름 변경 · 칩을 끌어 순서 변경')}"></span><span class="pill"></span><button class="node-more" data-act="more" aria-label="${_t('메뉴')}">⋯</button></div>
+      <div class="stage"><div class="avatar">${clawdSVG()}</div><div class="fx"><span></span><span></span><span></span><span class="mark"></span></div><span class="nlink" hidden></span></div>
       <div class="meta"></div>
       <div class="path-row"><span class="branch" hidden></span><div class="path"></div></div>
     </div>`);
