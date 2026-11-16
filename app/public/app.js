@@ -1234,6 +1234,7 @@ function render() {
   renderStep("renderInbox", renderInbox);
   renderStep("renderFloor", renderFloor);
   renderStep("renderDock", renderDock);
+  renderStep("renderLinkModal", renderLinkModal);
   renderStep("renderDetail", renderDetail);
   renderStep("renderHint", renderHint);
   renderStep("mgrUpdate", mgrUpdate);
@@ -1378,7 +1379,7 @@ function nodeTemplate() {
       <div class="node-head"><span class="led"></span><span class="repo-sw" hidden></span><span class="nid"></span><span class="nname" title="${_t('더블클릭해 이름 변경 · 칩을 끌어 순서 변경')}"></span><button class="node-more" data-act="more" aria-label="${_t('메뉴')}">⋯</button></div>
       <div class="stage"><div class="avatar">${clawdSVG()}</div><div class="fx"><span></span><span></span><span></span><span class="mark"></span></div><span class="pill"></span><span class="nlink" hidden></span></div>
       <div class="meta"></div>
-      <div class="path-row"><span class="branch" hidden></span><div class="path"></div></div>
+      <div class="path-row"><span class="branch" hidden></span></div>
     </div>`);
 }
 
@@ -1498,8 +1499,7 @@ function updateNode(node, w) {
   const docKey = showDoc && `${showDoc.url}@${showDoc.t}`;
   if (showDoc && tile?.dataset.key !== docKey) { tile?.remove(); tile = el(docTile(showDoc)); tile.dataset.key = docKey; $('.stage', node).append(tile); }
   if (!showDoc && tile) tile.remove();
-  $('.path', node).textContent = ltrPath(w.cwd);
-  $('.path', node).title = w.cwd;
+  $('.path-row', node).title = w.cwd || ''; // 폴더 경로는 줄에 띄우지 않고(묶음 머리줄이 폴더를 보여 줌) 마우스를 올리면
   setBranch($('.branch', node), w.branch);
 }
 // 작업 폴더의 git 브랜치(서버가 .git/HEAD 를 읽음) — 브랜치가 아니면(분리된 HEAD) 커밋 앞자리. 저장소가 아니면 숨김
@@ -5236,25 +5236,64 @@ function renderLinkButton(w) {
   const hide = w.status === 'exited' && !ids.length;
   if (b.hidden !== hide) { b.hidden = hide; requestAnimationFrame(placeMeters); }
 }
-async function linkMenu(w) {
+// 연결 창 — 예약 창(schedule.js)과 같은 가운데 팝업. 열려 있는 동안 상태가 바뀌면 다시 그린다(render → renderLinkModal)
+var linkBack = el(`<div class="modal-back lk-back" hidden><div class="modal panel lk-modal" role="dialog" aria-modal="true" tabindex="-1">
+    <div class="gr-head"><div><h3 class="lk-title"></h3><small class="gr-sub lk-sub"></small></div><button class="btn ghost gr-x" data-lk="close">✕</button></div>
+    <ul class="lk-list"></ul>
+    <p class="gr-foot lk-foot"></p>
+  </div></div>`);
+document.body.append(linkBack);
+var linkFor = null; // 창을 연 워커 id (var: render 가 이 줄보다 먼저 돌 수 있어 — 그땐 linkBack 이 아직 undefined)
+const closeLinkModal = () => { linkBack.hidden = true; linkFor = null; };
+function linkMenu(w) {
   if (!w) return;
-  const linked = w.links || [];
-  const byId = (id) => state.workers.find((x) => x.id === id);
-  const free = state.workers.filter((x) => x.id !== w.id && x.status !== 'exited' && !linked.includes(x.id));
-  const items = [
-    ...linked.map((id) => ({ key: `go:${id}`, label: _t('→ {id} · {name} 로 가기', { id, name: byId(id)?.name || '' }) })),
-    ...free.map((x) => ({ key: `on:${x.id}`, label: `🔗 ${x.id} · ${x.name}${x.cwd ? ` · ${folderOf(x.cwd)}` : ''}` })),
-    ...linked.map((id) => ({ key: `off:${id}`, label: _t('{id} 연결 끊기', { id }), danger: true })),
-  ];
-  if (!items.length) return toast(_t('연결할 다른 워커가 없어요 — 워커를 하나 더 투입하세요'), 3000);
-  const key = await sheet(_t('{id} · {name} — 워커 연결', { id: w.id, name: w.name }), items);
-  if (!key) return;
-  const [op, id] = key.split(':');
-  if (op === 'go') return select(id);
-  const r = await api(`/api/workers/${w.id}/link`, { to: id, on: op === 'on' });
-  if (r.error) return toast(r.error, 3000);
-  toast(op === 'on' ? _t('{a} ⇄ {b} 연결됨 — 다음 메시지부터 서로를 알아요', { a: w.id, b: id }) : _t('{a} ⇄ {b} 연결 끊음', { a: w.id, b: id }), 3000);
+  linkFor = w.id;
+  renderLinkModal();
+  linkBack.hidden = false;
+  linkBack.firstElementChild.focus();
 }
+function renderLinkModal() {
+  if (!linkBack || !linkFor) return;
+  const w = state.workers.find((x) => x.id === linkFor);
+  if (!w) return closeLinkModal();
+  const linked = w.links || [];
+  // 연결된 워커가 먼저, 그다음 연결할 수 있는(살아 있는) 워커. 종료된 워커는 연결돼 있을 때만(끊을 수 있게)
+  const rows = state.workers.filter((x) => x.id !== w.id && (linked.includes(x.id) || x.status !== 'exited'))
+    .sort((a, b) => (linked.includes(b.id) - linked.includes(a.id)) || (a.id.slice(1) - b.id.slice(1)));
+  $('.lk-title', linkBack).textContent = _t('워커 연결');
+  $('.lk-sub', linkBack).textContent = `${w.id} · ${w.name}`;
+  const html = rows.length ? rows.map((x) => {
+    const on = linked.includes(x.id), st = viewStatus(x);
+    return `<li class="lk-row${on ? ' on' : ''}" style="--avatar:${avatarColor(x.name) || 'var(--accent)'}${on ? `;--pc:${linkColor(w.id)}` : ''}">
+      <span class="lk-av">${clawdSVG()}</span>
+      <span class="lk-main"><span class="lk-name"><b>${esc(x.id)}</b> ${esc(x.name)}</span><span class="lk-meta">${esc(folderOf(x.cwd))} · ${esc(statusLabel(st))}</span></span>
+      ${on ? `<button type="button" class="btn ghost lk-go" data-lk-go="${esc(x.id)}">${esc(_t('가기'))}</button><button type="button" class="btn lk-btn lk-off" data-lk-off="${esc(x.id)}" title="${esc(_t('눌러서 연결 끊기'))}">${LINK_SVG}<span class="lk-t-on">${esc(_t('연결됨'))}</span><span class="lk-t-off">${esc(_t('끊기'))}</span></button>`
+        : `<button type="button" class="btn lk-btn" data-lk-on="${esc(x.id)}"${x.status === 'exited' ? ' disabled' : ''}>${esc(_t('연결'))}</button>`}
+    </li>`;
+  }).join('') : `<li class="lk-empty">${esc(_t('연결할 다른 워커가 없어요 — 워커를 하나 더 투입하세요'))}</li>`;
+  const list = $('.lk-list', linkBack);
+  if (list._html !== html) {
+    const lost = list.contains(document.activeElement); // 누른 버튼이 다시 그려지며 사라진다 → 포커스를 창에 돌려 둔다
+    list.innerHTML = list._html = html;
+    if (lost && !linkBack.hidden) linkBack.firstElementChild.focus();
+  }
+  $('.lk-foot', linkBack).textContent = _t('연결한 워커끼리 일을 맡기고 결과를 돌려받아요. 연결은 다음 메시지부터 알려 주고, 사람 입력 없이 12번 오가면 멈춰요.');
+}
+linkBack.addEventListener('click', async (e) => {
+  if (e.target === linkBack || e.target.closest('[data-lk="close"]')) return closeLinkModal();
+  const go = e.target.closest('[data-lk-go]');
+  if (go) { closeLinkModal(); return select(go.dataset.lkGo); }
+  const b = e.target.closest('[data-lk-on], [data-lk-off]');
+  if (!b || !linkFor) return;
+  const on = 'lkOn' in b.dataset, id = on ? b.dataset.lkOn : b.dataset.lkOff;
+  b.disabled = true;
+  const r = await api(`/api/workers/${linkFor}/link`, { to: id, on });
+  b.disabled = false;
+  if (r.error) toast(r.error, 3000);
+});
+// Esc 는 문서 전체에서(캡처) — 연결/끊기를 누르면 목록을 다시 그려 누른 버튼이 사라지고 포커스가 창 밖(body)으로 빠져,
+// 창에 단 keydown 으로는 Esc 가 안 닫혔다(실측). 열려 있는 동안엔 채팅의 Esc(작업 중단)로 새지 않게 여기서 멈춘다
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !linkBack.hidden) { e.preventDefault(); e.stopPropagation(); closeLinkModal(); } }, true);
 $('#btn-link').onclick = () => linkMenu(state.workers.find((x) => x.id === selected));
 
 // 카드 위 연결 표시 — 회로선(drawTraces)이 이미 많아 선을 늘 그리면 어지럽다. 그래서 3단계로:

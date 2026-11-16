@@ -1509,6 +1509,26 @@ html[data-char="clawd-white"] :is(.node, .dchip, .term-wrap) { --avatar: var(--c
 .cv-u.cv-relay .cv-msg { background: color-mix(in srgb, var(--accent) 10%, var(--surface-2, var(--surface-3))); border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); }
 .cv-relay-from { display: inline-flex; align-items: center; gap: 4px; font: inherit; font-weight: 600; color: var(--accent-hi); background: none; border: 0; padding: 0; margin-right: 6px; cursor: pointer; }
 .cv-relay-from:hover { text-decoration: underline; }
+/* 워커 연결 창(app.js linkMenu) — 예약 창과 같은 가운데 팝업. 연결된 줄은 짝 색(--pc) 테두리 */
+.lk-modal { width: min(480px, calc(100% - 32px)); }
+.lk-modal .gr-head > div:first-child { flex: 1; min-width: 0; }
+.lk-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: min(52vh, 420px); overflow: auto; }
+.lk-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: rgb(var(--ink) / .03); }
+.lk-row.on { border-color: color-mix(in srgb, var(--pc) 55%, transparent); background: color-mix(in srgb, var(--pc) 8%, transparent); }
+.lk-av { flex: none; width: 34px; height: 20px; }
+.lk-av svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.lk-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.lk-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lk-name b { font: 600 11px/1 var(--mono); color: var(--dim); margin-right: 3px; }
+.lk-meta { font-size: 11.5px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lk-btn { flex: none; display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; }
+.lk-go { flex: none; padding: 5px 10px; }
+.lk-off { color: var(--pc); border-color: color-mix(in srgb, var(--pc) 55%, transparent); background: color-mix(in srgb, var(--pc) 14%, var(--surface-3)); }
+.lk-off .lk-t-off { display: none; }
+.lk-off:hover { color: #e0655a; border-color: color-mix(in srgb, #e0655a 55%, transparent); background: color-mix(in srgb, #e0655a 12%, var(--surface-3)); }
+.lk-off:hover .lk-t-on { display: none; }
+.lk-off:hover .lk-t-off { display: inline; }
+.lk-empty { color: var(--dim); padding: 16px 4px; text-align: center; font-size: 13px; }
 /* 짝 칩 — 무대 오른쪽 위(왼쪽 위 = 상태 · 아래 = 캡처 · 문서). 머리 줄에 두면 역할 이름이 밀려 안 보였다.
    이어진 워커 묶음마다 같은 색(--pc, app.js linkColor) */
 .nlink { position: absolute; right: 8px; top: 8px; z-index: 3; display: inline-flex; align-items: center; gap: 3px; padding: 0 6px 0 4px; border-radius: 999px; font-size: 10.5px; font-weight: 600; line-height: 16px; white-space: nowrap;
