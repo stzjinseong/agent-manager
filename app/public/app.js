@@ -1391,10 +1391,9 @@ function fmtAgo(t) {
 function socketTemplate() {
   return el(`
     <div class="node socket">
-      <div class="node-head"><span class="repo-sw" hidden></span><span class="nid">SLOT</span><span class="nname" title="${_t('더블클릭해 이름 변경 · 칩을 끌어 순서 변경')}"></span><button class="node-more" data-act="more" aria-label="${_t('메뉴')}">⋯</button></div>
+      <div class="node-head"><span class="repo-sw" hidden></span><span class="nid">SLOT</span><span class="nname" title="${_t('더블클릭해 이름 변경 · 칩을 끌어 순서 변경')}"></span><button class="btn primary nlaunch" data-act="launch" aria-label="${_t('투입')}"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M3 1.8v6.4L8.4 5z"/></svg></button><button class="btn ghost nforget" data-act="forget" title="${_t('저장된 역할 삭제')}" aria-label="${_t('저장된 역할 삭제')}">✕</button><button class="node-more" data-act="more" aria-label="${_t('메뉴')}">⋯</button></div>
       <div class="stage"><div class="avatar">${clawdSVG()}</div><span class="pill">${_t('대기실')}</span></div>
       <div class="path"></div>
-      <div class="socket-acts"><button class="btn primary" data-act="launch">${_t('▶ 투입')}</button><button class="btn ghost" data-act="forget" title="${_t('저장된 역할 삭제')}">✕</button></div>
     </div>`);
 }
 

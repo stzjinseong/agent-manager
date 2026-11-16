@@ -338,7 +338,7 @@ body.card-drag .node-add { opacity: .25; transition: opacity .2s; }
 /* ---------- 워커 칩 ---------- */
 .node {
   --c: var(--idle);
-  position: relative; display: flex; flex-direction: column; gap: 9px; padding: 14px 14px 12px;
+  position: relative; display: flex; flex-direction: column; gap: 6px; padding: 10px 12px 9px; /* 9 · 14/14/12 → 6 · 10/12/9 — 카드 높이 줄이기 */
   border-radius: var(--radius); cursor: pointer;
   background: linear-gradient(180deg, var(--surface-2), var(--surface));
   border: 1px solid var(--line-2);
@@ -442,8 +442,12 @@ body.card-drag .node-add { opacity: .25; transition: opacity .2s; }
 .node.socket { background: transparent; border: 1px dashed rgb(var(--ink) / .13); box-shadow: none; cursor: default; }
 .node.socket .stage { background: rgb(0 0 0 / calc(.15 * var(--shade))); }
 .node.socket .avatar { opacity: .22; filter: grayscale(1); }
-.socket-acts { display: flex; gap: 6px; }
-.socket-acts .btn.primary { flex: 1; }
+.node-add { min-height: 0; } /* 워커 카드 높이에 맞춰 늘어난다(그리드 줄 높이) — 고정 150px 이면 카드보다 커졌다 */
+/* 대기실 카드: ▶ 투입 · ✕ 를 머리 줄 오른쪽 끝에 작게(예전엔 카드 맨 아래 한 줄을 따로 썼다) */
+.node-head .nlaunch, .node-head .nforget { flex: none; display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border-radius: 50%; font-size: 12px; line-height: 1; }
+.node-head .nlaunch svg { width: 10px; height: 10px; fill: currentColor; margin-left: 1px; }
+.node-head .nforget { color: var(--dim); }
+.node-head .nforget:hover { color: var(--text); }
 
 /* ---------- 상세 ---------- */
 /* 가로로 아무리 늘려도 터미널이 과하게 길어지지 않게 상세 패널 폭 상한 */
@@ -2003,7 +2007,8 @@ button.upd-run:disabled { opacity: .6; cursor: default; }
 .touch #btn-pick { display: none; } /* 폴더 선택 창은 서버 PC 화면에 뜬다 */
 .touch .keys-wrap { display: none; } /* 전송·개행 키 세트: 터치 기기 입력칸은 Enter 줄바꿈 · ↑ 버튼 전송으로 고정이라 고를 것이 없다 */
 /* 누르기 쉬운 크기(44px 안팎) */
-.touch .detail-head .btn, .touch .decision .acts .btn, .touch .socket-acts .btn { min-height: 38px; padding: 8px 14px; }
+.touch .detail-head .btn, .touch .decision .acts .btn { min-height: 38px; padding: 8px 14px; }
+.touch .node-head :is(.nlaunch, .nforget) { width: 34px; height: 34px; }
 .touch .memo-ic { min-width: 34px; min-height: 32px; }
 .touch .queue .qi button { min-width: 34px; min-height: 32px; }
 .touch .sec-toggle { padding: 6px 0; }
