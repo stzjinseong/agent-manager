@@ -1649,6 +1649,7 @@ function layoutRepoGroups() {
     $('#btn-floor-add').hidden = fits;
   };
   if (!kids.some((k) => k.classList.contains('repo-head'))) {
+    repoBoxGroups = []; drawRepoBoxes();
     for (const k of kids) { k.style.gridRow = k.style.gridColumn = ''; k.style.removeProperty('--sk'); k.classList?.remove('stack-lo'); }
     const n = kids.filter((k) => k.classList.contains('node')).length;
     showAdd(n === 0 || n % cols !== 0);
@@ -1673,42 +1674,107 @@ function layoutRepoGroups() {
       else g.slots.push({ socket: c.classList.contains('socket'), cards: [c] });
     }
   }
-  const shelves = [];
+  // 줄(line) 채우기: 줄 하나 = 머리줄 칸(그리드 1줄) + 카드 줄(그리드 2줄). 카드가 열 수보다 많은 묶음도 넘어간
+  // 줄마다 머리줄 칸을 둬서, 그 묶음의 마지막 줄에 남은 칸에 다음 묶음(머리줄 + 카드)이 같은 높이로 들어온다 —
+  // 예전엔 넘친 묶음이 선반을 통째로 써서 마지막 줄 빈칸이 늘 비었다. 묶음 경계는 drawRepoBoxes 가 상자로 그린다.
+  // 묶음은 끊지 않는다: 남은 칸에 다 들어가는 묶음만 그 줄에(first-fit), 열 수보다 큰 묶음은 새 줄부터 여러 줄로
+  const lines = [];
   for (const g of groups) {
-    g.shown = g.slots.length;
-    g.w = Math.max(1, Math.min(g.shown, cols));
-    let sh = shelves.find((x) => x.used + g.w <= cols);
-    if (!sh) shelves.push(sh = { used: 0, deep: 0, groups: [] });
-    g.col = sh.used + 1;
-    sh.used += g.w;
-    sh.deep = Math.max(sh.deep, Math.ceil(g.shown / cols));
-    sh.groups.push(g);
-  }
-  let row = 1;
-  for (const sh of shelves) {
-    sh.row = row;
-    for (const g of sh.groups) {
-      g.head.style.gridRow = String(row);
-      g.head.style.gridColumn = `${g.col} / span ${g.w}`;
-      g.slots.forEach((slot, i) => {
-        const r = row + 1 + 2 * Math.floor(i / cols), col = String(g.col + (i % cols));
-        slot.cards.forEach((c, k) => {
-          c.style.gridRow = `${r} / span 2`;
-          c.style.gridColumn = col;
-          if (slot.socket) c.style.setProperty('--sk', k); else c.style.removeProperty('--sk');
-          c.classList.toggle('stack-lo', slot.socket && k > 0); // 칸 맨 위가 아닌 대기실 카드 — 회로선을 긋지 않는다
-        });
-      });
+    const n = Math.max(1, g.slots.length);
+    g.w = Math.min(n, cols);
+    if (n <= cols) {
+      let li = lines.findIndex((x) => x.used + n <= cols);
+      if (li < 0) { li = lines.length; lines.push({ used: 0 }); }
+      g.line = li; g.col = lines[li].used + 1; lines[li].used += n;
+    } else {
+      g.line = lines.length; g.col = 1;
+      for (let left = n; left > 0; left -= cols) lines.push({ used: Math.min(left, cols) });
     }
-    row += 1 + 2 * Math.max(1, sh.deep);
   }
-  // '워커 추가' 카드: 칸이 남는 첫 선반의 카드 줄 끝. 남는 칸이 없으면 카드 대신 도구 줄 버튼
-  const sh = shelves.find((x) => x.used < cols && x.deep <= 1);
-  showAdd(!!sh);
-  if (add && sh) {
-    add.style.gridRow = `${sh.row + 1} / span 2`;
-    add.style.gridColumn = String(sh.used + 1);
+  for (const g of groups) {
+    g.head.style.gridRow = String(1 + 3 * g.line);
+    g.head.style.gridColumn = `${g.col} / span ${g.w}`;
+    g.slots.forEach((slot, i) => {
+      const r = 2 + 3 * (g.line + Math.floor(i / cols)), col = String(g.col + (i % cols));
+      slot.cards.forEach((c, k) => {
+        c.style.gridRow = `${r} / span 2`;
+        c.style.gridColumn = col;
+        if (slot.socket) c.style.setProperty('--sk', k); else c.style.removeProperty('--sk');
+        c.classList.toggle('stack-lo', slot.socket && k > 0); // 칸 맨 위가 아닌 대기실 카드 — 회로선을 긋지 않는다
+      });
+    });
   }
+  repoBoxGroups = groups.map((g) => ({ head: g.head, cards: g.cards }));
+  // '워커 추가' 카드: 칸이 남는 첫 줄의 카드 줄 끝. 남는 칸이 없으면 카드 대신 도구 줄 버튼
+  const li = lines.findIndex((x) => x.used < cols);
+  showAdd(li >= 0);
+  if (add && li >= 0) {
+    add.style.gridRow = `${2 + 3 * li} / span 2`;
+    add.style.gridColumn = String(lines[li].used + 1);
+  }
+  drawRepoBoxes();
+}
+
+// repo 묶음 상자 — 머리줄 선이 오른쪽 끝에서 꺾여 내려와 그 묶음 카드를 감싼다. 줄을 넘친 묶음은 계단(ㄱ자) 모양.
+// 묶음을 감싸는 요소가 없어(카드는 #nodes 그리드의 직접 자식) CSS 테두리로는 못 그리고, 카드 자리(offset)를 읽어 SVG 로 긋는다.
+// 위쪽 변은 머리줄 가운데 높이 — 머리줄 이름 · + 버튼의 바닥색이 선을 가려 fieldset 제목처럼 보인다
+let repoBoxGroups = [], repoBoxSig = '';
+const REPO_BOX_PAD = 8, REPO_BOX_R = 8;
+function roundedPath(pts, r) {
+  // 닫힌 꺾은선의 꼭짓점을 반지름 r 로 둥글린다(변이 짧으면 그 절반까지만)
+  const n = pts.length;
+  let d = '';
+  for (let i = 0; i < n; i++) {
+    const [px, py] = pts[(i - 1 + n) % n], [x, y] = pts[i], [nx, ny] = pts[(i + 1) % n];
+    const l1 = Math.hypot(x - px, y - py), l2 = Math.hypot(nx - x, ny - y);
+    const k = Math.min(r, l1 / 2, l2 / 2);
+    const ax = x + ((px - x) / l1) * k, ay = y + ((py - y) / l1) * k;
+    const bx = x + ((nx - x) / l2) * k, by = y + ((ny - y) / l2) * k;
+    d += `${i ? 'L' : 'M'}${ax.toFixed(1)} ${ay.toFixed(1)}Q${x} ${y} ${bx.toFixed(1)} ${by.toFixed(1)}`;
+  }
+  return d + 'Z';
+}
+function drawRepoBoxes() {
+  const svg = $('#repo-boxes'), nodes = $('#nodes');
+  if (!svg) return;
+  if (!nodes.offsetParent || !repoBoxGroups.length) { if (repoBoxSig) { svg.innerHTML = ''; repoBoxSig = ''; } return; }
+  const fr = $('#floor').getBoundingClientRect(), nr = nodes.getBoundingClientRect();
+  const ox = nr.left - fr.left, oy = nr.top - fr.top, P = REPO_BOX_PAD;
+  const boxes = [];
+  for (const g of repoBoxGroups) {
+    if (!g.head.isConnected) continue;
+    const cards = g.cards.filter((c) => c.isConnected && c.offsetParent);
+    if (!cards.length) continue;
+    // 카드를 줄(같은 그리드 줄 시작)별로 모아 줄마다 오른쪽 끝 · 아래 끝을 잰다
+    const byRow = new Map();
+    for (const c of cards) {
+      const key = c.style.gridRow;
+      const top = c.offsetTop, row = byRow.get(key) || { top, right: -Infinity, bottom: -Infinity, left: Infinity };
+      row.top = Math.min(row.top, top);
+      row.left = Math.min(row.left, c.offsetLeft);
+      row.right = Math.max(row.right, c.offsetLeft + c.offsetWidth);
+      row.bottom = Math.max(row.bottom, top + c.offsetHeight);
+      byRow.set(key, row);
+    }
+    const rows = [...byRow.values()].sort((a, b) => a.top - b.top);
+    const L = Math.min(...rows.map((r) => r.left)) - P + ox;
+    const T = g.head.offsetTop + g.head.offsetHeight / 2 + oy;
+    const pts = [[L, T]];
+    let prevR = null;
+    rows.forEach((r, i) => {
+      const R = r.right + P + ox, B = r.bottom + P + oy;
+      if (prevR === null) pts.push([R, T]);
+      else if (R !== prevR) pts.push([prevR, rows[i - 1].bottom + P + oy], [R, rows[i - 1].bottom + P + oy]);
+      prevR = R;
+      if (i === rows.length - 1) pts.push([R, B], [L, B]);
+    });
+    const color = g.head.style.getPropertyValue('--repo') || 'var(--repo-0)';
+    boxes.push({ d: roundedPath(pts.map(([x, y]) => [Math.round(x), Math.round(y)]), REPO_BOX_R), color });
+  }
+  const sig = boxes.map((b) => b.d + b.color).join('|');
+  if (sig === repoBoxSig) return;
+  repoBoxSig = sig;
+  svg.innerHTML = boxes.map((b) => `<path d="${b.d}" style="stroke: color-mix(in srgb, ${b.color} 75%, transparent)"/>`).join('');
 }
 
 // ---------- 최소화한 회로 기판 (헤더 아래 한 줄) ----------
@@ -1904,6 +1970,7 @@ function electric(d) {
 let traceSig = '';
 function drawTraces() {
   scheduleSelLink();
+  drawRepoBoxes(); // 카드 높이가 바뀌면(작업 시작 · 끝으로 카드가 펼쳐지고 접힘) 상자 아래 변도 따라가게
   const floor = $('#floor');
   const fr = floor.getBoundingClientRect();
   // 매니저 = 흰 클로드 캐릭터. 선은 캐릭터 아래 가장자리에서 출발한다
@@ -1952,6 +2019,8 @@ function drawTraces() {
 
 // 폭이 바뀌면 그리드 열 수가 달라져 묶음 배치(layoutRepoGroups)도 다시 계산
 new ResizeObserver(() => requestAnimationFrame(() => { layoutRepoGroups(); drawTraces(); })).observe($('#floor'));
+// 카드 높이가 애니메이션으로 바뀌면 다 바뀐 뒤 묶음 상자를 다시 잰다 (같은 자리면 sig 로 건너뜀)
+$('#nodes').addEventListener('transitionend', () => requestAnimationFrame(drawRepoBoxes));
 
 // 선택한 워커 카드 → 아래 상세 패널(CLI 가 든 카드) 위쪽 가운데로 워커 색 연결선 — 어느 카드의 터미널을 보고 있는지 한눈에.
 // 카드 영역(#floor)과 상세 패널은 따로 놓인 형제라 #traces 에 못 그리고, 페이지 좌표의 오버레이(body 아래 #sel-link)에 그린다.
