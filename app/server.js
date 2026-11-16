@@ -19,6 +19,7 @@ import { createUserProfile } from './userprofile.js';
 import { createRoleStats } from './rolestats.js';
 import { createScheduler, cleanSchedule, nextRunOf } from './schedule.js';
 import * as directives from './directives.js';
+import * as links from './links.js';
 import { L } from './cli-lang.js';
 import { createUpdates } from './updates.js';
 import { gitBranch } from './branch.js';
@@ -1232,14 +1233,22 @@ function onHook(w, ev, res) {
       progress.open(w);
       roleStats.prompt(w, w.lastPrompt);
       setStatus(w, 'working', w.lastPrompt);
+      // 연결된 워커가 보낸 메시지가 아니면 사람(또는 예약)이 보낸 것 — 사람 없이 오간 횟수를 다시 센다 (links.js HOP_LIMIT)
+      if (!links.RELAY_RE.test(String(w.lastPrompt || '').trimStart())) links.resetHops(w.id);
       {
         // 작업 지시(directives.js) — 이 세션에 아직 안 넣었거나 바뀌었으면 이번 메시지에 붙인다
         const ctx = directives.takeContext(config.directives, w);
         if (ctx) {
           const names = config.directives.filter((d) => directives.appliesTo(d, w.name)).map((d) => d.title);
           pushLog(w, 'status', names.length ? `헤더 전달: ${names.join(' · ')}` : '헤더 해제 전달');
+        }
+        // 연결된 워커 안내(links.js) — 같은 방식으로 바뀌었을 때만
+        const lctx = links.takeContext(w, workers);
+        if (lctx) pushLog(w, 'status', w.links?.length ? `연결 안내 전달: ${w.links.join(' · ')}` : '연결 해제 전달');
+        const all = [ctx, lctx].filter(Boolean).join('\n\n');
+        if (all) {
           saveWorkersSoon();
-          return reply({ hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: ctx } });
+          return reply({ hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: all } });
         }
       }
       break;
@@ -1510,7 +1519,7 @@ function resolveDecision(did, decision) {
 const BOOT_ID = Date.now().toString(36);
 const chatGenOf = (tx) => (tx?.chat ? `${path.basename(tx.path, '.jsonl')}:${BOOT_ID}.${tx.chatGen}` : null);
 function workerView(w, full) {
-  const { term, tx, approvalWaits, pot, lastPrompt, lastMessage, todos, notice, currentTool, subTool, ptySize, sentPrompt, seedAt, bootInputAt, dirSent, cacheJudged, modelAt, liteCache, ...rest } = w;
+  const { term, tx, approvalWaits, pot, lastPrompt, lastMessage, todos, notice, currentTool, subTool, ptySize, sentPrompt, seedAt, bootInputAt, dirSent, linkSent, cacheJudged, modelAt, liteCache, ...rest } = w;
   // chatRev: 채팅 보기가 바뀐 것을 알아채는 표시(내용은 열 때 /chat 으로 가져간다)
   const base = { ...rest, branch: branchOf.get(w.cwd) || null, dirPending: directives.pending(config.directives, w), chatRev: chatGenOf(tx) && `${chatGenOf(tx)}#${tx.chatRev}` };
   // ask: 결정 대기 중인 권한 요청·질문 문구 — 채팅 보기의 권한 카드에 쓴다
@@ -2173,6 +2182,7 @@ function forgetWorker(w) {
     w.queue = [];
     saveConfig(); // emitState 포함
   }
+  for (const id of w.links || []) { const x = workers.get(id); if (x) links.unlink(w, x); }
   hostSend({ op: 'forget', id: w.id });
   workers.delete(w.id);
   fs.rmSync(path.join(SHOT_DIR, w.id), { recursive: true, force: true });
@@ -2700,6 +2710,51 @@ const server = http.createServer(async (req, res) => {
     try { ok = !!d && fs.statSync(d.path).isFile(); } catch {}
     if (!ok) return json(res, 404, { error: '문서가 없습니다 (지워졌거나 옮겨짐)' });
     return json(res, 200, { ok: openPath(d.path) });
+  }
+  // 워커 연결(🔗) 켜기 · 끄기 — 화면에서 사람만 만든다. 양쪽에 같이 걸린다 (links.js)
+  if (req.method === 'POST' && (m = p.match(/^\/api\/workers\/(W\d+)\/link$/))) {
+    const a = workers.get(m[1]);
+    const body = await readBody(req);
+    const b = workers.get(String(body.to || ''));
+    if (!a || !b || a === b) return json(res, 404, { error: 'no worker' });
+    if (body.on) links.link(a, b); else links.unlink(a, b);
+    const verb = body.on ? '연결' : '연결 끊음';
+    pushLog(a, 'status', `🔗 ${b.id}(${b.name}) ${verb}`); pushLog(b, 'status', `🔗 ${a.id}(${a.name}) ${verb}`);
+    emitState();
+    return json(res, 200, { ok: true });
+  }
+  // 연결된 워커끼리 메시지 중계 — 워커 안의 send.mjs 가 토큰을 달고 부른다. 연결된 쌍만 · 사람 없이 HOP_LIMIT 번까지
+  if (req.method === 'POST' && p === '/api/relay') {
+    const body = await readBody(req);
+    const a = workers.get(String(body.from || '')), b = workers.get(String(body.to || ''));
+    let text = String(body.text || '').trim();
+    if (!a || !b) return json(res, 404, { error: `워커 ${!a ? body.from : body.to} 가 없습니다` });
+    if (!(a.links || []).includes(b.id)) return json(res, 403, { error: `${a.id} 와 ${b.id} 는 연결돼 있지 않습니다 — 클로드 키우기 화면의 🔗 로 사람이 연결해야 합니다` });
+    if (b.status === 'exited') return json(res, 409, { error: `${b.id} 는 종료된 워커입니다` });
+    if (!text) return json(res, 400, { error: '내용이 비었습니다' });
+    if (links.hopOf(a.id, b.id) >= links.HOP_LIMIT) {
+      pushLog(a, 'notice', `🔗 ${b.id} 와 사람 없이 ${links.HOP_LIMIT}번 오가 멈췄습니다 — 이어 가려면 직접 지시하세요`);
+      emitState();
+      return json(res, 429, { error: `사람 입력 없이 ${links.HOP_LIMIT}번 오가 멈췄습니다. 사용자에게 알리고 지시를 기다리세요` });
+    }
+    // 긴 글은 파일로 — 상대 컨텍스트에는 앞부분과 경로만
+    if (text.length > links.INLINE_MAX) {
+      const dir = path.join(DATA_DIR, 'relay');
+      fs.mkdirSync(dir, { recursive: true });
+      const file = path.join(dir, `${new Date().toISOString().replace(/\D/g, '').slice(0, 14)}-${a.id}-${b.id}.md`);
+      fs.writeFileSync(file, text);
+      text = `${text.slice(0, 600)}\n…(전체 ${text.length}자 — 나머지는 파일: ${file.replace(/\\/g, '/')})`;
+    }
+    const wasIdle = isIdle(b); // 보내고 나면 '작업 중'으로 바뀌므로 먼저 본다
+    const r = await assignTask(b, `${links.relayHead(a.id, b.id)} ${text}`);
+    if (r.rejected) {
+      const why = { starting: '아직 시작 중', draft: '상대 CLI 입력창에 사람이 쓰던 글이 있음', blocked: '상대 화면이 입력창이 아님(선택창 등)' }[r.rejected] || r.rejected;
+      return json(res, 409, { error: `${b.id} 에 넣지 못했습니다 (${why}) — 잠시 뒤 다시 보내세요` });
+    }
+    const n = links.bumpHop(a.id, b.id);
+    pushLog(a, 'status', `🔗 → ${b.id}: ${text}`);
+    emitState();
+    return json(res, 200, { ok: true, note: `${b.id}(${b.name}) 에게 보냈습니다${wasIdle ? '' : ' — 상대가 작업 중이라 지금 일이 끝나면 들어갑니다'} (사람 없이 ${n}/${links.HOP_LIMIT})` });
   }
   if (req.method === 'POST' && (m = p.match(/^\/api\/workers\/(W\d+)\/(task|kill|remove|interrupt|unqueue|tomemo|resume|autoqueue|rename|diffclear|attclear|btw-close)$/))) {
     const w = workers.get(m[1]);

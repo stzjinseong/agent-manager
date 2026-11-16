@@ -1500,6 +1500,16 @@ html[data-char="clawd-white"] :is(.node, .dchip, .term-wrap) { --avatar: var(--c
 }
 .d-add { color: var(--d-add); }
 .d-del { color: var(--d-del); }
+/* 워커 연결(🔗) 버튼 — 연결이 있으면 상대 번호를 붙이고 강조색 */
+.btn-link { display: inline-flex; align-items: center; gap: 5px; padding: 6px 9px; }
+.btn-link[hidden] { display: none; }
+.link-ic { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; flex: none; }
+.btn-link b { font-weight: 600; color: var(--accent-hi); }
+.btn-link.on { background: color-mix(in srgb, var(--accent) 14%, var(--surface-3)); border-color: color-mix(in srgb, var(--accent) 55%, transparent); color: var(--accent-hi); }
+/* 연결된 워커가 보낸 메시지 — 내 요청 자리(오른쪽)에 강조색 테두리로 갈라 보인다. 머리의 '보낸 워커'를 누르면 그 워커로 */
+.cv-u.cv-relay .cv-msg { background: color-mix(in srgb, var(--accent) 10%, var(--surface-2, var(--surface-3))); border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); }
+.cv-relay-from { display: inline-flex; align-items: center; gap: 4px; font: inherit; font-weight: 600; color: var(--accent-hi); background: none; border: 0; padding: 0; margin-right: 6px; cursor: pointer; }
+.cv-relay-from:hover { text-decoration: underline; }
 .btn-diff b { font-weight: 600; margin-left: 2px; color: var(--accent-hi); }
 .btn-diff.none { opacity: .55; }
 /* diff 를 보고 있을 때: 강조색으로 켜진 버튼 — 다시 누르면 터미널로 */

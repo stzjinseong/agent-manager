@@ -1020,7 +1020,7 @@ function placeMeters() {
   if (!t.width) return;
   // 좁은 화면에서 옆 패널이 터미널 아래로 내려가면 터미널이 전체 폭이라 오른쪽 버튼과 겹친다 → 버튼 왼쪽까지만
   // 기준은 버튼 묶음의 맨 왼쪽(diff) — 영어처럼 버튼 글자가 길면 diff 가 터미널 오른쪽 끝보다 왼쪽까지 온다
-  const btn = $('#btn-diff').getBoundingClientRect();
+  const btn = ($('#btn-link').hidden ? $('#btn-diff') : $('#btn-link')).getBoundingClientRect();
   const right = Math.min(t.right, btn.left - 14);
   box.style.setProperty('--mt-right', `${Math.max(0, h.right - right)}px`);
   box.style.setProperty('--mt-top', `${n.top - h.top}px`);
@@ -2092,6 +2092,7 @@ function renderDetail() {
   if (profileWid === w.id) renderProfile(w);
   else { profileWid = w.id; afterFrame('profile', () => setTimeout(() => { const cur = state.workers.find((x) => x.id === selected); if (cur) renderProfile(cur); }, 0)); }
   renderDiffButton(w);
+  renderLinkButton(w);
   syncChat(w);
   // 접은 영역 제목줄에 건수를 보여 준다 (펼쳐 있으면 안에 보이므로 비움)
   const memoN = (state.memos?.[w.name] || []).length;
@@ -5224,11 +5225,51 @@ function chatAtt(x) {
   const tiles = attachChips(`${x.text} ${(x.files || []).join(' ')}`, 'sm');
   return tiles || (x.img ? `<div class="cv-sys">🖼 ${_t('이미지 {n}개', { n: x.img })}</div>` : '');
 }
+// ---------- 워커 연결(🔗) — 서버 links.js ----------
+// 연결한 두 워커는 서로에게 일을 보내고 결과를 돌려받는다(워커 안의 send.mjs → 서버 중계). 연결은 여기서 사람만 만든다
+const RELAY_RE = /^\[(W\d+) → (W\d+)\]\s*/; // 서버 links.relayHead 와 같은 머리
+const LINK_SVG = '<svg class="link-ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M6.8 9.2a2.6 2.6 0 0 0 3.7 0l2.3-2.3a2.6 2.6 0 0 0-3.7-3.7l-.8.8M9.2 6.8a2.6 2.6 0 0 0-3.7 0L3.2 9.1a2.6 2.6 0 0 0 3.7 3.7l.8-.8"/></svg>';
+const folderOf = (p) => String(p || '').split(/[\\/]/).filter(Boolean).pop() || '';
+function renderLinkButton(w) {
+  const b = $('#btn-link'), ids = w.links || [];
+  const html = `${LINK_SVG}${ids.length ? `<b>${ids.map(esc).join(' ')}</b>` : ''}`;
+  if (b._html !== html) { b.innerHTML = b._html = html; requestAnimationFrame(placeMeters); }
+  b.classList.toggle('on', ids.length > 0);
+  const hide = w.status === 'exited' && !ids.length;
+  if (b.hidden !== hide) { b.hidden = hide; requestAnimationFrame(placeMeters); }
+}
+async function linkMenu(w) {
+  if (!w) return;
+  const linked = w.links || [];
+  const byId = (id) => state.workers.find((x) => x.id === id);
+  const free = state.workers.filter((x) => x.id !== w.id && x.status !== 'exited' && !linked.includes(x.id));
+  const items = [
+    ...linked.map((id) => ({ key: `go:${id}`, label: _t('→ {id} · {name} 로 가기', { id, name: byId(id)?.name || '' }) })),
+    ...free.map((x) => ({ key: `on:${x.id}`, label: `🔗 ${x.id} · ${x.name}${x.cwd ? ` · ${folderOf(x.cwd)}` : ''}` })),
+    ...linked.map((id) => ({ key: `off:${id}`, label: _t('{id} 연결 끊기', { id }), danger: true })),
+  ];
+  if (!items.length) return toast(_t('연결할 다른 워커가 없어요 — 워커를 하나 더 투입하세요'), 3000);
+  const key = await sheet(_t('{id} · {name} — 워커 연결', { id: w.id, name: w.name }), items);
+  if (!key) return;
+  const [op, id] = key.split(':');
+  if (op === 'go') return select(id);
+  const r = await api(`/api/workers/${w.id}/link`, { to: id, on: op === 'on' });
+  if (r.error) return toast(r.error, 3000);
+  toast(op === 'on' ? _t('{a} ⇄ {b} 연결됨 — 다음 메시지부터 서로를 알아요', { a: w.id, b: id }) : _t('{a} ⇄ {b} 연결 끊음', { a: w.id, b: id }), 3000);
+}
+$('#btn-link').onclick = () => linkMenu(state.workers.find((x) => x.id === selected));
+document.addEventListener('click', (e) => {
+  const g = e.target.closest('[data-goto-worker]');
+  if (g && state.workers.some((x) => x.id === g.dataset.gotoWorker)) select(g.dataset.gotoWorker);
+});
+
 function chatItemHtml(x) {
   const k = `${chatData.gen}|${x.seq}:${x.rev}`; // 워커·세션마다 seq 가 겹치므로 세대(gen)까지
   if (chatHtml.has(k)) return chatHtml.get(k);
   let h = '';
-  if (x.k === 'u') h = `<div class="cv-ev cv-u"><div class="cv-lab"><b>${_t('나')}</b>${chatTime(x.ts)}</div><div class="cv-msg">${esc(x.text)}${chatAtt(x)}</div></div>`;
+  const relay = x.k === 'u' && RELAY_RE.exec(x.text || '');
+  if (relay) h = `<div class="cv-ev cv-u cv-relay"><div class="cv-lab"><button type="button" class="cv-relay-from" data-goto-worker="${esc(relay[1])}" title="${esc(_t('{id} 로 가기', { id: relay[1] }))}">${LINK_SVG}${esc(_t('{id} 에게서', { id: relay[1] }))}</button>${chatTime(x.ts)}</div><div class="cv-msg">${esc(x.text.slice(relay[0].length).trim())}${chatAtt(x)}</div></div>`;
+  else if (x.k === 'u') h = `<div class="cv-ev cv-u"><div class="cv-lab"><b>${_t('나')}</b>${chatTime(x.ts)}</div><div class="cv-msg">${esc(x.text)}${chatAtt(x)}</div></div>`;
   else if (x.k === 'a') h = chatMd(x.text);
   else if (x.k === 'n') h = `<div class="cv-ev cv-n"><span class="cv-dot"></span><div class="cv-sys">${esc(x.text)}</div></div>`;
   else if (x.k === 'x') h = `<div class="cv-ev cv-n"><span class="cv-dot"></span><div class="cv-sys">${_t('사용자가 중단함')} · ${chatTime(x.ts)}</div></div>`;
@@ -6793,6 +6834,7 @@ async function cardMenu(n) {
     w && ['working', 'decision'].includes(w.status) && { key: 'stop', label: _t('⏸ 중단') },
     w && w.status !== 'exited' && { key: 'end', label: _t('⏹ 세션만 종료') },
     { key: 'rename', label: _t('이름 바꾸기') },
+    w && w.status !== 'exited' && { key: 'link', label: w.links?.length ? _t('🔗 워커 연결 ({ids})…', { ids: w.links.join(' · ') }) : _t('🔗 워커 연결…') },
     { key: 'prev', label: _t('← 앞으로 옮기기'), disabled: i <= 0 },
     { key: 'next', label: _t('뒤로 옮기기 →'), disabled: i < 0 || i >= order.length - 1 },
     { key: 'remove', label: _t(socket ? '저장된 역할 삭제' : '제거'), danger: true },
@@ -6802,6 +6844,7 @@ async function cardMenu(n) {
   if (key === 'prev' || key === 'next') moveCard(name, key === 'prev' ? -1 : 1);
   if (key === 'remove') removeCard(n);
   if (key === 'end') endSession(n);
+  if (key === 'link') linkMenu(w);
   if (key === 'rename') {
     const to = await ask({ title: _t('이름 바꾸기'), ok: _t('저장'), input: name });
     if (!to || to === name) return;
