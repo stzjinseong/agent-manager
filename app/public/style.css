@@ -225,25 +225,6 @@ main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24p
 .core-dot.busy .core-mark { animation: core-glow 2.2s ease-in-out infinite, bob .36s steps(2, jump-none) infinite alternate; }
 .core-dot.busy .clawd .legs-a { animation: legA .36s steps(1) infinite; }
 .core-dot.busy .clawd .legs-b { animation: legB .36s steps(1) infinite; }
-/* 산책(app.js roamSync): 작업 중 워커가 없으면 화면을 걸어 다닌다. 떠 있는 동안 다른 요소 위로, 클릭은 통과 */
-.core-dot.roam { z-index: 45; pointer-events: none; opacity: .8; transition: opacity .3s; } /* 돌아다니며 가리는 것이 비쳐 보이게 */
-/* 산책 중 제자리에 남는 그림자(app.js roamGhost) — .core-dot 과 같은 여백 · 크기로 겹쳐 둔다 */
-.mgr-ghost { position: absolute; left: 50%; top: 0; translate: -50% 0; padding: 6px 10px 2px; pointer-events: none; opacity: 0; transition: opacity .35s; }
-.mgr-ghost svg { width: 84px; height: 47px; display: block; overflow: visible; filter: brightness(0); opacity: .45; }
-.mgr-ghost svg * { animation: none !important; }
-.mgr-ghost::after { content: ""; position: absolute; left: 50%; bottom: -2px; width: 64px; height: 8px; translate: -50% 0; border-radius: 50%; background: radial-gradient(closest-side, rgb(0 0 0 / .45), transparent); }
-:root[data-theme="light"] .mgr-ghost svg { opacity: .18; }
-.core:has(> .core-dot.roam) > .mgr-ghost { opacity: 1; }
-.core-dot.walking .core-mark { animation: bob .36s steps(2, jump-none) infinite alternate; }
-.core-dot.walking .clawd .legs-a { animation: legA .36s steps(1) infinite; }
-.core-dot.walking .clawd .legs-b { animation: legB .36s steps(1) infinite; }
-.core-dot.face-l .core-mark svg { scale: -1 1; }
-.core-dot.jumping .core-mark svg { rotate: -8deg; } /* 뛰는 중: 살짝 몸을 젖힌다 */
-.core-dot.land .core-mark { animation: mgr-land .26s ease-out; transform-origin: 50% 100%; } /* 내려앉을 때 납작했다 펴짐 */
-@keyframes mgr-land { 0% { transform: scale(1.12, .82); } 60% { transform: scale(.96, 1.05); } 100% { transform: none; } }
-/* 제자리로 순간이동(app.js roamTeleport): 빛 고리 + 반짝이 */
-.mgr-tp-ring { position: fixed; z-index: 46; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .85); box-shadow: 0 0 14px rgba(255, 255, 255, .6), inset 0 0 10px rgba(255, 255, 255, .4); pointer-events: none; }
-.mgr-tp-spark { position: fixed; z-index: 46; width: 4px; height: 4px; margin: -2px 0 0 -2px; background: #fff; box-shadow: 0 0 6px #fff; pointer-events: none; }
 @keyframes core-glow {
   0%, 100% { filter: drop-shadow(0 0 5px rgba(255, 255, 255, .55)) drop-shadow(0 0 18px rgba(255, 255, 255, .25)); }
   50% { filter: drop-shadow(0 0 9px rgba(255, 255, 255, .9)) drop-shadow(0 0 32px rgba(255, 255, 255, .45)); }
