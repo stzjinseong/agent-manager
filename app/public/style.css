@@ -182,7 +182,7 @@ main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24p
 .dock-traces path { stroke: rgb(var(--ink) / .16); }
 .dock-traces path { stroke-width: 1.5; stroke-linejoin: round; } /* 차선 간격이 좁아(최대 5px) 선을 가늘게 */
 /* 작업 중: Claude 코랄 전류 */
-.traces .t-working path.base { stroke: color-mix(in srgb, var(--accent) 38%, transparent); animation: hum 2.2s ease-in-out infinite; }
+.traces .t-working path.base { stroke: color-mix(in srgb, var(--accent) 60%, transparent); opacity: .63; animation: hum 2.2s ease-in-out infinite; } /* 색 대신 투명도로 같은 진하기 변화(38% ↔ 60%) */
 .traces .t-working path.flow { stroke: color-mix(in srgb, var(--accent-hi) 70%, #fff); opacity: .55; stroke-width: 1.5; stroke-dasharray: 2 9; animation: flow .5s linear infinite; }
 .traces path.bolt { fill: none; stroke: #ffb08f; stroke-width: 2.6; stroke-linecap: round; stroke-dasharray: 9 91; animation: bolt 1.6s cubic-bezier(.5, 0, .5, 1) infinite, flicker .12s steps(2) infinite; }
 .traces path.bolt.b2 { stroke-dasharray: 4 96; stroke-width: 2; animation-delay: -.8s, -.05s; }
@@ -190,7 +190,7 @@ main, .new-panel, #inbox, .floor, .detail { margin-left: 24px; margin-right: 24p
    선을 다시 그릴 때마다 그 한 프레임이 흰 점으로 번쩍여서, 처음 0.06초는 투명하게 시작한다 */
 @keyframes bolt { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
 @keyframes flicker { 50% { opacity: .7; } }
-@keyframes hum { 50% { stroke: color-mix(in srgb, var(--accent) 60%, transparent); } }
+@keyframes hum { 50% { opacity: 1; } }
 .traces .t-decision path.base { stroke: color-mix(in srgb, var(--decision) 45%, transparent); }
 .traces .t-decision path.flow { stroke: var(--decision); opacity: 1; animation: flow 1.2s linear infinite reverse; }
 .traces .t-done path.base { stroke: color-mix(in srgb, var(--done) 35%, transparent); }
@@ -349,11 +349,17 @@ body.card-drag .node-add { opacity: .25; transition: opacity .2s; }
 @keyframes led { 50% { opacity: .35; } }
 /* 워커 카드엔 상태 점(LED)을 두지 않는다 — 상태 태그가 같은 색 · 같은 깜빡임을 맡는다(점과 태그가 같은 말을 두 번 했다).
    글자째 흐려지면 읽기 어려워 태그 면 · 테두리 빛만 맥동 */
-.node:is(.s-working, .s-decision) .stage > .pill { animation: pill-pulse 1s ease-in-out infinite; }
-.node.s-waiting .stage > .pill { animation: pill-pulse 1.6s ease-in-out infinite; }
-@keyframes pill-pulse {
-  50% { background: color-mix(in srgb, var(--c) 34%, var(--bg)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--c) 55%, transparent), 0 0 10px color-mix(in srgb, var(--c) 45%, transparent); }
+.node:is(.s-working, .s-decision, .s-waiting) .stage > .pill { isolation: isolate; }
+/* 맥동은 태그 뒤에 겹친 빛 층(::after)의 투명도만 바꾼다 — 예전엔 배경 · 그림자 자체를 움직여 매 프레임 스타일 계산 · 다시 그리기가 돌았다.
+   투명도 애니메이션은 브라우저 합성 단계에서 처리돼 그 비용이 없다. 보이는 모습(50% 지점의 진한 면 · 테두리 빛)은 같다 */
+.node:is(.s-working, .s-decision, .s-waiting) .stage > .pill::after {
+  content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; opacity: 0; will-change: opacity;
+  background: color-mix(in srgb, var(--c) 34%, var(--bg));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--c) 55%, transparent), 0 0 10px color-mix(in srgb, var(--c) 45%, transparent);
+  animation: pill-pulse 1s ease-in-out infinite;
 }
+.node.s-waiting .stage > .pill::after { animation-duration: 1.6s; }
+@keyframes pill-pulse { 50% { opacity: 1; } }
 .nid { font: 600 11px/1 var(--mono); color: var(--dim); letter-spacing: .06em; }
 .nname { flex: 1; min-width: 0; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pill { font-size: 11.5px; padding: 2px 9px; border-radius: 999px; color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); white-space: nowrap; }
@@ -510,7 +516,7 @@ body.card-drag .node-add { opacity: .25; transition: opacity .2s; }
 .mt-bar i.on { background: var(--uc); box-shadow: 0 0 4px color-mix(in srgb, var(--uc) 60%, transparent); }
 /* 물결: 채운 칸이 왼쪽부터 차례로 살짝 밝아지며 튀어 오른다(1.8초 주기 · 칸마다 90ms 늦게). 움직임 줄이기면 멈춤 */
 .mt-bar i.on { animation: mt-wave 1.8s ease-in-out infinite; animation-delay: calc(var(--k) * 90ms); }
-@keyframes mt-wave { 0%, 60%, 100% { filter: none; transform: none; } 25% { filter: brightness(1.55); transform: scaleY(1.35); } }
+@keyframes mt-wave { 0%, 60%, 100% { transform: none; } 25% { transform: scaleY(1.35); } } /* filter(밝기)는 매 프레임 다시 그려 뺐다 — 크기 출렁임만 */
 @media (prefers-reduced-motion: reduce) { .mt-bar i.on { animation: none; } }
 /* 항목별 고정 색(사용률에 따라 바꾸지 않는다): 컨텍스트 파랑 · 5시간 주황빛 노랑 · 주간 빨강 */
 :root { --m-ctx: #8cb8ff; --m-5h: #f4b34a; --m-wk: #ff9a8f; }
@@ -2988,3 +2994,13 @@ body.term-full #detail.chat-mode { --full-side-w: 0px; }
 /* 채팅 뷰는 .term-stage 만 덮는다 — 높이를 줄이면 xterm 이 줄 수를 다시 맞추기 전(60ms 디바운스 · 행 높이 반올림)까지 아래로 넘쳐
    .term-wrap 아래 여백 8px 에 터미널 줄이 비쳤다. 채팅 중엔 넘친 부분을 자른다 */
 .term-wrap.chatting .term-stage { overflow: hidden; }
+
+/* ---------- 성능: 매니저 · 작업 중 워커 카드의 무한 애니메이션 끔 ----------
+   가만히 띄워 둬도 매 프레임 레이아웃이 다시 돌던 주원인(실측 headless 크롬: 레이아웃 초당 75회 → 6회, CPU 38% → 26%).
+   SVG 안쪽 요소(눈 · 다리 · 망토 · 별)의 transform/opacity 와 filter 빛남은 합성 단계로 못 넘겨 매 프레임 다시 계산된다.
+   상태 태그 맥동(작업 중 표시)과 회로 선 전류는 남긴다 */
+.core-dot .clawd .eye, .brand-mark .clawd .eye, .s-working .clawd .eye,
+.core-dot .core-mark, .brand-mark.mgr-on svg, .core-dot .clawd :is(.legs-a, .legs-b), .brand-mark .clawd :is(.legs-a, .legs-b),
+:is(.core-dot, .brand-mark) :is(.acc-cape, .acc-halo), .mgr .star, .core-dot.sleepy::after,
+.s-working .avatar, .s-working .clawd :is(.legs-a, .legs-b), .s-working .fx span, .s-working .led,
+.dchip.s-working .avatar { animation: none !important; }
