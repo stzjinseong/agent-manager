@@ -883,13 +883,16 @@ function holdForDraft(w, state, note = '') {
 //   draft   — 사람이 쓰던 글이 있음(text)
 //   blocked — 화면 맨 아래에 ❯ 입력창이 없음: /resume·/model 같은 선택창, ! 셸 모드 등
 // 비어 있을 때 보이는 안내 문구(Try "…")는 흐린 색이라 빼고, 기본 글자색 칸만 센다
+// 서버 내부 확인(입력창·/btw 화면)은 보이는 화면만 쓰므로 기록(scrollback) 없이 직렬화해 받는다 — 1~4초마다 도는 폴링이라
+// 기록 1만 줄을 매번 직렬화·재해석하던 비용이 컸다(실측: 워커 화면 77~258KB · 15~39ms → 4.7~9.5KB · 1~7ms, 읽은 화면은 동일).
+// 옛 호스트(버전 3)는 이 값을 무시하고 전체를 보낸다 — 결과는 같다
 function hostSnapshot(id, ms = 1500) {
   return new Promise((resolve) => {
     if (host?.readyState !== 1) return resolve(null);
     const req = ++snapSeq;
     const timer = setTimeout(() => { snapWaiters.delete(req); resolve(null); }, ms);
     snapWaiters.set(req, (msg) => { clearTimeout(timer); resolve(msg); });
-    hostSend({ op: 'snapshot', id, req });
+    hostSend({ op: 'snapshot', id, req, scrollback: 0 });
   });
 }
 // 입력창 아래에는 상태 줄 몇 줄(권한 모드, statusLine)만 온다. 그보다 위에 있는 가로선 쌍은 지난 화면의 흔적으로 본다

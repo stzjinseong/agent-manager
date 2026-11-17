@@ -5,7 +5,7 @@
 // 프로토콜 (ws://127.0.0.1:7787, JSON 한 줄씩)
 //   → { op: 'spawn', id, file, args, cwd, env, cols, rows }   ← 이미 있는 id 면 무시
 //   → { op: 'write', id, data } / { op: 'resize', id, cols, rows } / { op: 'kill', id } / { op: 'forget', id }
-//   → { op: 'snapshot', id, req }   현재 화면 상태 요청
+//   → { op: 'snapshot', id, req, scrollback? }   현재 화면 상태 요청 (scrollback: 담을 기록 줄 수, 0 이면 보이는 화면만)
 //   → { op: 'shutdown' }   모든 워커 종료 후 호스트 종료
 //   ← { ev: 'hello', version, ptys: [{ id, pid, exited, exitCode }] }   접속 직후
 //   ← { ev: 'snapshot', id, req, data }
@@ -113,7 +113,7 @@ function handle(msg) {
       // 아직 해석 대기 중인 출력까지 반영한 뒤 직렬화
       p.screen.write('', () => {
         if (!p.screen) { sendFinal(p, msg.req); return; }
-        broadcast({ ev: 'snapshot', id: p.id, req: msg.req, cols: p.screen.cols, rows: p.screen.rows, data: p.serializer.serialize({ scrollback: SCROLLBACK }) });
+        broadcast({ ev: 'snapshot', id: p.id, req: msg.req, cols: p.screen.cols, rows: p.screen.rows, data: p.serializer.serialize({ scrollback: Number.isInteger(msg.scrollback) ? Math.min(msg.scrollback, SCROLLBACK) : SCROLLBACK }) });
       });
       break;
     // /clear 뒤 이전 대화 기록(스크롤백)만 지운다. Windows 에선 Claude 의 화면 지우기(ED3)가 ConPTY 를 거치며 사라져
