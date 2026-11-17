@@ -3005,8 +3005,13 @@ body.term-full #detail.chat-mode { --full-side-w: 0px; }
 .s-working .avatar, .s-working .clawd :is(.legs-a, .legs-b), .s-working .fx span, .s-working .led,
 .dchip.s-working .avatar { animation: none !important; }
 
-/* 매니저 idle — 아주 느린 숨쉬기(2px 오르내림). HTML 요소(.core-mark)의 transform 만 움직여 브라우저 합성 단계(GPU)에서 처리된다:
+/* 매니저 idle — 눌렸다 떠오르며 좌우로 살짝 기우는 움직임(최대 6px · 4도). HTML 요소(.core-mark)의 transform 만 움직여 브라우저 합성 단계(GPU)에서 처리된다:
    매 프레임 레이아웃 · 스타일 계산이 없고, JS 도 타이머도 없어 쌓이는 것이 없다. 작업 중 · 결정 대기의 빛남(filter)과 들썩임은 위에서 끈 그대로 */
-.core-dot .core-mark { animation: mgr-idle 3.6s ease-in-out infinite !important; will-change: transform; }
-@keyframes mgr-idle { 50% { transform: translateY(-2px); } }
+.core-dot .core-mark { animation: mgr-idle 2.8s ease-in-out infinite !important; transform-origin: 50% 100%; will-change: transform; }
+@keyframes mgr-idle { /* 발밑 기준: 살짝 눌렸다가 → 위로 떠오르며 기울고 → 반대로 기울며 내려앉는다 (전부 transform) */
+  0%, 100% { transform: none; }
+  12% { transform: scale(1.04, .95); }
+  40% { transform: translateY(-6px) rotate(-4deg); }
+  70% { transform: translateY(-3px) rotate(3deg); }
+}
 @media (prefers-reduced-motion: reduce) { .core-dot .core-mark { animation: none !important; } }
