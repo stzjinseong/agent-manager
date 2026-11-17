@@ -26,6 +26,7 @@ import { gitBranch } from './branch.js';
 import { ensureToken, hostOk, callerOk, TOKEN_HEADER } from './auth.js';
 import { chromePath, openInChrome } from './chrome.js';
 import { linkUserStatusLine } from './userstatusline.js';
+import { sweepStatuslineOrphans } from './orphans.js';
 const { Terminal: HeadlessTerminal } = createRequire(import.meta.url)('@xterm/headless');
 
 const APP_DIR = path.dirname(fileURLToPath(import.meta.url)); // app/ — 코드
@@ -2136,6 +2137,8 @@ function cleanupLegacyHook() {
   if (!inUse) { try { fs.unlinkSync(LEGACY_HOOK); console.log(L('호환용 hook.mjs 정리', 'Removed the legacy hook.mjs')); } catch {} }
 }
 setInterval(cleanupLegacyHook, 60_000);
+// 강제 종료된 상태줄 실행이 남긴 고아 프로세스(claude-hud 등) 정리 — orphans.js
+setInterval(() => { sweepStatuslineOrphans(DATA_DIR).then((n) => { if (n) console.log(`[statusline] 고아 프로세스 ${n}개 정리`); }).catch(() => {}); }, 60_000);
 
 // ---------- 워커 기록 저장 ----------
 // 서버 재시작 후 이름·상태·타임라인·큐 등을 되살리기 위해 data/workers.json 에 저장 (상태가 바뀔 때마다, 1초 묶음)

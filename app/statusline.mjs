@@ -5,12 +5,17 @@
 // 서버가 꺼져 있거나 늦어도 상태줄 표시를 막지 않게 짧게 기다리고 넘어간다.
 import fs from 'node:fs';
 import path from 'node:path';
-import { execSync } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { readToken, TOKEN_HEADER } from './auth.js';
 import { savedPath, claudeHome } from './userstatusline.js';
 
 const DATA_DIR = process.env.AM_DATA || path.join(path.dirname(path.dirname(fileURLToPath(import.meta.url))), 'data');
+
+// 사용자 상태줄 명령을 띄운 셸 pid 를 여기 파일로 남긴다(정상 종료 시 지움). 이 프로세스가 Claude Code 에 강제 종료되면
+// 파일이 남고, 서버가 주기적으로 그 셸의 자식(남은 상태줄 프로세스)을 정리한다 — server.js sweepStatuslineOrphans
+const PIDS_DIR = path.join(DATA_DIR, 'statusline-pids');
+const USER_LINE_MS = 3000;
 
 const worker = process.env.AGENT_MANAGER_WORKER;
 const port = process.env.AGENT_MANAGER_PORT || '7788';
@@ -43,7 +48,47 @@ process.stdin.on('end', async () => {
     if (!cmd || cmd.includes('statusline.mjs')) continue;
     // Claude Code 는 Windows 에서도 상태줄 명령을 bash 로 돌린다 — 기본(cmd.exe)으로 돌리면 $(…) 같은 sh 문법 명령이 깨진다
     const shell = process.platform === 'win32' ? process.env.CLAUDE_CODE_GIT_BASH_PATH || 'bash' : undefined;
-    try { process.stdout.write(execSync(cmd, { input, encoding: 'utf8', timeout: 3000, cwd, shell, stdio: ['pipe', 'pipe', 'ignore'] })); } catch {}
+    process.stdout.write(await runUserLine(cmd, cwd, shell));
     break;
   }
 });
+
+// 자식 트리 전체 종료. Windows 에선 셸만 죽이면 셸이 띄운 node(예: claude-hud)가 부모 없이 영구히 남는다
+// (실측 2026-11-17: 4시간에 고아 9개 · 개당 35MB). execSync 의 timeout 은 셸만 죽이고, 손자가 출력 통로를 쥐고 있으면 반환도 안 했다
+function killTree(pid) {
+  if (!pid) return false;
+  try {
+    if (process.platform === 'win32') execFileSync('taskkill', ['/T', '/F', '/PID', String(pid)], { stdio: 'ignore', windowsHide: true });
+    else process.kill(-pid, 'SIGKILL'); // detached 로 띄워 프로세스 그룹 전체
+    return true;
+  } catch { return false; }
+}
+
+let running = null; // 실행 중인 사용자 상태줄 셸 — 이 프로세스가 신호로 끝날 때 함께 정리
+for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(sig, () => { if (running) killTree(running.pid); process.exit(0); });
+
+function runUserLine(cmd, cwd, shell) {
+  return new Promise((resolve) => {
+    let child;
+    try { child = spawn(cmd, { cwd, shell, stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true, detached: process.platform !== 'win32' }); }
+    catch { return resolve(''); }
+    running = child;
+    const mark = child.pid ? path.join(PIDS_DIR, String(child.pid)) : null;
+    if (mark) { try { fs.mkdirSync(PIDS_DIR, { recursive: true }); fs.writeFileSync(mark, String(Date.now())); } catch {} }
+    let out = '', done = false;
+    const finish = (text, killed) => {
+      if (done) return; done = true;
+      clearTimeout(timer); running = null;
+      // 죽이기에 실패했으면(셸이 이미 없음) 표시 파일을 남겨 서버 정리에 맡긴다
+      if (mark && (!killed || killed === 'ok')) { try { fs.unlinkSync(mark); } catch {} }
+      resolve(text);
+    };
+    const timer = setTimeout(() => finish('', killTree(child.pid) ? 'ok' : 'fail'), USER_LINE_MS);
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', (c) => { out += c; });
+    child.on('error', () => finish('', false));
+    child.on('close', () => finish(out, false));
+    child.stdin.on('error', () => {});
+    child.stdin.end(input);
+  });
+}
