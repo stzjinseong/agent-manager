@@ -6391,24 +6391,31 @@ function btwPipSync() {
   const d = btwPip.document, h = d.documentElement, src = document.documentElement;
   for (const a of [...h.attributes]) if (!src.hasAttribute(a.name)) h.removeAttribute(a.name);
   for (const a of src.attributes) if (h.getAttribute(a.name) !== a.value) h.setAttribute(a.name, a.value);
-  const want = [...document.querySelectorAll('link[rel="stylesheet"], style')].map((el) => (el.tagName === 'STYLE' ? `style:${el.textContent}` : `link:${el.href}`));
-  const have = new Map([...d.head.querySelectorAll('link[rel="stylesheet"], style')].map((el) => [el._k, el]));
-  if (want.length === have.size && want.every((k) => have.has(k))) { if (d.title !== btwTitle) d.title = btwTitle; return Promise.resolve(); }
-  const loads = [];
-  let prev = null;
-  for (const k of want) { // 원래 탭과 같은 순서(뒤 것이 앞 것을 덮는다)로 끼운다
+  // xterm 이 터미널 안에 넣는 <style>(글자 칸 크기 · 색, 54KB)은 뺀다 — BTW 창엔 터미널이 없고, 워커를 바꾸거나 크기가 바뀔 때마다
+  // 글이 달라져 그때마다 별도 창 스타일을 갈아 끼우는 원인이었다
+  const want = [...new Set([...document.querySelectorAll('link[rel="stylesheet"], style')].filter((el) => !el.closest('.xterm'))
+    .map((el) => (el.tagName === 'STYLE' ? `style:${el.textContent}` : `link:${el.href}`)))];
+  const mine = [...d.head.querySelectorAll('link[rel="stylesheet"], style')].filter((el) => el._k && !el._stale);
+  const have = new Map(mine.map((el) => [el._k, el]));
+  if (want.length === have.size && want.every((k) => have.has(k))) { if (d.title !== btwTitle) d.title = btwTitle; return Promise.all(mine.map((el) => el._ready)); }
+  // 이미 붙어 있는 요소는 절대 옮기지 않는다 — link 는 DOM 에서 옮기면(떼었다 붙이면) 다시 읽는 동안 그 스타일이 빠져,
+  // 스타일 없는 흰 화면이 몇 프레임 보였다(녹화 9~11번 프레임: style.css 만 빠지고 글꼴 CSS 는 남은 화면).
+  // 새것만 원래 탭 순서대로 '다음에 올 기존 요소' 앞에 끼운다(뒤 것이 앞 것을 덮는 순서 유지)
+  for (let i = want.length - 1, next = null; i >= 0; i--) {
+    const k = want[i];
     let el = have.get(k);
-    if (el) have.delete(k);
-    else {
-      if (k.startsWith('style:')) { el = d.createElement('style'); el.textContent = k.slice(6); }
-      else { el = d.createElement('link'); el.rel = 'stylesheet'; el.href = k.slice(5); loads.push(new Promise((r) => { el.onload = el.onerror = r; })); } // 상대 경로는 about:blank 에서 깨지므로 절대 주소
-      el._k = k;
-    }
-    if ((prev ? prev.nextElementSibling : d.head.firstElementChild) !== el) { if (prev) prev.after(el); else d.head.prepend(el); } // 이미 제자리면 옮기지 않는다(떼었다 붙이면 다시 읽음)
-    prev = el;
+    if (el) { have.delete(k); next = el; continue; }
+    if (k.startsWith('style:')) { el = d.createElement('style'); el.textContent = k.slice(6); el._ready = Promise.resolve(); }
+    else { el = d.createElement('link'); el.rel = 'stylesheet'; el.href = k.slice(5); el._ready = new Promise((r) => { el.onload = el.onerror = r; }); } // 상대 경로는 about:blank 에서 깨지므로 절대 주소
+    el._k = k;
+    if (next) next.before(el); else { const t = d.head.querySelector('title'); if (t) t.before(el); else d.head.append(el); }
+    next = el;
   }
+  // 빠질 것은 새것을 '다 받은 뒤' 뗀다. 받는 중에 다시 불려도(제목·속성 변화로 자주 불린다) 앞서 붙인 링크의 받기(_ready)까지 기다린다 —
+  // 예전엔 두 번째 호출이 기다릴 것 없이 옛 링크를 바로 떼어, 새 링크를 받는 동안 스타일이 비는 틈이 있었다
   const stale = [...have.values()];
-  const done = Promise.all(loads);
+  stale.forEach((el) => { el._stale = true; });
+  const done = Promise.all([...d.head.querySelectorAll('link[rel="stylesheet"], style')].filter((el) => el._k && !el._stale).map((el) => el._ready));
   if (stale.length) done.then(() => stale.forEach((el) => el.remove()));
   if (d.title !== btwTitle) d.title = btwTitle;
   return done;
