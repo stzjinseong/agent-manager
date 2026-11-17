@@ -3005,13 +3005,9 @@ body.term-full #detail.chat-mode { --full-side-w: 0px; }
 .s-working .avatar, .s-working .clawd :is(.legs-a, .legs-b), .s-working .fx span, .s-working .led,
 .dchip.s-working .avatar { animation: none !important; }
 
-/* 매니저 idle — 눌렸다 떠오르며 좌우로 살짝 기우는 움직임(최대 6px · 4도). HTML 요소(.core-mark)의 transform 만 움직여 브라우저 합성 단계(GPU)에서 처리된다:
-   매 프레임 레이아웃 · 스타일 계산이 없고, JS 도 타이머도 없어 쌓이는 것이 없다. 작업 중 · 결정 대기의 빛남(filter)과 들썩임은 위에서 끈 그대로 */
-.core-dot .core-mark { animation: mgr-idle 2.8s ease-in-out infinite !important; transform-origin: 50% 100%; will-change: transform; }
-@keyframes mgr-idle { /* 발밑 기준: 살짝 눌렸다가 → 위로 떠오르며 기울고 → 반대로 기울며 내려앉는다 (전부 transform) */
-  0%, 100% { transform: none; }
-  12% { transform: scale(1.04, .95); }
-  40% { transform: translateY(-6px) rotate(-4deg); }
-  70% { transform: translateY(-3px) rotate(3deg); }
-}
+/* 매니저 idle — 위아래로 6px 오르내린다. HTML 요소(.core-mark)의 transform 만 움직여 브라우저 합성 단계(GPU)에서 처리:
+   매 프레임 레이아웃 · 스타일 계산이 없고, JS 도 타이머도 없어 쌓이는 것이 없다.
+   픽셀 아트라 기울이기(rotate) · 눌림(scale) · 소수점 위치는 픽셀이 격자에서 어긋나 흐려졌다 → 이동만, steps 로 1px 단위에 딱 맞춰 끊는다 */
+.core-dot .core-mark { animation: mgr-idle 1.5s steps(6, jump-none) infinite alternate !important; will-change: transform; }
+@keyframes mgr-idle { from { transform: none; } to { transform: translateY(-6px); } }
 @media (prefers-reduced-motion: reduce) { .core-dot .core-mark { animation: none !important; } }
