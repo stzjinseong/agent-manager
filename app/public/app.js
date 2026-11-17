@@ -1719,7 +1719,7 @@ function layoutRepoGroups() {
 // 묶음을 감싸는 요소가 없어(카드는 #nodes 그리드의 직접 자식) CSS 테두리로는 못 그리고, 카드 자리(offset)를 읽어 SVG 로 긋는다.
 // 위쪽 변은 머리줄 가운데 높이 — 머리줄 이름 · + 버튼의 바닥색이 선을 가려 fieldset 제목처럼 보인다
 let repoBoxGroups = [], repoBoxSig = '';
-const REPO_BOX_PAD = 8, REPO_BOX_R = 8;
+const REPO_BOX_PAD = 10, REPO_BOX_R = 24; // 반지름 = 카드 모서리(--radius 14) + 여백 — 안팎 모서리가 같은 중심으로 돌아 겹쳐 보이지 않게
 function roundedPath(pts, r) {
   // 닫힌 꺾은선의 꼭짓점을 반지름 r 로 둥글린다(변이 짧으면 그 절반까지만)
   const n = pts.length;
@@ -1740,20 +1740,26 @@ function drawRepoBoxes() {
   if (!nodes.offsetParent || !repoBoxGroups.length) { if (repoBoxSig) { svg.innerHTML = ''; repoBoxSig = ''; } return; }
   const fr = $('#floor').getBoundingClientRect(), nr = nodes.getBoundingClientRect();
   const ox = nr.left - fr.left, oy = nr.top - fr.top, P = REPO_BOX_PAD;
+  // 줄 아래 끝은 그 줄 전체(모든 묶음) 카드 중 가장 낮은 끝 — 묶음마다 제 카드에 맞추면 같은 줄인데 상자 아래 변이 들쭉날쭉했다
+  const lineBottom = new Map();
+  for (const c of nodes.children) {
+    if (!c.classList.contains('node') || !c.offsetParent) continue;
+    const key = c.style.gridRow;
+    lineBottom.set(key, Math.max(lineBottom.get(key) ?? -Infinity, c.offsetTop + c.offsetHeight));
+  }
   const boxes = [];
   for (const g of repoBoxGroups) {
     if (!g.head.isConnected) continue;
     const cards = g.cards.filter((c) => c.isConnected && c.offsetParent);
     if (!cards.length) continue;
-    // 카드를 줄(같은 그리드 줄 시작)별로 모아 줄마다 오른쪽 끝 · 아래 끝을 잰다
+    // 카드를 줄(같은 그리드 줄 시작)별로 모아 줄마다 오른쪽 끝을 잰다
     const byRow = new Map();
     for (const c of cards) {
       const key = c.style.gridRow;
-      const top = c.offsetTop, row = byRow.get(key) || { top, right: -Infinity, bottom: -Infinity, left: Infinity };
-      row.top = Math.min(row.top, top);
+      const row = byRow.get(key) || { top: c.offsetTop, right: -Infinity, left: Infinity, bottom: lineBottom.get(key) };
+      row.top = Math.min(row.top, c.offsetTop);
       row.left = Math.min(row.left, c.offsetLeft);
       row.right = Math.max(row.right, c.offsetLeft + c.offsetWidth);
-      row.bottom = Math.max(row.bottom, top + c.offsetHeight);
       byRow.set(key, row);
     }
     const rows = [...byRow.values()].sort((a, b) => a.top - b.top);
@@ -1768,13 +1774,26 @@ function drawRepoBoxes() {
       prevR = R;
       if (i === rows.length - 1) pts.push([R, B], [L, B]);
     });
+    // 위쪽 변(머리줄 선) — 이름 끝에서 상자 오른쪽 위 모서리 안쪽까지. 옅은 바탕 위에 이 선만 또렷이
+    const name = $('b', g.head);
+    const tx = Math.round(name.offsetLeft + name.offsetWidth + 6 + g.head.offsetLeft + ox), tr = Math.round(pts[1][0] - 10);
     const color = g.head.style.getPropertyValue('--repo') || 'var(--repo-0)';
-    boxes.push({ d: roundedPath(pts.map(([x, y]) => [Math.round(x), Math.round(y)]), REPO_BOX_R), color });
+    boxes.push({ d: roundedPath(pts.map(([x, y]) => [Math.round(x), Math.round(y)]), REPO_BOX_R), top: tr > tx ? `M${tx} ${Math.round(T)}H${tr}` : '', tx, tr, color });
   }
-  const sig = boxes.map((b) => b.d + b.color).join('|');
+  const sig = boxes.map((b) => b.d + b.top + b.color).join('|');
   if (sig === repoBoxSig) return;
   repoBoxSig = sig;
-  svg.innerHTML = boxes.map((b) => `<path d="${b.d}" style="stroke: color-mix(in srgb, ${b.color} 75%, transparent)"/>`).join('');
+  // 위쪽 선은 오른쪽 끝 FADE px 동안 옅어지며 사라진다 — 옅은 바탕의 둥근 모서리로 이어지는데 선이 뚝 끊겨 보였다
+  const FADE = 90;
+  svg.innerHTML = boxes.map((b, i) => {
+    const top = b.top ? (() => {
+      const id = `rb-fade-${i}`, at = Math.max(0, 1 - FADE / Math.max(1, b.tr - b.tx)).toFixed(3);
+      return `<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="${b.tx}" y1="0" x2="${b.tr}" y2="0">` +
+        `<stop offset="${at}" class="rb-stop"/><stop offset="1" class="rb-stop" stop-opacity="0"/></linearGradient>` +
+        `<path class="rb-top" d="${b.top}" stroke="url(#${id})"/>`;
+    })() : '';
+    return `<g style="--c: ${b.color}"><path class="rb-box" d="${b.d}"/>${top}</g>`;
+  }).join('');
 }
 
 // ---------- 최소화한 회로 기판 (헤더 아래 한 줄) ----------
