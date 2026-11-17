@@ -447,7 +447,7 @@ body.card-drag .node-add { opacity: .25; transition: opacity .2s; }
 /* 대기실 카드: ▶ 투입(아이콘만)을 제목 줄 오른쪽 끝에 작은 알약으로. 삭제는 휴지통에 끌어 놓기(터치는 ⋯ 메뉴) — ✕ 버튼은 뺐다 */
 .socket-acts { flex: none; display: flex; align-items: center; gap: 4px; margin-left: auto; }
 .socket-acts .nlaunch { flex: none; display: grid; place-items: center; width: 34px; height: 22px; padding: 0; border-radius: 999px; font-size: 12px; line-height: 1; }
-.socket-acts .nlaunch svg { width: 13px; height: 13px; fill: currentColor; margin-left: 1px; }
+.socket-acts .nlaunch svg { width: 13px; height: 13px; fill: currentColor; margin-left: 1px; translate: 0 -1px; } /* 칸 높이(테두리 안 20px)와 아이콘(13px) 차이가 홀수라 반 픽셀 아래로 내려앉아 보였다 */
 /* 평소엔 테두리 · 아이콘만 accent 로 옅게 — 대기실 카드마다 꽉 찬 주황 알약이라 화면에서 가장 먼저 눈에 띄었다.
    그 카드에 마우스를 올리거나 키보드로 고르면 원래의 꽉 찬 주황으로 */
 .socket-acts .nlaunch.btn.primary { background: transparent; border: 1px solid color-mix(in srgb, var(--accent) 38%, transparent); color: color-mix(in srgb, var(--accent) 80%, var(--text-2)); }
