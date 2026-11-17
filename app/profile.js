@@ -15,6 +15,7 @@ import path from 'node:path';
 import { priceFor, costOf, windowFor } from './pricing.js';
 
 const MAX_TURNS = 200;
+const READ_CHUNK = 8 * 1024 * 1024; // readLines 한 번에 읽는 크기
 const KEYS = ['input', 'cacheWrite', 'cacheRead', 'output', 'cost'];
 
 export function createProfile(file) {
@@ -393,17 +394,32 @@ function readLines(state, file, onEntry) {
   try { size = fs.statSync(file).size; } catch { return false; }
   if (size < state.offset) return 'reset';
   if (size === state.offset) return false;
+  // 조각(READ_CHUNK)씩 읽고, 줄은 바이트에서 하나씩 문자열로 만든다. 예전처럼 남은 부분 전체를 문자열 하나로 만들어
+  // split 하면, 거기서 잘라 낸 작은 문자열(채팅 글 등)이 큰 원본 문자열을 통째로 붙잡아 큰 세션을 열 때 메모리가 튀었다.
+  // 줄 단위로 만들면 붙잡히는 건 그 줄뿐이다. 다 안 쓰인 마지막 줄은 바이트(Buffer)로 남겨 글자가 중간에 잘려도 깨지지 않는다
   const fd = fs.openSync(file, 'r');
-  const buf = Buffer.alloc(size - state.offset);
-  fs.readSync(fd, buf, 0, buf.length, state.offset);
-  fs.closeSync(fd);
-  state.offset = size;
-  const lines = (state.rest + buf.toString('utf8')).split('\n');
-  state.rest = lines.pop(); // 아직 다 안 쓰인 마지막 줄
-  for (const line of lines) {
-    if (!line.trim()) continue;
-    try { onEntry(JSON.parse(line), line); } catch {}
-  }
+  const chunk = Buffer.allocUnsafe(Math.min(READ_CHUNK, size - state.offset));
+  let pos = state.offset;
+  let rest = typeof state.rest === 'string' ? Buffer.from(state.rest) : state.rest;
+  try {
+    while (pos < size) {
+      const n = fs.readSync(fd, chunk, 0, Math.min(chunk.length, size - pos), pos);
+      if (n <= 0) break;
+      pos += n;
+      const buf = rest.length ? Buffer.concat([rest, chunk.subarray(0, n)]) : chunk.subarray(0, n);
+      let start = 0, nl;
+      while ((nl = buf.indexOf(10, start)) !== -1) {
+        if (nl > start) {
+          const line = buf.toString('utf8', start, nl);
+          if (line.trim()) { try { onEntry(JSON.parse(line), line); } catch {} }
+        }
+        start = nl + 1;
+      }
+      rest = Buffer.from(buf.subarray(start)); // 복사 — chunk 는 다음 조각에 다시 쓴다
+    }
+  } finally { fs.closeSync(fd); }
+  state.rest = rest;
+  state.offset = pos;
   return true;
 }
 
