@@ -1800,14 +1800,14 @@ $('#btn-dock-expand').addEventListener('click', () => setFloorMin(false));
 new ResizeObserver(() => document.documentElement.style.setProperty('--topbar-h', `${$('.topbar').offsetHeight}px`)).observe($('.topbar'));
 
 // 작업 중인 선: MANAGER → 워커 방향으로 Claude 코랄 전류가 흐른다.
-// 짧은 전류 두 줄기(pathLength=100 으로 정규화한 dash 이동) + 선을 따라 달리는 불꽃 머리(animateMotion)
+// 짧은 전류 두 줄기(pathLength=100 으로 정규화한 dash 이동). 예전엔 선을 따라 달리는 불꽃 머리(SVG animateMotion)도 있었는데,
+// CSS 로 멈출 수 없는 SVG 자체 애니메이션이라 작업 중 워커가 하나만 있어도 화면 전체가 매 프레임 레이아웃을 다시 했다
+// (실측: 레이아웃 초당 66회 → 1회, CPU 8% → 1%) — 빼었다
 const ELECTRIC_DEFS = `<defs><filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
   <feGaussianBlur stdDeviation="2.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>`;
 function electric(d) {
-  const spark = (delay) => `<circle class="spark" r="3" filter="url(#glow)"><animateMotion dur="1.6s" begin="${delay}s" repeatCount="indefinite" path="${d}"/></circle>`;
   return `<path class="bolt" pathLength="100" d="${d}" filter="url(#glow)"/>` +
-    `<path class="bolt b2" pathLength="100" d="${d}" filter="url(#glow)"/>` +
-    spark(0) + spark(-0.8);
+    `<path class="bolt b2" pathLength="100" d="${d}" filter="url(#glow)"/>`;
 }
 
 
