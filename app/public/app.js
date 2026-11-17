@@ -6160,7 +6160,7 @@ function renderBtw() {
   const items = w ? (btwLogs[w.id] ||= []) : [];
   if (b) {
     const it = items.find((x) => x.at === b.at);
-    if (it) Object.assign(it, { text: b.text, open: b.open }); else items.push({ at: b.at, q: b.q, text: b.text, open: b.open });
+    if (it) Object.assign(it, { text: b.text, open: b.open }); else { items.push({ at: b.at, q: b.q, text: b.text, open: b.open }); if (items.length > 50) items.splice(0, items.length - 50); } // 새로고침 전까지 워커마다 끝없이 쌓였다 — 최근 50개
     if (!btwSeenAt.has(b.at)) { btwSeenAt.add(b.at); btwOpenFor[w.id] = true; } // 새 곁질문(채팅 입력칸의 /btw 포함)이면 창을 연다
   } else for (const x of items) x.open = false;
   // 창은 body 에 붙어 있으므로(아래 'body 로 옮김') 채팅 화면이 안 보이면(CLI 보기 · diff · 워커 닫힘) 직접 숨긴다

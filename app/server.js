@@ -1608,12 +1608,21 @@ function broadcastState() {
   }
   for (const [sel, list] of bySel) {
     const s = JSON.stringify({ type: 'state', state: stateFor(base, sel) });
-    for (const ws of list) ws.send(s);
+    for (const ws of list) sendWs(ws, s);
   }
+}
+// 받는 쪽이 멈춘 소켓(크롬이 얼린 탭 · 잠든 다른 기기 · 느린 망)은 보내지 못한 데이터가 이 서버 메모리에 끝없이 쌓인다 —
+// 모든 워커의 터미널 출력을 모든 소켓에 방송하므로 몇 시간이면 수백 MB. 밀린 양이 WS_STALL_BYTES 를 넘으면 끊는다.
+// 브라우저는 1초 뒤 다시 접속해 상태 · 화면을 처음부터 다시 받으므로(app.js connect) 잃는 것이 없다
+const WS_STALL_BYTES = 16 * 1024 * 1024;
+function sendWs(ws, s) {
+  if (ws.readyState !== 1) return;
+  if (ws.bufferedAmount > WS_STALL_BYTES) { console.log(`[ws] 받지 못한 데이터 ${(ws.bufferedAmount / 1048576).toFixed(0)}MB — 멈춘 연결을 끊음`); ws.terminate(); return; }
+  ws.send(s);
 }
 function broadcast(msg) {
   const s = JSON.stringify(msg);
-  for (const ws of sockets) if (ws.readyState === 1) ws.send(s);
+  for (const ws of sockets) sendWs(ws, s);
 }
 
 // ---------- PTY 호스트 연결 ----------
@@ -2212,6 +2221,9 @@ function forgetWorker(w) {
   for (const id of w.links || []) { const x = workers.get(id); if (x) links.unlink(w, x); }
   hostSend({ op: 'forget', id: w.id });
   workers.delete(w.id);
+  // 워커 id 를 키로 쓰는 보조 맵들 — 지우지 않으면 워커를 갈아 쓸수록 조금씩 계속 늘었다
+  for (const m of [escAt, shellPendingBy, stuckMisses, retryText]) m.delete(w.id);
+  for (const k of statusLineOf.keys()) if (k.startsWith(`${w.id}:`)) statusLineOf.delete(k);
   fs.rmSync(path.join(SHOT_DIR, w.id), { recursive: true, force: true });
 }
 
@@ -2882,6 +2894,7 @@ wss.on('connection', (ws) => {
     if ((msg.type === 'attach' && msg.snap !== false) || msg.type === 'snapshot') {
       const req = ++snapSeq;
       snapWaiters.set(req, { ws, lines: msg.full ? 0 : Math.max(0, Number(msg.lines) || 0) });
+      setTimeout(() => snapWaiters.delete(req), 15_000); // 응답이 안 오면(워커 삭제 · 호스트 끊김) 소켓 참조가 영구히 남았다
       hostSend({ op: 'snapshot', id: w.id, req });
     }
     // 채팅 보기로 보고 있는 워커 — 질문을 채팅에서 받을지 정한다(holdAsk). 아무도 안 보게 되면 붙잡은 질문을 터미널로 넘긴다
