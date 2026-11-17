@@ -26,7 +26,7 @@ const { Terminal } = require('@xterm/headless');
 const { SerializeAddon } = require('@xterm/addon-serialize');
 const { Unicode11Addon } = require('@xterm/addon-unicode11');
 
-const VERSION = 3; // 2: clearScrollback · 3: 접속 토큰(auth.js)
+const VERSION = 4; // 2: clearScrollback · 3: 접속 토큰(auth.js) · 4: 종료된 터미널은 마지막 화면 문자열만 남기고 해제
 const PORT = Number(process.env.AM_PTY_PORT || 7787);
 const IDLE_EXIT_MS = 60_000; // 워커도 접속한 서버도 없으면 스스로 종료 (고아 방지)
 
@@ -39,7 +39,27 @@ if (process.argv.includes('--shutdown')) {
   await new Promise(() => {});
 }
 
-const ptys = new Map(); // id → { id, term, pid, screen, serializer, exited, exitCode }
+const ptys = new Map(); // id → { id, term, pid, screen, serializer, exited, exitCode, final }
+
+// 종료된 워커는 가상 터미널(기록이 꽉 차면 실측 약 18MB)을 해제하고 마지막 화면 직렬화 문자열(약 0.6MB)만 남긴다.
+// 예전엔 forget(워커 삭제) 전까지 터미널을 통째로 들고 있어, 워커를 돌려 가며 며칠 쓰면 이 프로세스가 계속 커졌다.
+// 남기는 마지막 화면도 최근 FINAL_KEEP 개까지만 — 더 오래된 건 빈 화면으로 답한다
+const FINAL_KEEP = 10;
+const FINAL_DELAY_MS = 1000; // 종료 직후 늦게 도착한 출력까지 반영한 뒤 직렬화
+function retire(p) {
+  if (!p.screen) return;
+  p.screen.write('', () => {
+    if (!p.screen) return;
+    p.final = { cols: p.screen.cols, rows: p.screen.rows, data: p.serializer.serialize({ scrollback: SCROLLBACK }) };
+    p.screen.dispose(); p.screen = null; p.serializer = null;
+    const kept = [...ptys.values()].filter((x) => x.final?.data);
+    for (const x of kept.slice(0, Math.max(0, kept.length - FINAL_KEEP))) x.final.data = '';
+  });
+}
+function sendFinal(p, req) {
+  const f = p.final || { cols: 120, rows: 34, data: '' };
+  broadcast({ ev: 'snapshot', id: p.id, req, cols: f.cols, rows: f.rows, data: f.data });
+}
 
 // 워커마다 들고 있는 터미널 기록 줄 수. 타임라인의 오래된 요청을 눌러 그 위치로 가려면 기록이 남아 있어야 한다
 // (2000줄일 땐 diff·긴 출력 몇 턴이면 밀려났다). 한 줄 ≈ 110칸이라 워커당 메모리 약 10MB 안팎
@@ -69,13 +89,14 @@ function spawn({ id, file, args, cwd, env, cols = 120, rows = 34 }) {
   const p = { id, term, pid: term.pid, ...makeScreen(cols, rows), exited: false, exitCode: null };
   ptys.set(id, p);
   term.onData((data) => {
-    p.screen.write(data);
+    if (p.screen) p.screen.write(data);
     broadcast({ ev: 'data', id, data });
   });
   term.onExit(({ exitCode }) => {
     p.exited = true;
     p.exitCode = exitCode;
     broadcast({ ev: 'exit', id, exitCode });
+    setTimeout(() => retire(p), FINAL_DELAY_MS);
   });
   broadcast({ ev: 'spawned', id, pid: term.pid });
 }
@@ -85,19 +106,21 @@ function handle(msg) {
   switch (msg.op) {
     case 'spawn': spawn(msg); break;
     case 'write': if (p && !p.exited) p.term.write(msg.data); break;
-    case 'resize': if (p && !p.exited && msg.cols > 10 && msg.rows > 5) { try { p.term.resize(msg.cols, msg.rows); p.screen.resize(msg.cols, msg.rows); } catch {} } break;
+    case 'resize': if (p && !p.exited && p.screen && msg.cols > 10 && msg.rows > 5) { try { p.term.resize(msg.cols, msg.rows); p.screen.resize(msg.cols, msg.rows); } catch {} } break;
     case 'snapshot':
       if (!p) break;
+      if (!p.screen) { sendFinal(p, msg.req); break; }
       // 아직 해석 대기 중인 출력까지 반영한 뒤 직렬화
       p.screen.write('', () => {
+        if (!p.screen) { sendFinal(p, msg.req); return; }
         broadcast({ ev: 'snapshot', id: p.id, req: msg.req, cols: p.screen.cols, rows: p.screen.rows, data: p.serializer.serialize({ scrollback: SCROLLBACK }) });
       });
       break;
     // /clear 뒤 이전 대화 기록(스크롤백)만 지운다. Windows 에선 Claude 의 화면 지우기(ED3)가 ConPTY 를 거치며 사라져
     // 기록이 그대로 남는다(실측: /clear 후 지우기 제어 문자 0개, 스크롤백 1150줄 잔존). 화면(뷰포트)은 그대로 둔다
-    case 'clearScrollback': if (p) p.screen.write('\x1b[3J'); break;
+    case 'clearScrollback': if (p?.screen) p.screen.write('\x1b[3J'); break;
     case 'kill': if (p && !p.exited) { try { p.term.kill(); } catch {} } break;
-    case 'forget': if (p) { if (!p.exited) { try { p.term.kill(); } catch {} } p.screen.dispose(); ptys.delete(msg.id); } break;
+    case 'forget': if (p) { if (!p.exited) { try { p.term.kill(); } catch {} } p.screen?.dispose(); ptys.delete(msg.id); } break;
     case 'shutdown':
       for (const x of ptys.values()) if (!x.exited) { try { x.term.kill(); } catch {} }
       setTimeout(() => process.exit(0), 300);

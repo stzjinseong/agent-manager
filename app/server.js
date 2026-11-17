@@ -1594,7 +1594,7 @@ function broadcast(msg) {
 // ---------- PTY 호스트 연결 ----------
 // ptyhost.js 는 별도 상주 프로세스. 없으면 띄우고(detached — 이 서버가 꺼져도 남는다), 접속해서 워커 터미널을 다룬다.
 const PTY_PORT = Number(process.env.AM_PTY_PORT || 7787);
-const PTY_HOST_VERSION = 3; // ptyhost.js VERSION — 3: 접속 토큰
+const PTY_HOST_VERSION = 4; // ptyhost.js VERSION — 3: 접속 토큰 · 4: 종료 터미널 해제
 let host = null;
 let snapSeq = 0;
 const snapWaiters = new Map(); // 스냅샷 요청 번호 → 요청한 브라우저 소켓
