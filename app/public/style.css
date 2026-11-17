@@ -3000,7 +3000,13 @@ body.term-full #detail.chat-mode { --full-side-w: 0px; }
    SVG 안쪽 요소(눈 · 다리 · 망토 · 별)의 transform/opacity 와 filter 빛남은 합성 단계로 못 넘겨 매 프레임 다시 계산된다.
    상태 태그 맥동(작업 중 표시)과 회로 선 전류는 남긴다 */
 .core-dot .clawd .eye, .brand-mark .clawd .eye, .s-working .clawd .eye,
-.core-dot .core-mark, .brand-mark.mgr-on svg, .core-dot .clawd :is(.legs-a, .legs-b), .brand-mark .clawd :is(.legs-a, .legs-b),
+.brand-mark.mgr-on svg, .core-dot .clawd :is(.legs-a, .legs-b), .brand-mark .clawd :is(.legs-a, .legs-b),
 :is(.core-dot, .brand-mark) :is(.acc-cape, .acc-halo), .mgr .star, .core-dot.sleepy::after,
 .s-working .avatar, .s-working .clawd :is(.legs-a, .legs-b), .s-working .fx span, .s-working .led,
 .dchip.s-working .avatar { animation: none !important; }
+
+/* 매니저 idle — 아주 느린 숨쉬기(2px 오르내림). HTML 요소(.core-mark)의 transform 만 움직여 브라우저 합성 단계(GPU)에서 처리된다:
+   매 프레임 레이아웃 · 스타일 계산이 없고, JS 도 타이머도 없어 쌓이는 것이 없다. 작업 중 · 결정 대기의 빛남(filter)과 들썩임은 위에서 끈 그대로 */
+.core-dot .core-mark { animation: mgr-idle 3.6s ease-in-out infinite !important; will-change: transform; }
+@keyframes mgr-idle { 50% { transform: translateY(-2px); } }
+@media (prefers-reduced-motion: reduce) { .core-dot .core-mark { animation: none !important; } }
