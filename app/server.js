@@ -1432,6 +1432,28 @@ function coldSweep() {
 }
 setInterval(coldSweep, 60_000);
 
+// 종료된 워커 기록 자동 정리 — 지우지 않으면 끝없이 쌓여, 상태가 바뀔 때마다(최대 1초 1회) workers.json 전체를
+// 다시 직렬화하는 부담이 계속 늘었다(실측: 123개 중 119개가 종료 기록, 파일 3.3MB). 역할(이름)마다 최근 EXITED_KEEP 개만,
+// 그것도 EXITED_MAX_AGE 안의 것만 남긴다. 지금 화면에서 보고 있는 워커는 건드리지 않는다. 대화 기록(트랜스크립트)은 그대로라 --resume 가능
+const EXITED_KEEP = 3;
+const EXITED_MAX_AGE = 30 * 24 * 3600_000;
+function pruneExited() {
+  const open = new Set();
+  for (const ws of sockets) { if (ws.sel) open.add(ws.sel); if (ws.chatSel) open.add(ws.chatSel); }
+  const byName = new Map();
+  for (const w of workers.values()) if (w.status === 'exited') (byName.get(w.name) || byName.set(w.name, []).get(w.name)).push(w);
+  const now = Date.now(), gone = [];
+  for (const list of byName.values()) {
+    list.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    list.forEach((w, i) => { if ((i >= EXITED_KEEP || now - (w.updatedAt || 0) > EXITED_MAX_AGE) && !open.has(w.id)) gone.push(w); });
+  }
+  for (const w of gone) forgetWorker(w);
+  if (gone.length) { console.log(`[workers] 오래된 종료 기록 ${gone.length}개 정리`); emitState(); saveWorkersSoon(); }
+  return gone.length;
+}
+setTimeout(pruneExited, 30_000); // 시작 직후(워커 복원이 끝난 뒤) 한 번
+setInterval(pruneExited, 3600_000);
+
 function hasPending(workerId) {
   for (const d of decisions.values()) if (d.workerId === workerId) return true;
   return false;
