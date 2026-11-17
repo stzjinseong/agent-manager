@@ -1364,13 +1364,13 @@ html[data-char="clawd-white"] :is(.node, .dchip, .term-wrap) { --avatar: var(--c
 
 /* ---------- 매니저 반응 — app.js mgrAct / mgrUpdate ---------- */
 .mgr-lean, .mgr-act { transform-box: fill-box; transform-origin: 50% 100%; }
-.mgr-lean { transform: rotate(var(--lean, 0deg)); transition: transform .8s ease; } /* 시선: 작업 중인 워커 쪽으로 */
+.mgr-lean { transform: none; } /* 예전엔 작업 중인 워커 쪽으로 기울였다(rotate(--lean)) — 픽셀 아트를 비스듬히 돌리면 흐려지고 계단이 져서 뺐다 */
 .mgr-act.do-nod { animation: mgr-nod .7s ease-in-out; }
 @keyframes mgr-nod { 30% { transform: translateY(.7px) scaleY(.93); } 60% { transform: none; } }
 .mgr-act.do-hop { animation: mgr-hop .45s cubic-bezier(.3, 1.6, .5, 1) 2; }
 @keyframes mgr-hop { 40% { transform: translateY(-2.2px); } }
-.mgr-act.do-wave { animation: mgr-wave 1.3s ease-in-out; }
-@keyframes mgr-wave { 15% { transform: rotate(-8deg); } 35% { transform: rotate(8deg); } 55% { transform: rotate(-6deg); } 75% { transform: rotate(5deg); } 100% { transform: none; } }
+.mgr-act.do-wave { animation: mgr-wave 1.3s steps(1, end); }
+@keyframes mgr-wave { /* 기울이던 손 흔들기 → 정수 픽셀 좌우 흔들기(기울이면 픽셀 아트가 흐리고 계단이 짐) */ 0%, 100% { transform: none; } 15%, 55% { transform: translateX(-2px); } 35%, 75% { transform: translateX(2px); } }
 .mgr-act.do-yawn { animation: mgr-yawn 1.6s ease-in-out; }
 @keyframes mgr-yawn { 40%, 70% { transform: scale(1.04, 1.08); } }
 .mgr-act.do-yawn .eye { transform: scaleY(.1) !important; }
