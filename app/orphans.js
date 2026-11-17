@@ -27,9 +27,10 @@ export async function sweepStatuslineOrphans(dataDir) {
     marks.set(Number(n), { at, f });
   }
   if (!marks.size) return 0;
-  const ids = [...marks.keys()];
-  const filter = ids.map((p) => `ProcessId=${p} or ParentProcessId=${p}`).join(' or ');
-  const out = await ps(`Get-CimInstance Win32_Process -Filter '${filter}' | ForEach-Object { '{0} {1} {2}' -f $_.ProcessId, $_.ParentProcessId, ([DateTimeOffset]$_.CreationDate).ToUnixTimeMilliseconds() }`);
+  // Claude Code 는 상태줄을 다시 그릴 때 이전 실행을 강제 종료하는 일이 잦아 기록이 많이 남는다(실측: 20분에 150개).
+  // pid 마다 조건을 붙이면 조회식이 끝없이 길어지므로 전체 목록을 한 번 받아 여기서 맞춘다
+  const out = await ps(`Get-CimInstance Win32_Process -Property ProcessId,ParentProcessId,CreationDate | ForEach-Object { '{0} {1} {2}' -f $_.ProcessId, $_.ParentProcessId, ([DateTimeOffset]$_.CreationDate).ToUnixTimeMilliseconds() }`);
+  if (!out) return 0; // 조회 실패 — 기록은 남겨 다음에 다시
   const kill = new Set();
   for (const line of out.split(/\r?\n/)) {
     const [pid, ppid, born] = line.trim().split(' ').map(Number);
