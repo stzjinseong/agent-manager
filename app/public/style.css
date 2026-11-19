@@ -1539,7 +1539,7 @@ html[data-char="clawd-white"] :is(.node, .dchip, .term-wrap) { --avatar: var(--c
 .nlink { position: absolute; right: 6px; top: 6px; z-index: 3; display: inline-flex; align-items: center; gap: 3px; height: 18px; padding: 1px 6px 0 4px; border-radius: 999px; font-size: 10.5px; font-weight: 600; line-height: 1; white-space: nowrap; box-sizing: border-box;
   color: var(--pc); background: color-mix(in srgb, var(--pc) 14%, transparent); border: 1px solid color-mix(in srgb, var(--pc) 50%, transparent); }
 .nlink[hidden] { display: none; }
-.nlink .link-ic { width: 11px; height: 11px; }
+.nlink .link-ic { width: 11px; height: 11px; position: relative; top: -.5px; } /* 칩의 위 1px 여백(글자 기준선 맞춤) 탓에 아이콘이 아래로 처져 보였음 → 아이콘만 올려 칩 안쪽 세로 정가운데(2배율 실측 위 7 · 아래 7 픽셀) */
 /* 짝 선(app.js drawPairLinks) — 페이지 좌표 오버레이. 연 워커만이면 옅게(calm), 올렸거나 방금 주고받았으면 또렷하게(hot) */
 .pair-link { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; z-index: 3; }
 .pair-link path { fill: none; stroke-linecap: round; }
