@@ -115,6 +115,8 @@ In the chat view, the **list button** above the BTW button (with a count) opens 
 Pick a partner from the card's **⋯** menu → **🔗 Link worker…**.
 Then tell a linked worker something like "have W2 build and test this" — it sends the task to its partner, which reports back when done.
 
+![Linked workers — hover a card to see its partner line](docs/screenshots/en/link.png)
+
 - They can be in different repos — e.g. a client worker edits, and a worker in the build-machine repo pulls, builds, tests, and returns the result.
 - The card gets a partner chip (🔗 W2); hovering draws a line to the partner, and a note flies between them when they exchange messages.
 - Workers learn about a link from their next message. An exchange stops after **12** hops without a human message (no endless "got it").
