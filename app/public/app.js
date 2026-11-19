@@ -2978,6 +2978,20 @@ function switchFxReveal(id, kind) {
   fx.target.animate([{ opacity: 0 }, { opacity: 1 }], { duration: SWITCH_MS, easing: 'ease-out' });
 }
 
+// 채팅 입력칸에 쓰던 글(초안)은 워커마다 따로 — 다른 워커로 가면 그 워커의 초안으로 바꾸고, 돌아오면 쓰던 글이 다시 나온다.
+// 입력칸 주인(draftOwner)을 따로 둔다: 상세를 닫았다가(selected = null) 다른 워커를 열어도 닫힌 워커의 글을 잃지 않게
+const chatDrafts = new Map();
+let draftOwner = null;
+function swapChatDraft(id) {
+  if (draftOwner === id) return;
+  const t = chatForm.text;
+  if (draftOwner) { if (t.value) chatDrafts.set(draftOwner, t.value); else chatDrafts.delete(draftOwner); }
+  draftOwner = id;
+  const next = chatDrafts.get(id) || '';
+  if (t.value === next) return;
+  t.value = next;
+  t.dispatchEvent(new Event('input', { bubbles: true })); // 높이 맞춤 · / 자동완성 · 토글 반짝임도 새 글 기준으로
+}
 function select(id) {
   markSeen(id); // 카드를 눌렀으면 완료 확인
   // 이미 열려 있는 워커를 다시 누르면 아무것도 하지 않는다 — 터미널을 다시 그리지 않고,
@@ -2985,6 +2999,7 @@ function select(id) {
   if (id === selected && !$('#detail').hidden) return;
   if (selected && !$('#detail').hidden) saveTermScroll(selected);
   switchFxStart(selected, id);
+  swapChatDraft(id);
   selected = id;
   restoreFor = id;
   render();
