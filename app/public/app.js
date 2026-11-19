@@ -133,7 +133,8 @@ function mgrOnFx(msg) {
     flyToWorker(msg.id, from, 'task');
   }
   // 연결된 워커끼리 주고받은 순간 — 보낸 카드에서 받은 카드로 쪽지가 날아가고, 짝 선이 잠깐 켜진다 (links.js · drawPairLinks)
-  if (msg.kind === 'relay') { flyToWorker(msg.to, workerAvatar(msg.from), 'task'); flashPair(msg.from, msg.to); }
+  // 짝 선처럼 짝 칩(🔗)에서 짝 칩으로 — 칩이 안 보이면(최소화 등) 캐릭터끼리
+  if (msg.kind === 'relay') { flyToWorker(msg.to, linkChipOf(msg.from) || workerAvatar(msg.from), 'task', linkChipOf(msg.to)); flashPair(msg.from, msg.to); }
   if (msg.kind === 'commit' && mgrStage >= 1) {
     const t = document.createElement('span');
     t.className = 'mgr-twinkle'; t.textContent = '✦';
@@ -3563,8 +3564,12 @@ memoForm.onsubmit = (e) => {
 const floorMin = () => $('#floor').hidden;
 const workerAvatar = (id) => (floorMin() ? dockEls : nodeEls).get(id)?.querySelector('.avatar');
 const managerEl = () => (floorMin() ? $('.brand-mark') : $('.core-dot'));
-function flyToWorker(id, fromEl, kind) {
-  const w = state.workers.find((x) => x.id === id), target = workerAvatar(id);
+function linkChipOf(id) {
+  const c = floorMin() ? null : nodeEls.get(id)?.querySelector('.nlink');
+  return c && !c.hidden && c.offsetParent ? c : null;
+}
+function flyToWorker(id, fromEl, kind, toEl = null) {
+  const w = state.workers.find((x) => x.id === id), target = toEl || workerAvatar(id);
   if (!w || !target || !fromEl) return;
   const color = charId === 'clawd-white' ? 'var(--char-white)' : avatarColor(w.name) || 'var(--accent)';
   flyNote(fromEl, target, color, `fly-note ${kind}`, () => {
@@ -5326,11 +5331,24 @@ function drawPairLinks() {
   for (const [k, hot] of pairs) {
     const [na, nb] = k.split('|').map((id) => nodeEls.get(id));
     if (!na?.isConnected || !nb?.isConnected || !na.offsetParent || !nb.offsetParent) continue;
-    const pt = (n) => { const r = n.getBoundingClientRect(); return [Math.round(r.left + r.width / 2 + scrollX), Math.round(r.top + scrollY)]; };
-    const [a, b] = [pt(na), pt(nb)];
-    // 두 카드 윗변 가운데를 위로 솟은 호로 — 같은 줄이면 무지개, 다른 줄이면 위 카드 쪽으로 더 솟게
-    const top = Math.min(a[1], b[1]), h = 26 + Math.min(70, Math.abs(a[0] - b[0]) * 0.12);
-    const d = `M${a[0]} ${a[1] - 2} C${a[0]} ${top - h} ${b[0]} ${top - h} ${b[0]} ${b[1] - 2}`;
+    // 선은 카드끼리가 아니라 카드 안의 짝 칩(🔗 W2)끼리 잇는다 — 칩이 안 보이면(가려짐 등) 카드 윗변 가운데로
+    const box = (n) => {
+      const c = $('.nlink', n), r = (c && !c.hidden && c.offsetParent ? c : n).getBoundingClientRect();
+      return { x: r.left + r.width / 2 + scrollX, top: r.top + scrollY, bottom: r.bottom + scrollY };
+    };
+    let [ra, rb] = [box(na), box(nb)];
+    if (rb.top < ra.top) [ra, rb] = [rb, ra]; // ra 가 위쪽
+    const R = Math.round;
+    let a, b, d;
+    if (rb.top - ra.top < 24) { // 같은 줄 — 두 칩 윗변에서 위로 솟은 호
+      a = [R(ra.x), R(ra.top)]; b = [R(rb.x), R(rb.top)];
+      const top = Math.min(a[1], b[1]), h = 18 + Math.min(50, Math.abs(a[0] - b[0]) * 0.1);
+      d = `M${a[0]} ${a[1]} C${a[0]} ${top - h} ${b[0]} ${top - h} ${b[0]} ${b[1]}`;
+    } else { // 다른 줄 — 위 칩 아랫변에서 아래 칩 윗변으로 S자
+      a = [R(ra.x), R(ra.bottom)]; b = [R(rb.x), R(rb.top)];
+      const my = R((a[1] + b[1]) / 2);
+      d = `M${a[0]} ${a[1]} C${a[0]} ${my} ${b[0]} ${my} ${b[0]} ${b[1]}`;
+    }
     segs.push({ d, a, b, hot, c: linkColor(k.split('|')[0]) });
   }
   const anyHot = segs.some((s) => s.hot);
@@ -5339,7 +5357,7 @@ function drawPairLinks() {
   if (sig === pairLinkSig) return;
   pairLinkSig = sig;
   svg.innerHTML = segs.map((s) => `<g class="${s.hot ? 'hot' : 'calm'}" style="--pc:${s.c}"><path class="base" d="${s.d}"/><path class="flow" d="${s.d}"/>` +
-    `<circle cx="${s.a[0]}" cy="${s.a[1] - 2}" r="3"/><circle cx="${s.b[0]}" cy="${s.b[1] - 2}" r="3"/></g>`).join('');
+    `<circle cx="${s.a[0]}" cy="${s.a[1]}" r="3"/><circle cx="${s.b[0]}" cy="${s.b[1]}" r="3"/></g>`).join('');
 }
 document.addEventListener('click', (e) => {
   const g = e.target.closest('[data-goto-worker]');
