@@ -317,17 +317,37 @@ function resolveClaude() {
 
 // ---------- 워커 ----------
 
+// Windows 에 Git Bash 가 없으면 Claude Code 는 훅 · 상태줄 명령을 PowerShell 로 돌린다. PowerShell 은 따옴표로 시작하는 줄을
+// 명령이 아니라 문자열로 읽어 '"node" "hook.mjs"' 가 구문 오류(UnexpectedToken)로 끝났다 — 훅이 한 번도 안 와 워커가 '시작 중'에
+// 머물렀다(타 PC 실측). Claude Code 가 Git Bash 를 찾는 순서대로 본다: CLAUDE_CODE_GIT_BASH_PATH → PATH 의 git.exe 옆 bin/bash.exe → 기본 설치 경로
+function hasGitBash() {
+  if (!IS_WIN) return true;
+  if (hasGitBash.v !== undefined) return hasGitBash.v;
+  const cands = [process.env.CLAUDE_CODE_GIT_BASH_PATH];
+  for (const dir of (process.env.PATH || '').split(';')) {
+    if (dir && fs.existsSync(path.join(dir, 'git.exe'))) cands.push(path.join(dir, '..', 'bin', 'bash.exe'), path.join(dir, '..', '..', 'bin', 'bash.exe'));
+  }
+  for (const pf of [process.env.ProgramFiles, process.env['ProgramFiles(x86)'], process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'Programs')]) {
+    if (pf) cands.push(path.join(pf, 'Git', 'bin', 'bash.exe'));
+  }
+  return (hasGitBash.v = cands.some((c) => { try { return !!c && fs.statSync(c).isFile(); } catch { return false; } }));
+}
+const slashPath = (p) => p.replace(/\\/g, '/');
+// node 로 스크립트를 돌리는 셸 명령 한 줄. PowerShell 에서는 & 를 앞에 붙여야 따옴표 경로를 실행한다(bash 에선 & 가 백그라운드라 붙이면 안 됨)
+const nodeCommand = (script) => `${hasGitBash() ? '' : '& '}"${slashPath(process.execPath)}" "${slashPath(path.join(APP_DIR, script))}"`;
 // 상태줄 명령 — 워커 --settings 와, 관리 설정이 있는 PC 의 사용자 설정(userstatusline.js)에 같은 것을 넣는다
-const statusLineCommand = () => `"${process.execPath.replace(/\\/g, '/')}" "${path.join(APP_DIR, 'statusline.mjs').replace(/\\/g, '/')}"`;
+const statusLineCommand = () => nodeCommand('statusline.mjs');
 
 function hookSettings() {
   // http 타입 훅은 이 환경에서 서버에 도달하지 않아(실측) command 훅 + 전달 스크립트로 보낸다.
   // 워커 식별은 hook.mjs 가 상속받는 AGENT_MANAGER_WORKER 환경변수로 한다.
   // node 는 PATH 대신 지금 서버를 돌리는 node 의 절대 경로로 — macOS 에서 .app 으로 띄우면 PATH 에
   // Homebrew 경로가 없어 'node' 를 못 찾는다. 슬래시로 통일해 Git Bash/cmd/sh 어디서 실행돼도 같게.
-  const slash = (p) => p.replace(/\\/g, '/');
-  const command = `"${slash(process.execPath)}" "${slash(path.join(APP_DIR, 'hook.mjs'))}"`;
-  const h = (timeout = 10) => [{ type: 'command', command, timeout }];
+  // Git Bash 가 없는 Windows 는 셸을 거치지 않는 실행 형식(command = 프로그램, args = 인자)으로 — Claude Code 가 그 환경에서 권하는 형식이고,
+  // 셸 문자열 훅은 거기서 실패하면 도구 사용을 막는다(종료 코드 0 · 2 만 인정). Git Bash 가 있는 PC 는 예전 그대로(args 를 모르는 옛 버전 대비)
+  const h = hasGitBash()
+    ? (timeout = 10) => [{ type: 'command', command: nodeCommand('hook.mjs'), timeout }]
+    : (timeout = 10) => [{ type: 'command', command: slashPath(process.execPath), args: [slashPath(path.join(APP_DIR, 'hook.mjs'))], timeout }];
   // StopFailure: API 오류(사용량 한도·과부하 등)로 턴이 끝나면 Stop 대신 온다 — 안 받으면 '작업 중'에 남아 대기열이 멈췄다.
   // 설정은 띄울 때 읽고 바뀌어도 다시 읽지 않아(실측 v2.1.296), 훅을 늘리면 이미 떠 있는 워커는 다시 띄워야 받는다
   const events = ['SessionStart', 'UserPromptSubmit', 'Notification', 'Stop', 'StopFailure', 'SessionEnd', 'SubagentStop'];
