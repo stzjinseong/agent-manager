@@ -366,6 +366,45 @@ function cliScreenBlocked() {
   }
   return true;
 }
+// CLI 입력창(가로선 사이 ❯ 줄)에 글이 있는가 — 서버 cliDraft 와 같은 규칙: 흐린 안내 문구(Try "…")는 빼고 기본 글자색 칸만 센다
+function cliHasDraft() {
+  const b = term.buffer.active;
+  if (b.type === 'alternate') return false;
+  const lines = [];
+  for (let i = b.baseY; i < b.baseY + term.rows; i++) lines.push(b.getLine(i));
+  const txt = lines.map((l) => l?.translateToString(true) || '');
+  let last = txt.length - 1;
+  while (last >= 0 && !txt[last].trim()) last--;
+  const rule = txt.map((t, i) => (/^\s*─{20,}/.test(t) ? i : -1)).filter((i) => i >= 0);
+  for (let k = rule.length - 1; k > 0; k--) {
+    if (last - rule[k] > 8) break;
+    let j = rule[k - 1] + 1;
+    while (j < rule[k] && /^\s*─+\s*$/.test(txt[j])) j++;
+    const at = j < rule[k] ? txt[j].search(/[❯›>]/) : -1;
+    if (at < 0 || txt[j].slice(0, at).trim()) continue;
+    for (let i = j; i < rule[k]; i++) {
+      const line = lines[i];
+      if (!line) continue;
+      for (let x = i === j ? at + 1 : 0; x < line.length; x++) {
+        const c = line.getCell(x);
+        if (c && c.getChars().trim() && c.isFgDefault() && !c.isDim()) return true;
+      }
+    }
+    return false;
+  }
+  return false;
+}
+// CLI | 채팅 토글의 반짝임 — 숨겨진 쪽 입력칸에 보내지 않은 글이 있을 때만(채팅 보기: CLI 입력창에 남은 글, CLI 보기: 채팅 입력칸에 쓰던 글)
+function segHint() {
+  const seg = $('.cv-seg');
+  if (!seg) return;
+  try { // 시작 중 chatSeg 가 chatForm 선언보다 먼저 부르면 TDZ — 페이지를 멈추지 않게(1초 뒤 다시 본다)
+    const live = !$('#detail').hidden && termSnap.id === selected;
+    seg.classList.toggle('hint-cli', Boolean(chatOpen && live && cliHasDraft()));
+    seg.classList.toggle('hint-chat', Boolean(!chatOpen && live && chatForm.text.value.trim()));
+  } catch {}
+}
+setInterval(segHint, 1000); // 입력칸을 코드로 비우는 경우(전송 등)도 따라가게 — 화면 줄 몇십 개만 보는 가벼운 확인
 let peekOn = false, peekHidden = false, peekTimer = null, peekSince = 0, peekLast = 0;
 // 화면이 아직 짧으면(막 띄운 워커 등) 메뉴가 터미널 위쪽에 그려져 채팅 칸에 가린다 → 마지막 글 줄이 드러난 칸 맨 아래에 오게 터미널을 내린다
 function peekShift() {
@@ -377,6 +416,7 @@ function peekShift() {
 function cliPeekCheck() {
   clearTimeout(peekTimer);
   peekTimer = setTimeout(() => {
+    segHint();
     const w = state.workers.find((x) => x.id === selected);
     // 결정 대기 중 권한 요청(허락 · 거절 카드)과 클로드의 질문(#cv-ask 카드)은 채팅 카드가 맡는다 — 같이 열면 엿보기가 채팅을 덮어 카드가 가려졌다.
     // 그 밖의 선택창(카드가 'CLI 에서 답하기' 하나뿐)은 CLI 로 통째로 넘기지 않고 예전처럼 아래에 터미널을 드러내 그 자리에서 고르게 한다
@@ -5839,6 +5879,7 @@ function chatSeg() {
   for (const b of document.querySelectorAll('.btn-chat')) b.classList.toggle('on', chatOpen);
   for (const b of document.querySelectorAll('.cv-seg [data-cv]')) b.classList.toggle('on', (b.dataset.cv === 'chat') === chatOpen);
   placeCvThumb(true);
+  segHint();
 }
 function syncChat(w) {
   chatSeg();
@@ -5941,6 +5982,7 @@ function chatGrow() {
   syncAttach(ta);
 }
 chatForm.text.addEventListener('input', chatGrow);
+chatForm.text.addEventListener('input', segHint);
 acceptFiles(chatForm.text);
 onEnterKey(chatForm.text, () => chatForm.requestSubmit());
 // 보내기 두 갈래(입력칸 오른쪽 버튼): 바로 전송(작업 중이어도 지금 CLI 에) · Backlog(나중에 할 작업 — 자동 실행 안 됨, ▶ 로 바로 전송).
