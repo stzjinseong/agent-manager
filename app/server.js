@@ -374,7 +374,8 @@ async function confirmInterrupt(w) {
 // 답하기 전에 중단하면 Claude Code 는 보낸 글을 CLI 입력창에 되돌려 놓는다(보내기 취소). 채팅 보기에선 그게 안 보여 말풍선은
 // '보내는 중'에 남고, 다음에 보낸 글이 그 뒤에 붙어 섞였다(실측 17:29: 'ㄴㅁㅇ' 중단 → 'ㄴㅁㅇㅁㄴㅇㄴㅁ', 'ㄴㅁㅇasd').
 // 입력창에 방금 보낸 글이 돌아와 있으면 Ctrl+C 로 비우고(글이 있을 때 Ctrl+C = 입력 지우기) 화면의 채팅 입력칸으로 돌려준다
-const restoreNorm = (t) => String(t || '').replace(/\[Image #\d+\]/g, '').replace(/(?:[A-Za-z]:[\\/]|\/)[^\s"'<>|]*?\.(?:png|jpe?g|gif|webp|bmp|svg)/gi, '').replace(/\s+/g, '');
+// cliDraft 는 빈칸을 빼고 읽어 입력창의 '[Image #1]' 이 '[Image#1]' 로 온다 — 둘 다 뺀다(공백 필수였을 때 그림만 보낸 지시를 못 알아봤다)
+const restoreNorm = (t) => String(t || '').replace(/\[Image ?#\d+\]/g, '').replace(/(?:[A-Za-z]:[\\/]|\/)[^\s"'<>|]*?\.(?:png|jpe?g|gif|webp|bmp|svg)/gi, '').replace(/\s+/g, '');
 async function restoreAfterEsc(w, at = Date.now(), unsent = null) {
   if (!workers.has(w.id) || w.status === 'exited') return false;
   const last = w.log?.findLast((l) => l.kind === 'assign' && at - l.t < 120_000)?.text;
@@ -761,31 +762,72 @@ function watchBtw(w, q) {
   setTimeout(tick, 1200);
 }
 // 들고 있던 바로 전송 글을 CLI 에 넣는다 — 도구 하나가 끝날 때(PostToolUse). 입력창에 쓰던 글이 있으면 섞이지 않게 다음 틈까지 둔다.
-// 여러 개면 말풍선 하나씩 맞춰 지워지게 따로따로(붙여 넣기 + Enter 가 120ms 걸려 400ms 간격)
+// 여러 개면 말풍선 하나씩 맞춰 지워지게 따로따로 — 앞 글의 Enter 가 나간 뒤에 다음 글을 붙인다. 400ms 고정 간격이던 때는
+// 그림 든 글의 Enter(800~2000ms 뒤)보다 다음 붙여 넣기가 먼저 가 두 글이 한 입력창에 섞였다
 const nowBusy = new Set();
+const nowLeft = new Map(); // 워커 id → 넣었지만 아직 입력창에서 빠졌는지 확인 못 한 바로 전송 글들
 async function flushNow(w) {
   if (!w.nowQ?.length || w.status !== 'working' || nowBusy.has(w.id)) return;
   nowBusy.add(w.id);
+  let list = null;
   try {
     const cli = await cliDraft(w);
     if (cli.state !== 'empty' || w.status !== 'working') return;
-    const list = w.nowQ.splice(0);
-    list.forEach((text, i) => setTimeout(() => { pasteInput(w, text); pushLog(w, 'assign', text); emitState(); }, i * 400));
-    setTimeout(() => confirmNowPaste(w, list), list.length * 400 + 1500);
+    list = w.nowQ.splice(0);
+    nowLeft.set(w.id, list);
     emitState();
+    for (const text of list) {
+      if (!workers.has(w.id) || w.status === 'exited') return;
+      const enter = pasteInput(w, text);
+      pushLog(w, 'assign', text);
+      emitState();
+      await new Promise((r) => setTimeout(r, enter + 280));
+    }
   } finally { nowBusy.delete(w.id); }
+  if (list) setTimeout(() => confirmNowPaste(w, list), 1200);
+}
+// 보낸 글(그림 경로 · [Image #N] 은 빼고)이 입력창 글에 그대로 들어 있는가
+function draftHas(sent, cliText) {
+  const s = restoreNorm(sent), c = restoreNorm(cliText);
+  return s ? c.includes(s.slice(0, 20)) : /\[Image ?#\d+\]/.test(cliText) && !c; // 그림만 보낸 지시 — 입력창에 [Image #N] 만 남음
 }
 // 넣은 글이 입력창에 그대로 남아 있으면(Enter 가 먹히지 않음 — 실측: 도구가 막 끝난 순간 붙여 넣은 글이 대기열에 안 들어가고 사라졌다)
-// Enter 를 한 번 더. 입력창이 비었으면 Claude Code 가 받아 간 것
-async function confirmNowPaste(w, list) {
-  if (!workers.has(w.id) || w.status === 'exited') return;
+// Enter 를 다시. 입력창이 비었으면 Claude Code 가 받아 간 것.
+// 한 번만 보던 때는 그 Enter 마저 놓치면(또는 글이 그림 경로로 끝나 뒤 20자 비교가 빗나가면) 턴이 끝난 뒤에도 글이 입력창에 남아
+// 일이 멈춘 것처럼 보였다 → 2초 간격으로 몇 번 더 보고, 그사이 턴이 끝났으면(입력 대기) 새 지시로 보낸다
+const NOW_CONFIRM_TRIES = 5, NOW_CONFIRM_GAP_MS = 2000;
+async function confirmNowPaste(w, list, tries = 0) {
+  if (nowLeft.get(w.id) !== list) return; // 다음 묶음이 들어왔다 — 그쪽이 본다
+  if (!workers.has(w.id) || w.status === 'exited') { nowLeft.delete(w.id); return; }
   const cli = await cliDraft(w);
-  if (cli.state !== 'draft') return;
-  const seen = cli.text.replace(/\s+/g, ''), hit = list.some((t) => { const k = t.replace(/\s+/g, '').slice(-20); return k && seen.includes(k); });
-  if (!hit) return;
+  if (nowLeft.get(w.id) !== list) return;
+  const left = cli.state === 'draft' ? list.find((t) => draftHas(t, cli.text)) : null;
+  if (!left) { if (cli.state !== 'blocked') nowLeft.delete(w.id); else if (tries < NOW_CONFIRM_TRIES) setTimeout(() => confirmNowPaste(w, list, tries + 1), NOW_CONFIRM_GAP_MS); return; }
+  if (isIdle(w)) { nowLeft.delete(w.id); submitLeft(w, left); return; }
+  if (w.status === 'working') {
+    w.term.write('\r');
+    pushLog(w, 'status', '작업 사이에 전달 — 입력창에 남아 Enter 다시 보냄');
+    emitState();
+  }
+  // 결정 대기(선택창) 중이면 누르지 않고 기다린다. 다 써도 남아 있으면 턴이 끝날 때(Stop) 한 번 더 본다(nowLeft 유지)
+  if (tries < NOW_CONFIRM_TRIES) setTimeout(() => confirmNowPaste(w, list, tries + 1), NOW_CONFIRM_GAP_MS);
+}
+// 턴이 끝났다 — 작업 중에 넣은 글이 아직 입력창에 남아 있으면 새 지시로 보낸다
+function checkNowLeft(w) {
+  const list = nowLeft.get(w.id);
+  if (list) setTimeout(() => confirmNowPaste(w, list, NOW_CONFIRM_TRIES), 600);
+}
+// 입력창에 남은 지시를 Enter 로 보낸다 — sendPrompt 와 같이 투입 확인을 건다(이미 붙여 넣은 글이라 Enter 재시도는 끝난 것으로 둔다)
+function submitLeft(w, text) {
+  cancelDispatch(w);
   w.term.write('\r');
-  pushLog(w, 'status', '작업 사이에 전달 — 입력창에 남아 Enter 다시 보냄');
+  w.status = 'working';
+  w.turnStartedAt = Date.now();
+  w.sentPrompt = { text, at: w.turnStartedAt, enterRetried: true };
+  pushLog(w, 'notice', '작업 사이에 전달한 글이 턴이 끝난 뒤에도 CLI 입력창에 남아 Enter 로 보냈습니다');
   emitState();
+  clearTimeout(confirmTimers.get(w.id));
+  confirmTimers.set(w.id, setTimeout(() => confirmPrompt(w, w.turnStartedAt), PROMPT_CONFIRM_MS));
 }
 // 턴이 끝났는데(또는 중단) 아직 못 넣은 바로 전송 글 → 대기열 맨 앞으로. 자동 투입을 끈 역할이어도 '바로' 보낸 글이라 첫 건은 보낸다
 function nowToQueue(w, send) {
@@ -986,7 +1028,9 @@ const IMG_PATH_RE = /(?:[A-Za-z]:[\\/]|\/)[^\s"'<>|]*?\.(?:png|jpe?g|gif|webp|bm
 function pasteInput(w, text) {
   w.term.write(`\x1b[200~${text}${/\\$/.test(text) ? ' ' : ''}\x1b[201~`);
   const imgs = (text.match(IMG_PATH_RE) || []).length;
-  setTimeout(() => w.term.write('\r'), imgs ? Math.min(2000, 500 + imgs * 300) : 120);
+  const enter = imgs ? Math.min(2000, 500 + imgs * 300) : 120;
+  setTimeout(() => w.term.write('\r'), enter);
+  return enter; // Enter 까지 걸리는 ms — 다음 붙여 넣기는 그 뒤에(flushNow)
 }
 function sendPrompt(w, text) {
   pasteInput(w, text);
@@ -1019,8 +1063,7 @@ async function confirmPrompt(w, at) {
   }
   // 입력창에 보낸 지시가 그대로 있는가 — 그림 경로는 입력창에서 [Image #N] 으로 바뀌므로 둘 다 빼고 비교한다(restoreNorm).
   // 원문 앞 20자로 비교하던 때는 경로로 시작하는 지시를 못 알아봐 '안 들어감'으로 보고 대기열에 되돌렸고, 입력창이 빌 때까지 영영 기다렸다
-  const sentN = restoreNorm(sent.text), cliN = restoreNorm(cli.text);
-  const inBox = cli.state === 'draft' && (sentN ? cliN.includes(sentN.slice(0, 20)) : /\[Image #\d+\]/.test(cli.text) && !cliN);
+  const inBox = cli.state === 'draft' && draftHas(sent.text, cli.text);
   if (inBox && !sent.enterRetried) {
     // Enter 만 먹히지 않았다 — 입력창의 글이 곧 보낸 지시이니 Enter 를 한 번 더 누르고 다시 확인한다
     w.term.write('\r');
@@ -1311,7 +1354,10 @@ function onHook(w, ev, res) {
     }
     case 'Notification':
       w.notice = ev.message || ev.notification_type;
-      if (ev.notification_type === 'idle_prompt') setStatus(w, w.status === 'done' || w.status === 'interrupted' ? w.status : 'idle', w.notice);
+      // 방금 보낸 지시를 확인하는 중(sentPrompt)이면 idle_prompt 로 입력 대기로 바꾸지 않는다 — 지난 턴 뒤 60초 무입력 알림이
+      // 보낸 직후에 와서 상태가 바뀌면 confirmPrompt 가 '들어갔다'로 보고 입력창에 남은 지시의 Enter 재시도를 건너뛰었다
+      if (ev.notification_type === 'idle_prompt' && w.sentPrompt) { pushLog(w, 'notice', w.notice); emitState(); }
+      else if (ev.notification_type === 'idle_prompt') setStatus(w, w.status === 'done' || w.status === 'interrupted' ? w.status : 'idle', w.notice);
       else if (['permission_prompt', 'elicitation_dialog', 'agent_needs_input'].includes(ev.notification_type)) setStatus(w, 'decision', w.notice);
       else { pushLog(w, 'notice', w.notice); emitState(); }
       break;
@@ -1344,6 +1390,7 @@ function onHook(w, ev, res) {
       rereadAfterTurn(w);
       nowToQueue(w, true);
       afterTurn(w);
+      checkNowLeft(w);
       break;
     case 'SubagentStop':
       if (ev.agent_id && w.tx) w.tx.doneAgents.add(ev.agent_id);
