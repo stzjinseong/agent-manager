@@ -413,7 +413,7 @@ async function restoreAfterEsc(w, at = Date.now(), unsent = null) {
   }
   if (cli.state !== 'draft') return false;
   const a = restoreNorm(last), c = restoreNorm(cli.text), k = Math.min(20, a.length, c.length);
-  if (!k || a.slice(0, k) !== c.slice(0, k)) return false; // 사람이 CLI 에서 직접 쓰던 다른 글이면 건드리지 않는다
+  if (!pasteFolded(last, cli.text) && (!k || a.slice(0, k) !== c.slice(0, k))) return false; // 접힌 붙여넣기도 보낸 글로 본다 · 사람이 CLI 에서 직접 쓰던 다른 글이면 건드리지 않는다
   w.term.write('\x03');
   pushLog(w, 'status', '중단 — CLI 입력창으로 돌아온 글을 비우고 채팅 입력칸으로 돌려줌');
   broadcast({ type: 'restored', id: w.id, text: last });
@@ -806,8 +806,20 @@ async function flushNow(w) {
   } finally { nowBusy.delete(w.id); }
   if (list) setTimeout(() => confirmNowPaste(w, list), 1200);
 }
+// Claude Code 는 4줄 이상 붙여 넣은 글을 입력창에 '[Pasted text #N +M lines]' 로 접어 보인다(M = 줄바꿈 수, 실측 v2.1.328).
+// cliDraft 는 빈칸을 빼고 읽어 '[Pastedtext#N+Mlines]' 로 온다. 원래 글이 화면에 없어 앞 20자 비교로는 못 알아보고
+// '안 들어감'으로 대기열에 되돌려, 입력창의 글과 사본이 따로 나가 같은 글이 두 번 들어갔다(실측 11-22 W9)
+const PASTE_FOLD_RE = /\[Pasted ?text ?#\d+(?: ?\+(\d+) ?lines?)?\]/gi;
+function pasteFolded(sent, cliText) {
+  const folds = [...String(cliText || '').matchAll(PASTE_FOLD_RE)];
+  // 접힌 표시 말고 다른 글(사람이 쓴 글 등)도 있으면 아니다
+  if (!folds.length || restoreNorm(String(cliText).replace(PASTE_FOLD_RE, ''))) return false;
+  const nl = (String(sent).match(/\n/g) || []).length;
+  return folds.some((m) => m[1] == null || Math.abs(Number(m[1]) - nl) <= 1);
+}
 // 보낸 글(그림 경로 · [Image #N] 은 빼고)이 입력창 글에 그대로 들어 있는가
 function draftHas(sent, cliText) {
+  if (pasteFolded(sent, cliText)) return true;
   const s = restoreNorm(sent), c = restoreNorm(cliText);
   return s ? c.includes(s.slice(0, 20)) : /\[Image ?#\d+\]/.test(cliText) && !c; // 그림만 보낸 지시 — 입력창에 [Image #N] 만 남음
 }
@@ -1096,6 +1108,12 @@ async function confirmPrompt(w, at) {
   if (inBox) {
     // 다시 눌러도 그대로 — 그 글이 곧 '쓰던 글'이니 사람이 보내거나 지우면 된다
     setStatus(w, 'idle', '업무 지시가 CLI 입력창에 남아 있음 — Enter 로 보내거나 지우세요');
+    return;
+  }
+  if (cli.state === 'draft') {
+    // 보낸 글로 못 알아봤지만 입력창에 글이 있다 — 보내기 직전 비어 있던 입력창이니 방금 붙여 넣은 글이다.
+    // 대기열에 되돌리면 입력창의 글과 사본이 따로 나가 같은 글이 두 번 들어간다(실측 11-22 W9)
+    setStatus(w, 'idle', '업무 지시가 CLI 입력창에 남은 것 같음 — Enter 로 보내거나 지우세요' + seenNote(cli));
     return;
   }
   w.queue.unshift(sent.text);
