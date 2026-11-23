@@ -396,6 +396,29 @@ async function confirmInterrupt(w) {
 // 입력창에 방금 보낸 글이 돌아와 있으면 Ctrl+C 로 비우고(글이 있을 때 Ctrl+C = 입력 지우기) 화면의 채팅 입력칸으로 돌려준다
 // cliDraft 는 빈칸을 빼고 읽어 입력창의 '[Image #1]' 이 '[Image#1]' 로 온다 — 둘 다 뺀다(공백 필수였을 때 그림만 보낸 지시를 못 알아봤다)
 const restoreNorm = (t) => String(t || '').replace(/\[Image ?#\d+\]/g, '').replace(/(?:[A-Za-z]:[\\/]|\/)[^\s"'<>|]*?\.(?:png|jpe?g|gif|webp|bmp|svg)/gi, '').replace(/\s+/g, '');
+// 보낸 그림 지시의 원문 기록. Claude Code 는 붙여 넣은 그림 경로를 [Image #N] 으로 바꿔 대화 기록(jsonl)에 남기고 경로 원문은 버린다.
+// 평소엔 뒤따르는 메타 줄([Image: source: 경로])로 썸네일을 붙였지만, 작업 중에 보내 CLI 대기열을 거친 글(queued_command)은
+// 그 줄이 없어 썸네일 없이 '이미지 N개'만 보였다(실측 11-23 W245). 앱이 보낸 원문을 들고 있다가 채팅 보기에서 되돌려 준다(chatRestore).
+// 워커에 붙여 두면 workers.json 에 같이 저장돼 서버를 다시 켜도 남는다
+const SENT_IMG_MAX = 50, SENT_IMG_WINDOW = 15 * 60_000;
+function noteSentImages(w, text) {
+  (w.sentImgs ||= []).push({ text, at: Date.now() });
+  if (w.sentImgs.length > SENT_IMG_MAX) w.sentImgs.splice(0, w.sentImgs.length - SENT_IMG_MAX);
+  saveWorkersSoon();
+}
+// 채팅 요청 항목(k:'u')을 보낸 원문으로 되돌린다. 경로와 [Image #N] 을 뺀 글이 같고 시각이 가장 가까운 기록을 고른다
+function chatRestore(w, x) {
+  if (x.k !== 'u' || !x.img || !w.sentImgs?.length) return x;
+  const key = x.text === '(이미지)' ? '' : restoreNorm(x.text);
+  let best = null;
+  for (const s of w.sentImgs) {
+    const d = x.ts - s.at;
+    if (d < -5_000 || d > SENT_IMG_WINDOW || restoreNorm(s.text) !== key) continue;
+    if (!best || Math.abs(d) < Math.abs(x.ts - best.at)) best = s;
+  }
+  // 원문의 업로드 경로로 썸네일이 붙는다(화면 uploadsIn). 메타 줄로 온 files 와 겹쳐도 화면이 같은 파일을 한 번만 그린다
+  return best ? { ...x, text: best.text } : x;
+}
 async function restoreAfterEsc(w, at = Date.now(), unsent = null) {
   if (!workers.has(w.id) || w.status === 'exited') return false;
   const last = w.log?.findLast((l) => l.kind === 'assign' && at - l.t < 120_000)?.text;
@@ -1060,6 +1083,7 @@ const IMG_PATH_RE = /(?:[A-Za-z]:[\\/]|\/)[^\s"'<>|]*?\.(?:png|jpe?g|gif|webp|bm
 function pasteInput(w, text) {
   w.term.write(`\x1b[200~${text}${/\\$/.test(text) ? ' ' : ''}\x1b[201~`);
   const imgs = (text.match(IMG_PATH_RE) || []).length;
+  if (imgs) noteSentImages(w, text);
   const enter = imgs ? Math.min(2000, 500 + imgs * 300) : 120;
   setTimeout(() => w.term.write('\r'), enter);
   return enter; // Enter 까지 걸리는 ms — 다음 붙여 넣기는 그 뒤에(flushNow)
@@ -2496,7 +2520,7 @@ const server = http.createServer(async (req, res) => {
     const full = q.get('gen') !== gen;
     // 다시 읽은 세션은 셸 명령 수정(파일에서 복원)이 칩에 표시돼 있지 않다 — 보낼 때 얹는다
     const shellIds = new Set((tx.shellEdits || []).map((x) => x.toolUseId));
-    const items = (full ? tx.chat : tx.chat.filter((x) => x.rev > since)).map((x) => x.k === 't' && !x.ed && shellIds.has(x.id) ? { ...x, ed: 1 } : x);
+    const items = (full ? tx.chat : tx.chat.filter((x) => x.rev > since)).map((x) => x.k === 't' && !x.ed && shellIds.has(x.id) ? { ...x, ed: 1 } : chatRestore(w, x));
     return json(res, 200, { gen, rev: tx.chatRev, full, items });
   }
 
