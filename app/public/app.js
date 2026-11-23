@@ -5179,8 +5179,11 @@ const chatImgSrc = (href) => /^(?:https?:|data:image\/)/i.test(href) || /^\/(?:u
 // 이 PC 경로로 시작하고 그림 확장자로 끝나는 ![설명](경로) 는 <경로> 로 감싸 준다(서버 chat-image 는 답 원문에서 ](경로 를 찾으므로 그대로 맞는다)
 // 코드(``` 블록 · `한 줄`) 안은 예시 글이라 건드리지 않는다
 const CHAT_IMG_PATH_RE = /(```[\s\S]*?```|`[^`\n]*`)|!\[([^\]\n]*)\]\(((?:[A-Za-z]:[\\/]|\/|~[\\/])[^<>\n]*?\.(?:png|jpe?g|gif|webp|bmp))\)/gi;
+// 마크다운은 링크 주소 안의 '\문장부호' 도 이스케이프로 풀어 '\' 를 지운다 — Windows 경로 'QAReports\_capture' 가 'QAReports_capture' 로
+// 바뀌어 없는 파일을 찾았다(실측 11-23 W245 '02b_main.jpg' Could not load image). 문장부호 앞 '\' 를 두 번 써서 원래 경로가 나오게 한다
+const mdPathEsc = (p) => p.replace(/\\(?=[!-/:-@[-`{-~])/g, '\\\\');
 function chatMdParse(text) {
-  text = String(text).replace(CHAT_IMG_PATH_RE, (m, code, alt, p) => code ?? `![${alt}](<${p}>)`);
+  text = String(text).replace(CHAT_IMG_PATH_RE, (m, code, alt, p) => code ?? `![${alt}](<${mdPathEsc(p)}>)`);
   chatMarked ??= new marked.Marked({ renderer: {
     image(href, title, alt) {
       if (!href) return false;
