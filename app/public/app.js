@@ -2397,7 +2397,12 @@ document.addEventListener('click', (e) => {
   if (img && !mod) {
     e.preventDefault();
     if (txt) openText(a.getAttribute('href'), a.dataset.txt);
-    else if (vid) openVideo(a.getAttribute('href'), { cap: a.dataset.vid }); else openShot(a.getAttribute('href'), { cap: a.dataset.img });
+    else if (vid) openVideo(a.getAttribute('href'), { cap: a.dataset.vid });
+    else {
+      // 같은 묶음(채팅의 결과물 묶음 · 카드의 결과물 줄)에 나란한 그림 타일끼리 ← → 로 넘긴다 — 화면에 보이는 순서 그대로
+      const sib = [...a.parentElement.children].filter((x) => x.tagName === 'A' && x.className === a.className && x.dataset.img != null);
+      openShot(a.getAttribute('href'), { cap: a.dataset.img, list: sib.length > 1 ? sib.map((x) => ({ url: x.getAttribute('href'), cap: x.dataset.img })) : null });
+    }
     return;
   }
   if (!LOCAL_VIEW || (mod && !img)) return;
@@ -2541,10 +2546,10 @@ function fileActs(box, cur) {
   bar.addEventListener('pointerdown', (e) => e.stopPropagation());
   (box.querySelector('.tv-head') || box).append(bar);
 }
-function openShot(url, single) { // single: { cap, kind? } — 결과물(또는 kind) 그림 한 장(넘기기·보관 안내 없음)
+function openShot(url, single) { // single: { cap, kind?, list? } — 결과물(또는 kind) 그림(보관 안내 없음). list: [{ url, cap }] 면 그 안에서 ← → 로 넘긴다
   const upload = url.startsWith('/uploads/');
   const id = url.split('/')[2];
-  const list = upload || single ? [] : state.workers.find((w) => w.id === id)?.shots || [];
+  const list = single?.list || (upload || single ? [] : state.workers.find((w) => w.id === id)?.shots || []);
   let i = Math.max(0, list.findIndex((s) => s.url === url));
   const box = el(`<div class="shot-view" title="${_t('바깥을 누르거나 Esc 로 닫기')}">
     <button class="shot-nav prev" title="${_t('이전 캡처 (←)')}">‹</button>
@@ -2576,7 +2581,7 @@ function openShot(url, single) { // single: { cap, kind? } — 결과물(또는 
     const s = list[i] || { url, tool: '', arg: '' };
     z = 1; tx = ty = 0; paint();
     $('img', box).src = s.url;
-    $('.cap', box).textContent = single ? `${_t(single.kind || '결과물')} · ${single.cap}` : upload ? `${_t('사람이 첨부')} · data/uploads/${decodeURIComponent(url.slice('/uploads/'.length))}` : [s.tool, s.arg].filter(Boolean).join(' · ');
+    $('.cap', box).textContent = single ? `${_t(single.kind || '결과물')} · ${s.cap || single.cap}` : upload ? `${_t('사람이 첨부')} · data/uploads/${decodeURIComponent(url.slice('/uploads/'.length))}` : [s.tool, s.arg].filter(Boolean).join(' · ');
     $('.meta', box).textContent = list.length ? `${i + 1} / ${list.length}${s.t ? ` · ${new Date(s.t + clockSkew).toLocaleString(uiLocale(), { hour12: false })}` : ''}` : '';
     $('.note', box).textContent = single?.kind ? '' : single ? _t(LOCAL_VIEW ? '결과물 카드를 Ctrl/⌘+클릭하면 OS 기본 앱으로 엽니다.' : '결과물 카드를 Ctrl/⌘+클릭하면 새 탭에서 엽니다.') : upload ? _t('첨부 원본을 그대로 보여 줍니다 (7일 지나면 정리됨).') : _t('이미지는 최대 {n}장까지 관리됩니다.', { n: state.shotKeep || 50 });
     $('.prev', box).disabled = i <= 0;
