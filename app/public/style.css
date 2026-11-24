@@ -3021,3 +3021,7 @@ body.term-full #detail.chat-mode { --full-side-w: 0px; }
 .core-dot .core-mark { animation: mgr-idle 1.5s steps(6, jump-none) infinite alternate !important; will-change: transform; }
 @keyframes mgr-idle { from { transform: none; } to { transform: translateY(-6px); } }
 @media (prefers-reduced-motion: reduce) { .core-dot .core-mark { animation: none !important; } }
+
+/* 키보드로 고른 워커 카드(Alt+] / Alt+[) — Enter 로 연다 */
+.node.kbd-focus, .dchip.kbd-focus { outline: 2px solid var(--accent); outline-offset: 3px; }
+.node:focus:not(.kbd-focus), .dchip:focus:not(.kbd-focus) { outline: none; }

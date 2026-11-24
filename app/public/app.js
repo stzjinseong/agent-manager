@@ -1777,6 +1777,55 @@ $('#dock-list').addEventListener('click', (e) => {
   else select(c.dataset.id);
 });
 
+// ---------- 키보드로 워커 카드 넘나들기 ----------
+// Alt+] 다음(오른쪽) · Alt+[ 이전(왼쪽) 워커 카드에 포커스, Enter 면 그 카드를 연다. 대기실 카드는 건너뛴다.
+// 입력칸 · 터미널(xterm)에 포커스가 있어도 먼저 받도록 window 캡처 단계에서 듣는다. Ctrl+Tab 은 브라우저가 탭 이동에 먼저 써서 페이지가 못 받는다.
+// e.code 로 보므로 한글 입력 상태에서도 같다. Esc 면 포커스를 원래 자리로 돌려준다
+let cardKbdBack = null; // 단축키를 누르기 전 포커스가 있던 곳
+let cardKbdId = null; // 지금 고른 카드 — 카드 순서가 바뀌어 DOM 에서 옮겨지면 포커스가 풀리므로 포커스 대신 이 값으로 다음 카드를 센다
+const kbdCards = () => [...($('#floor').hidden ? document.querySelectorAll('#dock-list .dchip[data-id]:not(.socket)') : document.querySelectorAll('#nodes .node[data-id]:not(.socket)'))]
+  .filter((c) => c.offsetParent !== null);
+window.addEventListener('keydown', (e) => {
+  if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || (e.code !== 'BracketRight' && e.code !== 'BracketLeft')) return;
+  const list = kbdCards();
+  if (!list.length) return;
+  e.preventDefault(); e.stopPropagation();
+  if (!cardKbdId) cardKbdBack = document.activeElement;
+  const from = list.findIndex((c) => c.dataset.id === (cardKbdId || selected));
+  const step = e.code === 'BracketRight' ? 1 : -1;
+  const next = list[from < 0 ? (step > 0 ? 0 : list.length - 1) : (from + step + list.length) % list.length];
+  document.querySelectorAll('.kbd-focus').forEach((c) => c.classList.remove('kbd-focus'));
+  cardKbdId = next.dataset.id;
+  next.classList.add('kbd-focus');
+  next.tabIndex = -1;
+  next.focus();
+  next.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}, true);
+document.addEventListener('keydown', (e) => {
+  const c = e.target.closest?.('.kbd-focus');
+  if (!c || e.isComposing || e.altKey || e.ctrlKey || e.metaKey) return;
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    c.classList.remove('kbd-focus');
+    cardKbdBack = cardKbdId = null;
+    if (c.dataset.id === selected && !$('#detail').hidden) chatOpen ? chatForm.text.focus() : term.focus(); // 이미 열린 워커 — 입력하던 곳으로
+    else {
+      select(c.dataset.id);
+      // select 는 채팅이면 입력칸에 포커스를 주지만 터미널이면 그대로 둔다 — 키보드로 열었으니 바로 칠 수 있게 터미널로(select 의 rAF 뒤에)
+      if (!chatOpen && !TOUCH) requestAnimationFrame(() => requestAnimationFrame(() => term.focus()));
+    }
+  } else if (e.key === 'Escape') {
+    e.preventDefault();
+    c.classList.remove('kbd-focus');
+    const back = cardKbdBack;
+    cardKbdBack = cardKbdId = null;
+    back?.focus?.();
+  }
+});
+document.addEventListener('focusout', (e) => { if (e.target.classList?.contains('kbd-focus')) e.target.classList.remove('kbd-focus'); });
+// 다른 곳(입력칸 · 버튼 · 마우스 클릭)으로 옮겨 가면 고르던 것을 끝낸다
+document.addEventListener('focusin', (e) => { if (cardKbdId && !e.target.classList?.contains('kbd-focus')) cardKbdId = cardKbdBack = null; });
+
 const FLOOR_MIN_KEY = 'am.floorMin';
 // 최소화/펼치기 연출 — 판이 위로 접히며(카드는 차례로 살짝 떠오르며 흐려짐) 높이가 줄고, 칩 줄이 헤더 아래에서 내려온다.
 // 펼치면 거꾸로: 칩 줄이 걷히고 판 높이가 늘며 카드가 차례로 나타나고, 회로선은 다 펼친 뒤 흐릿하게. 판 높이가 부드럽게 변해
