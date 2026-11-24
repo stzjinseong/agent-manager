@@ -1778,48 +1778,103 @@ $('#dock-list').addEventListener('click', (e) => {
 });
 
 // ---------- 키보드로 워커 카드 넘나들기 ----------
-// Alt+] 다음(오른쪽) · Alt+[ 이전(왼쪽) 워커 카드에 포커스, Enter 면 그 카드를 연다. 대기실 카드는 건너뛴다.
-// 입력칸 · 터미널(xterm)에 포커스가 있어도 먼저 받도록 window 캡처 단계에서 듣는다. Ctrl+Tab 은 브라우저가 탭 이동에 먼저 써서 페이지가 못 받는다.
-// e.code 로 보므로 한글 입력 상태에서도 같다. Esc 면 포커스를 원래 자리로 돌려준다
+// Alt+← → 이전 · 다음 카드(순서대로, 끝에서 반대쪽으로) · Alt+↑ ↓ 화면 위 · 아래 카드에 포커스. 대기실 카드도 고른다. 고른 카드에서
+//   Enter: 워커면 연다(카드 클릭과 같음) · 대기실 카드면 투입(확인창)
+//   (Alt 없이) ↑: 워커를 대기 상태로(세션만 종료 — 카드는 대기실로, 확인창) · ↓: 대기실 카드만 투입(확인창, 지난 세션 이어서)
+//   Esc: 그만 고르고 원래 포커스로
+// 확인창(ask)은 Enter 확인 · Esc 취소. 입력칸 · 터미널(xterm)에 포커스가 있어도 먼저 받도록 window 캡처 단계에서 듣는다.
+// Ctrl+Tab 은 브라우저가 탭 이동에 먼저 써서 페이지가 못 받아 이 키들을 쓴다. Alt+← → 의 뒤로 · 앞으로는 막는다
 let cardKbdBack = null; // 단축키를 누르기 전 포커스가 있던 곳
-let cardKbdId = null; // 지금 고른 카드 — 카드 순서가 바뀌어 DOM 에서 옮겨지면 포커스가 풀리므로 포커스 대신 이 값으로 다음 카드를 센다
-const kbdCards = () => [...($('#floor').hidden ? document.querySelectorAll('#dock-list .dchip[data-id]:not(.socket)') : document.querySelectorAll('#nodes .node[data-id]:not(.socket)'))]
-  .filter((c) => c.offsetParent !== null);
-window.addEventListener('keydown', (e) => {
-  if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || (e.code !== 'BracketRight' && e.code !== 'BracketLeft')) return;
-  const list = kbdCards();
-  if (!list.length) return;
-  e.preventDefault(); e.stopPropagation();
-  if (!cardKbdId) cardKbdBack = document.activeElement;
-  const from = list.findIndex((c) => c.dataset.id === (cardKbdId || selected));
-  const step = e.code === 'BracketRight' ? 1 : -1;
-  const next = list[from < 0 ? (step > 0 ? 0 : list.length - 1) : (from + step + list.length) % list.length];
+let cardKbdId = null; // 지금 고른 카드 키 — 카드 순서가 바뀌어 DOM 에서 옮겨지면 포커스가 풀리므로 포커스 대신 이 값으로 다음 카드를 센다
+const kbdKey = (c) => c.dataset.id || `P:${c.dataset.profile}`; // 워커는 id, 대기실 카드는 역할 이름
+const kbdCards = () => [...($('#floor').hidden ? document.querySelectorAll('#dock-list .dchip:is([data-id], .socket)') : document.querySelectorAll('#nodes .node:is([data-id], .socket)'))]
+  .filter((c) => c.offsetParent !== null && (c.dataset.id || c.dataset.profile));
+function kbdPick(next) {
   document.querySelectorAll('.kbd-focus').forEach((c) => c.classList.remove('kbd-focus'));
-  cardKbdId = next.dataset.id;
+  cardKbdId = kbdKey(next);
   next.classList.add('kbd-focus');
   next.tabIndex = -1;
   next.focus();
   next.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+// 확인창을 취소했으면 그 카드를 다시 고른 상태로(이어서 Alt+방향키 · Esc). 카드가 사라졌으면 단축키 전 자리로
+function kbdKeep(c, back) {
+  if (c.isConnected && c.offsetParent !== null) { kbdPick(c); cardKbdBack = back; }
+  else if (back?.isConnected) back.focus?.();
+}
+// 고르기를 끝내고 단축키 전 자리로 포커스를 돌려준다
+function kbdDone(c, restore = true) {
+  c?.classList.remove('kbd-focus');
+  const back = cardKbdBack;
+  cardKbdBack = cardKbdId = null;
+  if (restore && back?.isConnected) back.focus?.();
+}
+// 위 · 아래(Alt+↑ ↓): 그 방향에 있고 가로로 겹치는(같은 열) 카드 중 가장 가까운 것. 없으면 그대로 — 다른 열로 튀지 않게
+function kbdVertical(list, from, dir) {
+  const r0 = from.getBoundingClientRect(), cx = r0.left + r0.width / 2, cy = r0.top + r0.height / 2;
+  let best = null, bestScore = Infinity;
+  for (const c of list) {
+    if (c === from) continue;
+    const r = c.getBoundingClientRect(), dy = (r.top + r.height / 2 - cy) * dir;
+    if (dy <= 4 || r.right <= r0.left || r.left >= r0.right) continue;
+    const score = Math.abs(r.left + r.width / 2 - cx) + dy;
+    if (score < bestScore) { bestScore = score; best = c; }
+  }
+  return best;
+}
+const KBD_ARROWS = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: 2, ArrowUp: -2 };
+window.addEventListener('keydown', (e) => {
+  const dir = KBD_ARROWS[e.key];
+  if (!dir || !e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+  if (!$('#ask-modal').hidden) return; // 확인창이 떠 있는 동안은 움직이지 않는다
+  const list = kbdCards();
+  if (!list.length) return;
+  // 좌우는 브라우저의 뒤로 · 앞으로 키이기도 하다 — 막아야 페이지가 넘어가지 않는다
+  e.preventDefault(); e.stopPropagation();
+  if (!cardKbdId) cardKbdBack = document.activeElement;
+  const from = list.findIndex((c) => kbdKey(c) === (cardKbdId || selected));
+  let next;
+  if (from < 0) next = dir > 0 ? list[0] : list.at(-1);
+  else if (Math.abs(dir) === 1) next = list[(from + dir + list.length) % list.length];
+  else next = kbdVertical(list, list[from], Math.sign(dir)) || list[from];
+  kbdPick(next);
 }, true);
+// 대기실 카드 투입 — 마우스 ▶ 와 같은 지난 세션 이어서(launchProfile 이 새 워커를 열어 준다)
+async function kbdLaunch(c) {
+  const name = c.dataset.profile, back = cardKbdBack;
+  kbdDone(c, false);
+  if (await ask({ title: _t('"{name}" 를 투입할까요?', { name }), body: _t('대기실의 이 역할로 Claude 를 시작합니다. 지난 세션이 있으면 이어서 시작해요.'), ok: _t('투입') })) launchProfile(name, false);
+  else kbdKeep(c, back); // 취소 — 그 카드를 계속 고른 채로
+}
 document.addEventListener('keydown', (e) => {
   const c = e.target.closest?.('.kbd-focus');
-  if (!c || e.isComposing || e.altKey || e.ctrlKey || e.metaKey) return;
+  if (!c || e.isComposing || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+  const socket = c.classList.contains('socket');
   if (e.key === 'Enter') {
     e.preventDefault();
-    c.classList.remove('kbd-focus');
-    cardKbdBack = cardKbdId = null;
+    if (socket) return kbdLaunch(c);
+    kbdDone(c, false);
     if (c.dataset.id === selected && !$('#detail').hidden) chatOpen ? chatForm.text.focus() : term.focus(); // 이미 열린 워커 — 입력하던 곳으로
     else {
       select(c.dataset.id);
       // select 는 채팅이면 입력칸에 포커스를 주지만 터미널이면 그대로 둔다 — 키보드로 열었으니 바로 칠 수 있게 터미널로(select 의 rAF 뒤에)
       if (!chatOpen && !TOUCH) requestAnimationFrame(() => requestAnimationFrame(() => term.focus()));
     }
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (socket) return toast(_t('이미 대기실에 있는 카드예요'), 2000);
+    const w = state.workers.find((x) => x.id === c.dataset.id);
+    if (!w || w.status === 'exited') return toast(_t('이미 끝난 세션이에요'), 2000);
+    const back = cardKbdBack;
+    kbdDone(c, false);
+    endSession(c).then((ok) => ok ? back?.isConnected && back.focus?.() : kbdKeep(c, back));
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (!socket) return toast(_t('투입은 대기실 카드에서만 돼요'), 2000);
+    kbdLaunch(c);
   } else if (e.key === 'Escape') {
     e.preventDefault();
-    c.classList.remove('kbd-focus');
-    const back = cardKbdBack;
-    cardKbdBack = cardKbdId = null;
-    back?.focus?.();
+    kbdDone(c);
   }
 });
 document.addEventListener('focusout', (e) => { if (e.target.classList?.contains('kbd-focus')) e.target.classList.remove('kbd-focus'); });
@@ -3267,6 +3322,7 @@ async function endSession(n, confirm = true) {
   if (!w || w.status === 'exited') return;
   if (confirm && !(await ask({ title: _t('"{name}" 세션을 종료할까요?', { name: w.name }), body: _t('실행 중인 Claude 세션만 끝냅니다. 카드는 대기실에 남아 다시 투입할 수 있어요.'), ok: _t('세션 종료'), danger: true }))) return;
   await api(`/api/workers/${w.id}/kill`);
+  return true;
 }
 // 카드·칩 제거 — 휴지통에 놓거나 터치 기기의 카드 메뉴에서
 async function removeCard(n, confirm = true) {
