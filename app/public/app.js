@@ -1799,7 +1799,7 @@ const kbdTip = document.body.appendChild(el('<div class="kbd-tip" hidden></div>'
 function kbdTipHtml(c) {
   const k = (keys, text) => `<span><kbd>${keys}</kbd>${text}</span>`;
   const socket = c.classList.contains('socket');
-  return [k('Alt+←→↑↓', _t('이동')), socket ? k('Enter / ↓', _t('투입')) : k('Enter', _t('열기')), socket ? '' : k('↑', _t('대기로')), k('Esc', _t('닫기'))].join('');
+  return [k('Alt+←→↑↓', _t('이동')), socket ? k('Enter / ↓', _t('투입')) : k('Enter', _t('열기')), socket ? '' : k('↑', _t('대기로')), k('Esc', _t('취소'))].join('');
 }
 // 커서 모드 동안 매 프레임: 카드가 다시 그려져도 표시를 다시 붙이고, 딤드 구멍 · 키 안내 위치를 맞춘다
 function kbdFrame() {
