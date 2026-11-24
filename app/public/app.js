@@ -1778,108 +1778,154 @@ $('#dock-list').addEventListener('click', (e) => {
 });
 
 // ---------- 키보드로 워커 카드 넘나들기 ----------
-// Alt+← → 이전 · 다음 카드(순서대로, 끝에서 반대쪽으로) · Alt+↑ ↓ 화면 위 · 아래 카드에 포커스. 대기실 카드도 고른다. 고른 카드에서
+// Alt+방향키로 카드 커서를 켜고 옮긴다(대기실 카드 포함). 커서가 켜진 동안(커서 모드)
 //   Enter: 워커면 연다(카드 클릭과 같음) · 대기실 카드면 투입(확인창)
-//   (Alt 없이) ↑: 워커를 대기 상태로(세션만 종료 — 카드는 대기실로, 확인창) · ↓: 대기실 카드만 투입(확인창, 지난 세션 이어서)
-//   Esc: 그만 고르고 원래 포커스로
-// 확인창(ask)은 Enter 확인 · Esc 취소. 입력칸 · 터미널(xterm)에 포커스가 있어도 먼저 받도록 window 캡처 단계에서 듣는다.
+//   ↑: 워커를 대기 상태로(세션만 종료 — 카드는 대기실로, 확인창) · ↓: 대기실 카드 투입(확인창, 지난 세션 이어서)
+//   Esc: 커서를 끄고 원래 포커스로 · 그 밖의 키: 커서를 끄고 원래 자리로 돌아가 그 키가 그대로 들어간다 · 마우스 클릭: 커서만 끈다
+// 확인창(ask)은 Enter 확인 · Esc 취소. 커서 모드는 포커스가 아니라 cardKbdId 로 유지한다 — 실행 중인 워커 카드는 상태가 바뀔
+// 때마다 다시 그려져(클래스 교체 · 순서가 바뀌면 DOM 이동) 포커스로 들고 있으면 1~2초 만에 커서가 풀렸다. 키는 window 캡처 단계에서
+// 받아 입력칸 · 터미널(xterm)에 포커스가 있어도 먼저 받는다. 커서 모드 동안 카드판 밖은 어둡게 하고 카드 옆에 키 안내를 띄운다(rAF 로 따라감).
 // Ctrl+Tab 은 브라우저가 탭 이동에 먼저 써서 페이지가 못 받아 이 키들을 쓴다. Alt+← → 의 뒤로 · 앞으로는 막는다
-let cardKbdBack = null; // 단축키를 누르기 전 포커스가 있던 곳
-let cardKbdId = null; // 지금 고른 카드 키 — 카드 순서가 바뀌어 DOM 에서 옮겨지면 포커스가 풀리므로 포커스 대신 이 값으로 다음 카드를 센다
-const kbdKey = (c) => c.dataset.id || `P:${c.dataset.profile}`; // 워커는 id, 대기실 카드는 역할 이름
+let cardKbdBack = null; // 커서를 켜기 전 포커스가 있던 곳
+let cardKbdId = null; // 커서가 있는 카드 키(워커 id · 대기실 'P:역할 이름'). null 이면 커서 모드가 아니다
+let kbdRaf = 0;
+const kbdKey = (c) => c.dataset.id || `P:${c.dataset.profile}`;
 const kbdCards = () => [...($('#floor').hidden ? document.querySelectorAll('#dock-list .dchip:is([data-id], .socket)') : document.querySelectorAll('#nodes .node:is([data-id], .socket)'))]
   .filter((c) => c.offsetParent !== null && (c.dataset.id || c.dataset.profile));
-function kbdPick(next) {
-  document.querySelectorAll('.kbd-focus').forEach((c) => c.classList.remove('kbd-focus'));
-  cardKbdId = kbdKey(next);
-  next.classList.add('kbd-focus');
-  next.tabIndex = -1;
-  next.focus();
-  next.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+const kbdCard = () => cardKbdId && kbdCards().find((c) => kbdKey(c) === cardKbdId);
+// 딤드는 카드판(구멍) 둘레를 사각형 넷으로 덮는다 — 큰 box-shadow 로 구멍을 내던 때는 상세 화면이 열려 스크롤된 상태에서 그려지지 않았다
+const kbdDim = document.body.appendChild(el('<div class="kbd-dim" hidden><i></i><i></i><i></i><i></i></div>'));
+const kbdTip = document.body.appendChild(el('<div class="kbd-tip" hidden></div>'));
+function kbdTipHtml(c) {
+  const k = (keys, text) => `<span><kbd>${keys}</kbd>${text}</span>`;
+  const socket = c.classList.contains('socket');
+  return [k('Alt+←→↑↓', _t('이동')), socket ? k('Enter / ↓', _t('투입')) : k('Enter', _t('열기')), socket ? '' : k('↑', _t('대기로')), k('Esc', _t('닫기'))].join('');
 }
-// 확인창을 취소했으면 그 카드를 다시 고른 상태로(이어서 Alt+방향키 · Esc). 카드가 사라졌으면 단축키 전 자리로
-function kbdKeep(c, back) {
-  if (c.isConnected && c.offsetParent !== null) { kbdPick(c); cardKbdBack = back; }
-  else if (back?.isConnected) back.focus?.();
+// 커서 모드 동안 매 프레임: 카드가 다시 그려져도 표시를 다시 붙이고, 딤드 구멍 · 키 안내 위치를 맞춘다
+function kbdFrame() {
+  kbdRaf = 0;
+  if (!cardKbdId) return;
+  const c = kbdCard();
+  if (!c) return void kbdOff(true); // 카드가 사라졌다(종료 · 제거) — 커서를 끈다
+  document.querySelectorAll('.kbd-focus').forEach((x) => x !== c && x.classList.remove('kbd-focus'));
+  if (!c.classList.contains('kbd-focus')) c.classList.add('kbd-focus');
+  const area = ($('#floor').hidden ? $('#dock') : $('#floor')).getBoundingClientRect();
+  const [t, b, l, r2] = kbdDim.children, top = Math.max(0, area.top), bot = Math.min(innerHeight, area.bottom);
+  Object.assign(t.style, { left: 0, top: 0, width: '100%', height: `${top}px` });
+  Object.assign(b.style, { left: 0, top: `${bot}px`, width: '100%', height: `${Math.max(0, innerHeight - bot)}px` });
+  Object.assign(l.style, { left: 0, top: `${top}px`, width: `${Math.max(0, area.left)}px`, height: `${Math.max(0, bot - top)}px` });
+  Object.assign(r2.style, { left: `${area.right}px`, top: `${top}px`, width: `${Math.max(0, innerWidth - area.right)}px`, height: `${Math.max(0, bot - top)}px` });
+  const r = c.getBoundingClientRect(), html = kbdTipHtml(c);
+  if (kbdTip.dataset.html !== html) { kbdTip.innerHTML = html; kbdTip.dataset.html = html; }
+  const tw = kbdTip.offsetWidth, th = kbdTip.offsetHeight;
+  const below = r.bottom + 8 + th <= innerHeight;
+  kbdTip.style.left = `${Math.max(8, Math.min(innerWidth - tw - 8, r.left + r.width / 2 - tw / 2))}px`;
+  kbdTip.style.top = `${below ? r.bottom + 8 : Math.max(8, r.top - th - 8)}px`;
+  kbdRaf = requestAnimationFrame(kbdFrame);
 }
-// 고르기를 끝내고 단축키 전 자리로 포커스를 돌려준다
-function kbdDone(c, restore = true) {
-  c?.classList.remove('kbd-focus');
+function kbdPick(c) {
+  if (!cardKbdId) { cardKbdBack = document.activeElement; document.body.classList.add('kbd-mode'); kbdDim.hidden = kbdTip.hidden = false; }
+  cardKbdId = kbdKey(c);
+  c.tabIndex = -1;
+  c.focus({ preventScroll: true }); // 글자가 입력칸으로 새지 않게(포커스를 잃어도 커서 모드는 cardKbdId 로 유지)
+  c.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  cancelAnimationFrame(kbdRaf);
+  kbdFrame();
+}
+// 커서 모드를 끈다. restore 면 커서를 켜기 전 자리로 포커스를 돌려준다. 그 자리를 돌려준다
+function kbdOff(restore = false) {
   const back = cardKbdBack;
-  cardKbdBack = cardKbdId = null;
+  cardKbdId = cardKbdBack = null;
+  cancelAnimationFrame(kbdRaf); kbdRaf = 0;
+  document.querySelectorAll('.kbd-focus').forEach((x) => x.classList.remove('kbd-focus'));
+  document.body.classList.remove('kbd-mode');
+  kbdDim.hidden = kbdTip.hidden = true;
   if (restore && back?.isConnected) back.focus?.();
+  return back;
 }
-// 위 · 아래(Alt+↑ ↓): 그 방향에 있고 가로로 겹치는(같은 열) 카드 중 가장 가까운 것. 없으면 그대로 — 다른 열로 튀지 않게
-function kbdVertical(list, from, dir) {
-  const r0 = from.getBoundingClientRect(), cx = r0.left + r0.width / 2, cy = r0.top + r0.height / 2;
-  let best = null, bestScore = Infinity;
-  for (const c of list) {
-    if (c === from) continue;
-    const r = c.getBoundingClientRect(), dy = (r.top + r.height / 2 - cy) * dir;
-    if (dy <= 4 || r.right <= r0.left || r.left >= r0.right) continue;
-    const score = Math.abs(r.left + r.width / 2 - cx) + dy;
-    if (score < bestScore) { bestScore = score; best = c; }
+// 다음 카드 고르기 — 화면 배치 기준.
+// 좌우: 그 방향에 있고 높이가 비슷한(가운데 세로 차이가 두 카드 높이 평균 또는 120px 안) 카드 중 가까운 것. 칸 안에 위아래로 쌓인
+//   대기실 카드에서 → 를 누르면 아래 카드가 아니라 오른쪽 칸으로 간다(예전엔 DOM 순서라 아래로 갔다). 그쪽에 없으면 다음 줄 맨 앞
+//   (← 는 윗줄 맨 끝), 그래도 없으면 반대쪽 끝
+// 위아래: 그 방향에 있고 가로로 겹치는(같은 열) 카드 중 가까운 것. 없으면 그대로 — 다른 열로 튀지 않게
+function kbdNext(list, from, key) {
+  const box = (c) => { const r = c.getBoundingClientRect(); return { c, l: r.left, r: r.right, t: r.top, b: r.bottom, cx: r.left + r.width / 2, cy: r.top + r.height / 2, h: r.height }; };
+  const all = list.map(box), o = all.find((x) => x.c === from), rest = all.filter((x) => x !== o);
+  const near = (cands, score) => cands.reduce((best, x) => (!best || score(x) < score(best) ? x : best), null)?.c;
+  if (key === 'ArrowRight' || key === 'ArrowLeft') {
+    const d = key === 'ArrowRight' ? 1 : -1;
+    const side = rest.filter((x) => (d > 0 ? x.l >= o.r - 4 : x.r <= o.l + 4) && Math.abs(x.cy - o.cy) <= Math.max(120, (o.h + x.h) / 2));
+    if (side.length) return near(side, (x) => Math.abs(x.cx - o.cx) + 2 * Math.abs(x.cy - o.cy));
+    // 줄 바꿈: 칸 안에 위아래로 붙어 쌓인 카드(틈 14px 안 · 가로로 겹침)는 맨 위 카드의 줄(row)로 친다 — 아니면 쌓인 아래 카드를
+    // '다음 줄'로 보아 마지막 카드에서 → 가 처음으로 안 돌아가고 옆 칸의 아래 카드로 갔다
+    for (const x of [...all].sort((p, q) => p.t - q.t)) {
+      const up = all.find((y) => y !== x && y.b <= x.t + 2 && x.t - y.b < 14 && y.r > x.l && y.l < x.r);
+      x.row = up ? up.row : x.t;
+    }
+    const rows = rest.filter((x) => (d > 0 ? x.row > o.row + 4 : x.row < o.row - 4)); // 아랫줄 맨 앞 · 윗줄 맨 끝(쌓인 칸은 맨 위 카드)
+    const pick = (cands) => near(cands, (x) => (d > 0 ? x.row * 1e4 + x.l * 10 + x.t / 100 : -x.row * 1e4 - x.r * 10 + x.t / 100));
+    return (rows.length ? pick(rows) : pick(all.filter((x) => (d > 0 ? x.row === Math.min(...all.map((y) => y.row)) : x.row === Math.max(...all.map((y) => y.row)))))) || from; // 끝 → 반대쪽 끝 줄
   }
-  return best;
+  const d = key === 'ArrowDown' ? 1 : -1;
+  const col = rest.filter((x) => (x.cy - o.cy) * d > 4 && x.r > o.l && x.l < o.r);
+  return near(col, (x) => Math.abs(x.cx - o.cx) + Math.abs(x.cy - o.cy)) || from;
 }
-const KBD_ARROWS = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: 2, ArrowUp: -2 };
-window.addEventListener('keydown', (e) => {
-  const dir = KBD_ARROWS[e.key];
-  if (!dir || !e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
-  if (!$('#ask-modal').hidden) return; // 확인창이 떠 있는 동안은 움직이지 않는다
-  const list = kbdCards();
-  if (!list.length) return;
-  // 좌우는 브라우저의 뒤로 · 앞으로 키이기도 하다 — 막아야 페이지가 넘어가지 않는다
-  e.preventDefault(); e.stopPropagation();
-  if (!cardKbdId) cardKbdBack = document.activeElement;
-  const from = list.findIndex((c) => kbdKey(c) === (cardKbdId || selected));
-  let next;
-  if (from < 0) next = dir > 0 ? list[0] : list.at(-1);
-  else if (Math.abs(dir) === 1) next = list[(from + dir + list.length) % list.length];
-  else next = kbdVertical(list, list[from], Math.sign(dir)) || list[from];
-  kbdPick(next);
-}, true);
+// 확인창을 취소했을 때 — 그 카드에 커서를 다시 켠다(이어서 이동 · Esc). 카드가 사라졌으면 원래 자리로
+function kbdResume(key, back) {
+  const c = kbdCards().find((x) => kbdKey(x) === key);
+  if (c) { kbdPick(c); cardKbdBack = back; } else if (back?.isConnected) back.focus?.();
+}
 // 대기실 카드 투입 — 마우스 ▶ 와 같은 지난 세션 이어서(launchProfile 이 새 워커를 열어 준다)
 async function kbdLaunch(c) {
-  const name = c.dataset.profile, back = cardKbdBack;
-  kbdDone(c, false);
+  const name = c.dataset.profile, key = kbdKey(c), back = kbdOff();
   if (await ask({ title: _t('"{name}" 를 투입할까요?', { name }), body: _t('대기실의 이 역할로 Claude 를 시작합니다. 지난 세션이 있으면 이어서 시작해요.'), ok: _t('투입') })) launchProfile(name, false);
-  else kbdKeep(c, back); // 취소 — 그 카드를 계속 고른 채로
+  else kbdResume(key, back);
 }
-document.addEventListener('keydown', (e) => {
-  const c = e.target.closest?.('.kbd-focus');
-  if (!c || e.isComposing || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+window.addEventListener('keydown', (e) => {
+  if (!$('#ask-modal').hidden) return; // 확인창이 떠 있으면 확인창이 받는다
+  const arrow = e.key.startsWith('Arrow');
+  if (arrow && e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+    const list = kbdCards();
+    if (!list.length) return;
+    e.preventDefault(); e.stopPropagation(); // 좌우는 브라우저 뒤로 · 앞으로 키이기도 하다
+    const cur = kbdCard() || list.find((c) => kbdKey(c) === selected);
+    kbdPick(cur ? kbdNext(list, cur, e.key) : (e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? list.at(-1) : list[0]));
+    return;
+  }
+  if (!cardKbdId || e.isComposing || ['Alt', 'Control', 'Shift', 'Meta'].includes(e.key)) return;
+  const c = kbdCard();
+  if (!c) return void kbdOff();
+  const plain = !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey;
   const socket = c.classList.contains('socket');
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    if (socket) return kbdLaunch(c);
-    kbdDone(c, false);
+  const stop = () => { e.preventDefault(); e.stopPropagation(); };
+  if (plain && e.key === 'Escape') { stop(); kbdOff(true); }
+  else if (plain && e.key === 'Enter') {
+    stop();
+    if (socket) return void kbdLaunch(c);
+    kbdOff();
     if (c.dataset.id === selected && !$('#detail').hidden) chatOpen ? chatForm.text.focus() : term.focus(); // 이미 열린 워커 — 입력하던 곳으로
     else {
       select(c.dataset.id);
       // select 는 채팅이면 입력칸에 포커스를 주지만 터미널이면 그대로 둔다 — 키보드로 열었으니 바로 칠 수 있게 터미널로(select 의 rAF 뒤에)
       if (!chatOpen && !TOUCH) requestAnimationFrame(() => requestAnimationFrame(() => term.focus()));
     }
-  } else if (e.key === 'ArrowUp') {
-    e.preventDefault();
-    if (socket) return toast(_t('이미 대기실에 있는 카드예요'), 2000);
+  } else if (plain && e.key === 'ArrowUp') {
+    stop();
+    if (socket) return void toast(_t('이미 대기실에 있는 카드예요'), 2000);
     const w = state.workers.find((x) => x.id === c.dataset.id);
-    if (!w || w.status === 'exited') return toast(_t('이미 끝난 세션이에요'), 2000);
-    const back = cardKbdBack;
-    kbdDone(c, false);
-    endSession(c).then((ok) => ok ? back?.isConnected && back.focus?.() : kbdKeep(c, back));
-  } else if (e.key === 'ArrowDown') {
-    e.preventDefault();
-    if (!socket) return toast(_t('투입은 대기실 카드에서만 돼요'), 2000);
+    if (!w || w.status === 'exited') return void toast(_t('이미 끝난 세션이에요'), 2000);
+    const key = kbdKey(c), back = kbdOff();
+    endSession(c).then((ok) => (ok ? back?.isConnected && back.focus?.() : kbdResume(key, back)));
+  } else if (plain && e.key === 'ArrowDown') {
+    stop();
+    if (!socket) return void toast(_t('투입은 대기실 카드에서만 돼요'), 2000);
     kbdLaunch(c);
-  } else if (e.key === 'Escape') {
-    e.preventDefault();
-    kbdDone(c);
-  }
-});
-document.addEventListener('focusout', (e) => { if (e.target.classList?.contains('kbd-focus')) e.target.classList.remove('kbd-focus'); });
-// 다른 곳(입력칸 · 버튼 · 마우스 클릭)으로 옮겨 가면 고르던 것을 끝낸다
-document.addEventListener('focusin', (e) => { if (cardKbdId && !e.target.classList?.contains('kbd-focus')) cardKbdId = cardKbdBack = null; });
+  } else if (arrow && plain) stop(); // ← → 는 커서 모드에서 아무것도 안 한다(페이지 스크롤 · 터미널로 새지 않게)
+  else kbdOff(true); // 그 밖의 키 — 커서를 끄고 원래 자리로 돌아가 그 키가 그대로 들어가게
+}, true);
+// 마우스로 아무 곳이나 누르면 커서 모드를 끈다(클릭은 그대로). 창을 떠나도(Alt+Tab 등)
+document.addEventListener('pointerdown', () => { if (cardKbdId) kbdOff(); }, true);
+addEventListener('blur', () => { if (cardKbdId) kbdOff(); });
 
 const FLOOR_MIN_KEY = 'am.floorMin';
 // 최소화/펼치기 연출 — 판이 위로 접히며(카드는 차례로 살짝 떠오르며 흐려짐) 높이가 줄고, 칩 줄이 헤더 아래에서 내려온다.

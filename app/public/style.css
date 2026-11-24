@@ -3022,6 +3022,14 @@ body.term-full #detail.chat-mode { --full-side-w: 0px; }
 @keyframes mgr-idle { from { transform: none; } to { transform: translateY(-6px); } }
 @media (prefers-reduced-motion: reduce) { .core-dot .core-mark { animation: none !important; } }
 
-/* 키보드로 고른 워커 카드(Alt+방향키) — Enter 열기, ↑ 대기, ↓ 투입 */
+/* 키보드로 고른 워커 카드(Alt+방향키) — 커서 모드 동안 카드판 밖은 어둡게(구멍 뚫린 그림자), 카드 옆에 키 안내. 확인 창(200) · 토스트(400) 아래 */
 .node.kbd-focus, .dchip.kbd-focus { outline: 2px solid var(--accent); outline-offset: 3px; }
 .node:focus:not(.kbd-focus), .dchip:focus:not(.kbd-focus) { outline: none; }
+.kbd-dim { position: fixed; inset: 0; z-index: 150; pointer-events: none; }
+.kbd-dim i { position: fixed; background: rgb(0 0 0 / .62); }
+/* 스크롤해 카드로 갈 때 상단 고정 헤더에 가리지 않게 */
+.node, .dchip { scroll-margin: 72px 0 16px; }
+.kbd-tip { position: fixed; z-index: 160; pointer-events: none; display: flex; flex-wrap: wrap; gap: 4px 12px; max-width: min(420px, calc(100vw - 16px));
+  padding: 6px 10px; border-radius: 8px; background: var(--surface-3); color: var(--text); border: 1px solid rgb(var(--ink) / .14);
+  box-shadow: 0 6px 20px rgb(0 0 0 / .35); font-size: 12px; line-height: 1.5; white-space: nowrap; }
+.kbd-tip kbd { font: inherit; font-size: 11px; padding: 0 5px; margin-right: 4px; border-radius: 4px; border: 1px solid rgb(var(--ink) / .2); background: rgb(var(--ink) / .06); }
