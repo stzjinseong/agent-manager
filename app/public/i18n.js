@@ -771,6 +771,12 @@ const EN = {
   '그 시각에 워커나 서버가 꺼져 있었으면 워커가 다시 뜰 때 넣어요 (24시간까지)': 'If the worker or server was off at that time, it runs when the worker is back (up to 24h)',
   '그 시각에 워커나 서버가 꺼져 있었으면 그 회차는 넘어가요': 'If the worker or server was off at that time, that run is skipped',
   '이 PC 시각 기준 · 클로드 키우기가 켜져 있을 때만 돌아요 · 작업 중이면 턴이 끝난 뒤 · 5시간 한도 90% 이상이면 건너뜀 · CLI 입력창이 막혀 있으면 1분마다 다시(10번)': "This PC's clock · runs only while the dashboard is on · queued if the worker is busy · skipped at 90%+ 5-hour usage · retried every minute (10×) if the CLI input is blocked", '예약': 'Schedule',
+  // 워커 카드 키보드 이동(Alt+방향키)
+  '워커 카드 고르기': 'Pick a worker card', '이동': 'Move', '열기': 'Open', '대기로': 'Send to lounge',
+  '이미 대기실에 있는 카드예요': 'This card is already in the lounge', '이미 끝난 세션이에요': 'This session has already ended',
+  '투입은 대기실 카드에서만 돼요': 'Only lounge cards can be launched',
+  '"{name}" 를 투입할까요?': 'Launch "{name}"?',
+  '대기실의 이 역할로 Claude 를 시작합니다. 지난 세션이 있으면 이어서 시작해요.': 'Starts Claude with this lounge role. Resumes the last session if there is one.',
 };
 const DICTS = { en: EN };
 // 서버가 만든 한국어 문구(타임라인 기록·알림·오류) — 서버는 언어를 모르니 화면에서 바꾼다. 이미 저장된 예전 기록에도 그대로 통한다.

@@ -1798,44 +1798,61 @@ const kbdDim = document.body.appendChild(el('<div class="kbd-dim" hidden><i></i>
 const kbdTip = document.body.appendChild(el('<div class="kbd-tip" hidden></div>'));
 function kbdTipHtml(c) {
   const k = (keys, text) => `<span><kbd>${keys}</kbd>${text}</span>`;
+  if (!c) return k('Alt + ←→↑↓', _t('워커 카드 고르기'));
   const socket = c.classList.contains('socket');
-  return [k('Alt+←→↑↓', _t('이동')), socket ? k('Enter / ↓', _t('투입')) : k('Enter', _t('열기')), socket ? '' : k('↑', _t('대기로')), k('Esc', _t('취소'))].join('');
+  return [k('Alt + ←→↑↓', _t('이동')), socket ? k('Enter / ↓', _t('투입')) : k('Enter', _t('열기')), socket ? '' : k('↑', _t('대기로')), k('Esc', _t('취소'))].join('');
+}
+// Alt 만 누르고 있어도 카드판을 강조하고 고르는 법을 띄운다(잠깐 눌렀다 떼거나 Alt+다른 키 조합이면 띄우지 않게 조금 기다린다)
+const KBD_ALT_MS = 250;
+let kbdAlt = false, kbdAltTimer = 0;
+function kbdShow() {
+  document.body.classList.add('kbd-mode');
+  kbdDim.hidden = kbdTip.hidden = false;
+  if (!kbdRaf) kbdFrame();
+}
+function kbdAltEnd() {
+  clearTimeout(kbdAltTimer); kbdAltTimer = 0;
+  const was = kbdAlt;
+  kbdAlt = false;
+  if (was && !cardKbdId) kbdOff();
+  return was;
 }
 // 커서 모드 동안 매 프레임: 카드가 다시 그려져도 표시를 다시 붙이고, 딤드 구멍 · 키 안내 위치를 맞춘다
 function kbdFrame() {
   kbdRaf = 0;
-  if (!cardKbdId) return;
-  const c = kbdCard();
-  if (!c) return void kbdOff(true); // 카드가 사라졌다(종료 · 제거) — 커서를 끈다
+  if (!cardKbdId && !kbdAlt) return;
+  const c = cardKbdId ? kbdCard() : null;
+  if (cardKbdId && !c) return void kbdOff(true); // 카드가 사라졌다(종료 · 제거) — 커서를 끈다
   document.querySelectorAll('.kbd-focus').forEach((x) => x !== c && x.classList.remove('kbd-focus'));
-  if (!c.classList.contains('kbd-focus')) c.classList.add('kbd-focus');
+  if (c && !c.classList.contains('kbd-focus')) c.classList.add('kbd-focus');
   const area = ($('#floor').hidden ? $('#dock') : $('#floor')).getBoundingClientRect();
   const [t, b, l, r2] = kbdDim.children, top = Math.max(0, area.top), bot = Math.min(innerHeight, area.bottom);
   Object.assign(t.style, { left: 0, top: 0, width: '100%', height: `${top}px` });
   Object.assign(b.style, { left: 0, top: `${bot}px`, width: '100%', height: `${Math.max(0, innerHeight - bot)}px` });
   Object.assign(l.style, { left: 0, top: `${top}px`, width: `${Math.max(0, area.left)}px`, height: `${Math.max(0, bot - top)}px` });
   Object.assign(r2.style, { left: `${area.right}px`, top: `${top}px`, width: `${Math.max(0, innerWidth - area.right)}px`, height: `${Math.max(0, bot - top)}px` });
-  const r = c.getBoundingClientRect(), html = kbdTipHtml(c);
+  const html = kbdTipHtml(c);
   if (kbdTip.dataset.html !== html) { kbdTip.innerHTML = html; kbdTip.dataset.html = html; }
   const tw = kbdTip.offsetWidth, th = kbdTip.offsetHeight;
-  const below = r.bottom + 8 + th <= innerHeight;
-  kbdTip.style.left = `${Math.max(8, Math.min(innerWidth - tw - 8, r.left + r.width / 2 - tw / 2))}px`;
-  kbdTip.style.top = `${below ? r.bottom + 8 : Math.max(8, r.top - th - 8)}px`;
+  kbdTip.style.left = `${Math.max(8, Math.min(innerWidth - tw - 8, area.left + area.width / 2 - tw / 2))}px`;
+  kbdTip.style.top = `${Math.max(8, Math.min(innerHeight - th - 16, area.bottom + 12))}px`;
   kbdRaf = requestAnimationFrame(kbdFrame);
 }
 function kbdPick(c) {
-  if (!cardKbdId) { cardKbdBack = document.activeElement; document.body.classList.add('kbd-mode'); kbdDim.hidden = kbdTip.hidden = false; }
+  if (!cardKbdId) cardKbdBack = document.activeElement;
   cardKbdId = kbdKey(c);
+  kbdShow();
   c.tabIndex = -1;
   c.focus({ preventScroll: true }); // 글자가 입력칸으로 새지 않게(포커스를 잃어도 커서 모드는 cardKbdId 로 유지)
   c.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-  cancelAnimationFrame(kbdRaf);
+  cancelAnimationFrame(kbdRaf); kbdRaf = 0;
   kbdFrame();
 }
 // 커서 모드를 끈다. restore 면 커서를 켜기 전 자리로 포커스를 돌려준다. 그 자리를 돌려준다
 function kbdOff(restore = false) {
   const back = cardKbdBack;
   cardKbdId = cardKbdBack = null;
+  if (kbdAlt) return back; // Alt 를 아직 누르고 있다 — 강조는 남기고 커서만 끈다(떼면 꺼진다)
   cancelAnimationFrame(kbdRaf); kbdRaf = 0;
   document.querySelectorAll('.kbd-focus').forEach((x) => x.classList.remove('kbd-focus'));
   document.body.classList.remove('kbd-mode');
@@ -1883,6 +1900,11 @@ async function kbdLaunch(c) {
 }
 window.addEventListener('keydown', (e) => {
   if (!$('#ask-modal').hidden) return; // 확인창이 떠 있으면 확인창이 받는다
+  if (e.key === 'Alt') {
+    if (!e.repeat && !e.ctrlKey && !e.metaKey && !e.shiftKey && !kbdAltTimer && !kbdAlt) kbdAltTimer = setTimeout(() => { kbdAltTimer = 0; kbdAlt = true; kbdShow(); }, KBD_ALT_MS);
+    return;
+  }
+  if (!e.key.startsWith('Arrow') || !e.altKey) { clearTimeout(kbdAltTimer); kbdAltTimer = 0; if (kbdAlt && !e.altKey) kbdAltEnd(); } // Alt+다른 키 조합은 강조하지 않는다
   const arrow = e.key.startsWith('Arrow');
   if (arrow && e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
     const list = kbdCards();
@@ -1925,7 +1947,12 @@ window.addEventListener('keydown', (e) => {
 }, true);
 // 마우스로 아무 곳이나 누르면 커서 모드를 끈다(클릭은 그대로). 창을 떠나도(Alt+Tab 등)
 document.addEventListener('pointerdown', () => { if (cardKbdId) kbdOff(); }, true);
-addEventListener('blur', () => { if (cardKbdId) kbdOff(); });
+addEventListener('blur', () => { kbdAltEnd(); if (cardKbdId) kbdOff(); });
+// Alt 를 떼면 강조를 끈다(Alt+방향키로 고른 커서는 남는다). 강조를 띄웠을 때는 떼는 키를 막아 브라우저 메뉴로 포커스가 가지 않게
+window.addEventListener('keyup', (e) => {
+  if (e.key !== 'Alt') return;
+  if (kbdAltEnd() || cardKbdId) e.preventDefault();
+}, true);
 
 const FLOOR_MIN_KEY = 'am.floorMin';
 // 최소화/펼치기 연출 — 판이 위로 접히며(카드는 차례로 살짝 떠오르며 흐려짐) 높이가 줄고, 칩 줄이 헤더 아래에서 내려온다.
