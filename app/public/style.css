@@ -2757,6 +2757,20 @@ button.cv-more:hover { color: var(--text); }
 .cv-md code { font-family: var(--mono); font-size: 12px; background: var(--surface-2); border: 1px solid var(--line); padding: 0 4px; border-radius: 4px; }
 .cv-md pre { font-family: var(--mono); font-size: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; overflow-x: auto; color: var(--text-2); }
 .cv-md pre code { background: none; border: 0; padding: 0; }
+/* 복사 버튼 — 코드 블록 우상단 · 답 이름줄 오른쪽 · 계획 질문줄 오른쪽. 마우스를 올렸을 때만(터치 화면은 항상) */
+.cv-copy { display: inline-grid; place-items: center; width: 24px; height: 24px; padding: 0; border-radius: 6px; cursor: pointer;
+  background: var(--surface-2); color: var(--dim); border: 1px solid var(--line); opacity: 0; transition: opacity .12s, color .12s; }
+.cv-copy svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.cv-copy:hover, .cv-copy:focus-visible { color: var(--text); opacity: 1; }
+.cv-copy.done { color: var(--accent-hi); opacity: 1; }
+.cv-codebox { position: relative; margin: 6px 0; }
+.cv-codebox > pre { margin: 0; }
+.cv-codebox > .cv-copy { position: absolute; top: 6px; right: 6px; z-index: 1; }
+.cv-codebox:hover > .cv-copy, .cv-a:hover .cv-lab > .cv-copy, .cv-plan:hover .cv-q > .cv-copy { opacity: 1; }
+.cv-a .cv-lab { display: flex; align-items: center; min-height: 24px; }
+.cv-lab > .cv-copy, .cv-q > .cv-copy { margin-left: auto; }
+.cv-plan .cv-q { display: flex; align-items: center; gap: 8px; }
+@media (hover: none) { .cv-copy { opacity: .8; } }
 .cv-md table { border-collapse: collapse; font-size: 12.5px; display: block; overflow-x: auto; }
 .cv-md :is(th, td) { border: 1px solid var(--line-2); padding: 3px 8px; text-align: left; }
 .cv-md a { color: var(--accent-hi); }

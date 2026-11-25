@@ -5376,9 +5376,48 @@ function chatMdParse(text) {
   } });
   return chatMarked.parse(text);
 }
+// ---------- 복사 버튼(코드 블록 · 답 한 덩어리 · 계획) ----------
+// 길게 뽑은 프롬프트 · 문서를 끝까지 드래그하지 않고 한 번에 복사한다. 코드 블록 = 블록 안 글 그대로, 답 = 마크다운 원문(chatData.items),
+// 계획 = 계획 원문. 버튼은 마우스를 올렸을 때만 보인다(터치 화면은 항상)
+const COPY_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M3.5 10.5h-.5a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h6.5a1 1 0 0 1 1 1v.5"/></svg>';
+const COPIED_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5"/></svg>';
+const copyBtn = (kind, tip) => `<button type="button" class="cv-copy" data-copy="${kind}" title="${esc(tip)}" aria-label="${esc(tip)}">${COPY_SVG}</button>`;
+// 클립보드 API 는 https · localhost 에서만 있다 — 폰에서 http://PC주소 로 열면 없어서 예전 방식(execCommand)으로 복사한다
+async function copyText(text) {
+  try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); return true; } } catch {}
+  const ta = Object.assign(document.createElement('textarea'), { value: text, readOnly: true });
+  Object.assign(ta.style, { position: 'fixed', top: '0', left: '0', opacity: '0' });
+  const back = document.activeElement;
+  document.body.append(ta);
+  ta.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch {}
+  ta.remove();
+  back?.focus?.({ preventScroll: true });
+  return ok;
+}
+let planCopyText = '';
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest?.('.cv-copy');
+  if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  let text = '';
+  if (b.dataset.copy === 'code') text = b.parentElement.querySelector('pre')?.textContent.replace(/\n$/, '') || '';
+  else if (b.dataset.copy === 'msg') {
+    const seqs = new Set([...b.closest('.cv-ev').querySelectorAll('.cv-ai[data-seq]')].map((x) => Number(x.dataset.seq)));
+    text = chatData.items.filter((x) => x.k === 'a' && seqs.has(x.seq)).map((x) => x.text.trim()).join('\n\n');
+  } else if (b.dataset.copy === 'plan') text = planCopyText;
+  if (!text) return;
+  if (!(await copyText(text))) return void toast(_t('복사하지 못했습니다'), 2500);
+  b.innerHTML = COPIED_SVG; b.classList.add('done');
+  clearTimeout(b._t); b._t = setTimeout(() => { b.innerHTML = COPY_SVG; b.classList.remove('done'); }, 1200);
+  toast(_t('복사했습니다'), 1200);
+}, true);
+// 코드 블록마다 우상단 복사 버튼 — 정리(DOMPurify)를 마친 HTML 에 붙인다(버튼 · 감싸개는 우리가 만든 고정 마크업)
+const withCodeCopy = (html) => html.includes('<pre') ? html.replace(/<pre\b/g, `<div class="cv-codebox">${copyBtn('code', _t('코드 복사'))}<pre`).replace(/<\/pre>/g, '</pre></div>') : html;
 function chatMd(text) {
   if (window.marked && window.DOMPurify) {
-    try { return `<div class="cv-md">${DOMPurify.sanitize(chatMdParse(text), { ADD_ATTR: ['data-cv-img'] })}</div>`; } catch {}
+    try { return `<div class="cv-md">${withCodeCopy(DOMPurify.sanitize(chatMdParse(text), { ADD_ATTR: ['data-cv-img'] }))}</div>`; } catch {}
   }
   return `<div class="cv-md cv-plain">${esc(text)}</div>`;
 }
@@ -5644,7 +5683,7 @@ function chatBlocks(items, limit = Infinity) {
       return `<div class="cv-ev cv-t"><span class="cv-dot"></span><div class="cv-body"><div class="cv-chips">${shown.map(chatChip).join('')}${more}</div>${chatShots(b.list)}</div></div>`;
     }
     if (b.k === 'd') return `<div class="cv-ev cv-d"><span class="cv-dot"></span><div class="cv-body"><div class="cv-lab"><b>${_t('📄 결과물')}</b>${chatTime(b.list.at(-1).t)}</div><div class="cv-docs">${b.list.map(docCard).join('')}</div></div></div>`;
-    if (b.k === 'a') return `<div class="cv-ev cv-a"><span class="cv-dot"></span><div class="cv-body"><div class="cv-lab"><b>${_t('클로드')}</b>${chatTime(b.list[0].ts)}</div>${b.list.map((x) => `<div class="cv-ai" data-seq="${x.seq}">${chatPathLinks(chatItemHtml(x))}</div>`).join('')}</div></div>`;
+    if (b.k === 'a') return `<div class="cv-ev cv-a"><span class="cv-dot"></span><div class="cv-body"><div class="cv-lab"><b>${_t('클로드')}</b>${chatTime(b.list[0].ts)}${copyBtn('msg', _t('답 전체 복사'))}</div>${b.list.map((x) => `<div class="cv-ai" data-seq="${x.seq}">${chatPathLinks(chatItemHtml(x))}</div>`).join('')}</div></div>`;
     return chatItemHtml(b.x);
   }).join('');
 }
@@ -5998,7 +6037,8 @@ function renderAsk(w) {
 // 계획 승인 카드(plan mode 끝 — ExitPlanMode). 승인 · 고칠 점을 적어 수정 요청(클로드가 계획을 다시 쓴다) · CLI 에서 고르기(진행 방식 고르기 등)
 function renderPlanAsk(box, q) {
   askState = { id: q.id, kind: 'plan' };
-  box.innerHTML = `<div class="cv-ask-card cv-plan"><div class="cv-q">${_t('이 계획대로 진행할까요?')}</div>
+  planCopyText = q.plan || '';
+  box.innerHTML = `<div class="cv-ask-card cv-plan"><div class="cv-q">${_t('이 계획대로 진행할까요?')}${planCopyText ? copyBtn('plan', _t('계획 복사')) : ''}</div>
     <div class="cv-plan-body">${chatMd(q.plan || '')}</div>
     <textarea class="cv-other cv-plan-fb" rows="2" placeholder="${esc(_t('고칠 점 — 적고 수정 요청 (Ctrl+Enter)'))}"></textarea>
     <div class="cv-btns"><button type="button" class="cv-yes" data-plan="approve">${_t('승인')}</button><button type="button" data-plan="revise" disabled>${_t('수정 요청')}</button><button type="button" data-ask="cli">${_t('CLI 에서 고르기')}</button></div></div>`;
