@@ -6842,16 +6842,39 @@ function histFill() {
   ta.dispatchEvent(new Event('input', { bubbles: true })); // 크기 · 첨부 · / 목록이 새 글에 맞게
   ta.focus();
 }
+// 입력칸의 글자 자리 idx 가 화면에서 몇 번째 줄 높이인지(px) — 입력칸과 같은 글꼴 · 너비 · 줄바꿈의 숨은 거울에 글을 넣고
+// 그 자리에 둔 표시의 높이를 잰다. 줄바꿈 문자가 없어도 너비 때문에 접힌 줄까지 보이는 그대로 센다
+const caretMirror = document.createElement('div');
+const CARET_CSS = ['fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'fontVariant', 'fontStretch', 'fontKerning', 'fontFeatureSettings', 'letterSpacing', 'wordSpacing',
+  'lineHeight', 'textTransform', 'textIndent', 'tabSize', 'wordBreak', 'overflowWrap', 'whiteSpace', 'paddingTop', 'paddingRight', 'paddingLeft', 'direction'];
+function caretTop(ta, idx) {
+  const cs = getComputedStyle(ta), m = caretMirror;
+  if (!m.isConnected) document.body.append(m);
+  for (const p of CARET_CSS) m.style[p] = cs[p];
+  // clientWidth = 안쪽 너비(세로 스크롤 막대 제외) + 좌우 여백 — 글이 실제로 접히는 너비와 같게
+  Object.assign(m.style, { position: 'absolute', visibility: 'hidden', left: '-99999px', top: '0', boxSizing: 'border-box', border: '0', height: 'auto', overflow: 'hidden',
+    width: `${ta.clientWidth}px`, whiteSpace: cs.whiteSpace === 'normal' ? 'pre-wrap' : cs.whiteSpace });
+  const v = ta.value, mark = document.createElement('span');
+  mark.textContent = v.slice(idx) || '.'; // 커서 뒤 글을 표시에 담아 접힘이 입력칸과 같게(끝이면 점 하나)
+  m.textContent = v.slice(0, idx);
+  m.append(mark);
+  return mark.offsetTop;
+}
+// 커서가 화면상 맨 윗줄 · 맨 아랫줄인지(접힌 줄 포함). 반 줄 높이보다 덜 차이 나면 같은 줄
+const caretLineH = (ta) => parseFloat(getComputedStyle(ta).lineHeight) || 16;
+const caretOnFirstLine = (ta) => !ta.value || caretTop(ta, ta.selectionStart) - caretTop(ta, 0) < caretLineH(ta) / 2;
+const caretOnLastLine = (ta) => !ta.value || caretTop(ta, ta.value.length) - caretTop(ta, ta.selectionEnd) < caretLineH(ta) / 2;
 // / 목록 처리보다도 먼저 받는다(목록이 열려 있을 때만 키를 가로챈다)
 chatForm.text.addEventListener('keydown', (e) => {
   if (e.isComposing || e.altKey || e.ctrlKey || e.metaKey) return;
   const ta = chatForm.text, take = () => { e.preventDefault(); e.stopImmediatePropagation(); };
   if (blMenu.open) return blKey(e, take);
   if (!histMenu.open) {
-    // 커서가 첫 줄에 있고 / 목록이 닫혀 있을 때만 — 여러 줄 글에서 ↑ 는 원래대로 윗줄로
-    if (e.key === 'ArrowUp' && !e.shiftKey && !slashMenu.open && !ta.value.slice(0, ta.selectionStart).includes('\n') && histOpen()) take();
-    // 커서가 마지막 줄이면 ↓ = Backlog 꺼내기 목록(↑ 기록과 반대 방향)
-    else if (e.key === 'ArrowDown' && !e.shiftKey && !slashMenu.open && !ta.value.slice(ta.selectionEnd).includes('\n') && blOpen()) take();
+    // 커서가 화면상 맨 윗줄에 있고 / 목록이 닫혀 있을 때만 — 여러 줄 글 · 너비 때문에 접힌 긴 줄에서 ↑ 는 원래대로 윗줄로.
+    // 예전엔 줄바꿈 문자만 봐서 접힌 한 줄 글의 둘째 줄에서도 기록 목록이 떴다
+    if (e.key === 'ArrowUp' && !e.shiftKey && !slashMenu.open && caretOnFirstLine(ta) && histOpen()) take();
+    // 커서가 화면상 맨 아랫줄이면 ↓ = Backlog 꺼내기 목록(↑ 기록과 반대 방향)
+    else if (e.key === 'ArrowDown' && !e.shiftKey && !slashMenu.open && caretOnLastLine(ta) && blOpen()) take();
     return;
   }
   const n = histMenu.items.length;
