@@ -5840,6 +5840,18 @@ $('#cv-list').addEventListener('load', (e) => {
   if (e.target.tagName === 'IMG' && l._atBottom) afterFrame('cv-img', () => { if (l._atBottom) { l._settling = true; l.scrollTop = l.scrollHeight; l._settling = false; } });
 }, true);
 $('#cv-list').addEventListener('scroll', (e) => { if (!e.currentTarget._settling && e.currentTarget.scrollTop < 80) chatShowOlder(); }, { passive: true });
+// Ctrl+↑ ↓ — 채팅 보기가 열려 있으면 대화 목록을 위아래로 스크롤한다(입력칸에서 쓰던 중에도). 꾹 누르면 이어서 움직인다.
+// 다른 입력칸(메모 · 창 안 입력)에 있거나 확인창 · 모달이 떠 있으면 건드리지 않는다
+const CV_KEY_STEP = 0.4; // 한 번에 보이는 높이의 40%
+window.addEventListener('keydown', (e) => {
+  if ((e.key !== 'ArrowUp' && e.key !== 'ArrowDown') || !e.ctrlKey || e.altKey || e.shiftKey || e.metaKey || e.isComposing) return;
+  const list = $('#cv-list');
+  if (!chatOpen || $('#detail').hidden || !list || list.offsetParent === null || document.querySelector('.modal-back:not([hidden]), .shot-view')) return;
+  const a = document.activeElement;
+  if (a && a !== chatForm.text && (a.matches('input, textarea, select, [contenteditable="true"]') || a.closest('.modal-back:not([hidden])'))) return;
+  e.preventDefault(); e.stopPropagation();
+  list.scrollBy({ top: (e.key === 'ArrowUp' ? -1 : 1) * Math.max(60, list.clientHeight * CV_KEY_STEP), behavior: e.repeat ? 'auto' : 'smooth' });
+}, true);
 $('#cv-list').addEventListener('click', (e) => {
   if (e.target.closest('[data-older]')) { chatShowOlder(); return; }
   const chip = e.target.closest('.cv-chip[data-ed]');
