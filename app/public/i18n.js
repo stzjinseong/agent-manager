@@ -479,7 +479,7 @@ const EN = {
   '복사': "Copy",
   '복사했습니다': "Copied",
   '복사하지 못했습니다': "Couldn't copy",
-  '코드 복사': 'Copy code', '답 전체 복사': 'Copy whole reply', '계획 복사': 'Copy plan',
+  '코드 복사': 'Copy code', '답 전체 복사': 'Copy whole reply', '계획 복사': 'Copy plan', '인용 복사': 'Copy quote',
   '프로젝트': 'project',
   '내 명령': 'mine',
   '플러그인': 'plugin',

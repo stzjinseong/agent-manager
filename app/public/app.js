@@ -5403,6 +5403,7 @@ document.addEventListener('click', async (e) => {
   e.preventDefault(); e.stopPropagation();
   let text = '';
   if (b.dataset.copy === 'code') text = b.parentElement.querySelector('pre')?.textContent.replace(/\n$/, '') || '';
+  else if (b.dataset.copy === 'quote') text = b.parentElement.innerText.trim();
   else if (b.dataset.copy === 'msg') {
     const seqs = new Set([...b.closest('.cv-ev').querySelectorAll('.cv-ai[data-seq]')].map((x) => Number(x.dataset.seq)));
     text = chatData.items.filter((x) => x.k === 'a' && seqs.has(x.seq)).map((x) => x.text.trim()).join('\n\n');
@@ -5413,8 +5414,25 @@ document.addEventListener('click', async (e) => {
   clearTimeout(b._t); b._t = setTimeout(() => { b.innerHTML = COPY_SVG; b.classList.remove('done'); }, 1200);
   toast(_t('복사했습니다'), 1200);
 }, true);
-// 코드 블록마다 우상단 복사 버튼 — 정리(DOMPurify)를 마친 HTML 에 붙인다(버튼 · 감싸개는 우리가 만든 고정 마크업)
-const withCodeCopy = (html) => html.includes('<pre') ? html.replace(/<pre\b/g, `<div class="cv-codebox">${copyBtn('code', _t('코드 복사'))}<pre`).replace(/<\/pre>/g, '</pre></div>') : html;
+// 코드 블록 · 인용마다 우상단 복사 버튼 — 정리(DOMPurify)를 마친 HTML 에 붙인다(버튼 · 감싸개는 우리가 만든 고정 마크업).
+// 인용은 바깥 인용에만(안쪽 인용은 바깥 버튼이 함께 복사)
+function withCodeCopy(html) {
+  if (!html.includes('<pre') && !html.includes('<blockquote')) return html;
+  const t = document.createElement('template');
+  t.innerHTML = html;
+  for (const pre of t.content.querySelectorAll('pre')) {
+    const box = document.createElement('div');
+    box.className = 'cv-codebox';
+    pre.replaceWith(box);
+    box.innerHTML = copyBtn('code', _t('코드 복사'));
+    box.append(pre);
+  }
+  for (const q of t.content.querySelectorAll('blockquote')) if (!q.parentElement?.closest('blockquote')) {
+    q.classList.add('cv-quote-box');
+    q.insertAdjacentHTML('afterbegin', copyBtn('quote', _t('인용 복사')));
+  }
+  return t.innerHTML;
+}
 function chatMd(text) {
   if (window.marked && window.DOMPurify) {
     try { return `<div class="cv-md">${withCodeCopy(DOMPurify.sanitize(chatMdParse(text), { ADD_ATTR: ['data-cv-img'] }))}</div>`; } catch {}

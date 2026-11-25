@@ -2766,7 +2766,9 @@ button.cv-more:hover { color: var(--text); }
 .cv-codebox { position: relative; margin: 6px 0; }
 .cv-codebox > pre { margin: 0; }
 .cv-codebox > .cv-copy { position: absolute; top: 6px; right: 6px; z-index: 1; }
-.cv-codebox:hover > .cv-copy, .cv-a:hover .cv-lab > .cv-copy, .cv-plan:hover .cv-q > .cv-copy { opacity: 1; }
+.cv-md blockquote.cv-quote-box { position: relative; padding-right: 36px; }
+.cv-quote-box > .cv-copy { position: absolute; top: 4px; right: 4px; z-index: 1; }
+.cv-codebox:hover > .cv-copy, .cv-quote-box:hover > .cv-copy,.cv-a:hover .cv-lab > .cv-copy, .cv-plan:hover .cv-q > .cv-copy { opacity: 1; }
 .cv-a .cv-lab { display: flex; align-items: center; min-height: 24px; }
 .cv-lab > .cv-copy, .cv-q > .cv-copy { margin-left: auto; }
 .cv-plan .cv-q { display: flex; align-items: center; gap: 8px; }
