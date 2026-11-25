@@ -4036,7 +4036,22 @@ function renderKeysPop() {
     const on = k.id === keySet;
     return `<button class="lang-item keys-item${on ? ' on' : ''}" role="menuitemradio" aria-checked="${on}" data-keys="${k.id}">
       <span class="lang-check" aria-hidden="true">${on ? '✓' : ''}</span><span class="keys-desc"><span>${_t('전송')} <kbd>${k.send}</kbd></span><span>${_t('개행')} <kbd>${k.newline}</kbd></span></span></button>`;
-  }).join('');
+  }).join('') + (TOUCH ? '' : keysGuideHtml());
+}
+// 그 밖의 단축키 안내(고르는 항목이 아닌 읽을거리) — 키 이름은 OS 대로(맥은 ⌥ · ⌘). 새 단축키를 만들면 여기에도 적는다
+function keysGuideHtml() {
+  const mod = IS_MAC ? '⌘' : 'Ctrl', kb = (s) => s.split(' ').map((x) => `<kbd>${x}</kbd>`).join(' ');
+  const rows = [
+    [kb(`${ALT_KEY}+←→↑↓`), _t('워커 카드 고르기')],
+    ['', `${kb('Enter')} ${_t('열기')} · ${kb('↑')} ${_t('대기로')} · ${kb('↓')} ${_t('투입')} · ${kb('Esc')} ${_t('취소')}`],
+    [kb(`${mod}+↑↓`), _t('채팅 대화 스크롤 (꾹 누르면 이어서)')],
+    [`${kb('↑')} ${kb('↓')}`, _t('입력칸 맨 윗줄 · 맨 아랫줄에서 지난 지시 · Backlog 목록')],
+    [kb('/'), _t('채팅 입력칸으로 가기')],
+    [kb('1 2 3'), _t('채팅 글을 드래그한 뒤 물어보기 · 입력칸에 넣기 · 복사')],
+    [kb(`${mod}+${_t('클릭')}`),_t('결과물을 앱이나 새 탭으로 열기')],
+    [kb('← →'), _t('그림 크게 보기에서 옆 그림으로')],
+  ];
+  return `<div class="pop-h">${_t('단축키 안내')}</div><div class="keys-guide">${rows.map(([k, t]) => `<div class="kg-row${k ? '' : ' kg-sub'}"><span class="kg-k">${k}</span><span class="kg-t">${t}</span></div>`).join('')}</div>`;
 }
 function setKeysPop(open) {
   keysPop.hidden = !open;
