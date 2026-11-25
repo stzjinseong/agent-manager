@@ -23,6 +23,9 @@ let ws;
 // 마우스도 있는 기기(터치 노트북·트랙패드 iPad)는 hover 가 있어 데스크톱 방식 그대로
 const TOUCH = matchMedia('(hover: none) and (pointer: coarse)').matches;
 document.documentElement.classList.toggle('touch', TOUCH);
+// 맥: 단축키 안내를 맥 키 이름(⌥ · ⌘)으로 보이고, OS 가 먼저 가져가는 조합(Ctrl+↑↓ = Mission Control 등)은 ⌘ 조합도 받는다
+const IS_MAC = /mac|iphone|ipad/i.test(navigator.userAgentData?.platform || navigator.platform || navigator.userAgent);
+const ALT_KEY = IS_MAC ? '⌥' : 'Alt';
 // 휴대폰 폭: 상세 머리줄이 두 줄(이름 · 버튼)이 되고 미터는 그 아래 한 줄(style.css) — 미터 자리를 재지 않는다(placeMeters)
 const NARROW = matchMedia('(max-width: 640px)');
 
@@ -1798,9 +1801,9 @@ const kbdDim = document.body.appendChild(el('<div class="kbd-dim" hidden><i></i>
 const kbdTip = document.body.appendChild(el('<div class="kbd-tip" hidden></div>'));
 function kbdTipHtml(c) {
   const k = (keys, text) => `<span><kbd>${keys}</kbd>${text}</span>`;
-  if (!c) return k('Alt + ←→↑↓', _t('워커 카드 고르기'));
+  if (!c) return k(`${ALT_KEY} + ←→↑↓`, _t('워커 카드 고르기'));
   const socket = c.classList.contains('socket');
-  return [k('Alt + ←→↑↓', _t('이동')), socket ? k('Enter / ↓', _t('투입')) : k('Enter', _t('열기')), socket ? '' : k('↑', _t('대기로')), k('Esc', _t('취소'))].join('');
+  return [k(`${ALT_KEY} + ←→↑↓`, _t('이동')), socket ? k('Enter / ↓', _t('투입')) : k('Enter', _t('열기')), socket ? '' : k('↑', _t('대기로')), k('Esc', _t('취소'))].join('');
 }
 // Alt 만 누르고 있어도 카드판을 강조하고 고르는 법을 띄운다(잠깐 눌렀다 떼거나 Alt+다른 키 조합이면 띄우지 않게 조금 기다린다)
 const KBD_ALT_MS = 250;
@@ -5840,17 +5843,18 @@ $('#cv-list').addEventListener('load', (e) => {
   if (e.target.tagName === 'IMG' && l._atBottom) afterFrame('cv-img', () => { if (l._atBottom) { l._settling = true; l.scrollTop = l.scrollHeight; l._settling = false; } });
 }, true);
 $('#cv-list').addEventListener('scroll', (e) => { if (!e.currentTarget._settling && e.currentTarget.scrollTop < 80) chatShowOlder(); }, { passive: true });
-// Ctrl+↑ ↓ — 채팅 보기가 열려 있으면 대화 목록을 위아래로 스크롤한다(입력칸에서 쓰던 중에도). 꾹 누르면 이어서 움직인다.
+// Ctrl+↑ ↓(맥은 ⌘+↑ ↓ 도) — 채팅 보기가 열려 있으면 대화 목록을 위아래로 스크롤한다(입력칸에서 쓰던 중에도). 꾹 누르면 이어서 움직인다.
+// 맥은 Ctrl+↑ ↓ 를 OS(Mission Control · 앱 윈도우)가 먼저 가져가 페이지까지 오지 않아 ⌘ 조합을 같이 받는다(Ctrl 은 그 OS 단축키를 끈 사람용으로 남김)
 // 다른 입력칸(메모 · 창 안 입력)에 있거나 확인창 · 모달이 떠 있으면 건드리지 않는다
-const CV_KEY_STEP = 0.4; // 한 번에 보이는 높이의 40%
+const CV_KEY_STEP = 0.2; // 한 번에 보이는 높이의 20%(40% 는 너무 많이 튀었다)
 window.addEventListener('keydown', (e) => {
-  if ((e.key !== 'ArrowUp' && e.key !== 'ArrowDown') || !e.ctrlKey || e.altKey || e.shiftKey || e.metaKey || e.isComposing) return;
+  if ((e.key !== 'ArrowUp' && e.key !== 'ArrowDown') || e.ctrlKey === e.metaKey || (e.metaKey && !IS_MAC) || e.altKey || e.shiftKey || e.isComposing) return;
   const list = $('#cv-list');
   if (!chatOpen || $('#detail').hidden || !list || list.offsetParent === null || document.querySelector('.modal-back:not([hidden]), .shot-view')) return;
   const a = document.activeElement;
   if (a && a !== chatForm.text && (a.matches('input, textarea, select, [contenteditable="true"]') || a.closest('.modal-back:not([hidden])'))) return;
   e.preventDefault(); e.stopPropagation();
-  list.scrollBy({ top: (e.key === 'ArrowUp' ? -1 : 1) * Math.max(60, list.clientHeight * CV_KEY_STEP), behavior: e.repeat ? 'auto' : 'smooth' });
+  list.scrollBy({ top: (e.key === 'ArrowUp' ? -1 : 1) * Math.max(40, list.clientHeight * CV_KEY_STEP), behavior: e.repeat ? 'auto' : 'smooth' });
 }, true);
 $('#cv-list').addEventListener('click', (e) => {
   if (e.target.closest('[data-older]')) { chatShowOlder(); return; }
