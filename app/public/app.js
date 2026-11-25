@@ -5854,8 +5854,32 @@ window.addEventListener('keydown', (e) => {
   const a = document.activeElement;
   if (a && a !== chatForm.text && (a.matches('input, textarea, select, [contenteditable="true"]') || a.closest('.modal-back:not([hidden])'))) return;
   e.preventDefault(); e.stopPropagation();
-  list.scrollBy({ top: (e.key === 'ArrowUp' ? -1 : 1) * Math.max(40, list.clientHeight * CV_KEY_STEP), behavior: e.repeat ? 'auto' : 'smooth' });
+  const dir = e.key === 'ArrowUp' ? -1 : 1;
+  if (!e.repeat) { cvHoldStop(); list.scrollBy({ top: dir * Math.max(40, list.clientHeight * CV_KEY_STEP), behavior: 'smooth' }); return; }
+  // 꾹 누름: 키 반복(초당 30번 남짓 · 띄엄띄엄)마다 끊어 옮기면 덜컥거려, 매 프레임 일정한 속도로 흐르게 한다
+  cvHold.last = performance.now();
+  if (cvHold.raf && cvHold.dir === dir) return;
+  cvHoldStop();
+  Object.assign(cvHold, { dir, list, t0: cvHold.last, prev: cvHold.last, raf: requestAnimationFrame(cvHoldFrame) });
 }, true);
+// 꾹 누름 연속 스크롤 — 처음 0.25초는 천천히 출발해 속도를 올리고(초당 보이는 높이의 1.2배), 키를 떼면 멈춘다.
+// 맥은 ⌘ 를 누른 동안 다른 키의 keyup 이 오지 않아, 키 반복이 0.25초 끊기면 뗀 것으로 본다(Ctrl · ⌘ 를 먼저 떼도 같음)
+const cvHold = { raf: 0, dir: 0, list: null, t0: 0, prev: 0, last: 0 };
+const CV_HOLD_SPEED = 1.2, CV_HOLD_EASE = 250, CV_HOLD_GAP = 250;
+function cvHoldStop() { cancelAnimationFrame(cvHold.raf); cvHold.raf = 0; }
+function cvHoldFrame(now) {
+  const { list, dir } = cvHold;
+  if (now - cvHold.last > CV_HOLD_GAP || !list?.isConnected || !chatOpen) return cvHoldStop();
+  const dt = Math.min(50, now - cvHold.prev), ramp = Math.min(1, (now - cvHold.t0) / CV_HOLD_EASE);
+  cvHold.prev = now;
+  const before = list.scrollTop;
+  list.scrollTop = before + dir * Math.max(300, list.clientHeight * CV_HOLD_SPEED) * (dt / 1000) * ramp * ramp;
+  // 끝에 닿았다 — 멈춘다(맨 위면 스크롤 처리기가 지난 대화를 더 불러온다)
+  if (list.scrollTop === before && ramp === 1) return cvHoldStop();
+  cvHold.raf = requestAnimationFrame(cvHoldFrame);
+}
+window.addEventListener('keyup', (e) => { if (cvHold.raf && ['ArrowUp', 'ArrowDown', 'Control', 'Meta'].includes(e.key)) cvHoldStop(); }, true);
+addEventListener('blur', cvHoldStop);
 $('#cv-list').addEventListener('click', (e) => {
   if (e.target.closest('[data-older]')) { chatShowOlder(); return; }
   const chip = e.target.closest('.cv-chip[data-ed]');
