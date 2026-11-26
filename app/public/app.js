@@ -6349,11 +6349,82 @@ async function chatSend(mode) {
     const l = $('#cv-list'); l.scrollTop = l.scrollHeight;
   }
   ta.value = '';
+  draftsSave(); // 보낸 글이 다음에 열 때 초안으로 되살아나지 않게 바로 지운다
   slashClose(); histClose(); // 값만 비우면 input 이 안 나서 / 목록(인자 힌트 · 마우스로 보낸 경우)이 떠 있었다
   chatGrow();
   ta.focus();
 }
 chatForm.onsubmit = (e) => { e.preventDefault(); chatSend('now'); };
+// ---------- 쓰던 글 보관(브라우저가 갑자기 닫혀도) ----------
+// 채팅 입력칸의 워커별 초안(chatDrafts + 지금 입력칸)과 Backlog 메모 입력칸을 IndexedDB(am-drafts)에 둔다.
+// localStorage 는 Chrome 이 몇 초씩 모았다가 디스크에 써서 브라우저가 강제 종료되면 마지막 몇 초가 사라졌다(실측: 0.7초 뒤 종료 시 유실,
+// 6.5초 뒤는 남음). IndexedDB 는 저장이 끝났다고 알리기 전에 디스크에 기록한다(durability strict). IndexedDB 를 못 쓰면 localStorage 로.
+// 입력이 0.4초 멈추면 한 번만 쓰고(글자마다 쓰지 않는다), 탭을 숨기거나 닫을 때는 바로 쓴다. 바뀐 게 없으면 쓰지 않는다.
+// 다시 열면 불러와 그 워커를 열 때 입력칸에 나온다. 7일 지난 것 · 없어진 워커 것은 지우고 최대 50개만 둔다.
+// 둘 다 못 쓰는 환경(Safari 개인 정보 보호 창 등)이면 조용히 건너뛴다 — 초안 기억은 메모리로 그대로 된다
+const DRAFT_KEY = 'am.drafts', DRAFT_TTL = 7 * 864e5, DRAFT_MAX = 50, DRAFT_WAIT = 400;
+const draftAt = new Map(), draftSeen = new Map(); // 워커 id → 마지막으로 바뀐 시각 · 그때 글(값이 실제로 바뀔 때만 시각을 올린다)
+let draftsJson = '', draftsTimer = 0, memoDraftAt = 0, memoSeen = '';
+const draftDb = new Promise((res) => {
+  try {
+    const r = indexedDB.open('am-drafts', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('kv');
+    r.onsuccess = () => res(r.result);
+    r.onerror = r.onblocked = () => res(null);
+  } catch { res(null); }
+});
+function draftsWrite(json) {
+  draftDb.then((db) => {
+    if (db) try { const s = db.transaction('kv', 'readwrite', { durability: 'strict' }).objectStore('kv'); json ? s.put(json, 'all') : s.delete('all'); return; } catch {}
+    try { json ? localStorage.setItem(DRAFT_KEY, json) : localStorage.removeItem(DRAFT_KEY); } catch {}
+  });
+}
+function draftsSave() {
+  clearTimeout(draftsTimer); draftsTimer = 0;
+  const now = Date.now(), live = state.workers?.length ? new Set(state.workers.map((w) => w.id)) : null;
+  const all = new Map(chatDrafts);
+  if (draftOwner) { if (chatForm.text.value) all.set(draftOwner, chatForm.text.value); else all.delete(draftOwner); }
+  const chat = {};
+  for (const [id, t] of [...all].map(([id, t]) => [id, t, draftAt.get(id) || now]).sort((a, b) => b[2] - a[2]).slice(0, DRAFT_MAX).map(([id, t]) => [id, t])) {
+    if (live && !live.has(id)) continue;
+    const at = draftAt.get(id) || now;
+    if (now - at < DRAFT_TTL) chat[id] = { t, at };
+  }
+  const memo = memoForm.text.value ? { t: memoForm.text.value, at: memoDraftAt || now } : null;
+  const json = JSON.stringify({ chat, memo });
+  if (json === draftsJson) return;
+  draftsJson = json;
+  draftsWrite(Object.keys(chat).length || memo ? json : '');
+}
+const draftsSaveSoon = () => { clearTimeout(draftsTimer); draftsTimer = setTimeout(draftsSave, DRAFT_WAIT); };
+// 불러오기(비동기 — 보통 워커를 열기 전에 끝난다). 이미 그 워커를 열어 둔 채 입력칸이 비어 있으면 바로 넣는다. 그사이 쓴 글이 있으면 그 글이 이긴다
+draftDb.then(async (db) => {
+  let raw = null;
+  if (db) raw = await new Promise((res) => { try { const q = db.transaction('kv').objectStore('kv').get('all'); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); } catch { res(null); } });
+  if (!raw) try { raw = localStorage.getItem(DRAFT_KEY); } catch {}
+  let d = null;
+  try { d = JSON.parse(raw || 'null'); } catch {}
+  if (!d) return;
+  const now = Date.now();
+  for (const [id, x] of Object.entries(d.chat || {})) {
+    if (!x?.t || now - x.at >= DRAFT_TTL || chatDrafts.has(id)) continue;
+    draftAt.set(id, x.at); draftSeen.set(id, x.t);
+    if (id !== draftOwner) chatDrafts.set(id, x.t);
+    else if (!chatForm.text.value) { chatForm.text.value = x.t; chatGrow(); }
+  }
+  if (d.memo?.t && now - d.memo.at < DRAFT_TTL && !memoForm.text.value) { memoForm.text.value = memoSeen = d.memo.t; memoDraftAt = d.memo.at; autoGrow(memoForm.text); }
+  draftsJson = JSON.stringify(d);
+});
+chatForm.text.addEventListener('input', () => {
+  const v = chatForm.text.value;
+  if (draftOwner && draftSeen.get(draftOwner) !== v) { draftSeen.set(draftOwner, v); draftAt.set(draftOwner, Date.now()); }
+  draftsSaveSoon();
+});
+memoForm.text.addEventListener('input', () => { if (memoSeen !== memoForm.text.value) { memoSeen = memoForm.text.value; memoDraftAt = Date.now(); } draftsSaveSoon(); });
+memoForm.addEventListener('submit', () => queueMicrotask(draftsSave)); // onsubmit 이 칸을 비운 뒤에
+// 탭을 숨기거나(다른 탭 · 최소화 · 맥 ⌘+Tab) 닫을 때는 기다리지 않고 바로. 강제 종료면 마지막 0.4초 안에 친 글자만 잃을 수 있다
+document.addEventListener('visibilitychange', () => { if (document.hidden) draftsSave(); });
+addEventListener('pagehide', draftsSave);
 // 대기 중인 글 빼기 · Backlog 로 — 번호 + 글을 보내 그사이 CLI 로 나갔으면 서버가 거절(409)
 $('#cv-list').addEventListener('click', async (e) => {
   const b = e.target.closest('[data-wq]');
